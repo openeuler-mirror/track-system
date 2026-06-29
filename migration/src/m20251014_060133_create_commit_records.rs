@@ -68,3 +68,38 @@ impl MigrationTrait for Migration {
                     .table(CommitRecords::Table)
                     .col(CommitRecords::CommitSha)
                     .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_commit_status")
+                    .table(CommitRecords::Table)
+                    .col(CommitRecords::SyncStatus)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_commit_type")
+                    .table(CommitRecords::Table)
+                    .col(CommitRecords::ChangeType)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_commit_tracking_sha")
+                    .table(CommitRecords::Table)
+                    .col(CommitRecords::TrackingId)
+                    .col(CommitRecords::CommitSha)
+                    .unique()
+                    .to_owned(),
+            )
+            .await
+    }
