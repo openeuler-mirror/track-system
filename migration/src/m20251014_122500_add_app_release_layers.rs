@@ -504,3 +504,54 @@ CREATE TABLE IF NOT EXISTS backport_candidates (
     patch_artifact TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
+    FOREIGN KEY(package_id) REFERENCES packages(id) ON DELETE CASCADE,
+    FOREIGN KEY(l0_commit_id) REFERENCES l0_commits(id) ON DELETE CASCADE,
+    FOREIGN KEY(target_distro_id) REFERENCES distros(id) ON DELETE CASCADE
+)
+"#;
+        manager
+            .get_connection()
+            .execute(Statement::from_string(backend, create_sql.to_string()))
+            .await?;
+
+        let index_sql = "CREATE INDEX IF NOT EXISTS idx_backport_candidates_pkg_status ON backport_candidates(package_id, status)";
+        manager
+            .get_connection()
+            .execute(Statement::from_string(backend, index_sql.to_string()))
+            .await?;
+
+        Ok(())
+    } else {
+        manager
+            .create_table(
+                Table::create()
+                    .table(BackportCandidates::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(BackportCandidates::Id)
+                            .big_integer()
+                            .not_null()
+                            .auto_increment()
+                            .primary_key(),
+                    )
+                    .col(
+                        ColumnDef::new(BackportCandidates::PackageId)
+                            .integer()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(BackportCandidates::L0CommitId)
+                            .big_integer()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(BackportCandidates::TargetDistroId)
+                            .integer()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(BackportCandidates::SpecBaseVersion)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
