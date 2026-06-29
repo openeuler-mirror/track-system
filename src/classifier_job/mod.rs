@@ -87,3 +87,47 @@ impl<'a> ClassificationJobQueue<'a> {
     }
 
     /// 将任务标记为运行中
+    pub async fn mark_started(&self, job: &sync_jobs::Model) -> Result<sync_jobs::Model> {
+        let mut active: sync_jobs::ActiveModel = job.clone().into();
+        active.status = Set(STATUS_RUNNING.to_string());
+        active.started_at = Set(Some(Utc::now()));
+        active.finished_at = Set(None);
+        active.attempt_count = Set(job.attempt_count + 1);
+        active.updated_at = Set(Utc::now());
+
+        Ok(active.update(self.db).await?)
+    }
+
+    /// 成功结束任务
+    pub async fn mark_succeeded(&self, job: &sync_jobs::Model) -> Result<sync_jobs::Model> {
+        let mut active: sync_jobs::ActiveModel = job.clone().into();
+        active.status = Set(STATUS_SUCCEEDED.to_string());
+        active.finished_at = Set(Some(Utc::now()));
+        active.error = Set(None);
+        active.updated_at = Set(Utc::now());
+
+        Ok(active.update(self.db).await?)
+    }
+
+    /// 任务失败，记录错误信息
+    pub async fn mark_failed(
+        &self,
+        job: &sync_jobs::Model,
+        error: &str,
+    ) -> Result<sync_jobs::Model> {
+        let mut active: sync_jobs::ActiveModel = job.clone().into();
+        active.status = Set(STATUS_FAILED.to_string());
+        active.finished_at = Set(Some(Utc::now()));
+        active.error = Set(Some(error.to_string()));
+        active.updated_at = Set(Utc::now());
+
+        Ok(active.update(self.db).await?)
+    }
+
+    /// 获取下一条待执行任务并标记为运行中
+    pub async fn dequeue(&self) -> Result<Option<sync_jobs::Model>> {
+        let jobs = self.fetch_pending_jobs(1).await?;
+
+        if let Some(job) = jobs.into_iter().next() {
+            let running = self.mark_started(&job).await?;
+            return Ok(Some(running));
