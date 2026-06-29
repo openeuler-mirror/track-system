@@ -118,3 +118,43 @@ getent passwd %{pkg_user} >/dev/null || \
     -c "Track System service user" %{pkg_user}
 
 %post
+# 设置权限
+chown -R %{pkg_user}:%{pkg_group} %{pkg_home}
+chown -R %{pkg_user}:%{pkg_group} %{pkg_data_dir}
+chown -R %{pkg_user}:%{pkg_group} %{pkg_log_dir}
+chown %{pkg_user}:%{pkg_group} %{pkg_config_dir}/track-system.env
+chmod 640 %{pkg_config_dir}/track-system.env
+
+# 重新加载 systemd 配置
+systemctl daemon-reload
+
+# 输出安装完成提示
+echo "========================================"
+echo "Track System RPM 安装完成"
+echo "========================================"
+
+%preun
+# 在卸载前停止服务
+if [ $1 -eq 0 ]; then
+    systemctl stop track-server >/dev/null 2>&1 || true
+    systemctl disable track-server >/dev/null 2>&1 || true
+fi
+
+%postun
+# 删除用户和组（可选，取决于策略）
+# getent passwd %{pkg_user} >/dev/null && userdel -r %{pkg_user}
+
+# 重新加载 systemd 配置
+systemctl daemon-reload >/dev/null 2>&1 || true
+
+%files
+# 指定要打包的文件和目录
+
+# 三个可执行文件
+%{pkg_home}/bin/track-server
+%{pkg_home}/bin/track-cli
+%{pkg_home}/bin/track-collector
+
+# 全局命令符号链接
+%{_bindir}/track-cli
+%{_bindir}/track-collector
