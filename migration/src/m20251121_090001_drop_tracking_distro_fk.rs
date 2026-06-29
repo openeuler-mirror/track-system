@@ -168,3 +168,45 @@ impl MigrationTrait for Migration {
                     )
                     .await?;
 
+                // 迁移数据
+                conn
+                    .execute(Statement::from_string(
+                        backend,
+                        "INSERT INTO tracking_new (id, package_id, distro_id, l1_branch, l1_repo_owner, l1_repo_name, l2_branch, l2_repo_path, tracking_status, last_sync_time, last_l1_commit_sha, last_l2_commit_sha, created_at, updated_at, last_error) SELECT id, package_id, distro_id, l1_branch, l1_repo_owner, l1_repo_name, l2_branch, l2_repo_path, tracking_status, last_sync_time, last_l1_commit_sha, last_l2_commit_sha, created_at, updated_at, last_error FROM tracking;".to_owned(),
+                    ))
+                    .await?;
+
+                // 删除旧表并重命名
+                conn.execute(Statement::from_string(
+                    backend,
+                    "DROP TABLE tracking".to_owned(),
+                ))
+                .await?;
+                conn.execute(Statement::from_string(
+                    backend,
+                    "ALTER TABLE tracking_new RENAME TO tracking".to_owned(),
+                ))
+                .await?;
+
+                // 重新开启外键检查
+                conn.execute(Statement::from_string(
+                    backend,
+                    "PRAGMA foreign_keys=ON".to_owned(),
+                ))
+                .await?;
+            }
+            DatabaseBackend::Postgres => {
+                // 恢复约束（PostgreSQL）
+                manager
+                    .get_connection()
+                    .execute(Statement::from_string(
+                        backend,
+                        "ALTER TABLE tracking ADD CONSTRAINT fk_tracking_distro FOREIGN KEY (distro_id) REFERENCES distros(id) ON DELETE CASCADE".to_owned(),
+                    ))
+                    .await?;
+            }
+            DatabaseBackend::MySql => {
+                // 恢复约束（MySQL）
+                manager
+                    .get_connection()
+                    .execute(Statement::from_string(
