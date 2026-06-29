@@ -14,3 +14,20 @@
 //! 所有命令现在都通过 API 客户端与 track-server 通信
 //! 不再直接连接数据库
 
+// API 客户端命令（新架构）
+pub mod classify_api;
+pub mod compare_api;
+pub mod config_api;
+pub mod distro_api;
+pub mod export_api;
+pub mod health_api;
+pub mod import_api;
+pub mod l0_api;
+pub mod package_api;
+pub mod report_api;
+pub mod server;
+pub mod snapshot_api;
+pub mod status_api;
+pub mod sync_api;
+pub mod tracking_api;
+pub mod workflow_api;
