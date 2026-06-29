@@ -180,3 +180,49 @@ cargo run --bin track-server -- migration up
 ## 项目结构
 
 ```
+track-sys/
+├── src/
+│   ├── bin/              # 二进制程序入口
+│   │   ├── track_server.rs    # 服务端
+│   │   ├── track_cli.rs       # 客户端 CLI
+│   │   └── track-collector.rs # 独立采集器
+│   ├── server/           # 服务器模块 (API, Middleware, Routes)
+│   ├── cli/              # CLI 模块 (Commands, Parser)
+│   ├── collectors/       # 采集器 (GitHub, GitLab, Gitee, Gitea, Local)
+│   ├── scheduler/        # 调度器 (Pipeline, Executors)
+│   ├── diff/             # 对比引擎 (L1 vs L0, L2 vs L1)
+│   ├── entities/         # 数据实体 (SeaORM Model)
+│   ├── utils/            # 工具函数
+│   ├── analyzer/         # 变更分析器
+│   ├── backport_advisor/ # 回合建议
+│   ├── snapshot/         # 快照管理
+│   ├── component/        # 组件管理
+│   ├── importer/         # 数据导入
+│   ├── exporter/         # 数据导出
+│   ├── workflow/         # 工作流引擎
+│   └── lib.rs            # 库入口
+├── docs/                 # 文档
+├── tests/                # 测试
+├── migration/            # 数据库迁移脚本
+└── config/               # 配置文件
+```
+
+## 配置
+
+### 环境变量（推荐）
+
+```bash
+# 服务器配置
+export HOST="0.0.0.0"
+export PORT=8080
+
+# 数据库配置
+export DATABASE_URL="postgresql://user:password@localhost/track_system"
+
+# 认证配置
+export AUTH_ENABLED=false              # 开放模式（默认）
+export JWT_SECRET="your-secret-key"    # 安全模式时必须配置
+export JWT_EXPIRY_HOURS=24
+
+# CORS 配置
+export CORS_ALLOWED_ORIGINS="*"        # 开发环境
