@@ -125,3 +125,46 @@ impl MigrationTrait for Migration {
                     backend,
                     "PRAGMA foreign_keys=OFF".to_owned(),
                 ))
+                .await?;
+
+                // 创建包含 distros 外键的 tracking 新表
+                manager
+                    .create_table(
+                        Table::create()
+                            .table(Alias::new("tracking_new"))
+                            .if_not_exists()
+                            .col(pk_auto(Tracking::Id))
+                            .col(integer(Tracking::PackageId))
+                            .col(integer(Tracking::DistroId))
+                            .col(string(Tracking::L1Branch))
+                            .col(string(Tracking::L1RepoOwner))
+                            .col(string(Tracking::L1RepoName))
+                            .col(string(Tracking::L2Branch))
+                            .col(string(Tracking::L2RepoPath))
+                            .col(string(Tracking::TrackingStatus))
+                            .col(timestamp_null(Tracking::LastSyncTime))
+                            .col(string_null(Tracking::LastL1CommitSha))
+                            .col(string_null(Tracking::LastL2CommitSha))
+                            .col(timestamp(Tracking::CreatedAt))
+                            .col(timestamp(Tracking::UpdatedAt))
+                            .col(ColumnDef::new(Tracking::LastError).text().null())
+                            // 保留 packages 外键
+                            .foreign_key(
+                                ForeignKey::create()
+                                    .name("fk_tracking_package")
+                                    .from(Alias::new("tracking_new"), Tracking::PackageId)
+                                    .to(Packages::Table, Packages::Id)
+                                    .on_delete(ForeignKeyAction::Cascade),
+                            )
+                            // 恢复 distros 外键
+                            .foreign_key(
+                                ForeignKey::create()
+                                    .name("fk_tracking_distro")
+                                    .from(Alias::new("tracking_new"), Tracking::DistroId)
+                                    .to(Distros::Table, Distros::Id)
+                                    .on_delete(ForeignKeyAction::Cascade),
+                            )
+                            .to_owned(),
+                    )
+                    .await?;
+
