@@ -230,3 +230,50 @@ EOF
 
 print_success "覆盖率记录已追加到 $CHECKLIST_FILE"
 echo ""
+
+# 7. 覆盖率阈值检查
+if [ "${SKIP_THRESHOLD_CHECK:-0}" != "1" ]; then
+    print_header "覆盖率阈值检查"
+
+    print_info "期望阈值: ≥${COVERAGE_THRESHOLD}%"
+    print_info "实际覆盖率: ${COVERAGE_PERCENT}%"
+    echo ""
+
+    if (( $(echo "$COVERAGE_PERCENT >= $COVERAGE_THRESHOLD" | bc -l) )); then
+        print_success "覆盖率达标! 🎉"
+        echo ""
+        echo "当前覆盖率 ${COVERAGE_PERCENT}% 已达到或超过阈值 ${COVERAGE_THRESHOLD}%"
+        EXIT_CODE=0
+    else
+        print_error "覆盖率未达标! ⚠️"
+        echo ""
+        echo "当前覆盖率 ${COVERAGE_PERCENT}% 低于阈值 ${COVERAGE_THRESHOLD}%"
+        echo ""
+        COVERAGE_GAP=$(echo "$COVERAGE_THRESHOLD - $COVERAGE_PERCENT" | bc)
+        print_warning "还需提升 ${COVERAGE_GAP}% 的覆盖率"
+        echo ""
+        echo "建议:"
+        echo "  1. 打开报告文件查看未覆盖的代码: $REPORT_FILE"
+        echo "  2. 优先为 0% 覆盖率的文件添加测试"
+        echo "  3. 参考测试指南: docs/coverage/guide.md"
+        EXIT_CODE=1
+    fi
+else
+    print_info "跳过阈值检查 (SKIP_THRESHOLD_CHECK=1)"
+    EXIT_CODE=0
+fi
+
+echo ""
+print_header "测试覆盖率检查完成"
+
+# 打印摘要
+echo "📊 覆盖率摘要:"
+echo "   覆盖率: ${COVERAGE_PERCENT}%"
+echo "   覆盖行数: $COVERAGE_LINES"
+echo "   阈值: ≥${COVERAGE_THRESHOLD}%"
+echo "   运行时间: ${ELAPSED_TIME}s"
+echo "   报告文件: $REPORT_FILE"
+echo ""
+
+exit $EXIT_CODE
+
