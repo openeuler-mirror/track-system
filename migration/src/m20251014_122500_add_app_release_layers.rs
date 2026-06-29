@@ -707,3 +707,54 @@ enum Issues {
     ClosedAt,
     RawPayload,
 }
+
+#[derive(Iden)]
+enum IssueEvents {
+    Table,
+    Id,
+    IssueId,
+    EventType,
+    Actor,
+    EventAt,
+    Payload,
+    CreatedAt,
+}
+
+#[derive(Iden)]
+enum TrackingReports {
+    Table,
+    Id,
+    TrackingId,
+    GeneratedAt,
+    DiffSummary,
+    RepresentativeChanges,
+    Source,
+    Status,
+    FailureReason,
+    CreatedAt,
+    UpdatedAt,
+}
+
+#[derive(Iden)]
+enum SyncJobs {
+    Table,
+    Id,
+    TrackingId,
+    JobKind,
+    ScheduledAt,
+    StartedAt,
+    FinishedAt,
+    Status,
+    Error,
+    AttemptCount,
+    Priority,
+    CreatedAt,
+    UpdatedAt,
+}
+
+#[derive(Iden)]
+enum L0Commits {
+    Table,
+    Id,
+    PackageId,
+    Repo,
