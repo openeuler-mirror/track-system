@@ -226,3 +226,49 @@ export JWT_EXPIRY_HOURS=24
 
 # CORS 配置
 export CORS_ALLOWED_ORIGINS="*"        # 开发环境
+export CORS_ALLOW_CREDENTIALS=true
+
+# API Token（采集器使用）
+export GITHUB_TOKEN="your_github_token"
+export GITLAB_TOKEN="your_gitlab_token"
+export GITEE_TOKEN="your_gitee_token"
+export GITEA_TOKEN="your_gitea_token"
+```
+
+### 配置文件
+
+可以使用 `config.toml` 或 `test_config.yaml` 进行配置。
+
+## 测试
+
+```bash
+# 运行所有测试
+cargo test --workspace
+
+# 运行特定测试
+cargo test --test unit collectors_test
+
+# 生成测试覆盖率
+./run_coverage.sh
+```
+
+## 贡献
+
+欢迎贡献代码！请遵循以下步骤：
+
+1. Fork 项目
+2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 开启 Pull Request
+
+## 许可证
+
+本项目采用 Mulan PSL v2 许可证。详见 LICENSE 文件。
+
+## 作者
+
+- Yong Qin <qiny15@chinatelecom.cn>
+- Si Wang <wangs88@chinatelecom.cn>
+
+
