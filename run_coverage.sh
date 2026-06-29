@@ -91,3 +91,49 @@ print_info "覆盖率阈值: ${COVERAGE_THRESHOLD}%"
 print_info "超时时间: ${TIMEOUT} 秒"
 print_info "输出格式: ${OUTPUT_FORMAT}"
 echo ""
+
+# 1. 检查 Tarpaulin 是否已安装
+print_info "检查 cargo-tarpaulin 是否已安装..."
+if ! command -v cargo-tarpaulin &> /dev/null; then
+    print_warning "cargo-tarpaulin 未安装,正在安装..."
+    cargo install cargo-tarpaulin || {
+        print_error "cargo-tarpaulin 安装失败"
+        echo ""
+        echo "请手动安装: cargo install cargo-tarpaulin"
+        exit 1
+    }
+    print_success "cargo-tarpaulin 安装成功"
+else
+    TARPAULIN_VERSION=$(cargo tarpaulin --version | head -1)
+    print_success "已安装: $TARPAULIN_VERSION"
+fi
+echo ""
+
+# 2. 清理旧的报告文件
+print_info "清理旧的报告文件..."
+if [ -f "$REPORT_FILE" ]; then
+    rm -f "$REPORT_FILE"
+    print_success "已删除旧报告: $REPORT_FILE"
+fi
+echo ""
+
+# 3. 运行 Tarpaulin
+print_header "运行 Tarpaulin 测试覆盖率分析"
+print_info "这可能需要几分钟时间,请耐心等待..."
+echo ""
+
+START_TIME=$(date +%s)
+
+# 运行 Tarpaulin 并捕获输出
+TARPAULIN_OUTPUT=$(cargo tarpaulin \
+    --workspace \
+    --timeout $TIMEOUT \
+    --out $OUTPUT_FORMAT \
+    --engine llvm \
+    --verbose \
+    --exclude-files "migration/*"
+    2>&1) || {
+    TARPAULIN_EXIT_CODE=$?
+    print_error "Tarpaulin 运行失败 (退出码: $TARPAULIN_EXIT_CODE)"
+    echo ""
+    echo "错误输出:"
