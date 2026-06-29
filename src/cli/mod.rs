@@ -68,3 +68,38 @@ impl CliExecutor {
             }
             parser::Commands::Classify { action } => {
                 commands::classify_api::execute(&self.api_client, action).await
+            }
+            parser::Commands::Workflow { action } => {
+                commands::workflow_api::execute(&self.api_client, action).await
+            }
+            parser::Commands::L0 { action } => {
+                commands::l0_api::execute(&self.api_client, action).await
+            }
+            parser::Commands::Compare { action } => {
+                commands::compare_api::execute(&self.api_client, action).await
+            }
+            parser::Commands::Snapshot { action } => {
+                commands::snapshot_api::execute(&self.api_client, action).await
+            }
+            parser::Commands::Export { action } => {
+                commands::export_api::execute(&self.api_client, action).await
+            }
+            parser::Commands::Import { action } => {
+                commands::import_api::execute(&self.api_client, action).await
+            }
+            parser::Commands::Config { action } => commands::config_api::execute(action).await,
+            parser::Commands::Db { action: _ } => Ok(()),
+            parser::Commands::Package { action } => {
+                commands::package_api::execute(&self.api_client, action).await
+            }
+            parser::Commands::Distro { action } => {
+                commands::distro_api::execute(&self.api_client, action).await
+            }
+            parser::Commands::Tracking { action } => {
+                commands::tracking_api::execute(&self.api_client, action).await
+            }
+            parser::Commands::Status { action } => {
+                commands::status_api::execute(&self.api_client, action).await
+            }
+            parser::Commands::Health { action } => {
+                commands::health_api::execute(&self.api_client, action).await
