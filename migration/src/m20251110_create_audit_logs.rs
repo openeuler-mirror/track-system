@@ -84,3 +84,46 @@ impl MigrationTrait for Migration {
                     .table(AuditLogs::Table)
                     .col(AuditLogs::ResourceType)
                     .col(AuditLogs::ResourceId)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_audit_logs_created_at")
+                    .table(AuditLogs::Table)
+                    .col(AuditLogs::CreatedAt)
+                    .to_owned(),
+            )
+            .await?;
+
+        Ok(())
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(AuditLogs::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+enum AuditLogs {
+    Table,
+    Id,
+    UserId,
+    Action,
+    ResourceType,
+    ResourceId,
+    Method,
+    Path,
+    IpAddress,
+    UserAgent,
+    RequestBody,
+    ResponseStatus,
+    ResponseBody,
+    Duration,
+    ErrorMessage,
+    CreatedAt,
+}
