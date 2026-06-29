@@ -189,3 +189,51 @@ track_cli:
           args:
             package: Package name or ID
             distro: Distribution ID
+            l1_repo: L1 repository (owner/repo, owner:repo or URL)
+            l1_branch: L1 branch
+            l2_repo: L2 local repository path
+            l2_branch: L2 branch
+            status: Tracking status (active/paused)
+        list:
+          about: List all tracking configurations
+          args:
+            limit: Limit
+            package: Filter by package
+            status: Filter by status
+        show:
+          about: Show tracking configuration details
+          args:
+            id: Tracking ID
+        pause:
+          about: Pause tracking
+          args:
+            id: Tracking ID
+        resume:
+          about: Resume tracking
+          args:
+            id: Tracking ID
+        remove:
+          about: Remove tracking configuration
+          args:
+            id: Tracking ID
+            confirm: Confirm removal
+    report:
+      about: Report management
+      commands:
+        list:
+          about: List reports
+          args:
+            page: Page number
+            page_size: Page size
+            tracking_id: Filter by tracking ID
+            report_type: Filter by report type
+        show:
+          about: Show report details
+          args:
+            id: Report ID
+        export:
+          about: Export report
+          args:
+            id: Report ID
+            format: Export format (json, yaml, markdown, html)
+            output: Output file path
