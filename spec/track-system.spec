@@ -158,3 +158,44 @@ systemctl daemon-reload >/dev/null 2>&1 || true
 # 全局命令符号链接
 %{_bindir}/track-cli
 %{_bindir}/track-collector
+%{_bindir}/track-server
+
+# 配置文件（%config 表示配置文件，升级时不会覆盖用户修改）
+%config(noreplace) %{pkg_config_dir}/track-system.env
+%config(noreplace) %{_sysconfdir}/logrotate.d/track-server
+%config(noreplace) %{pkg_config_dir}/track-system.env.example
+%config(noreplace) %{pkg_config_dir}/track-cli.toml
+
+# systemd 服务文件（仅 track-server）
+%{_sysconfdir}/systemd/system/track-server.service
+
+# 数据和日志目录
+%dir %{pkg_home}
+%dir %{pkg_home}/bin
+%dir %{pkg_data_dir}
+%dir %{pkg_log_dir}
+%dir %{pkg_config_dir}
+%dir %{_sysconfdir}/track-cli
+
+# 预置数据库文件
+%config(noreplace) %{pkg_data_dir}/track-system.db
+
+# 文档
+%doc %{_docdir}/%{pkg_name}/
+
+# 日志文件
+%{pkg_log_dir}/track-server.log
+
+%changelog
+* Wed Jan 21 2026 Si Wang <wangs88@chinatelecom.cn> - 1.2.0-2
+-Fix bug #111746 #112451
+
+* Mon Jan 05 2026 Si Wang <wangs88@chinatelecom.cn> - 1.2.0-1
+- Fix bug #111656/#111794/#111788/#111785/#111779/#111683 \
+- #111791/#111680/#111707/#111659
+
+* Wed Dec 10 2025 Si Wang <wangs88@chinatelecom.cn> - 1.1.0-1
+- Update version to 1.1.0
+
+* Tue Nov 11 2025 Yong Qin <qiny15@chinatelecom.cn> - 1.0.0-1
+- Initial commit
