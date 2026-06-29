@@ -150,3 +150,53 @@ CREATE TABLE IF NOT EXISTS issues (
             .await?;
 
         let index_sql = "CREATE INDEX IF NOT EXISTS idx_issues_tracking_number ON issues(tracking_id, issue_number)";
+        manager
+            .get_connection()
+            .execute(Statement::from_string(backend, index_sql.to_string()))
+            .await?;
+
+        Ok(())
+    } else {
+        manager
+            .create_table(
+                Table::create()
+                    .table(Issues::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(Issues::Id)
+                            .integer()
+                            .not_null()
+                            .auto_increment()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(Issues::TrackingId).integer().not_null())
+                    .col(ColumnDef::new(Issues::IssueNumber).string().not_null())
+                    .col(ColumnDef::new(Issues::Title).text().not_null())
+                    .col(ColumnDef::new(Issues::State).string().not_null())
+                    .col(ColumnDef::new(Issues::Author).string().not_null())
+                    .col(ColumnDef::new(Issues::ApiUrl).string().not_null())
+                    .col(ColumnDef::new(Issues::Labels).json_binary().null())
+                    .col(ColumnDef::new(Issues::CreatedAt).timestamp().not_null())
+                    .col(ColumnDef::new(Issues::UpdatedAt).timestamp().not_null())
+                    .col(ColumnDef::new(Issues::ClosedAt).timestamp().null())
+                    .col(ColumnDef::new(Issues::RawPayload).json_binary().null())
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk_issues_tracking")
+                            .from(Issues::Table, Issues::TrackingId)
+                            .to(Tracking::Table, Tracking::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
+                    )
+                    .index(
+                        Index::create()
+                            .name("idx_issues_tracking_number")
+                            .col(Issues::TrackingId)
+                            .col(Issues::IssueNumber),
+                    )
+                    .to_owned(),
+            )
+            .await
+    }
+}
+
+async fn create_issue_events_table(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
