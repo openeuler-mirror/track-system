@@ -29,3 +29,35 @@ impl MigrationTrait for Migration {
                     .col(string(CommitFiles::ChangeType))
                     .col(integer(CommitFiles::Additions))
                     .col(integer(CommitFiles::Deletions))
+                    .col(text_null(CommitFiles::PatchUrl))
+                    .col(boolean(CommitFiles::IsSpec))
+                    .col(boolean(CommitFiles::IsPatch))
+                    .col(timestamp(CommitFiles::CreatedAt))
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk_commit_files_commit")
+                            .from(CommitFiles::Table, CommitFiles::CommitRecordId)
+                            .to(CommitRecords::Table, CommitRecords::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_commit_files_commit")
+                    .table(CommitFiles::Table)
+                    .col(CommitFiles::CommitRecordId)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_commit_files_spec")
+                    .table(CommitFiles::Table)
+                    .col(CommitFiles::IsSpec)
+                    .to_owned(),
