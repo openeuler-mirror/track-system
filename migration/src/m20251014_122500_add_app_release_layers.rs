@@ -606,3 +606,53 @@ CREATE TABLE IF NOT EXISTS backport_candidates (
                     .index(
                         Index::create()
                             .name("idx_backport_candidates_pkg_status")
+                            .col(BackportCandidates::PackageId)
+                            .col(BackportCandidates::Status),
+                    )
+                    .to_owned(),
+            )
+            .await
+    }
+}
+
+async fn create_l2_snapshots_table(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
+    let backend = manager.get_database_backend();
+
+    if backend == DatabaseBackend::Sqlite {
+        let create_sql = r#"
+CREATE TABLE IF NOT EXISTS l2_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tracking_id INTEGER NOT NULL,
+    snapshot_type TEXT NOT NULL,
+    checksum TEXT NOT NULL,
+    payload TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(tracking_id) REFERENCES tracking(id) ON DELETE CASCADE
+)
+"#;
+        manager
+            .get_connection()
+            .execute(Statement::from_string(backend, create_sql.to_string()))
+            .await?;
+
+        let index_sql =
+            "CREATE INDEX IF NOT EXISTS idx_l2_snapshots_tracking ON l2_snapshots(tracking_id)";
+        manager
+            .get_connection()
+            .execute(Statement::from_string(backend, index_sql.to_string()))
+            .await?;
+
+        Ok(())
+    } else {
+        manager
+            .create_table(
+                Table::create()
+                    .table(L2Snapshots::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(L2Snapshots::Id)
+                            .integer()
+                            .not_null()
+                            .auto_increment()
+                            .primary_key(),
+                    )
