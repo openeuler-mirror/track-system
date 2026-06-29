@@ -454,3 +454,53 @@ CREATE TABLE IF NOT EXISTS l0_commits (
                 Table::create()
                     .table(L0Commits::Table)
                     .if_not_exists()
+                    .col(
+                        ColumnDef::new(L0Commits::Id)
+                            .big_integer()
+                            .not_null()
+                            .auto_increment()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(L0Commits::PackageId).integer().not_null())
+                    .col(ColumnDef::new(L0Commits::Repo).string().not_null())
+                    .col(ColumnDef::new(L0Commits::CommitSha).string().not_null())
+                    .col(ColumnDef::new(L0Commits::Summary).text().not_null())
+                    .col(ColumnDef::new(L0Commits::AuthoredAt).timestamp().not_null())
+                    .col(ColumnDef::new(L0Commits::Metadata).json_binary().null())
+                    .col(ColumnDef::new(L0Commits::CreatedAt).timestamp().not_null())
+                    .col(ColumnDef::new(L0Commits::UpdatedAt).timestamp().not_null())
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk_l0_commits_package")
+                            .from(L0Commits::Table, L0Commits::PackageId)
+                            .to(Packages::Table, Packages::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
+                    )
+                    .index(
+                        Index::create()
+                            .name("idx_l0_commits_package_sha")
+                            .col(L0Commits::PackageId)
+                            .col(L0Commits::CommitSha),
+                    )
+                    .to_owned(),
+            )
+            .await
+    }
+}
+
+async fn create_backport_candidates_table(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
+    let backend = manager.get_database_backend();
+
+    if backend == DatabaseBackend::Sqlite {
+        let create_sql = r#"
+CREATE TABLE IF NOT EXISTS backport_candidates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    package_id INTEGER NOT NULL,
+    l0_commit_id INTEGER NOT NULL,
+    target_distro_id INTEGER NOT NULL,
+    spec_base_version TEXT NOT NULL,
+    recommendation TEXT NOT NULL,
+    status TEXT NOT NULL,
+    patch_artifact TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
