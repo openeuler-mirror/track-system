@@ -25,3 +25,30 @@ impl MigrationTrait for Migration {
 
         manager.alter_table(add_spec_version).await?;
 
+        let add_spec_release: TableAlterStatement = Table::alter()
+            .table(CommitRecords::Table)
+            .add_column(ColumnDef::new(CommitRecords::SpecRelease).string().null())
+            .to_owned();
+
+        manager.alter_table(add_spec_release).await?;
+
+        Ok(())
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        // 回滚：移除新增字段（SQLite 不支持一次多项 ALTER，拆分执行）
+        let drop_spec_release: TableAlterStatement = Table::alter()
+            .table(CommitRecords::Table)
+            .drop_column(CommitRecords::SpecRelease)
+            .to_owned();
+        manager.alter_table(drop_spec_release).await?;
+
+        let drop_spec_version: TableAlterStatement = Table::alter()
+            .table(CommitRecords::Table)
+            .drop_column(CommitRecords::SpecVersion)
+            .to_owned();
+        manager.alter_table(drop_spec_version).await?;
+
+        Ok(())
+    }
+}
