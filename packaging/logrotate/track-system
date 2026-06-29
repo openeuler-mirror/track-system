@@ -1,0 +1,16 @@
+# Track System 日志轮转配置
+
+/var/log/track-system/track-system.log {
+    # 日志轮转频率
+    daily
+
+    # 保留的日志文件数量
+    rotate 14
+
+    # 压缩旧日志文件
+    compress
+
+    # 延迟压缩上一个日志文件直到下一个轮转
+    delaycompress
+
+    # 如果日志文件丢失，不产生错误
