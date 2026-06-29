@@ -131,3 +131,48 @@ impl<'a> ClassificationJobQueue<'a> {
         if let Some(job) = jobs.into_iter().next() {
             let running = self.mark_started(&job).await?;
             return Ok(Some(running));
+        }
+
+        Ok(None)
+    }
+}
+
+pub struct ClassificationWorker<'a> {
+    db: &'a DatabaseConnection,
+}
+
+impl<'a> ClassificationWorker<'a> {
+    pub fn new(db: &'a DatabaseConnection) -> Self {
+        Self { db }
+    }
+
+    /// 处理待分类的 commit 记录
+    pub async fn process_pending(&self, limit: usize) -> Result<usize> {
+        self.process_internal(None, limit).await
+    }
+
+    /// 仅处理指定 tracking 的待分类记录
+    pub async fn process_tracking(&self, tracking_id: i32, limit: usize) -> Result<usize> {
+        self.process_internal(Some(tracking_id), limit).await
+    }
+
+    async fn process_internal(&self, tracking_id: Option<i32>, limit: usize) -> Result<usize> {
+        let mut query = L1CommitRecords::find()
+            .filter(l1_commit_records::Column::ClassificationStatus.eq(STATUS_PENDING))
+            .order_by_asc(l1_commit_records::Column::CommittedAt)
+            .limit(limit as u64);
+
+        if let Some(tracking_id) = tracking_id {
+            query = query.filter(l1_commit_records::Column::TrackingId.eq(tracking_id));
+        }
+
+        let pending = query.all(self.db).await?;
+
+        if pending.is_empty() {
+            return Ok(0);
+        }
+
+        let classifier = ChangeClassifier::new(self.db);
+        let mut processed = 0usize;
+
+        for record in pending {
