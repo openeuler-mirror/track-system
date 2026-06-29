@@ -758,3 +758,54 @@ enum L0Commits {
     Id,
     PackageId,
     Repo,
+    CommitSha,
+    Summary,
+    AuthoredAt,
+    Metadata,
+    CreatedAt,
+    UpdatedAt,
+}
+
+#[derive(Iden)]
+enum BackportCandidates {
+    Table,
+    Id,
+    PackageId,
+    L0CommitId,
+    TargetDistroId,
+    SpecBaseVersion,
+    Recommendation,
+    Status,
+    PatchArtifact,
+    CreatedAt,
+    UpdatedAt,
+}
+
+#[derive(Iden)]
+enum L2Snapshots {
+    Table,
+    Id,
+    TrackingId,
+    SnapshotType,
+    Checksum,
+    Payload,
+    CreatedAt,
+}
+
+#[derive(Iden)]
+enum Tracking {
+    Table,
+    Id,
+}
+
+#[derive(Iden)]
+enum Packages {
+    Table,
+    Id,
+}
+
+#[derive(Iden)]
+enum Distros {
+    Table,
+    Id,
+}
