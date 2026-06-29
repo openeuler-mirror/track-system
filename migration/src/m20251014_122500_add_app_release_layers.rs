@@ -48,3 +48,54 @@ impl MigrationTrait for Migration {
         }
 
         create_issues_table(manager)
+            .await
+            .map_err(|err| DbErr::Custom(format!("create_issues_table failed: {}", err)))?;
+        create_issue_events_table(manager)
+            .await
+            .map_err(|err| DbErr::Custom(format!("create_issue_events_table failed: {}", err)))?;
+        create_tracking_reports_table(manager)
+            .await
+            .map_err(|err| {
+                DbErr::Custom(format!("create_tracking_reports_table failed: {}", err))
+            })?;
+        create_sync_jobs_table(manager)
+            .await
+            .map_err(|err| DbErr::Custom(format!("create_sync_jobs_table failed: {}", err)))?;
+        create_l0_commits_table(manager)
+            .await
+            .map_err(|err| DbErr::Custom(format!("create_l0_commits_table failed: {}", err)))?;
+        create_backport_candidates_table(manager)
+            .await
+            .map_err(|err| {
+                DbErr::Custom(format!("create_backport_candidates_table failed: {}", err))
+            })?;
+        create_l2_snapshots_table(manager)
+            .await
+            .map_err(|err| DbErr::Custom(format!("create_l2_snapshots_table failed: {}", err)))?;
+
+        Ok(())
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        let backend = manager.get_database_backend();
+        if backend != DatabaseBackend::Sqlite {
+            for column in [
+                "primary_change_type",
+                "cve_list",
+                "spec_changed",
+                "patch_stats",
+                "classification_status",
+                "classification_notes",
+            ] {
+                let sql = format!("ALTER TABLE commit_records DROP COLUMN {}", column);
+                manager
+                    .get_connection()
+                    .execute(Statement::from_string(backend, sql.clone()))
+                    .await
+                    .map_err(|err| {
+                        DbErr::Custom(format!("Failed to execute `{}`: {}", sql, err))
+                    })?;
+            }
+        }
+
+        manager
