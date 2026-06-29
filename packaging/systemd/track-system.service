@@ -17,3 +17,23 @@ ExecStart=/opt/track-system/bin/track-server server
 
 # 重启策略
 Restart=on-failure
+RestartSec=10
+
+# 资源限制
+LimitNOFILE=65535
+LimitNPROC=4096
+
+# 内存限制（可选，根据实际情况调整）
+# MemoryLimit=2G
+
+# 启用 systemd 通知（可选，如果应用支持）
+# Type=notify
+# NotifyAccess=main
+
+# 日志记录
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=track-system
+
+[Install]
+WantedBy=multi-user.target
