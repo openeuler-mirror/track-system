@@ -31,3 +31,36 @@ impl MigrationTrait for Migration {
                     .col(timestamp(Distros::UpdatedAt))
                     .to_owned(),
             )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_distros_name_version")
+                    .table(Distros::Table)
+                    .col(Distros::Name)
+                    .col(Distros::Version)
+                    .unique()
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(Distros::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+enum Distros {
+    Table,
+    Id,
+    Name,
+    Version,
+    Platform,
+    BaseUrl,
+    CreatedAt,
+    UpdatedAt,
+}
