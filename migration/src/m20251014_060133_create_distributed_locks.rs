@@ -28,3 +28,33 @@ impl MigrationTrait for Migration {
                     .col(timestamp(DistributedLocks::AcquiredAt))
                     .col(timestamp(DistributedLocks::ExpiresAt))
                     .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_distributed_locks_expires")
+                    .table(DistributedLocks::Table)
+                    .col(DistributedLocks::ExpiresAt)
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(DistributedLocks::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+enum DistributedLocks {
+    Table,
+    Id,
+    LockKey,
+    Owner,
+    AcquiredAt,
+    ExpiresAt,
+}
