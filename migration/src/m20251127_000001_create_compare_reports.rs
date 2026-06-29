@@ -68,3 +68,38 @@ CREATE TABLE IF NOT EXISTS compare_reports (
                                 .integer()
                                 .not_null(),
                         )
+                        .col(
+                            ColumnDef::new(CompareReports::GeneratedAt)
+                                .timestamp()
+                                .not_null(),
+                        )
+                        .col(
+                            ColumnDef::new(CompareReports::L2VsL1Diff)
+                                .json_binary()
+                                .null(),
+                        )
+                        .col(
+                            ColumnDef::new(CompareReports::L1VsL0Diff)
+                                .json_binary()
+                                .null(),
+                        )
+                        .col(ColumnDef::new(CompareReports::Status).string().not_null())
+                        .col(ColumnDef::new(CompareReports::FailureReason).text().null())
+                        .col(
+                            ColumnDef::new(CompareReports::CreatedAt)
+                                .timestamp()
+                                .not_null(),
+                        )
+                        .col(
+                            ColumnDef::new(CompareReports::UpdatedAt)
+                                .timestamp()
+                                .not_null(),
+                        )
+                        .foreign_key(
+                            ForeignKey::create()
+                                .name("fk_compare_reports_tracking")
+                                .from(CompareReports::Table, CompareReports::TrackingId)
+                                .to(Tracking::Table, Tracking::Id)
+                                .on_delete(ForeignKeyAction::Cascade),
+                        )
+                        .index(
