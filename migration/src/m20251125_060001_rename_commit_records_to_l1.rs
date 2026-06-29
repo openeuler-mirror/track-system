@@ -38,3 +38,44 @@ impl MigrationTrait for Migration {
             DatabaseBackend::Postgres => {
                 // PostgreSQL: 重命名表、索引和约束
                 let statements = vec![
+                    "ALTER TABLE commit_records RENAME TO l1_commit_records",
+                    "ALTER INDEX idx_commit_tracking RENAME TO idx_l1_commit_tracking",
+                    "ALTER INDEX idx_commit_sha RENAME TO idx_l1_commit_sha",
+                    "ALTER INDEX idx_commit_status RENAME TO idx_l1_commit_status",
+                    "ALTER INDEX idx_commit_type RENAME TO idx_l1_commit_type",
+                    "ALTER INDEX idx_commit_tracking_sha RENAME TO idx_l1_commit_tracking_sha",
+                    "ALTER TABLE l1_commit_records RENAME CONSTRAINT fk_commit_tracking TO fk_l1_commit_tracking",
+                ];
+
+                for sql in statements {
+                    manager
+                        .get_connection()
+                        .execute(Statement::from_string(backend, sql.to_string()))
+                        .await?;
+                }
+            }
+            DatabaseBackend::MySql => {
+                // MySQL: RENAME TABLE
+                let statements = vec![
+                    "RENAME TABLE commit_records TO l1_commit_records",
+                    // MySQL 会自动重命名相关的索引和约束
+                ];
+
+                for sql in statements {
+                    manager
+                        .get_connection()
+                        .execute(Statement::from_string(backend, sql.to_string()))
+                        .await?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        let backend = manager.get_database_backend();
+
+        match backend {
+            DatabaseBackend::Sqlite => {
+                let statements = vec!["ALTER TABLE l1_commit_records RENAME TO commit_records"];
