@@ -103,3 +103,39 @@ impl CliExecutor {
             }
             parser::Commands::Health { action } => {
                 commands::health_api::execute(&self.api_client, action).await
+            }
+            parser::Commands::Server { action } => {
+                commands::server::execute(&self.api_client, action).await
+            }
+            parser::Commands::Report { action } => match action {
+                parser::ReportAction::List {
+                    page,
+                    page_size,
+                    tracking_id,
+                    report_type,
+                } => {
+                    commands::report_api::list_reports(
+                        &self.api_client,
+                        page,
+                        page_size,
+                        tracking_id,
+                        report_type,
+                    )
+                    .await
+                }
+                parser::ReportAction::Show { id } => {
+                    commands::report_api::show_report(&self.api_client, id).await
+                }
+                parser::ReportAction::Export { id, format, output } => {
+                    commands::report_api::export_report(&self.api_client, id, format, output).await
+                }
+            },
+        }
+    }
+}
+
+impl Default for CliExecutor {
+    fn default() -> Self {
+        Self::new().expect("无法创建默认 CLI 执行器")
+    }
+}
