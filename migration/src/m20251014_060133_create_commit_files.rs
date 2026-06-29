@@ -61,3 +61,35 @@ impl MigrationTrait for Migration {
                     .table(CommitFiles::Table)
                     .col(CommitFiles::IsSpec)
                     .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(CommitFiles::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+enum CommitFiles {
+    Table,
+    Id,
+    CommitRecordId,
+    Filename,
+    FilePath,
+    ChangeType,
+    Additions,
+    Deletions,
+    PatchUrl,
+    IsSpec,
+    IsPatch,
+    CreatedAt,
+}
+
+#[derive(DeriveIden)]
+enum CommitRecords {
+    Table,
+    Id,
+}
