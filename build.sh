@@ -14,3 +14,20 @@
 	mkdir -p $HOME/.cargo
 cat > $HOME/.cargo/config.toml <<EOF
 [source.crates-io]
+replace-with = 'rsproxy-sparse'
+[source.rsproxy]
+registry = "https://rsproxy.cn/crates.io-index"
+[source.rsproxy-sparse]
+registry = "sparse+https://rsproxy.cn/index/"
+[registries.rsproxy]
+index = "https://rsproxy.cn/crates.io-index"
+[net]
+git-fetch-with-cli = true
+EOF
+
+	source "$HOME/.cargo/env"
+	rm -rf .xrustup.sh
+
+cargo build --release --bin track-server
+cargo build --release --bin track-cli
+cargo build --release --bin track-collector
