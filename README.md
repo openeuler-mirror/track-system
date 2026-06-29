@@ -89,3 +89,49 @@ cargo run --bin track-server -- migration up
 - `--addr`: 服务器监听地址（默认：0.0.0.0:3000）
 - `--database-url`: 数据库连接 URL（默认：sqlite://data/track-system.db?mode=rwc）
 - `--log-level`: 日志级别（默认：info）
+- `--interval`: 调度间隔（秒，默认：3600）
+- `--max-concurrent`: 最大并发任务数（默认：10）
+
+### 4. 使用客户端 (track-cli)
+
+```bash
+# 配置服务器连接
+./target/release/track-cli server config --url http://localhost:3000
+
+# 测试连接
+./target/release/track-cli server ping
+
+# 添加软件包
+./target/release/track-cli package add \
+  --name nginx \
+  --description "High performance web server"
+
+# 查看报告
+./target/release/track-cli report list
+```
+
+### 5. 使用采集工具 (track-collector)
+
+```bash
+# 采集 L0 元数据（上游社区）
+./target/release/track-collector collect l0 \
+  --platform github \
+  --owner nginx \
+  --repo nginx \
+  --output /tmp/nginx_l0.json
+
+# 采集 L1 元数据（发行版）
+./target/release/track-collector collect l1 \
+  --platform gitee \
+  --owner src-openeuler \
+  --repo nginx \
+  --output /tmp/nginx_l1.json
+
+# 采集 L2 元数据（本地仓库）
+./target/release/track-collector collect l2 \
+  --local-path /path/to/nginx \
+  --output /tmp/nginx_l2.json
+```
+
+## 核心概念
+
