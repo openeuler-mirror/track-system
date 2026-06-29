@@ -1,0 +1,44 @@
+/*
+ * Copyright(c) 2024-2026 China Telecom Cloud Technologies Co., Ltd. All rights
+ * reserved. ctscat is licensed under Mulan PSL v2. You can use this software
+ * according to the terms and conditions of the Mulan PSL V2. You may obtain a
+ * copy of Mulan PSL v2 at: http://license.coscl.org.cn/MulanPSL2.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
+ * KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+ * MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.  See the Mulan PSL v2 for
+ * more details.
+ */
+
+use anyhow::{Context, Result};
+use chrono::Utc;
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, JsonValue, QueryFilter,
+    QueryOrder, QuerySelect, Set,
+};
+use serde_json::json;
+
+use crate::{
+    analyzer::ChangeClassifier,
+    entities::{l1_commit_records, prelude::L1CommitRecords, prelude::SyncJobs, sync_jobs},
+    telemetry::Telemetry,
+};
+
+const CLASSIFICATION_JOB_KIND: &str = "classification";
+const STATUS_PENDING: &str = "pending";
+const STATUS_RUNNING: &str = "running";
+const STATUS_SUCCEEDED: &str = "succeeded";
+const STATUS_FAILED: &str = "failed";
+
+/// 变更分类任务队列
+pub struct ClassificationJobQueue<'a> {
+    db: &'a DatabaseConnection,
+}
+
+impl<'a> ClassificationJobQueue<'a> {
+    pub fn new(db: &'a DatabaseConnection) -> Self {
+        Self { db }
+    }
+
+    /// 入队一个给定 tracking 的分类任务，如果已有待处理任务则复用
+    pub async fn enqueue(&self, tracking_id: i32) -> Result<()> {
+        let existing = SyncJobs::find()
