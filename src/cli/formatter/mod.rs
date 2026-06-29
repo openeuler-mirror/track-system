@@ -28,3 +28,34 @@ use serde::Serialize;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OutputFormat {
     /// 表格格式
+    Table,
+    /// JSON 格式
+    Json,
+    /// YAML 格式
+    Yaml,
+}
+
+#[allow(clippy::should_implement_trait)]
+impl OutputFormat {
+    /// 从字符串解析输出格式
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s.to_lowercase().as_str() {
+            "table" => Some(Self::Table),
+            "json" => Some(Self::Json),
+            "yaml" | "yml" => Some(Self::Yaml),
+            _ => None,
+        }
+    }
+}
+
+/// 格式化器 trait
+pub trait Formatter {
+    /// 格式化输出
+    fn format<T: Serialize>(&self, data: &T) -> anyhow::Result<String>;
+}
+
+pub fn format_datetime_local(dt: &DateTime<Utc>) -> String {
+    dt.with_timezone(&Local)
+        .format("%Y-%m-%d %H:%M:%S")
+        .to_string()
+}
