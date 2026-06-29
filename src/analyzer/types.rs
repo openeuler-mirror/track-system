@@ -30,3 +30,35 @@ impl ChangeType {
         match self {
             ChangeType::CVE => "CVE",
             ChangeType::Bugfix => "Bugfix",
+            ChangeType::Backport => "Backport",
+            ChangeType::Unknown => "Unknown",
+        }
+    }
+}
+
+/// 补丁变更统计
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PatchChanges {
+    /// 新增补丁数量
+    pub added: usize,
+    /// 删除补丁数量
+    pub deleted: usize,
+    /// 修改补丁数量
+    pub modified: usize,
+}
+
+/// 版本信息
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VersionInfo {
+    /// 旧版本
+    pub old_version: Option<String>,
+    /// 新版本
+    pub new_version: String,
+}
+
+/// 变更分类结果
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ChangeClassification {
+    /// 主要变更类型
+    pub primary_type: ChangeType,
+    /// 影响的文件列表
