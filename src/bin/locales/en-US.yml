@@ -93,3 +93,51 @@ track_cli:
     sync:
       about: Sync operations
       commands:
+        run:
+          about: Run sync for a specific tracking
+          args:
+            tracking_id: Tracking ID
+            timeout: Timeout (seconds)
+            continue_on_error: Continue on error
+        run-all:
+          about: Run sync for all pending trackings
+          args:
+            concurrency: Max concurrency
+        batch:
+          about: Run sync for multiple trackings
+          args:
+            ids: Tracking IDs
+            concurrency: Max concurrency
+        wake:
+          about: Wake up scheduler to trigger immediate scheduling
+          args:
+            tracking_id: Tracking ID (optional)
+        status:
+          about: Show sync status
+    snapshot:
+      about: Snapshot operations
+      commands:
+        create:
+          about: Create L2 snapshot
+          args:
+            tracking_id: Tracking ID
+            tag: Snapshot tag
+        restore:
+          about: Restore L2 snapshot
+          args:
+            snapshot_id: Snapshot ID
+            force: Overwrite existing data
+        list:
+          about: List snapshots
+          args:
+            tracking_id: Tracking ID (optional)
+        delete:
+          about: Delete snapshot
+          args:
+            snapshot_id: Snapshot ID
+    server:
+      about: Server connection management
+      commands:
+        config:
+          about: Configure server connection
+          args:
