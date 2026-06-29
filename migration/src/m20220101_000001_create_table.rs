@@ -22,3 +22,27 @@ impl MigrationTrait for Migration {
             .create_table(
                 Table::create()
                     .table(Post::Table)
+                    .if_not_exists()
+                    .col(pk_auto(Post::Id))
+                    .col(string(Post::Title))
+                    .col(string(Post::Text))
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+
+        manager
+            .drop_table(Table::drop().table(Post::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+enum Post {
+    Table,
+    Id,
+    Title,
+    Text,
+}
