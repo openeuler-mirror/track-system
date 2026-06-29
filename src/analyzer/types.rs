@@ -62,3 +62,35 @@ pub struct ChangeClassification {
     /// 主要变更类型
     pub primary_type: ChangeType,
     /// 影响的文件列表
+    pub affected_files: Vec<String>,
+    /// spec 文件变更列表
+    pub spec_changes: Vec<String>,
+    /// 是否有 spec 变更
+    pub has_spec_change: bool,
+    /// 补丁变更统计
+    pub patch_changes: PatchChanges,
+    /// 源码文件变更数量
+    pub source_changes: usize,
+    /// 是否有 changelog 更新
+    pub has_changelog_update: bool,
+    /// 版本信息
+    pub version_info: Option<VersionInfo>,
+    /// CVE 编号列表
+    pub cve_numbers: Vec<String>,
+}
+
+impl Default for ChangeClassification {
+    fn default() -> Self {
+        Self {
+            primary_type: ChangeType::Unknown,
+            affected_files: Vec::new(),
+            spec_changes: Vec::new(),
+            has_spec_change: false,
+            patch_changes: PatchChanges::default(),
+            source_changes: 0,
+            has_changelog_update: false,
+            version_info: None,
+            cve_numbers: Vec::new(),
+        }
+    }
+}
