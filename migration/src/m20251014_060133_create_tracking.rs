@@ -81,3 +81,45 @@ impl MigrationTrait for Migration {
                     .table(Tracking::Table)
                     .col(Tracking::TrackingStatus)
                     .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(Tracking::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+#[allow(clippy::enum_variant_names)]
+enum Tracking {
+    Table,
+    Id,
+    PackageId,
+    DistroId,
+    L1Branch,
+    L1RepoOwner,
+    L1RepoName,
+    L2Branch,
+    L2RepoPath,
+    TrackingStatus,
+    LastSyncTime,
+    LastL1CommitSha,
+    LastL2CommitSha,
+    CreatedAt,
+    UpdatedAt,
+}
+
+#[derive(DeriveIden)]
+enum Packages {
+    Table,
+    Id,
+}
+
+#[derive(DeriveIden)]
+enum Distros {
+    Table,
+    Id,
+}
