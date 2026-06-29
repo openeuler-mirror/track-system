@@ -76,3 +76,42 @@ impl MigrationTrait for Migration {
                     .table(L2CommitRecords::Table)
                     .col(L2CommitRecords::CommitSha)
                     .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_l2_commit_status")
+                    .table(L2CommitRecords::Table)
+                    .col(L2CommitRecords::SyncStatus)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_l2_commit_type")
+                    .table(L2CommitRecords::Table)
+                    .col(L2CommitRecords::ChangeType)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_l2_commit_tracking_sha")
+                    .table(L2CommitRecords::Table)
+                    .col(L2CommitRecords::TrackingId)
+                    .col(L2CommitRecords::CommitSha)
+                    .unique()
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(L2CommitRecords::Table).to_owned())
