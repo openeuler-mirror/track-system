@@ -555,3 +555,54 @@ CREATE TABLE IF NOT EXISTS backport_candidates (
                             .not_null(),
                     )
                     .col(
+                        ColumnDef::new(BackportCandidates::Recommendation)
+                            .text()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(BackportCandidates::Status)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(BackportCandidates::PatchArtifact)
+                            .string()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(BackportCandidates::CreatedAt)
+                            .timestamp()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(BackportCandidates::UpdatedAt)
+                            .timestamp()
+                            .not_null(),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk_backport_candidates_package")
+                            .from(BackportCandidates::Table, BackportCandidates::PackageId)
+                            .to(Packages::Table, Packages::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk_backport_candidates_l0_commit")
+                            .from(BackportCandidates::Table, BackportCandidates::L0CommitId)
+                            .to(L0Commits::Table, L0Commits::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk_backport_candidates_target_distro")
+                            .from(
+                                BackportCandidates::Table,
+                                BackportCandidates::TargetDistroId,
+                            )
+                            .to(Distros::Table, Distros::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
+                    )
+                    .index(
+                        Index::create()
+                            .name("idx_backport_candidates_pkg_status")
