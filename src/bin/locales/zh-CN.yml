@@ -93,3 +93,51 @@ track_cli:
     sync:
       about: 数据同步相关命令
       commands:
+        run:
+          about: 执行单个 tracking 的数据同步
+          args:
+            tracking_id: Tracking ID
+            timeout: 超时时间（秒）
+            continue_on_error: 失败是否继续
+        run-all:
+          about: 执行所有待处理的同步任务
+          args:
+            concurrency: 最大并发数
+        batch:
+          about: 批量执行指定的 tracking
+          args:
+            ids: Tracking ID 列表
+            concurrency: 最大并发数
+        wake:
+          about: 唤醒调度器，立即触发调度
+          args:
+            tracking_id: 指定 tracking ID（可选）
+        status:
+          about: 显示同步状态
+    snapshot:
+      about: 快照管理相关命令
+      commands:
+        create:
+          about: 创建 L2 快照
+          args:
+            tracking_id: Tracking ID
+            tag: 快照标签
+        restore:
+          about: 恢复 L2 快照
+          args:
+            snapshot_id: Snapshot ID
+            force: 是否覆盖现有数据
+        list:
+          about: 列出快照
+          args:
+            tracking_id: Tracking ID（可选）
+        delete:
+          about: 删除快照
+          args:
+            snapshot_id: Snapshot ID
+    server:
+      about: 服务器连接管理
+      commands:
+        config:
+          about: 配置服务器连接
+          args:
