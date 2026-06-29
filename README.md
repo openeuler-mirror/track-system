@@ -43,3 +43,49 @@
 
 ## 快速开始
 
+### 1. 编译工具
+
+```bash
+# 编译所有工具
+cargo build --release
+
+# 编译单个工具
+cargo build --release --bin track-server
+cargo build --release --bin track-cli
+cargo build --release --bin track-collector
+```
+
+### 2. 数据库迁移
+
+在使用系统之前，需要初始化数据库：
+
+```bash
+# 设置数据库连接 URL (示例使用 SQLite)
+export DATABASE_URL=sqlite://data/track-system.db?mode=rwc
+
+# 运行迁移
+cargo run --bin track-server -- migration up
+```
+
+### 3. 启动 track-server
+
+#### 方式：直接运行
+
+```bash
+# 服务器模式（Web API + 后台调度器）
+./target/release/track-server server --addr 0.0.0.0:3000
+
+# 仅调度器模式
+./target/release/track-server scheduler-only --interval 3600
+
+# 单次执行模式
+./target/release/track-server run-once
+```
+
+#### 配置选项
+
+可以通过命令行参数或环境变量配置：
+
+- `--addr`: 服务器监听地址（默认：0.0.0.0:3000）
+- `--database-url`: 数据库连接 URL（默认：sqlite://data/track-system.db?mode=rwc）
+- `--log-level`: 日志级别（默认：info）
