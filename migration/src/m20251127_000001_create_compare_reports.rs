@@ -33,3 +33,38 @@ CREATE TABLE IF NOT EXISTS compare_reports (
     status TEXT NOT NULL,
     failure_reason TEXT,
     created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY(tracking_id) REFERENCES tracking(id) ON DELETE CASCADE
+)
+"#;
+            manager
+                .get_connection()
+                .execute(Statement::from_string(backend, create_sql.to_string()))
+                .await?;
+
+            let index_sql = "CREATE INDEX IF NOT EXISTS idx_compare_reports_tracking_id ON compare_reports(tracking_id)";
+            manager
+                .get_connection()
+                .execute(Statement::from_string(backend, index_sql.to_string()))
+                .await?;
+
+            Ok(())
+        } else {
+            // PostgreSQL/MySQL 使用 json_binary
+            manager
+                .create_table(
+                    Table::create()
+                        .table(CompareReports::Table)
+                        .if_not_exists()
+                        .col(
+                            ColumnDef::new(CompareReports::Id)
+                                .integer()
+                                .not_null()
+                                .auto_increment()
+                                .primary_key(),
+                        )
+                        .col(
+                            ColumnDef::new(CompareReports::TrackingId)
+                                .integer()
+                                .not_null(),
+                        )
