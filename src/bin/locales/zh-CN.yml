@@ -141,3 +141,51 @@ track_cli:
         config:
           about: 配置服务器连接
           args:
+            url: 服务器 URL
+            token: 认证 token
+            show: 显示当前配置
+        ping:
+          about: 测试服务器连接
+        info:
+          about: 获取服务器信息
+    import:
+      about: 导入元数据到服务器
+    package:
+      about: 软件包管理（通过 API）
+      commands:
+        add:
+          about: 添加软件包
+          args:
+            name: 软件包名称
+            level: 优先级等级
+            sync_interval: 同步间隔（如 12h, 24h）
+            l0_repo: L0 仓库 URL
+            description: 描述
+        list:
+          about: 列出所有软件包
+          args:
+            limit: 限制数量
+        show:
+          about: 显示软件包详情
+          args:
+            name_or_id: 软件包名称或 ID
+        update:
+          about: 更新软件包
+          args:
+            name: 软件包名称
+            sync_interval: 新的同步间隔
+            level: 新的优先级等级
+            description: 新的描述
+        remove:
+          about: 删除软件包
+          args:
+            name: 软件包名称
+            confirm: 确认删除
+    tracking:
+      about: 跟踪配置管理（通过 API）
+      commands:
+        add:
+          about: 添加新的跟踪配置
+          args:
+            package: 软件包名称或ID（名称需存在）
+            distro: 发行版ID（仅支持数字ID）
