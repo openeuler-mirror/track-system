@@ -176,3 +176,47 @@ impl<'a> ClassificationWorker<'a> {
         let mut processed = 0usize;
 
         for record in pending {
+            let result = classifier.classify_commit(record.id).await;
+            let mut active: l1_commit_records::ActiveModel = record.into();
+
+            match result {
+                Ok(classification) => {
+                    let patch_stats = json!({
+                        "added": classification.patch_changes.added,
+                        "deleted": classification.patch_changes.deleted,
+                        "modified": classification.patch_changes.modified,
+                    });
+
+                    let cve_json: Option<JsonValue> = if classification.cve_numbers.is_empty() {
+                        None
+                    } else {
+                        Some(serde_json::to_value(classification.cve_numbers.clone())?)
+                    };
+
+                    active.primary_change_type =
+                        Set(Some(classification.primary_type.as_str().to_string()));
+                    active.spec_changed = Set(classification.has_spec_change);
+                    active.patch_stats = Set(Some(patch_stats));
+                    active.cve_list = Set(cve_json);
+                    active.classification_status = Set("done".to_string());
+                    active.classification_notes = Set(None);
+                }
+                Err(err) => {
+                    active.classification_status = Set("needs_review".to_string());
+                    active.classification_notes = Set(Some(err.to_string()));
+                }
+            }
+
+            active.updated_at = Set(Utc::now());
+            active.save(self.db).await?;
+            processed += 1;
+        }
+
+        Telemetry::classification_batch_processed(tracking_id, processed);
+        Ok(processed)
+    }
+}
+
+/// 分类流水线执行器
+pub struct ClassificationJobRunner<'a> {
+    queue: ClassificationJobQueue<'a>,
