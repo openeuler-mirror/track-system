@@ -656,3 +656,54 @@ CREATE TABLE IF NOT EXISTS l2_snapshots (
                             .auto_increment()
                             .primary_key(),
                     )
+                    .col(ColumnDef::new(L2Snapshots::TrackingId).integer().not_null())
+                    .col(
+                        ColumnDef::new(L2Snapshots::SnapshotType)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(ColumnDef::new(L2Snapshots::Checksum).string().not_null())
+                    .col(
+                        ColumnDef::new(L2Snapshots::Payload)
+                            .json_binary()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(L2Snapshots::CreatedAt)
+                            .timestamp()
+                            .not_null(),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk_l2_snapshots_tracking")
+                            .from(L2Snapshots::Table, L2Snapshots::TrackingId)
+                            .to(Tracking::Table, Tracking::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
+                    )
+                    .index(
+                        Index::create()
+                            .name("idx_l2_snapshots_tracking")
+                            .col(L2Snapshots::TrackingId),
+                    )
+                    .to_owned(),
+            )
+            .await
+    }
+}
+
+#[derive(Iden)]
+enum Issues {
+    Table,
+    Id,
+    TrackingId,
+    IssueNumber,
+    Title,
+    State,
+    Author,
+    ApiUrl,
+    Labels,
+    CreatedAt,
+    UpdatedAt,
+    ClosedAt,
+    RawPayload,
+}
