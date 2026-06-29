@@ -28,3 +28,34 @@ RUN yum install -y \
     gcc-c++ \
     make \
     pkg-config \
+    # Required libraries
+    openssl-devel \
+    libgit2-devel \
+    libcurl-devel \
+    # RPM building tools
+    rpm-build \
+    rpmdevtools \
+    # Development tools
+    wget \
+    vim \
+    # PostgreSQL client for testing
+    postgresql \
+    && yum clean all && \
+    rm -rf /var/cache/yum
+
+# Set Rust toolchain mirror sources for faster downloads
+ENV RUSTUP_DIST_SERVER=https://rsproxy.cn
+ENV RUSTUP_UPDATE_ROOT=https://rsproxy.cn/rustup
+
+# Install Rust toolchain using Chinese mirror
+RUN curl --proto '=https' --tlsv1.2 -sSf https://rsproxy.cn/rustup-init.sh | sh -s -- -y
+
+# Set Rust environment
+ENV PATH="/root/.cargo/bin:${PATH}" \
+    RUSTFLAGS="-C opt-level=3" \
+    CARGO_INCREMENTAL=0 \
+    RUST_LOG=info,track_system=debug
+
+# Configure cargo mirror for faster crates download
+RUN mkdir -p /root/.cargo && \
+    echo -e '[registry]\n\
