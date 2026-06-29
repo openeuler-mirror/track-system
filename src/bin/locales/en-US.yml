@@ -141,3 +141,51 @@ track_cli:
         config:
           about: Configure server connection
           args:
+            url: Server URL
+            token: Auth token
+            show: Show current config
+        ping:
+          about: Test server connection
+        info:
+          about: Get server information
+    import:
+      about: Import metadata to server
+    package:
+      about: Package management (via API)
+      commands:
+        add:
+          about: Add a new package
+          args:
+            name: Package name
+            level: Priority level
+            sync_interval: Sync interval (e.g. 12h, 24h)
+            l0_repo: L0 repository URL
+            description: Description
+        list:
+          about: List all packages
+          args:
+            limit: Limit
+        show:
+          about: Show package details
+          args:
+            name_or_id: Package name or ID
+        update:
+          about: Update package
+          args:
+            name: Package name
+            sync_interval: New sync interval
+            level: New priority level
+            description: New description
+        remove:
+          about: Remove package
+          args:
+            name: Package name
+            confirm: Confirm removal
+    tracking:
+      about: Tracking configuration management (via API)
+      commands:
+        add:
+          about: Add a new tracking configuration
+          args:
+            package: Package name or ID
+            distro: Distribution ID
