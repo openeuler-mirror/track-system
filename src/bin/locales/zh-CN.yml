@@ -189,3 +189,51 @@ track_cli:
           args:
             package: 软件包名称或ID（名称需存在）
             distro: 发行版ID（仅支持数字ID）
+            l1_repo: L1 仓库（owner/repo、owner:repo 或完整URL）
+            l1_branch: L1 分支名称
+            l2_repo: L2 本地仓库路径
+            l2_branch: L2 分支名称
+            status: 跟踪状态（active/paused）
+        list:
+          about: 列出所有跟踪配置
+          args:
+            limit: 限制数量
+            package: 按软件包过滤
+            status: 按状态过滤
+        show:
+          about: 显示跟踪配置详情
+          args:
+            id: 跟踪配置 ID
+        pause:
+          about: 暂停跟踪
+          args:
+            id: 跟踪配置 ID
+        resume:
+          about: 恢复跟踪
+          args:
+            id: 跟踪配置 ID
+        remove:
+          about: 删除跟踪配置
+          args:
+            id: 跟踪配置 ID
+            confirm: 确认删除
+    report:
+      about: 报告管理
+      commands:
+        list:
+          about: 列出报告
+          args:
+            page: 页码
+            page_size: 每页大小
+            tracking_id: 按跟踪配置 ID 过滤
+            report_type: 按报告类型过滤
+        show:
+          about: 显示报告详情
+          args:
+            id: 报告 ID
+        export:
+          about: 导出报告
+          args:
+            id: 报告 ID
+            format: 导出格式（json, yaml, markdown, html）
+            output: 输出文件路径
