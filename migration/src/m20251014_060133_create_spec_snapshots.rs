@@ -37,3 +37,42 @@ impl MigrationTrait for Migration {
                     .col(string(SpecSnapshots::ContentHash))
                     .col(text(SpecSnapshots::DownloadUrl))
                     .col(timestamp(SpecSnapshots::FetchedAt))
+                    .col(timestamp(SpecSnapshots::CreatedAt))
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk_spec_commit")
+                            .from(SpecSnapshots::Table, SpecSnapshots::CommitRecordId)
+                            .to(CommitRecords::Table, CommitRecords::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_spec_commit")
+                    .table(SpecSnapshots::Table)
+                    .col(SpecSnapshots::CommitRecordId)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_spec_version")
+                    .table(SpecSnapshots::Table)
+                    .col(SpecSnapshots::Name)
+                    .col(SpecSnapshots::Version)
+                    .col(SpecSnapshots::Release)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_spec_hash")
+                    .table(SpecSnapshots::Table)
