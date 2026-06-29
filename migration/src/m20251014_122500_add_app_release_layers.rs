@@ -302,3 +302,53 @@ CREATE TABLE IF NOT EXISTS tracking_reports (
                     )
                     .col(ColumnDef::new(TrackingReports::Source).string().not_null())
                     .col(ColumnDef::new(TrackingReports::Status).string().not_null())
+                    .col(ColumnDef::new(TrackingReports::FailureReason).text().null())
+                    .col(
+                        ColumnDef::new(TrackingReports::CreatedAt)
+                            .timestamp()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(TrackingReports::UpdatedAt)
+                            .timestamp()
+                            .not_null(),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk_tracking_reports_tracking")
+                            .from(TrackingReports::Table, TrackingReports::TrackingId)
+                            .to(Tracking::Table, Tracking::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
+                    )
+                    .index(
+                        Index::create()
+                            .name("idx_tracking_reports_tracking_id")
+                            .col(TrackingReports::TrackingId),
+                    )
+                    .to_owned(),
+            )
+            .await
+    }
+}
+
+async fn create_sync_jobs_table(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
+    let backend = manager.get_database_backend();
+
+    if backend == DatabaseBackend::Sqlite {
+        let create_sql = r#"
+CREATE TABLE IF NOT EXISTS sync_jobs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tracking_id INTEGER NOT NULL,
+    job_kind TEXT NOT NULL,
+    scheduled_at TEXT NOT NULL,
+    started_at TEXT,
+    finished_at TEXT,
+    status TEXT NOT NULL,
+    error TEXT,
+    attempt_count INTEGER NOT NULL DEFAULT 0,
+    priority INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY(tracking_id) REFERENCES tracking(id) ON DELETE CASCADE
+)
+"#;
