@@ -103,3 +103,39 @@ CREATE TABLE IF NOT EXISTS compare_reports (
                                 .on_delete(ForeignKeyAction::Cascade),
                         )
                         .index(
+                            Index::create()
+                                .name("idx_compare_reports_tracking_id")
+                                .col(CompareReports::TrackingId),
+                        )
+                        .to_owned(),
+                )
+                .await
+        }
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(CompareReports::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+enum CompareReports {
+    Table,
+    Id,
+    TrackingId,
+    GeneratedAt,
+    L2VsL1Diff,
+    L1VsL0Diff,
+    Status,
+    FailureReason,
+    CreatedAt,
+    UpdatedAt,
+}
+
+#[derive(DeriveIden)]
+enum Tracking {
+    Table,
+    Id,
+}
