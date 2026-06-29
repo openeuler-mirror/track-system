@@ -37,3 +37,42 @@ impl MigrationTrait for Migration {
                     .col(string(L2CommitRecords::ClassificationStatus).default("pending"))
                     .col(text_null(L2CommitRecords::ClassificationNotes))
                     .col(string(L2CommitRecords::SyncStatus))
+                    .col(string_null(L2CommitRecords::SyncedToL2Commit))
+                    .col(timestamp_null(L2CommitRecords::SyncedAt))
+                    .col(text(L2CommitRecords::ApiUrl))
+                    .col(timestamp(L2CommitRecords::FetchedAt))
+                    .col(integer(L2CommitRecords::FilesChangedCount))
+                    .col(integer(L2CommitRecords::Additions))
+                    .col(integer(L2CommitRecords::Deletions))
+                    .col(string_null(L2CommitRecords::SpecVersion))
+                    .col(string_null(L2CommitRecords::SpecRelease))
+                    .col(timestamp(L2CommitRecords::CreatedAt))
+                    .col(timestamp(L2CommitRecords::UpdatedAt))
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk_l2_commit_tracking")
+                            .from(L2CommitRecords::Table, L2CommitRecords::TrackingId)
+                            .to(Tracking::Table, Tracking::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_l2_commit_tracking")
+                    .table(L2CommitRecords::Table)
+                    .col(L2CommitRecords::TrackingId)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_l2_commit_sha")
+                    .table(L2CommitRecords::Table)
+                    .col(L2CommitRecords::CommitSha)
+                    .to_owned(),
