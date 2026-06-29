@@ -200,3 +200,54 @@ CREATE TABLE IF NOT EXISTS issues (
 }
 
 async fn create_issue_events_table(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
+    manager
+        .create_table(
+            Table::create()
+                .table(IssueEvents::Table)
+                .if_not_exists()
+                .col(
+                    ColumnDef::new(IssueEvents::Id)
+                        .integer()
+                        .not_null()
+                        .auto_increment()
+                        .primary_key(),
+                )
+                .col(ColumnDef::new(IssueEvents::IssueId).integer().not_null())
+                .col(ColumnDef::new(IssueEvents::EventType).string().not_null())
+                .col(ColumnDef::new(IssueEvents::Actor).string().null())
+                .col(ColumnDef::new(IssueEvents::EventAt).timestamp().not_null())
+                .col(ColumnDef::new(IssueEvents::Payload).json_binary().null())
+                .col(
+                    ColumnDef::new(IssueEvents::CreatedAt)
+                        .timestamp()
+                        .not_null(),
+                )
+                .foreign_key(
+                    ForeignKey::create()
+                        .name("fk_issue_events_issue")
+                        .from(IssueEvents::Table, IssueEvents::IssueId)
+                        .to(Issues::Table, Issues::Id)
+                        .on_delete(ForeignKeyAction::Cascade),
+                )
+                .to_owned(),
+        )
+        .await
+}
+
+async fn create_tracking_reports_table(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
+    let backend = manager.get_database_backend();
+
+    if backend == DatabaseBackend::Sqlite {
+        // SQLite 使用 TEXT 存储 JSON
+        let create_sql = r#"
+CREATE TABLE IF NOT EXISTS tracking_reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tracking_id INTEGER NOT NULL,
+    generated_at TEXT NOT NULL,
+    diff_summary TEXT NOT NULL,
+    representative_changes TEXT,
+    source TEXT NOT NULL,
+    status TEXT NOT NULL,
+    failure_reason TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
