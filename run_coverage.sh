@@ -137,3 +137,50 @@ TARPAULIN_OUTPUT=$(cargo tarpaulin \
     print_error "Tarpaulin 运行失败 (退出码: $TARPAULIN_EXIT_CODE)"
     echo ""
     echo "错误输出:"
+    echo "$TARPAULIN_OUTPUT" | tail -20
+    exit $TARPAULIN_EXIT_CODE
+}
+
+END_TIME=$(date +%s)
+ELAPSED_TIME=$((END_TIME - START_TIME))
+
+echo "$TARPAULIN_OUTPUT"
+echo ""
+
+print_success "Tarpaulin 运行完成 (耗时: ${ELAPSED_TIME}s)"
+echo ""
+
+# 4. 解析覆盖率结果
+print_info "解析覆盖率结果..."
+
+# 从输出中提取覆盖率百分比 (格式: XX.XX% coverage, XXXX/XXXX lines covered)
+COVERAGE_LINE=$(echo "$TARPAULIN_OUTPUT" | grep -E "[0-9]+\.[0-9]+% coverage" | tail -1)
+
+if [ -z "$COVERAGE_LINE" ]; then
+    print_error "无法从 Tarpaulin 输出中解析覆盖率"
+    echo ""
+    echo "Tarpaulin 输出末尾:"
+    echo "$TARPAULIN_OUTPUT" | tail -10
+    exit 1
+fi
+
+# 提取覆盖率百分比 (例如: 30.19)
+COVERAGE_PERCENT=$(echo "$COVERAGE_LINE" | grep -oE "[0-9]+\.[0-9]+" | head -1)
+
+# 提取覆盖行数 (例如: 7052/23358)
+COVERAGE_LINES=$(echo "$COVERAGE_LINE" | grep -oE "[0-9]+/[0-9]+ lines" | sed 's/ lines//')
+
+print_success "当前覆盖率: ${COVERAGE_PERCENT}% ($COVERAGE_LINES 行)"
+echo ""
+
+# 5. 检查报告文件是否生成
+print_info "检查报告文件..."
+if [ -f "$REPORT_FILE" ]; then
+    REPORT_SIZE=$(ls -lh "$REPORT_FILE" | awk '{print $5}')
+    print_success "报告已生成: $REPORT_FILE (大小: $REPORT_SIZE)"
+    print_info "在浏览器中打开: file://$(pwd)/$REPORT_FILE"
+else
+    print_warning "HTML 报告文件未找到: $REPORT_FILE"
+fi
+echo ""
+
