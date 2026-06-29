@@ -59,3 +59,34 @@ ENV PATH="/root/.cargo/bin:${PATH}" \
 # Configure cargo mirror for faster crates download
 RUN mkdir -p /root/.cargo && \
     echo -e '[registry]\n\
+[source.crates-io]\n\
+replace-with = "rsproxy-sparse"\n\
+[source.rsproxy]\n\
+registry = "https://rsproxy.cn/crates.io-index"\n\
+[source.rsproxy-sparse]\n\
+registry = "sparse+https://rsproxy.cn/index/"\n\
+[registries.rsproxy]\n\
+index = "https://rsproxy.cn/crates.io-index"\n\
+[net]\n\
+git-fetch-with-cli = true' > /root/.cargo/config.toml && \
+    rustup component add rustfmt clippy
+
+# Setup rpmbuild directory structure
+RUN rpmdev-setuptree
+
+# Create app user and group
+RUN groupadd -r track && useradd -r -g track track
+
+# Set working directory
+WORKDIR /workspace
+
+# Verify installation
+RUN echo "=== Build Environment ===" && \
+    rustup --version && \
+    cargo --version && \
+    gcc --version | head -1 && \
+    rpm --version && \
+    git --version
+
+# Default command
+CMD ["/bin/bash"]
