@@ -76,3 +76,42 @@ impl MigrationTrait for Migration {
                 Index::create()
                     .name("idx_spec_hash")
                     .table(SpecSnapshots::Table)
+                    .col(SpecSnapshots::ContentHash)
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(SpecSnapshots::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+enum SpecSnapshots {
+    Table,
+    Id,
+    CommitRecordId,
+    SpecFilename,
+    Name,
+    Version,
+    Release,
+    Summary,
+    License,
+    Sources,
+    Patches,
+    LatestChangelogEntry,
+    FullContent,
+    ContentHash,
+    DownloadUrl,
+    FetchedAt,
+    CreatedAt,
+}
+
+#[derive(DeriveIden)]
+enum CommitRecords {
+    Table,
+    Id,
+}
