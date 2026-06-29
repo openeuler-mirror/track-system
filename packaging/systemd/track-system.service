@@ -1,0 +1,19 @@
+[Unit]
+Description=Track System - Automated Source Code Repository Tracking
+Documentation=man:track-system(1)
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+
+# 环境配置
+EnvironmentFile=/etc/track-system/track-system.env
+Environment="RUST_LOG=info,track_system=debug"
+Environment="RUST_BACKTRACE=1"
+
+# 启动命令
+ExecStart=/opt/track-system/bin/track-server server
+
+# 重启策略
+Restart=on-failure
