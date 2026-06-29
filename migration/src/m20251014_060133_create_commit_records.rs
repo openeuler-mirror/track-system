@@ -33,3 +33,38 @@ impl MigrationTrait for Migration {
                     .col(string(CommitRecords::SyncStatus))
                     .col(string_null(CommitRecords::SyncedToL2Commit))
                     .col(timestamp_null(CommitRecords::SyncedAt))
+                    .col(text(CommitRecords::ApiUrl))
+                    .col(timestamp(CommitRecords::FetchedAt))
+                    .col(integer(CommitRecords::FilesChangedCount))
+                    .col(integer(CommitRecords::Additions))
+                    .col(integer(CommitRecords::Deletions))
+                    .col(timestamp(CommitRecords::CreatedAt))
+                    .col(timestamp(CommitRecords::UpdatedAt))
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk_commit_tracking")
+                            .from(CommitRecords::Table, CommitRecords::TrackingId)
+                            .to(Tracking::Table, Tracking::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_commit_tracking")
+                    .table(CommitRecords::Table)
+                    .col(CommitRecords::TrackingId)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_commit_sha")
+                    .table(CommitRecords::Table)
+                    .col(CommitRecords::CommitSha)
+                    .to_owned(),
