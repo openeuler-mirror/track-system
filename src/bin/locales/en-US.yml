@@ -1,0 +1,47 @@
+
+track_server:
+  about: Track-System server daemon (API + scheduler)
+  help:
+    usage: Usage
+    commands: Commands
+    options: Options
+  args:
+    lang: Language (zh-CN / en-US)
+    database_url: Database URL
+    log_level: Log level
+  commands:
+    scheduler-only:
+      about: Run scheduler only (no web server)
+      args:
+        interval: Schedule interval (seconds)
+        max_concurrent: Max concurrent jobs
+    server:
+      about: Run web server with background scheduler
+      args:
+        addr: Listen address
+        interval: Schedule interval (seconds)
+        max_concurrent: Max concurrent jobs
+    run-once:
+      about: Run one scheduling round and exit
+      args:
+        max_concurrent: Max concurrent jobs
+
+track_collector:
+  about: Lightweight repository metadata collector
+  long_about: |-
+    Track Collector - standalone metadata collection tool
+
+    Supported platforms:
+      - GitHub: upstream community repositories
+      - GitLab: upstream community repositories (WIP)
+      - Gitee: distribution repositories
+      - Gitea: self-hosted repositories
+      - Local: local Git repositories
+
+    Levels:
+      - L0: upstream community (commits, tags, releases)
+      - L1: distribution repos (spec, patches, commits)
+      - L2: enterprise distribution repos (spec, patches, commits)
+
+    Examples:
+      track-collector collect l0 --platform github --owner nginx --repo nginx --branch master --token $GITHUB_TOKEN -o nginx-l0.json
