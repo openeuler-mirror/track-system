@@ -52,3 +52,30 @@ impl MigrationTrait for Migration {
         Ok(())
     }
 }
+
+#[derive(DeriveIden)]
+#[allow(dead_code)]
+enum CommitRecords {
+    Table,
+    Id,
+    TrackingId,
+    CommitSha,
+    CommitMessage,
+    AuthorName,
+    AuthorEmail,
+    CommittedAt,
+    ChangeType,
+    SyncStatus,
+    SyncedToL2Commit,
+    SyncedAt,
+    ApiUrl,
+    FetchedAt,
+    FilesChangedCount,
+    Additions,
+    Deletions,
+    CreatedAt,
+    UpdatedAt,
+    // 新增列
+    SpecVersion,
+    SpecRelease,
+}
