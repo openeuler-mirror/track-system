@@ -1,0 +1,47 @@
+
+track_server:
+  about: Track-System 服务器守护进程（API + 调度器）
+  help:
+    usage: 用法
+    commands: 命令
+    options: 选项
+  args:
+    lang: 语言（zh-CN / en-US）
+    database_url: 数据库 URL
+    log_level: 日志级别
+  commands:
+    scheduler-only:
+      about: 仅运行调度器（不启动 Web 服务器）
+      args:
+        interval: 调度间隔（秒）
+        max_concurrent: 最大并发任务数
+    server:
+      about: 运行 Web 服务器 + 后台调度器
+      args:
+        addr: 监听地址
+        interval: 调度间隔（秒）
+        max_concurrent: 最大并发任务数
+    run-once:
+      about: 执行一次调度后退出
+      args:
+        max_concurrent: 最大并发任务数
+
+track_collector:
+  about: 轻量化仓库元数据采集工具
+  long_about: |-
+    Track Collector - 独立的元数据采集工具
+
+    支持从多个平台采集仓库元数据：
+      - GitHub: 上游社区仓库
+      - GitLab: 上游社区仓库（待实现）
+      - Gitee: 发行版仓库
+      - Gitea: 自建仓库
+      - Local: 本地 Git 仓库
+
+    采集层级：
+      - L0: 上游社区仓库（commits, tags, releases）
+      - L1: 发行版仓库（spec, patches, commits）
+      - L2: 企业发行版仓库（spec, patches, commits）
+
+    示例：
+      track-collector collect l0 --platform github --owner nginx --repo nginx --branch master --token $GITHUB_TOKEN -o nginx-l0.json
