@@ -99,3 +99,54 @@ impl MigrationTrait for Migration {
         }
 
         manager
+            .drop_table(Table::drop().table(L2Snapshots::Table).to_owned())
+            .await?;
+        manager
+            .drop_table(Table::drop().table(BackportCandidates::Table).to_owned())
+            .await?;
+        manager
+            .drop_table(Table::drop().table(L0Commits::Table).to_owned())
+            .await?;
+        manager
+            .drop_table(Table::drop().table(SyncJobs::Table).to_owned())
+            .await?;
+        manager
+            .drop_table(Table::drop().table(TrackingReports::Table).to_owned())
+            .await?;
+        manager
+            .drop_table(Table::drop().table(IssueEvents::Table).to_owned())
+            .await?;
+        manager
+            .drop_table(Table::drop().table(Issues::Table).to_owned())
+            .await?;
+
+        Ok(())
+    }
+}
+
+async fn create_issues_table(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
+    let backend = manager.get_database_backend();
+    if backend == DatabaseBackend::Sqlite {
+        let create_sql = r#"
+CREATE TABLE IF NOT EXISTS issues (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tracking_id INTEGER NOT NULL,
+    issue_number TEXT NOT NULL,
+    title TEXT NOT NULL,
+    state TEXT NOT NULL,
+    author TEXT NOT NULL,
+    api_url TEXT NOT NULL,
+    labels TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    closed_at TEXT,
+    raw_payload TEXT,
+    FOREIGN KEY(tracking_id) REFERENCES tracking(id) ON DELETE CASCADE
+);
+"#;
+        manager
+            .get_connection()
+            .execute(Statement::from_string(backend, create_sql.to_string()))
+            .await?;
+
+        let index_sql = "CREATE INDEX IF NOT EXISTS idx_issues_tracking_number ON issues(tracking_id, issue_number)";
