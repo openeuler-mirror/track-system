@@ -1,0 +1,30 @@
+# RPM Build Container for Track System
+# Base: CtyunOS 4 (similar to CentOS/RHEL 8)
+# Purpose: Build and test RPM package in production environment
+
+FROM ctyunos:4-25.07-250605
+
+LABEL maintainer="Track System Team"
+LABEL description="Build environment for Track System RPM package"
+
+# Add custom YUM repository configuration
+RUN echo -e '[everything]\n\
+name=ctyunos-everything\n\
+baseurl=https://repo.ctyun.cn/testting/ctyunos-4-25.07/everything/$basearch/\n\
+enabled=1\n\
+gpgcheck=0\n' > /etc/yum.repos.d/ctyunos.repo && \
+    yum makecache
+
+# Install system dependencies
+RUN yum install -y \
+    curl \
+    git \
+    tar \
+    clang \
+    libacl-devel \
+    libselinux-devel \
+    # Build essentials
+    gcc \
+    gcc-c++ \
+    make \
+    pkg-config \
