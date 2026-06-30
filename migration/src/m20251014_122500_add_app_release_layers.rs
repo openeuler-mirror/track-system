@@ -403,3 +403,54 @@ CREATE TABLE IF NOT EXISTS sync_jobs (
                         ForeignKey::create()
                             .name("fk_sync_jobs_tracking")
                             .from(SyncJobs::Table, SyncJobs::TrackingId)
+                            .to(Tracking::Table, Tracking::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
+                    )
+                    .index(
+                        Index::create()
+                            .name("idx_sync_jobs_status")
+                            .col(SyncJobs::Status)
+                            .col(SyncJobs::Priority),
+                    )
+                    .to_owned(),
+            )
+            .await
+    }
+}
+
+async fn create_l0_commits_table(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
+    let backend = manager.get_database_backend();
+
+    if backend == DatabaseBackend::Sqlite {
+        let create_sql = r#"
+CREATE TABLE IF NOT EXISTS l0_commits (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    package_id INTEGER NOT NULL,
+    repo TEXT NOT NULL,
+    commit_sha TEXT NOT NULL,
+    summary TEXT NOT NULL,
+    authored_at TEXT NOT NULL,
+    metadata TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY(package_id) REFERENCES packages(id) ON DELETE CASCADE
+)
+"#;
+        manager
+            .get_connection()
+            .execute(Statement::from_string(backend, create_sql.to_string()))
+            .await?;
+
+        let index_sql = "CREATE INDEX IF NOT EXISTS idx_l0_commits_package_sha ON l0_commits(package_id, commit_sha)";
+        manager
+            .get_connection()
+            .execute(Statement::from_string(backend, index_sql.to_string()))
+            .await?;
+
+        Ok(())
+    } else {
+        manager
+            .create_table(
+                Table::create()
+                    .table(L0Commits::Table)
+                    .if_not_exists()
