@@ -33,3 +33,39 @@ pub struct GiteaClient {
     base_url: String,
 }
 
+impl GiteaClient {
+    pub fn new(token: impl Into<String>, base_url: impl Into<String>) -> ApiResult<Self> {
+        let client = Client::builder()
+            .timeout(DEFAULT_TIMEOUT)
+            .user_agent("track-system/0.1.0")
+            .no_proxy()
+            .build()?;
+
+        Ok(Self {
+            client,
+            token: token.into(),
+            base_url: base_url.into(),
+        })
+    }
+
+    /// 创建实现了 Collector trait 的适配器
+    pub fn as_collector(self) -> impl Collector {
+        use crate::collectors::{adapters::GitClientCollectorAdapter, traits::Platform};
+        GitClientCollectorAdapter::new(self, Platform::Gitea)
+    }
+
+    async fn get<T: serde::de::DeserializeOwned>(&self, path: &str) -> ApiResult<T> {
+        let url = format!("{}{}", self.base_url, path);
+        let mut retries = 0;
+
+        loop {
+            let response = self
+                .client
+                .get(&url)
+                .header("Authorization", format!("token {}", self.token))
+                .send()
+                .await?;
+
+            let status = response.status();
+
+            if status.is_success() {
