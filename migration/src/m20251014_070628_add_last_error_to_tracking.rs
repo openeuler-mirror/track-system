@@ -22,3 +22,27 @@ impl MigrationTrait for Migration {
             .alter_table(
                 Table::alter()
                     .table(Tracking::Table)
+                    .add_column(ColumnDef::new(Tracking::LastError).text().null())
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        // 回滚：删除 last_error 字段
+        manager
+            .alter_table(
+                Table::alter()
+                    .table(Tracking::Table)
+                    .drop_column(Tracking::LastError)
+                    .to_owned(),
+            )
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+enum Tracking {
+    Table,
+    LastError,
+}
