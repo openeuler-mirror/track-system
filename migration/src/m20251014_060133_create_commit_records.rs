@@ -103,3 +103,39 @@ impl MigrationTrait for Migration {
             )
             .await
     }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(CommitRecords::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+enum CommitRecords {
+    Table,
+    Id,
+    TrackingId,
+    CommitSha,
+    CommitMessage,
+    AuthorName,
+    AuthorEmail,
+    CommittedAt,
+    ChangeType,
+    SyncStatus,
+    SyncedToL2Commit,
+    SyncedAt,
+    ApiUrl,
+    FetchedAt,
+    FilesChangedCount,
+    Additions,
+    Deletions,
+    CreatedAt,
+    UpdatedAt,
+}
+
+#[derive(DeriveIden)]
+enum Tracking {
+    Table,
+    Id,
+}
