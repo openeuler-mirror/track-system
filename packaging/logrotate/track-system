@@ -14,3 +14,19 @@
     delaycompress
 
     # 如果日志文件丢失，不产生错误
+    missingok
+
+    # 如果日志文件为空，不轮转
+    notifempty
+
+    # 创建新的日志文件，权限为 640，owner 为 track:track
+    create 640 track track
+
+    # 轮转后执行的脚本
+    sharedscripts
+
+    # 发送 HUP 信号给进程
+    postrotate
+        systemctl reload track-system > /dev/null 2>&1 || true
+    endscript
+}
