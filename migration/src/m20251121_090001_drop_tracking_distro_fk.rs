@@ -210,3 +210,46 @@ impl MigrationTrait for Migration {
                 manager
                     .get_connection()
                     .execute(Statement::from_string(
+                        backend,
+                        "ALTER TABLE tracking ADD CONSTRAINT fk_tracking_distro FOREIGN KEY (distro_id) REFERENCES distros(id) ON DELETE CASCADE".to_owned(),
+                    ))
+                    .await?;
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(DeriveIden)]
+#[allow(dead_code)]
+#[allow(clippy::enum_variant_names)]
+enum Tracking {
+    Table,
+    Id,
+    PackageId,
+    DistroId,
+    L1Branch,
+    L1RepoOwner,
+    L1RepoName,
+    L2Branch,
+    L2RepoPath,
+    TrackingStatus,
+    LastSyncTime,
+    LastL1CommitSha,
+    LastL2CommitSha,
+    CreatedAt,
+    UpdatedAt,
+    LastError,
+}
+
+#[derive(DeriveIden)]
+enum Packages {
+    Table,
+    Id,
+}
+
+#[derive(DeriveIden)]
+enum Distros {
+    Table,
+    Id,
+}
