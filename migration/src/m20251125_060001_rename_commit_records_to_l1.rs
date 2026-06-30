@@ -79,3 +79,44 @@ impl MigrationTrait for Migration {
         match backend {
             DatabaseBackend::Sqlite => {
                 let statements = vec!["ALTER TABLE l1_commit_records RENAME TO commit_records"];
+
+                for sql in statements {
+                    manager
+                        .get_connection()
+                        .execute(Statement::from_string(backend, sql.to_string()))
+                        .await?;
+                }
+            }
+            DatabaseBackend::Postgres => {
+                let statements = vec![
+                    "ALTER TABLE l1_commit_records RENAME CONSTRAINT fk_l1_commit_tracking TO fk_commit_tracking",
+                    "ALTER INDEX idx_l1_commit_tracking_sha RENAME TO idx_commit_tracking_sha",
+                    "ALTER INDEX idx_l1_commit_type RENAME TO idx_commit_type",
+                    "ALTER INDEX idx_l1_commit_status RENAME TO idx_commit_status",
+                    "ALTER INDEX idx_l1_commit_sha RENAME TO idx_commit_sha",
+                    "ALTER INDEX idx_l1_commit_tracking RENAME TO idx_commit_tracking",
+                    "ALTER TABLE l1_commit_records RENAME TO commit_records",
+                ];
+
+                for sql in statements {
+                    manager
+                        .get_connection()
+                        .execute(Statement::from_string(backend, sql.to_string()))
+                        .await?;
+                }
+            }
+            DatabaseBackend::MySql => {
+                let statements = vec!["RENAME TABLE l1_commit_records TO commit_records"];
+
+                for sql in statements {
+                    manager
+                        .get_connection()
+                        .execute(Statement::from_string(backend, sql.to_string()))
+                        .await?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
