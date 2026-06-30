@@ -80,3 +80,44 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
+            .drop_table(Table::drop().table(SpecChanges::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+enum SpecChanges {
+    Table,
+    Id,
+    CommitRecordId,
+    OldSnapshotId,
+    NewSnapshotId,
+    VersionChanged,
+    OldVersion,
+    NewVersion,
+    ReleaseChanged,
+    OldRelease,
+    NewRelease,
+    SourcesChanged,
+    SourcesAdded,
+    SourcesRemoved,
+    SourcesModified,
+    PatchesChanged,
+    PatchesAdded,
+    PatchesRemoved,
+    PatchesModified,
+    ChangelogEntriesAdded,
+    CreatedAt,
+}
+
+#[derive(DeriveIden)]
+enum CommitRecords {
+    Table,
+    Id,
+}
+
+#[derive(DeriveIden)]
+enum SpecSnapshots {
+    Table,
+    Id,
+}
