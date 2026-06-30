@@ -220,3 +220,48 @@ impl<'a> ClassificationWorker<'a> {
 /// 分类流水线执行器
 pub struct ClassificationJobRunner<'a> {
     queue: ClassificationJobQueue<'a>,
+    worker: ClassificationWorker<'a>,
+}
+
+impl<'a> ClassificationJobRunner<'a> {
+    pub fn new(db: &'a DatabaseConnection) -> Self {
+        Self {
+            queue: ClassificationJobQueue::new(db),
+            worker: ClassificationWorker::new(db),
+        }
+    }
+
+    /// 拉取一条任务并执行，返回处理的 commit 数量
+    pub async fn run_next(&self, limit: usize) -> Result<Option<usize>> {
+        let Some(job) = self.queue.dequeue().await? else {
+            return Ok(None);
+        };
+
+        let tracking_id = job.tracking_id;
+
+        match self.worker.process_tracking(tracking_id, limit).await {
+            Ok(processed) => {
+                self.queue
+                    .mark_succeeded(&job)
+                    .await
+                    .context("failed to mark classification job succeeded")?;
+                Ok(Some(processed))
+            }
+            Err(err) => {
+                self.queue
+                    .mark_failed(&job, &err.to_string())
+                    .await
+                    .context("failed to mark classification job failed")?;
+                Err(err)
+            }
+        }
+    }
+
+    pub fn queue(&self) -> &ClassificationJobQueue<'a> {
+        &self.queue
+    }
+
+    pub fn worker(&self) -> &ClassificationWorker<'a> {
+        &self.worker
+    }
+}
