@@ -184,3 +184,49 @@ else
 fi
 echo ""
 
+# 6. 记录到 checklist.md
+print_info "更新覆盖率检查清单..."
+
+# 检查 checklist 文件是否存在
+if [ ! -f "$CHECKLIST_FILE" ]; then
+    print_error "检查清单文件不存在: $CHECKLIST_FILE"
+    echo "请先创建文档框架 (任务 1)"
+    exit 1
+fi
+
+# 生成记录内容
+TIMESTAMP=$(date "+%Y-%m-%d %H:%M:%S")
+RUNNER="${USER:-CI}"
+
+# 判断阶段
+PHASE="Phase1"
+if (( $(echo "$COVERAGE_PERCENT >= 80" | bc -l) )); then
+    PHASE="Phase3"
+elif (( $(echo "$COVERAGE_PERCENT >= 50" | bc -l) )); then
+    PHASE="Phase2"
+fi
+
+# 判断是否达标
+PASS_EMOJI="❌"
+PASS_TEXT="未达标 (目标 ≥${COVERAGE_THRESHOLD}%)"
+if (( $(echo "$COVERAGE_PERCENT >= $COVERAGE_THRESHOLD" | bc -l) )); then
+    PASS_EMOJI="✅"
+    PASS_TEXT="达标"
+fi
+
+# 追加记录到 checklist
+cat >> "$CHECKLIST_FILE" << EOF
+
+---
+**日期**: $TIMESTAMP
+**覆盖率**: ${COVERAGE_PERCENT}% ($COVERAGE_LINES 行)
+**阶段**: $PHASE
+**是否达标**: $PASS_EMOJI ($PASS_TEXT)
+**运行者**: $RUNNER
+**运行时间**: ${ELAPSED_TIME}s
+**备注**: 自动化脚本运行
+
+EOF
+
+print_success "覆盖率记录已追加到 $CHECKLIST_FILE"
+echo ""
