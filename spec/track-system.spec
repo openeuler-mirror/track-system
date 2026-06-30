@@ -78,3 +78,43 @@ mkdir -p %{buildroot}%{_localstatedir}/lib/track-system/migrations
 install -m 755 target/release/track-server %{buildroot}%{pkg_home}/bin/
 install -m 755 target/release/track-cli %{buildroot}%{pkg_home}/bin/
 install -m 755 target/release/track-collector %{buildroot}%{pkg_home}/bin/
+
+# 创建符号链接到 /usr/local/bin 以便全局访问
+mkdir -p %{buildroot}%{_bindir}
+ln -s %{pkg_home}/bin/track-cli %{buildroot}%{_bindir}/track-cli
+ln -s %{pkg_home}/bin/track-collector %{buildroot}%{_bindir}/track-collector
+ln -s %{pkg_home}/bin/track-server %{buildroot}%{_bindir}/track-server
+
+# 安装配置文件
+install -m 640 .env.example %{buildroot}%{pkg_config_dir}/track-system.env.example
+install -m 640 .env.example %{buildroot}%{pkg_config_dir}/track-system.env
+install -m 644 config/track-cli.toml %{buildroot}%{pkg_config_dir}/track-cli.toml
+
+# 安装 systemd 服务文件（仅 track-server 需要）
+install -m 644 packaging/systemd/track-system.service %{buildroot}%{_sysconfdir}/systemd/system/track-server.service
+
+# 安装日志轮转配置（仅 track-server 需要）
+mkdir -p %{buildroot}%{_sysconfdir}/logrotate.d
+install -m 644 packaging/logrotate/track-system %{buildroot}%{_sysconfdir}/logrotate.d/track-server
+
+# 安装预置数据库文件
+install -m 640 database/track-system.db %{buildroot}%{pkg_data_dir}/track-system.db
+
+# 安装文档
+mkdir -p %{buildroot}%{_docdir}/%{pkg_name}
+install -m 644 README.md %{buildroot}%{_docdir}/%{pkg_name}/
+
+# 创建空日志文件
+touch %{buildroot}%{pkg_log_dir}/track-server.log
+
+# 创建 track-cli 配置目录
+mkdir -p %{buildroot}%{_sysconfdir}/track-cli
+
+%pre
+# 创建 track 用户和组（如果不存在）
+getent group %{pkg_group} >/dev/null || groupadd -r %{pkg_group}
+getent passwd %{pkg_user} >/dev/null || \
+  useradd -r -g %{pkg_group} -d %{pkg_home} -s /sbin/nologin \
+    -c "Track System service user" %{pkg_user}
+
+%post
