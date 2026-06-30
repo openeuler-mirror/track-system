@@ -35,3 +35,41 @@ impl MigrationTrait for Migration {
             "ALTER TABLE commit_files ADD COLUMN old_mode TEXT",
             "ALTER TABLE commit_files ADD COLUMN new_mode TEXT",
             "ALTER TABLE commit_files ADD COLUMN updated_at TEXT",
+        ];
+
+        for sql in statements {
+            manager
+                .get_connection()
+                .execute(Statement::from_string(backend, sql.to_string()))
+                .await
+                .map_err(|err| DbErr::Custom(format!("Failed to execute `{}`: {}", sql, err)))?;
+        }
+
+        Ok(())
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        let backend = manager.get_database_backend();
+        if backend != DatabaseBackend::Sqlite {
+            for column in [
+                "patch_content",
+                "patch_format",
+                "is_binary",
+                "old_mode",
+                "new_mode",
+                "updated_at",
+            ] {
+                let sql = format!("ALTER TABLE commit_files DROP COLUMN {}", column);
+                manager
+                    .get_connection()
+                    .execute(Statement::from_string(backend, sql))
+                    .await
+                    .map_err(|err| {
+                        DbErr::Custom(format!("Failed to execute `{}`: {}", column, err))
+                    })?;
+            }
+        }
+
+        Ok(())
+    }
+}
