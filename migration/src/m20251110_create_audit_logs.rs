@@ -41,3 +41,46 @@ impl MigrationTrait for Migration {
                     .col(
                         ColumnDef::new(AuditLogs::ResponseStatus)
                             .integer()
+                            .not_null(),
+                    )
+                    .col(ColumnDef::new(AuditLogs::ResponseBody).json().null())
+                    .col(ColumnDef::new(AuditLogs::Duration).integer().null())
+                    .col(ColumnDef::new(AuditLogs::ErrorMessage).text().null())
+                    .col(
+                        ColumnDef::new(AuditLogs::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        // 创建索引以提高查询性能
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_audit_logs_user_id")
+                    .table(AuditLogs::Table)
+                    .col(AuditLogs::UserId)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_audit_logs_action")
+                    .table(AuditLogs::Table)
+                    .col(AuditLogs::Action)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_audit_logs_resource")
+                    .table(AuditLogs::Table)
+                    .col(AuditLogs::ResourceType)
+                    .col(AuditLogs::ResourceId)
