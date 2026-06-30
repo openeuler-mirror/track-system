@@ -45,3 +45,51 @@ track_collector:
 
     示例：
       track-collector collect l0 --platform github --owner nginx --repo nginx --branch master --token $GITHUB_TOKEN -o nginx-l0.json
+      track-collector batch --config batch-config.yaml
+  args:
+    lang: 语言（zh-CN / en-US）
+  commands:
+    collect:
+      about: 采集单个仓库元数据
+      args:
+        level: 采集层级（l0/l1/l2）
+        platform: 平台类型
+        owner: 仓库所有者（远端平台需要）
+        repo: 仓库名称（远端平台需要）
+        repo_path: 本地仓库路径（local 平台需要）
+        branch: 分支名称
+        api_url: API 地址（自建平台需要，如 Gitea）
+        token: 认证 token
+        limit: 采集数量限制
+        output: 输出文件路径
+    batch:
+      about: 批量采集多个仓库
+      args:
+        config: 配置文件路径（YAML 格式）
+        output_dir: 输出目录
+  help:
+    usage: 用法
+    commands: 命令
+    options: 选项
+
+track_cli:
+  about: Track-System CLI 客户端（仅 HTTP API）
+  long_about: |-
+    Track CLI - Track-System 生产级命令行客户端
+
+    说明：
+      - 这是纯客户端工具，通过 HTTP API 与 track-server 通信
+      - 不再直接连接数据库
+  help:
+    usage: 用法
+    commands: 命令
+    options: 选项
+    help_command: 帮助
+    help_about: 显示帮助信息或指定子命令的帮助
+  args:
+    lang: 语言（zh-CN / en-US）
+    log_level: 日志级别（debug, info, warn, error）
+  commands:
+    sync:
+      about: 数据同步相关命令
+      commands:
