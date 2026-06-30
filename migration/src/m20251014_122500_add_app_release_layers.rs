@@ -251,3 +251,54 @@ CREATE TABLE IF NOT EXISTS tracking_reports (
     failure_reason TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
+    FOREIGN KEY(tracking_id) REFERENCES tracking(id) ON DELETE CASCADE
+)
+"#;
+        manager
+            .get_connection()
+            .execute(Statement::from_string(backend, create_sql.to_string()))
+            .await?;
+
+        let index_sql = "CREATE INDEX IF NOT EXISTS idx_tracking_reports_tracking_id ON tracking_reports(tracking_id)";
+        manager
+            .get_connection()
+            .execute(Statement::from_string(backend, index_sql.to_string()))
+            .await?;
+
+        Ok(())
+    } else {
+        // PostgreSQL/MySQL 使用 json_binary
+        manager
+            .create_table(
+                Table::create()
+                    .table(TrackingReports::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(TrackingReports::Id)
+                            .integer()
+                            .not_null()
+                            .auto_increment()
+                            .primary_key(),
+                    )
+                    .col(
+                        ColumnDef::new(TrackingReports::TrackingId)
+                            .integer()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(TrackingReports::GeneratedAt)
+                            .timestamp()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(TrackingReports::DiffSummary)
+                            .json_binary()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(TrackingReports::RepresentativeChanges)
+                            .json_binary()
+                            .null(),
+                    )
+                    .col(ColumnDef::new(TrackingReports::Source).string().not_null())
+                    .col(ColumnDef::new(TrackingReports::Status).string().not_null())
