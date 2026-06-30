@@ -45,3 +45,51 @@ track_collector:
 
     Examples:
       track-collector collect l0 --platform github --owner nginx --repo nginx --branch master --token $GITHUB_TOKEN -o nginx-l0.json
+      track-collector batch --config batch-config.yaml
+  args:
+    lang: Language (zh-CN / en-US)
+  commands:
+    collect:
+      about: Collect metadata for a single repository
+      args:
+        level: Collection level (l0/l1/l2)
+        platform: Platform type
+        owner: Repository owner (remote platforms)
+        repo: Repository name (remote platforms)
+        repo_path: Local repository path (local platform)
+        branch: Branch name
+        api_url: API base URL (self-hosted platforms)
+        token: Access token
+        limit: Collection limit
+        output: Output file path
+    batch:
+      about: Batch collect multiple repositories
+      args:
+        config: Config file path (YAML)
+        output_dir: Output directory
+  help:
+    usage: Usage
+    commands: Commands
+    options: Options
+
+track_cli:
+  about: Track-System CLI client (HTTP API only)
+  long_about: |-
+    Track CLI - production-grade command line client for Track-System
+
+    Notes:
+      - This is a pure client tool; it communicates with track-server via HTTP API.
+      - It does not connect to the database directly.
+  help:
+    usage: Usage
+    commands: Commands
+    options: Options
+    help_command: help
+    help_about: Print this message or the help of the given subcommand(s)
+  args:
+    lang: Language (zh-CN / en-US)
+    log_level: Log level (debug, info, warn, error)
+  commands:
+    sync:
+      about: Sync operations
+      commands:
