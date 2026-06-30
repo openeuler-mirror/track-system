@@ -38,3 +38,43 @@ Requires(pre):  /usr/sbin/useradd, /usr/sbin/groupadd
 %description
 Track System is an automated source code repository tracking and analysis tool
 written in Rust. It focuses on tracking and comparing L0 (upstream), L1 
+(distribution) and L2 (local) repositories, supporting monitoring of openEuler, 
+Anolis, and OpenCloud source code repository changes.
+
+The system consists of three independent tools:
+- track-server: RESTful API server with database and scheduler
+- track-cli: Pure client tool for user interaction
+- track-collector: Standalone metadata collection tool (no database required)
+
+Key Features:
+- Three-layer architecture (L0 → L1 → L2) tracking
+- Multi-platform support (GitHub, GitLab, Gitee, Gitea, Local)
+- Automated change classification (CVE, version upgrade, features, etc.)
+- Git repository comparison and analysis
+- Priority-based sync scheduling
+- Workflow engine for custom processing
+- Isolated environment deployment support
+
+%prep
+# 解包源码
+%setup -q -n %{pkg_name}-%{pkg_version}
+
+%build
+# 使用 Release 模式编译以获得最佳性能
+# 编译三个独立的二进制文件
+sh build.sh
+
+%install
+# 创建安装目录结构
+mkdir -p %{buildroot}%{pkg_home}/bin
+mkdir -p %{buildroot}%{pkg_home}/lib
+mkdir -p %{buildroot}%{pkg_data_dir}
+mkdir -p %{buildroot}%{pkg_log_dir}
+mkdir -p %{buildroot}%{pkg_config_dir}
+mkdir -p %{buildroot}%{_sysconfdir}/systemd/system
+mkdir -p %{buildroot}%{_localstatedir}/lib/track-system/migrations
+
+# 安装三个二进制文件
+install -m 755 target/release/track-server %{buildroot}%{pkg_home}/bin/
+install -m 755 target/release/track-cli %{buildroot}%{pkg_home}/bin/
+install -m 755 target/release/track-collector %{buildroot}%{pkg_home}/bin/
