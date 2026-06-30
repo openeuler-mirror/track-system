@@ -39,3 +39,45 @@ impl MigrationTrait for Migration {
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk_tracking_package")
+                            .from(Tracking::Table, Tracking::PackageId)
+                            .to(Packages::Table, Packages::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk_tracking_distro")
+                            .from(Tracking::Table, Tracking::DistroId)
+                            .to(Distros::Table, Distros::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_tracking_package")
+                    .table(Tracking::Table)
+                    .col(Tracking::PackageId)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_tracking_distro")
+                    .table(Tracking::Table)
+                    .col(Tracking::DistroId)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_tracking_status")
+                    .table(Tracking::Table)
+                    .col(Tracking::TrackingStatus)
+                    .to_owned(),
