@@ -36,3 +36,42 @@ impl MigrationTrait for Migration {
 
         // 创建索引
         manager
+            .create_index(
+                Index::create()
+                    .name("idx_packages_name")
+                    .table(Packages::Table)
+                    .col(Packages::Name)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_packages_level")
+                    .table(Packages::Table)
+                    .col(Packages::Level)
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(Packages::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+enum Packages {
+    Table,
+    Id,
+    Name,
+    Level,
+    SyncIntervalHours,
+    L0RepoUrl,
+    Description,
+    CreatedAt,
+    UpdatedAt,
+}
