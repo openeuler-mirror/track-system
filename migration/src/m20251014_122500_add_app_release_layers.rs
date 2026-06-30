@@ -352,3 +352,54 @@ CREATE TABLE IF NOT EXISTS sync_jobs (
     FOREIGN KEY(tracking_id) REFERENCES tracking(id) ON DELETE CASCADE
 )
 "#;
+        manager
+            .get_connection()
+            .execute(Statement::from_string(backend, create_sql.to_string()))
+            .await?;
+
+        let index_sql =
+            "CREATE INDEX IF NOT EXISTS idx_sync_jobs_status ON sync_jobs(status, priority)";
+        manager
+            .get_connection()
+            .execute(Statement::from_string(backend, index_sql.to_string()))
+            .await?;
+
+        Ok(())
+    } else {
+        manager
+            .create_table(
+                Table::create()
+                    .table(SyncJobs::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(SyncJobs::Id)
+                            .big_integer()
+                            .not_null()
+                            .auto_increment()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(SyncJobs::TrackingId).integer().not_null())
+                    .col(ColumnDef::new(SyncJobs::JobKind).string().not_null())
+                    .col(ColumnDef::new(SyncJobs::ScheduledAt).timestamp().not_null())
+                    .col(ColumnDef::new(SyncJobs::StartedAt).timestamp().null())
+                    .col(ColumnDef::new(SyncJobs::FinishedAt).timestamp().null())
+                    .col(ColumnDef::new(SyncJobs::Status).string().not_null())
+                    .col(ColumnDef::new(SyncJobs::Error).text().null())
+                    .col(
+                        ColumnDef::new(SyncJobs::AttemptCount)
+                            .integer()
+                            .not_null()
+                            .default(0),
+                    )
+                    .col(
+                        ColumnDef::new(SyncJobs::Priority)
+                            .integer()
+                            .not_null()
+                            .default(0),
+                    )
+                    .col(ColumnDef::new(SyncJobs::CreatedAt).timestamp().not_null())
+                    .col(ColumnDef::new(SyncJobs::UpdatedAt).timestamp().not_null())
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk_sync_jobs_tracking")
+                            .from(SyncJobs::Table, SyncJobs::TrackingId)
