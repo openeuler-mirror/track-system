@@ -83,3 +83,45 @@ impl MigrationTrait for Migration {
                     "ALTER TABLE tracking_new RENAME TO tracking".to_owned(),
                 ))
                 .await?;
+
+                // 重新开启外键检查
+                conn.execute(Statement::from_string(
+                    backend,
+                    "PRAGMA foreign_keys=ON".to_owned(),
+                ))
+                .await?;
+            }
+            DatabaseBackend::Postgres => {
+                // 删除约束（PostgreSQL）
+                manager
+                    .get_connection()
+                    .execute(Statement::from_string(
+                        backend,
+                        "ALTER TABLE tracking DROP CONSTRAINT fk_tracking_distro".to_owned(),
+                    ))
+                    .await?;
+            }
+            DatabaseBackend::MySql => {
+                // 删除约束（MySQL）
+                manager
+                    .get_connection()
+                    .execute(Statement::from_string(
+                        backend,
+                        "ALTER TABLE tracking DROP FOREIGN KEY fk_tracking_distro".to_owned(),
+                    ))
+                    .await?;
+            }
+        }
+        Ok(())
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        let backend = manager.get_database_backend();
+        match backend {
+            DatabaseBackend::Sqlite => {
+                let conn = manager.get_connection();
+                // 关闭外键检查以允许表重建
+                conn.execute(Statement::from_string(
+                    backend,
+                    "PRAGMA foreign_keys=OFF".to_owned(),
+                ))
