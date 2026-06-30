@@ -39,3 +39,44 @@ impl MigrationTrait for Migration {
                     .col(boolean(SpecChanges::PatchesChanged))
                     .col(integer(SpecChanges::PatchesAdded))
                     .col(integer(SpecChanges::PatchesRemoved))
+                    .col(integer(SpecChanges::PatchesModified))
+                    .col(integer(SpecChanges::ChangelogEntriesAdded))
+                    .col(timestamp(SpecChanges::CreatedAt))
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk_spec_changes_commit")
+                            .from(SpecChanges::Table, SpecChanges::CommitRecordId)
+                            .to(CommitRecords::Table, CommitRecords::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk_spec_changes_old")
+                            .from(SpecChanges::Table, SpecChanges::OldSnapshotId)
+                            .to(SpecSnapshots::Table, SpecSnapshots::Id)
+                            .on_delete(ForeignKeyAction::SetNull),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk_spec_changes_new")
+                            .from(SpecChanges::Table, SpecChanges::NewSnapshotId)
+                            .to(SpecSnapshots::Table, SpecSnapshots::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_spec_changes_commit")
+                    .table(SpecChanges::Table)
+                    .col(SpecChanges::CommitRecordId)
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
