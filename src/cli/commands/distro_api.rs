@@ -287,3 +287,48 @@ mod tests {
             .create_async()
             .await;
 
+        let result = list_distros(&client).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_show_distro_by_id() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/distros/123")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "id": 123,
+                    "name": "Fedora",
+                    "version": "39",
+                    "description": "Fedora 39",
+                    "created_at": "2024-01-01T00:00:00Z",
+                    "updated_at": "2024-01-01T00:00:00Z",
+                    "tracking_count": 5
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = show_distro(&client, "123".to_string()).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_show_distro_by_name() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/distros/by-name/CentOS")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "id": 456,
+                    "name": "CentOS",
