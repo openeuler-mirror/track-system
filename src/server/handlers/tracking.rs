@@ -501,3 +501,50 @@ mod tests {
             .append_query_results::<packages::Model, _, _>([vec![]]) // Package not found
             .into_connection();
         let state = AppState::without_external_clients(db);
+
+        let req = CreateTrackingRequest {
+            package_id: 999,
+            distro_id: 1,
+            l1_repo_owner: "owner".to_string(),
+            l1_repo_name: "repo".to_string(),
+            l1_branch: "main".to_string(),
+            l2_branch: "main".to_string(),
+            l2_repo_path: "/path".to_string(),
+            tracking_status: None,
+        };
+
+        let result = create_tracking(State(state), Json(req)).await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            ApiError::NotFound(msg) => assert!(msg.contains("Package 999 not found")),
+            _ => panic!("Expected NotFound error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_create_tracking_success() {
+        let mock_package = create_mock_package(1);
+        let mock_tracking = create_mock_tracking(1, 1);
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results([[mock_package]]) // Package exists
+            .append_query_results([[mock_tracking]]) // Created tracking
+            .into_connection();
+        let state = AppState::without_external_clients(db);
+
+        let req = CreateTrackingRequest {
+            package_id: 1,
+            distro_id: 1,
+            l1_repo_owner: "openeuler".to_string(),
+            l1_repo_name: "glibc".to_string(),
+            l1_branch: "main".to_string(),
+            l2_branch: "CTyunOS-2.0".to_string(),
+            l2_repo_path: "/opt/repo/glibc".to_string(),
+            tracking_status: Some("active".to_string()),
+        };
+
+        let result = create_tracking(State(state), Json(req)).await;
+        assert!(result.is_ok());
+        let response = result.unwrap();
+        assert_eq!(response.0.code, 201);
+    }
