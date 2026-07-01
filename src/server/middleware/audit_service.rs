@@ -80,3 +80,44 @@ impl<'a> AuditService<'a> {
             user_id: Set(user_id),
             action: Set(action.to_string()),
             resource_type: Set(resource_type.to_string()),
+            resource_id: Set(Some(resource_id.to_string())),
+            method: Set("INTERNAL".to_string()),
+            path: Set(format!("/{}/{}", resource_type, resource_id)),
+            ip_address: Set(None),
+            user_agent: Set(None),
+            request_body: Set(details),
+            response_status: Set(200),
+            response_body: Set(None),
+            duration: Set(None),
+            error_message: Set(None),
+            created_at: Set(Utc::now()),
+            ..Default::default()
+        };
+
+        audit_log.insert(self.db).await?;
+
+        Ok(())
+    }
+
+    /// 记录用户操作
+    pub async fn log_user_action(
+        &self,
+        user_id: &str,
+        action: audit_logs::AuditAction,
+        description: &str,
+    ) -> Result<(), sea_orm::DbErr> {
+        let audit_log = audit_logs::ActiveModel {
+            user_id: Set(Some(user_id.to_string())),
+            action: Set(action.to_string()),
+            resource_type: Set("user_action".to_string()),
+            resource_id: Set(None),
+            method: Set("USER".to_string()),
+            path: Set(description.to_string()),
+            ip_address: Set(None),
+            user_agent: Set(None),
+            request_body: Set(None),
+            response_status: Set(200),
+            response_body: Set(None),
+            duration: Set(None),
+            error_message: Set(None),
+            created_at: Set(Utc::now()),
