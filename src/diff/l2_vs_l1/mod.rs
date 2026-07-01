@@ -578,3 +578,55 @@ impl L2VsL1Comparator {
     /// 分析 spec 文件中的定制内容
     fn analyze_spec_customizations(spec_content: &str) -> Result<Vec<Customization>> {
         let mut customizations = Vec::new();
+
+        // 检查定制标记
+        if spec_content.contains("# Custom:") || spec_content.contains("# Enterprise:") {
+            customizations.push(Customization {
+                customization_type: CustomizationType::Other,
+                description: "spec 文件包含定制标记".to_string(),
+                affected_files: vec!["*.spec".to_string()],
+            });
+        }
+
+        // 检查版本变更标记
+        if spec_content.contains("# Version modified") || spec_content.contains("# Custom version")
+        {
+            customizations.push(Customization {
+                customization_type: CustomizationType::VersionChange,
+                description: "spec 文件包含版本变更标记".to_string(),
+                affected_files: vec!["*.spec".to_string()],
+            });
+        }
+
+        // 检查配置修改标记
+        let config_keywords = [
+            "# Config:",
+            "# Configuration:",
+            "--with-",
+            "--enable-",
+            "--disable-",
+        ];
+
+        for keyword in &config_keywords {
+            if spec_content.contains(keyword) {
+                // 提取配置相关的行
+                let config_lines: Vec<&str> = spec_content
+                    .lines()
+                    .filter(|line| line.contains(keyword))
+                    .take(3) // 最多取 3 行作为示例
+                    .collect();
+
+                if !config_lines.is_empty() {
+                    customizations.push(Customization {
+                        customization_type: CustomizationType::ConfigurationChange,
+                        description: format!("spec 文件包含配置修改: {}", config_lines.join("; ")),
+                        affected_files: vec!["*.spec".to_string()],
+                    });
+                    break; // 只添加一次配置修改
+                }
+            }
+        }
+
+        // 检查性能优化标记
+        let perf_keywords = [
+            "# Performance:",
