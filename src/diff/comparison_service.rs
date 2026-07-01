@@ -188,3 +188,51 @@ impl<'a> ComparisonService<'a> {
                 "needs_backport": !diff.l1_ahead.is_empty(),
                 "needs_forward_port": !diff.l2_ahead.is_empty(),
             },
+            "generated_at": Utc::now().to_rfc3339(),
+        }))
+    }
+
+    /// 保存对比报告到数据库
+    pub async fn save_report(&self, report: &ComparisonReport) -> Result<()> {
+        let now = Utc::now();
+
+        let active = tracking_reports::ActiveModel {
+            tracking_id: Set(report.tracking_id),
+            generated_at: Set(now),
+            diff_summary: Set(report.diff_summary.clone()),
+            representative_changes: Set(None),
+            source: Set(report.source.clone()),
+            status: Set("completed".to_string()),
+            failure_reason: Set(None),
+            created_at: Set(now),
+            updated_at: Set(now),
+            ..Default::default()
+        };
+
+        active.insert(self.db).await.context("保存对比报告失败")?;
+
+        info!(
+            tracking_id = report.tracking_id,
+            commits_ahead = report.commits_ahead,
+            commits_behind = report.commits_behind,
+            "对比报告已保存"
+        );
+
+        Ok(())
+    }
+
+    /// 获取最新的对比报告
+    pub async fn get_latest_report(
+        &self,
+        tracking_id: i32,
+    ) -> Result<Option<tracking_reports::Model>> {
+        let report = TrackingReports::find()
+            .filter(tracking_reports::Column::TrackingId.eq(tracking_id))
+            .order_by_desc(tracking_reports::Column::GeneratedAt)
+            .one(self.db)
+            .await?;
+
+        Ok(report)
+    }
+}
+
