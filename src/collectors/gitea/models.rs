@@ -39,3 +39,45 @@ impl From<GiteaRepository> for Repository {
             name: repo.name.clone(),
             full_name: repo.full_name,
             description: repo.description,
+            html_url: repo.html_url.unwrap_or_default(),
+            default_branch: repo.default_branch.unwrap_or_else(|| "master".to_string()),
+            created_at: repo.created_at,
+            updated_at: repo.updated_at,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GiteaBranch {
+    pub name: String,
+    pub commit: GiteaBranchCommit,
+    pub protected: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GiteaBranchCommit {
+    pub id: String,
+}
+
+impl From<GiteaBranch> for Branch {
+    fn from(branch: GiteaBranch) -> Self {
+        Branch {
+            name: branch.name,
+            commit_sha: branch.commit.id,
+            protected: branch.protected,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GiteaCommit {
+    pub sha: String,
+    pub commit: GiteaCommitMetadata,
+    pub html_url: Option<String>,
+    pub stats: Option<GiteaCommitStats>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GiteaCommitMetadata {
+    #[serde(default)]
+    pub title: Option<String>,
