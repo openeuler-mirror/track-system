@@ -130,3 +130,26 @@ pub fn to_public_spec(name: &str, info: SpecInfo) -> ComponentSpec {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::{decode_file_content, normalize_spec_path};
+    use crate::collectors::traits::FileContent;
+
+    #[test]
+    fn normalize_spec_name() {
+        assert_eq!(normalize_spec_path("nginx", None), "nginx.spec");
+        assert_eq!(
+            normalize_spec_path("nginx", Some("custom.spec")),
+            "custom.spec"
+        );
+        assert_eq!(normalize_spec_path("nginx", Some("custom")), "custom.spec");
+    }
+
+    #[test]
+    fn decode_base64_content() {
+        let file = FileContent {
+            name: "nginx.spec".into(),
+            path: "nginx.spec".into(),
+            sha: "dummy".into(),
+            size: 4,
+            content: "VGVzdA==".into(),
