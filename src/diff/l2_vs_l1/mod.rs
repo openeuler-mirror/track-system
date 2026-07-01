@@ -683,3 +683,56 @@ impl L2VsL1Comparator {
                 || filename_lower.contains("enterprise")
                 || filename_lower.contains("internal")
                 || filename_lower.contains("proprietary")
+            {
+                customizations.push(Customization {
+                    customization_type: CustomizationType::FeatureModification,
+                    description: format!("定制功能补丁: {}", patch.filename),
+                    affected_files: vec![patch.path.clone()],
+                });
+                continue; // 已分类，跳过后续检查
+            }
+
+            // 2. 检查安全相关补丁
+            if filename_lower.contains("security")
+                || filename_lower.contains("hardening")
+                || filename_lower.contains("cve-")
+                || filename_lower.contains("vulnerability")
+            {
+                customizations.push(Customization {
+                    customization_type: CustomizationType::SecurityHardening,
+                    description: format!("安全加固补丁: {}", patch.filename),
+                    affected_files: vec![patch.path.clone()],
+                });
+                continue;
+            }
+
+            // 3. 检查配置相关补丁
+            if filename_lower.contains("config")
+                || filename_lower.contains("configure")
+                || filename_lower.contains("settings")
+                || filename_lower.contains("options")
+            {
+                customizations.push(Customization {
+                    customization_type: CustomizationType::ConfigurationChange,
+                    description: format!("配置修改补丁: {}", patch.filename),
+                    affected_files: vec![patch.path.clone()],
+                });
+                continue;
+            }
+
+            // 4. 检查性能优化补丁
+            if filename_lower.contains("performance")
+                || filename_lower.contains("optimize")
+                || filename_lower.contains("optimization")
+                || filename_lower.contains("perf")
+                || filename_lower.contains("speed")
+            {
+                customizations.push(Customization {
+                    customization_type: CustomizationType::PerformanceOptimization,
+                    description: format!("性能优化补丁: {}", patch.filename),
+                    affected_files: vec![patch.path.clone()],
+                });
+                continue;
+            }
+
+            // 5. 检查版本相关补丁
