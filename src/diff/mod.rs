@@ -121,3 +121,46 @@ fn diff_spec(l1_spec: Option<&SpecEntry>, l2_spec: Option<&SpecEntry>) -> Option
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::snapshot::types::{FileEntry, RepositorySnapshot, SnapshotOrigin, SpecEntry};
+
+    #[test]
+    fn test_diff_files_modified() {
+        let l1_files = vec![
+            FileEntry {
+                path: "file1.txt".to_string(),
+                sha256: "sha1".to_string(),
+                size: 100,
+                is_binary: false,
+            },
+            FileEntry {
+                path: "file2.txt".to_string(),
+                sha256: "sha2".to_string(),
+                size: 200,
+                is_binary: false,
+            },
+        ];
+        let l2_files = vec![
+            FileEntry {
+                path: "file1.txt".to_string(),
+                sha256: "sha1_modified".to_string(),
+                size: 100,
+                is_binary: false,
+            },
+            FileEntry {
+                path: "file2.txt".to_string(),
+                sha256: "sha2".to_string(),
+                size: 200,
+                is_binary: false,
+            },
+        ];
+
+        let diff = diff_files(&l1_files, &l2_files);
+        assert_eq!(diff.len(), 1);
+        if let FileDiff::Modified {
+            path,
+            l1_sha,
+            l2_sha,
+        } = &diff[0]
