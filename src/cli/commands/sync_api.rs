@@ -340,3 +340,54 @@ mod tests {
             .mock("POST", "/api/sync/5/queue")
             .with_status(500)
             .create_async()
+            .await;
+
+        let result = run_all_sync(&client).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock_list.assert_async().await;
+        mock_sync.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_batch_sync() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock1 = server
+            .mock("POST", "/api/sync/11/queue")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "job_id": 110,
+                    "status": "queued"
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let mock2 = server
+            .mock("POST", "/api/sync/22/queue")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "job_id": 220,
+                    "status": "queued"
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = batch_sync(&client, vec![11, 22]).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock1.assert_async().await;
+        mock2.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_batch_sync_with_failures() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock1 = server
