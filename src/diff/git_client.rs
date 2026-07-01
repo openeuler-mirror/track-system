@@ -134,3 +134,49 @@ impl GitRepositoryClient {
         debug!(branch = branch, count = commits.len(), "获取 commits 完成");
 
         Ok(commits)
+    }
+
+    /// 对比两个分支的 commits
+    pub fn compare_branches(&self, l1_branch: &str, l2_branch: &str) -> Result<CommitDiff> {
+        let l1_commits = self
+            .get_commits(l1_branch)
+            .context("获取 L1 branch commits 失败")?;
+        let l2_commits = self
+            .get_commits(l2_branch)
+            .context("获取 L2 branch commits 失败")?;
+
+        let diff = Self::compute_diff(&l1_commits, &l2_commits);
+
+        info!(
+            l1_branch = l1_branch,
+            l2_branch = l2_branch,
+            l1_ahead = diff.l1_ahead.len(),
+            l2_ahead = diff.l2_ahead.len(),
+            "分支对比完成"
+        );
+
+        Ok(diff)
+    }
+
+    /// 对比两个 commit 列表
+    pub fn compute_diff(l1_commits: &[GitCommit], l2_commits: &[GitCommit]) -> CommitDiff {
+        // 构建 L2 commit SHA 的集合用于快速查询
+        let l2_shas: std::collections::HashSet<_> =
+            l2_commits.iter().map(|c| c.sha.as_str()).collect();
+
+        // 找出 L1 中有但 L2 中没有的 commits
+        let l1_ahead: Vec<GitCommit> = l1_commits
+            .iter()
+            .filter(|c| !l2_shas.contains(c.sha.as_str()))
+            .cloned()
+            .collect();
+
+        // 构建 L1 commit SHA 的集合用于快速查询
+        let l1_shas: std::collections::HashSet<_> =
+            l1_commits.iter().map(|c| c.sha.as_str()).collect();
+
+        // 找出 L2 中有但 L1 中没有的 commits
+        let l2_ahead: Vec<GitCommit> = l2_commits
+            .iter()
+            .filter(|c| !l1_shas.contains(c.sha.as_str()))
+            .cloned()
