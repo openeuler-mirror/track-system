@@ -500,3 +500,52 @@ mod tests_extra {
             l1_repo_owner: "owner".to_string(),
             l1_repo_name: "repo".to_string(),
             l2_branch: "local".to_string(),
+            l2_repo_path: "/tmp/l2".to_string(),
+            tracking_status: "idle".to_string(),
+            last_sync_time: Some(Utc::now()),
+            last_l1_commit_sha: None,
+            last_l2_commit_sha: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            last_error: None,
+        };
+
+        let job = sync_jobs::Model {
+            id: 88,
+            tracking_id: 300,
+            job_kind: "sync".to_string(),
+            scheduled_at: Utc::now(),
+            started_at: Some(Utc::now()),
+            finished_at: None,
+            status: "running".to_string(),
+            error: None,
+            attempt_count: 0,
+            priority: 0,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let now = Utc::now();
+        let compare_model = compare_reports::Model {
+            id: 42,
+            tracking_id: track.id,
+            generated_at: now,
+            l2_vs_l1_diff: None,
+            l1_vs_l0_diff: None,
+            status: "success".to_string(),
+            failure_reason: None,
+            created_at: now,
+            updated_at: now,
+        };
+
+        let tracking_report = tracking_reports::Model {
+            id: 1,
+            tracking_id: track.id,
+            generated_at: now,
+            diff_summary: serde_json::json!({}),
+            representative_changes: None,
+            source: "pipeline".to_string(),
+            status: "success".to_string(),
+            failure_reason: None,
+            created_at: now,
+            updated_at: now,
