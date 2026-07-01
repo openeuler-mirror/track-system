@@ -34,3 +34,39 @@ where
 {
     db: &'a DatabaseConnection,
     collector: &'a C,
+}
+
+impl<'a, C> L0Watcher<'a, C>
+where
+    C: Collector + Send + Sync + ?Sized,
+{
+    pub fn new(db: &'a DatabaseConnection, collector: &'a C) -> Self {
+        Self { db, collector }
+    }
+
+    /// 轮询指定软件包的 L0 仓库，记录新增 commit
+    pub async fn poll_package(
+        &self,
+        package: &packages::Model,
+        branch: &str,
+    ) -> Result<L0PollSummary> {
+        let repo_url = package
+            .l0_repo_url
+            .as_deref()
+            .ok_or_else(|| anyhow!("package {} missing l0_repo_url", package.name))?;
+
+        let (owner, repo) = parse_github_repo(repo_url)
+            .with_context(|| format!("failed to parse GitHub repo from {}", repo_url))?;
+
+        // 构建采集配置
+        let config = CollectConfig::new(Platform::GitHub, branch)
+            .with_remote(&owner, &repo)
+            .with_limit(50);
+
+        // 使用 Collector 采集 commits
+        let result = self
+            .collector
+            .collect(&config)
+            .await
+            .context("failed to collect commits from GitHub")?;
+
