@@ -183,3 +183,38 @@ mod tests {
         assert_eq!(dto.author_email, commit.author_email);
         assert_eq!(dto.additions, commit.additions);
         assert_eq!(dto.deletions, commit.deletions);
+        assert_eq!(dto.total, commit.total);
+    }
+
+    #[tokio::test]
+    async fn test_select_client_no_clients() {
+        use sea_orm::{DatabaseBackend, MockDatabase};
+        let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+        let state = AppState::without_external_clients(db);
+
+        let result = select_client(&state, None);
+        assert!(result.is_err());
+        // Since Result::unwrap_err requires T: Debug and (&dyn GitClient, &str) doesn't implement Debug,
+        // we can't use unwrap_err() directly here.
+        // Instead, we check the error directly from the Result.
+        if let Err(e) = result {
+            assert_eq!(e, StatusCode::SERVICE_UNAVAILABLE);
+        } else {
+            panic!("Expected error, but got Ok");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_component_handler_error_without_clients() {
+        use axum::extract::{Path, Query, State};
+        use sea_orm::{DatabaseBackend, MockDatabase};
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+        let state = AppState::without_external_clients(db);
+
+        let params = ComponentQueryParams {
+            platform: None,
+            owner: None,
+            branch: None,
+            spec: None,
+        };
