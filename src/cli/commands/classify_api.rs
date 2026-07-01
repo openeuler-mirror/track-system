@@ -275,3 +275,43 @@ mod tests {
 
         let action = ClassifyAction::ProcessTracking {
             tracking_id: 456,
+            limit: 15,
+        };
+        let result = execute(&client, action).await;
+        if let Err(e) = &result {
+            eprintln!("Test error: {:?}", e);
+        }
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_execute_daemon_action() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("POST", "/api/classify/daemon/start")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "daemon_id": "daemon-789",
+                    "status": "started"
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let action = ClassifyAction::Daemon {
+            interval: 30,
+            batch_size: 50,
+        };
+        let result = execute(&client, action).await;
+        if let Err(e) = &result {
+            eprintln!("Test error: {:?}", e);
+        }
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+}
