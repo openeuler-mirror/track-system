@@ -405,3 +405,46 @@ mod tests {
         let package_model = packages::Model {
             id: 1,
             name: "pkg".to_string(),
+            level: 1,
+            sync_interval_hours: 24,
+            l0_repo_url: None,
+            description: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let inserted_job = sync_jobs::Model {
+            id: 1,
+            tracking_id: 1,
+            job_kind: "sync".to_string(),
+            scheduled_at: Utc::now(),
+            started_at: None,
+            finished_at: None,
+            status: "pending".to_string(),
+            error: None,
+            attempt_count: 0,
+            priority: 0,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            // get_pending_sync_tasks_ordered -> returns (tracking, Some(package))
+            .append_query_results::<(tracking::Model, Option<packages::Model>), _, _>(vec![vec![(
+                tracking_model.clone(),
+                Some(package_model.clone()),
+            )]])
+            // queue_sync_job -> find_active_sync_job -> none
+            .append_query_results::<sync_jobs::Model, _, _>(vec![vec![]])
+            // queue_sync_job -> insert returning
+            .append_query_results::<sync_jobs::Model, _, _>(vec![vec![inserted_job]])
+            .into_connection();
+
+        let executor = SyncExecutor::new(&db, None);
+
+        // Test limit 0：不会调用 execute_sync，避免复杂的 SyncService 依赖
+        let stats = executor.execute_pending_tasks_with_limit(0).await.unwrap();
+        assert_eq!(stats.discovered, 1);
+        assert_eq!(stats.processed, 0);
+    }
+}
