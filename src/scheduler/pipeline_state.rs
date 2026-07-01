@@ -164,3 +164,45 @@ impl PipelineStateManager {
             Ok(state.to_job_progress(job.status))
         } else {
             // 如果内存中没有,从数据库读取
+            let job = SyncJobs::find_by_id(job_id)
+                .one(self.db.as_ref())
+                .await?
+                .ok_or_else(|| anyhow::anyhow!("SyncJob {} 不存在", job_id))?;
+
+            Ok(JobProgress {
+                job_id,
+                tracking_id: job.tracking_id,
+                current_stage: None,
+                completed_stages: vec![],
+                progress_percent: 0.0,
+                status: job.status,
+            })
+        }
+    }
+
+    /// 更新数据库中的任务状态
+    pub async fn update_job_status(&self, job_id: i64, status: &str) -> Result<()> {
+        let job = SyncJobs::find_by_id(job_id)
+            .one(self.db.as_ref())
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("SyncJob {} 不存在", job_id))?;
+
+        let mut active_job: sync_jobs::ActiveModel = job.into();
+        active_job.status = Set(status.to_string());
+        active_job.updated_at = Set(Utc::now());
+
+        active_job
+            .update(self.db.as_ref())
+            .await
+            .context("更新任务状态失败")?;
+
+        Ok(())
+    }
+
+    /// 清理已完成的状态
+    pub fn cleanup_state(&self, job_id: i64) {
+        let mut states = self.states.write().unwrap();
+        states.remove(&job_id);
+    }
+}
+
