@@ -237,3 +237,51 @@ impl<'a> SyncService<'a> {
             "同步完成"
         );
 
+        Ok(SyncResult::success(commits_synced, issues_synced))
+    }
+
+    /// 保存 commits 到数据库
+    async fn save_commits(
+        &self,
+        tracking_id: i32,
+        commits: &[crate::collectors::traits::CommitMetadata],
+        tracking: &tracking::Model,
+        platform: Platform,
+    ) -> Result<usize> {
+        use std::collections::HashSet;
+        let mut saved_count = 0;
+
+        info!(platform = %platform, "保存 commits 到数据库");
+        if platform == Platform::Gitee {
+            // 为确保作者提交优先于机器人提交，按时间升序处理
+            let mut commits_sorted = commits.to_vec();
+            commits_sorted.sort_by_key(|c| c.date);
+            let mut seen_version_release: HashSet<(String, String)> = HashSet::new();
+
+            for commit in &commits_sorted {
+                // 检查是否已存在
+                let existing = L1CommitRecords::find()
+                    .filter(l1_commit_records::Column::TrackingId.eq(tracking_id))
+                    .filter(l1_commit_records::Column::CommitSha.eq(&commit.sha))
+                    .one(self.db)
+                    .await?;
+
+                if existing.is_some() {
+                    continue; // 跳过已存在的
+                }
+
+                // 构造 API URL gitee 默认使用src-openeuler/ 前缀
+                // 根据实际平台构造正确的 API URL
+
+                let api_url = format!(
+                    "https://gitee.com/src-openeuler/{}/commit/{}",
+                    tracking.l1_repo_name, commit.sha
+                );
+
+                // 解析 spec 版本与 release：按该 commit 的 SHA 拉取 spec 文件内容
+                // 仅在平台为 Gitee 且存在 repo 信息时进行
+                let (spec_version_opt, spec_release_opt) = {
+                    use crate::collectors::gitee::GiteeClient;
+                    use crate::component::normalize_spec_path;
+                    use crate::spec::parse_spec;
+                    let mut spec_version: Option<String> = None;
