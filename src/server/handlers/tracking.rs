@@ -222,3 +222,48 @@ pub async fn create_tracking(
         l1_repo_name: Set(req.l1_repo_name),
         l1_branch: Set(req.l1_branch),
         l2_branch: Set(req.l2_branch),
+        l2_repo_path: Set(req.l2_repo_path),
+        tracking_status: Set(req.tracking_status.unwrap_or_else(|| "active".to_string())),
+        created_at: Set(now),
+        updated_at: Set(now),
+        ..Default::default()
+    };
+
+    let result = tracking.insert(state.db.as_ref()).await?;
+
+    Ok(Json(ApiResponse::created(result.into())))
+}
+
+/// GET /api/tracking/:id
+///
+/// 获取跟踪配置详情
+pub async fn get_tracking(
+    State(state): State<AppState>,
+    Path(id): Path<i32>,
+) -> ApiResult<Json<ApiResponse<TrackingResponse>>> {
+    let tracking = Tracking::find_by_id(id)
+        .one(state.db.as_ref())
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("Tracking {} not found", id)))?;
+
+    Ok(Json(ApiResponse::success(tracking.into())))
+}
+
+/// PUT /api/tracking/:id
+///
+/// 更新跟踪配置
+pub async fn update_tracking(
+    State(state): State<AppState>,
+    Path(id): Path<i32>,
+    Json(req): Json<UpdateTrackingRequest>,
+) -> ApiResult<Json<ApiResponse<TrackingResponse>>> {
+    // 查找现有配置
+    let tracking = Tracking::find_by_id(id)
+        .one(state.db.as_ref())
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("Tracking {} not found", id)))?;
+
+    let mut active: tracking::ActiveModel = tracking.into();
+
+    // 更新字段
+    if let Some(l1_repo_owner) = req.l1_repo_owner {
