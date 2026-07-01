@@ -1117,3 +1117,52 @@ mod tests {
             .with_body(
                 serde_json::json!({
                     "code": 200,
+                    "message": "success",
+                    "data": {
+                        "items": [
+                            {
+                                "id": 100,
+                                "package_id": 10,
+                                "distro_id": 1,
+                                "l1_repo_owner": "test-owner",
+                                "l1_repo_name": "test-repo",
+                                "l1_branch": "main",
+                                "l2_branch": "openeuler",
+                                "l2_repo_path": "/path/to/repo",
+                                "tracking_status": "active",
+                                "last_sync_time": null,
+                                "last_l1_commit_sha": null,
+                                "last_l2_commit_sha": null,
+                                "created_at": "2024-01-01T00:00:00Z",
+                                "updated_at": "2024-01-01T00:00:00Z"
+                            }
+                        ],
+                        "total": 1
+                    }
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let import_mock = server
+            .mock("POST", "/api/metadata/l1")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "code": 200,
+                    "message": "success",
+                    "data": {
+                        "snapshot_id": "snap-batch",
+                        "tracking_id": 100,
+                        "file_count": 1,
+                        "imported_at": "2024-01-01T00:00:00Z"
+                    }
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = import_batch_files(
