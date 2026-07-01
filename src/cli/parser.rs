@@ -730,3 +730,56 @@ pub enum ServerAction {
     /// 测试服务器连接
     #[command(about = "Test server connection")]
     Ping,
+
+    /// 获取服务器信息
+    #[command(about = "Get server information")]
+    Info,
+}
+
+// ============== Report Commands ==============
+
+#[derive(Subcommand, Debug)]
+pub enum ReportAction {
+    /// 列出报告
+    #[command(about = "List reports")]
+    List {
+        /// 页码
+        #[arg(long)]
+        page: Option<u64>,
+
+        /// 每页大小
+        #[arg(long)]
+        page_size: Option<u64>,
+
+        /// 按跟踪配置 ID 过滤
+        #[arg(long)]
+        tracking_id: Option<i32>,
+
+        /// 按报告类型过滤
+        #[arg(long)]
+        report_type: Option<String>,
+    },
+
+    /// 显示报告详情
+    #[command(about = "Show report details")]
+    Show {
+        /// 报告 ID
+        id: i64,
+    },
+
+    /// 导出报告
+    #[command(about = "Export report")]
+    Export {
+        /// 报告 ID
+        id: i64,
+
+        /// 导出格式 (json, yaml, markdown, html)
+        #[arg(long, default_value = "json")]
+        format: String,
+
+        /// 输出文件路径
+        #[arg(long)]
+        output: Option<String>,
+    },
+}
+
