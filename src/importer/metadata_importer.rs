@@ -330,3 +330,25 @@ impl<'a> MetadataImporter<'a> {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_import_result_success() {
+        let result = ImportResult::success(10, 5, 3, 2);
+        assert!(result.success);
+        assert_eq!(result.commits_imported, 10);
+        assert_eq!(result.commits_skipped, 5);
+        assert_eq!(result.issues_imported, 3);
+        assert_eq!(result.issues_skipped, 2);
+    }
+
+    #[test]
+    fn test_import_result_failed() {
+        let result = ImportResult::failed("测试错误".to_string());
+        assert!(!result.success);
+        assert_eq!(result.commits_imported, 0);
+        assert_eq!(result.message, "测试错误");
+    }
+}
