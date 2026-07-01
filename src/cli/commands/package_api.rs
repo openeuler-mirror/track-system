@@ -297,3 +297,52 @@ async fn remove_package(api_client: &ApiClient, name: String, confirm: bool) -> 
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cli::client::ClientConfig;
+    use mockito::Server;
+
+    async fn setup_test_server() -> (mockito::ServerGuard, ApiClient) {
+        let server = Server::new_async().await;
+        let config = ClientConfig {
+            server_url: server.url(),
+            auth_token: Some("test_token".to_string()),
+            timeout: 30,
+            verify_ssl: true,
+        };
+        let client = ApiClient::new(config).unwrap();
+        (server, client)
+    }
+
+    fn create_test_package_dto(id: i32, name: &str) -> serde_json::Value {
+        serde_json::json!({
+            "id": id,
+            "name": name,
+            "level": 1,
+            "sync_interval_hours": 24,
+            "l0_repo_url": "https://github.com/test/repo",
+            "description": "Test package",
+            "created_at": "2024-01-01T00:00:00Z",
+            "updated_at": "2024-01-01T00:00:00Z"
+        })
+    }
+
+    #[test]
+    fn test_parse_sync_interval_hours_ok() {
+        assert_eq!(parse_sync_interval_hours("12h").unwrap(), 12);
+        assert_eq!(parse_sync_interval_hours("24").unwrap(), 24);
+        assert_eq!(parse_sync_interval_hours("\"6h\"").unwrap(), 6);
+        assert_eq!(parse_sync_interval_hours("'48h'").unwrap(), 48);
+        assert_eq!(parse_sync_interval_hours("8760H").unwrap(), 8760);
+    }
+
+    #[test]
+    fn test_parse_sync_interval_hours_invalid() {
+        assert!(parse_sync_interval_hours("").is_err());
+        assert!(parse_sync_interval_hours("0h").is_err());
+        assert!(parse_sync_interval_hours("-1h").is_err());
+        assert!(parse_sync_interval_hours("abc").is_err());
+        assert!(parse_sync_interval_hours("12m").is_err());
+        assert!(parse_sync_interval_hours("8761h").is_err());
+    }
