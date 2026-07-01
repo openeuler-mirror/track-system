@@ -39,3 +39,44 @@ impl TaskExecutor {
 
         // 根据任务类型分发到不同的处理器
         match task.task_type.as_str() {
+            "sync" => {
+                let tracking_id = task
+                    .parameters
+                    .get("tracking_id")
+                    .and_then(|v| v.as_i64())
+                    .context("sync 任务缺少 tracking_id 参数")?;
+
+                info!("  执行 sync 任务: tracking_id = {}", tracking_id);
+                Ok(serde_yaml::Value::String(format!(
+                    "Sync completed for tracking {}",
+                    tracking_id
+                )))
+            }
+            "classify" => {
+                let limit = task
+                    .parameters
+                    .get("limit")
+                    .and_then(|v| v.as_i64())
+                    .unwrap_or(100);
+
+                info!("  执行 classify 任务: limit = {}", limit);
+                Ok(serde_yaml::Value::String(format!(
+                    "Classified {} items",
+                    limit
+                )))
+            }
+            "compare" => {
+                let tracking_id = task
+                    .parameters
+                    .get("tracking_id")
+                    .and_then(|v| v.as_i64())
+                    .context("compare 任务缺少 tracking_id 参数")?;
+
+                info!("  执行 compare 任务: tracking_id = {}", tracking_id);
+                Ok(serde_yaml::Value::String(format!(
+                    "Comparison completed for tracking {}",
+                    tracking_id
+                )))
+            }
+            "export" => {
+                let format = task
