@@ -341,3 +341,52 @@ async fn remove_tracking(api_client: &ApiClient, id: i32, confirm: bool) -> Resu
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cli::client::ClientConfig;
+    use mockito::Server;
+
+    async fn setup_test_server() -> (mockito::ServerGuard, ApiClient) {
+        let server = Server::new_async().await;
+        let config = ClientConfig {
+            server_url: server.url(),
+            auth_token: Some("test_token".to_string()),
+            timeout: 30,
+            verify_ssl: true,
+        };
+        let client = ApiClient::new(config).unwrap();
+        (server, client)
+    }
+
+    #[test]
+    fn test_parse_owner_repo_slash() {
+        let result = parse_owner_repo("owner/repo");
+        assert!(result.is_ok());
+        let (owner, repo) = result.unwrap();
+        assert_eq!(owner, "owner");
+        assert_eq!(repo, "repo");
+    }
+
+    #[test]
+    fn test_parse_owner_repo_colon() {
+        let result = parse_owner_repo("owner:repo");
+        assert!(result.is_ok());
+        let (owner, repo) = result.unwrap();
+        assert_eq!(owner, "owner");
+        assert_eq!(repo, "repo");
+    }
+
+    #[test]
+    fn test_parse_owner_repo_url() {
+        let result = parse_owner_repo("https://gitee.com/src-openeuler/elfutils.git");
+        assert!(result.is_ok());
+        let (owner, repo) = result.unwrap();
+        assert_eq!(owner, "src-openeuler");
+        assert_eq!(repo, "elfutils");
+    }
+
+    #[test]
+    fn test_parse_owner_repo_invalid() {
+        let result = parse_owner_repo("invalid");
+        assert!(result.is_err());
