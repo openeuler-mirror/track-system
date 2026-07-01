@@ -320,3 +320,45 @@ mod tests {
 
     #[test]
     fn test_sync_execution_stats_record_error() {
+        let mut stats = SyncExecutionStats::default();
+
+        stats.record_error(123, "Connection timeout".to_string());
+
+        assert_eq!(stats.processed, 1);
+        assert_eq!(stats.failed, 1);
+        assert_eq!(stats.errors.len(), 1);
+        assert_eq!(stats.errors[0].0, 123);
+        assert_eq!(stats.errors[0].1, "Connection timeout");
+    }
+
+    #[test]
+    fn test_sync_execution_stats_multiple_records() {
+        let mut stats = SyncExecutionStats::default();
+
+        stats.record_outcome(
+            1,
+            &SyncResult {
+                status: SyncStatus::Success,
+                commits_synced: 5,
+                issues_synced: 2,
+                message: "OK".to_string(),
+            },
+        );
+
+        stats.record_outcome(
+            2,
+            &SyncResult {
+                status: SyncStatus::Skipped,
+                commits_synced: 0,
+                issues_synced: 0,
+                message: "Skipped".to_string(),
+            },
+        );
+
+        stats.record_error(3, "Failed".to_string());
+
+        assert_eq!(stats.processed, 3);
+        assert_eq!(stats.succeeded, 1);
+        assert_eq!(stats.skipped, 1);
+        assert_eq!(stats.failed, 1);
+        assert_eq!(stats.errors.len(), 1);
