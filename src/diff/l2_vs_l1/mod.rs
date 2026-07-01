@@ -208,3 +208,56 @@ pub enum VersionRelationship {
     /// 无法比较
     Incomparable,
 }
+
+/// patch 文件差异
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PatchDiff {
+    /// 总 patch 数（L1）
+    pub l1_total: usize,
+    /// 总 patch 数（L2）
+    pub l2_total: usize,
+    /// L2 新增的 patch
+    pub l2_added: Vec<PatchFile>,
+    /// L2 删除的 patch（L1 有但 L2 没有）
+    pub l2_removed: Vec<PatchFile>,
+    /// L2 修改的 patch（文件名相同但内容不同）
+    pub l2_modified: Vec<PatchModification>,
+    /// 相同的 patch
+    pub identical: Vec<PatchFile>,
+}
+
+/// patch 修改
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PatchModification {
+    /// 文件名
+    pub filename: String,
+    /// L1 的哈希
+    pub l1_hash: String,
+    /// L2 的哈希
+    pub l2_hash: String,
+}
+
+/// 源文件差异
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SourceDiff {
+    /// 总源文件数（L1）
+    pub l1_total: usize,
+    /// 总源文件数（L2）
+    pub l2_total: usize,
+    /// L2 新增的源文件
+    pub l2_added: Vec<SourceFile>,
+    /// L2 删除的源文件
+    pub l2_removed: Vec<SourceFile>,
+    /// L2 修改的源文件
+    pub l2_modified: Vec<SourceModification>,
+}
+
+/// 源文件修改
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SourceModification {
+    /// 文件名
+    pub filename: String,
+    /// L1 的哈希
+    pub l1_hash: String,
+    /// L2 的哈希
+    pub l2_hash: String,
