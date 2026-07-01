@@ -118,3 +118,44 @@ pub async fn update_package(
     let mut package: packages::ActiveModel = package.into();
 
     if let Some(level) = req.level {
+        package.level = Set(level);
+    }
+    if let Some(sync_interval_hours) = req.sync_interval_hours {
+        if sync_interval_hours <= 0 || sync_interval_hours > 24 * 365 {
+            return Err(ApiError::BadRequest(
+                "sync_interval_hours 必须在 1..=8760 小时范围内".to_string(),
+            ));
+        }
+        package.sync_interval_hours = Set(sync_interval_hours);
+    }
+    if let Some(l0_repo_url) = req.l0_repo_url {
+        package.l0_repo_url = Set(Some(l0_repo_url));
+    }
+    if let Some(description) = req.description {
+        package.description = Set(Some(description));
+    }
+
+    package.updated_at = Set(Utc::now());
+
+    let result = package.update(state.db.as_ref()).await?;
+
+    Ok(Json(result.into()))
+}
+
+/// 删除软件包
+pub async fn delete_package(
+    State(state): State<AppState>,
+    Path(id): Path<i32>,
+) -> ApiResult<StatusCode> {
+    let result = Packages::delete_by_id(id).exec(state.db.as_ref()).await?;
+
+    if result.rows_affected == 0 {
+        return Err(ApiError::NotFound(format!(
+            "Package with id {} not found",
+            id
+        )));
+    }
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
