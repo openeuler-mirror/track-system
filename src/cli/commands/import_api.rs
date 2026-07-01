@@ -287,3 +287,51 @@ fn parse_snapshot_or_convert(
     // 2) 解析为通用 JSON，转换为 RepositorySnapshot
     let root: Value = serde_json::from_str(content)?;
 
+    // 读取顶层字段：level/collected_at（可选）
+    let level = root.get("level").and_then(|v| v.as_str()).unwrap_or("l1");
+    let origin = match level {
+        "l2" => SnapshotOrigin::L2,
+        // 将 l0 也归并到 L1，以便走同一导入端点
+        "l0" | "l1" => SnapshotOrigin::L1,
+        _ => SnapshotOrigin::L1,
+    };
+
+    let generated_at = root
+        .get("collected_at")
+        .and_then(|v| v.as_str())
+        .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
+        .map(|dt| dt.with_timezone(&Utc))
+        .unwrap_or_else(Utc::now);
+
+    // commits 列表
+    let commits_arr = root
+        .get("commits")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+
+    // issues 列表（可选）
+    let issues_arr = root
+        .get("issues")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+
+    // spec 信息（可选）
+    let spec_entry = root.get("spec").and_then(|v| {
+        let path = v
+            .get("path")
+            .and_then(|p| p.as_str())
+            .unwrap_or("")
+            .to_string();
+        let version = v
+            .get("version")
+            .and_then(|p| p.as_str())
+            .map(|s| s.to_string());
+        let release = v
+            .get("release")
+            .and_then(|p| p.as_str())
+            .map(|s| s.to_string());
+        let content_base64 = v
+            .get("content_base64")
+            .and_then(|p| p.as_str())
