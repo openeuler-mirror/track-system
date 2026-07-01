@@ -294,3 +294,42 @@ mod tests {
             "content": "SGVsbG8gV29ybGQ=",
             "encoding": "base64",
             "download_url": "url"
+        });
+
+        let mock = server.mock(|when, then| {
+            when.method(GET)
+                .path("/repos/owner/test-repo/contents/file.txt")
+                .query_param("ref", "main")
+                .header("Authorization", "token token");
+            then.status(200).json_body(file_response);
+        });
+
+        let result = client
+            .get_file_content("owner", "test-repo", "file.txt", "main")
+            .await;
+        mock.assert();
+        assert!(result.is_ok());
+        let file = result.unwrap();
+        assert_eq!(file.name, "file.txt");
+    }
+
+    #[tokio::test]
+    async fn test_retry_mechanism() {
+        let server = MockServer::start();
+        let client = GiteaClient::new("token", server.base_url()).unwrap();
+
+        let mock = server.mock(|when, then| {
+            when.method(GET).path("/repos/owner/test-repo");
+            then.status(500).body("Internal Server Error");
+        });
+
+        let result = client.get_repository("owner", "test-repo").await;
+
+        // Should fail after retries
+        assert!(result.is_err());
+        // Verify multiple calls were made (1 initial + 3 retries = 4 calls ideally,
+        // but httpmock hits counts might vary depending on implementation detail.
+        // Just checking it fails with 500 is good enough for now, or check hits >= 2)
+        mock.assert_calls(4);
+    }
+}
