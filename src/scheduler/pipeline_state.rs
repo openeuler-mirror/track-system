@@ -81,3 +81,44 @@ impl PipelineState {
             current_stage: self.current_stage,
             completed_stages: self.completed_stages.clone(),
             progress_percent: self.progress_percent(),
+            status,
+        }
+    }
+}
+
+/// 流水线状态管理器
+pub struct PipelineStateManager {
+    db: Arc<DatabaseConnection>,
+    states: Arc<RwLock<HashMap<i64, PipelineState>>>,
+}
+
+impl PipelineStateManager {
+    pub fn new(db: Arc<DatabaseConnection>) -> Self {
+        Self {
+            db,
+            states: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
+    /// 创建新的流水线状态
+    pub fn create_state(&self, job_id: i64, tracking_id: i32) -> Result<()> {
+        let mut states = self.states.write().unwrap();
+        states.insert(job_id, PipelineState::new(job_id, tracking_id));
+        Ok(())
+    }
+
+    /// 更新当前阶段
+    pub fn start_stage(&self, job_id: i64, stage: PipelineStage) -> Result<()> {
+        let mut states = self.states.write().unwrap();
+        if let Some(state) = states.get_mut(&job_id) {
+            state.start_stage(stage);
+        }
+        Ok(())
+    }
+
+    /// 完成阶段
+    pub fn complete_stage(&self, job_id: i64, stage: PipelineStage) -> Result<()> {
+        let mut states = self.states.write().unwrap();
+        if let Some(state) = states.get_mut(&job_id) {
+            state.complete_stage(stage);
+        }
