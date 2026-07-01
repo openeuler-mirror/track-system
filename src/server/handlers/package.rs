@@ -159,3 +159,46 @@ pub async fn delete_package(
     Ok(StatusCode::NO_CONTENT)
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::server::dto::{CreatePackageRequest, UpdatePackageRequest};
+    use axum::extract::{Path, State};
+    use sea_orm::{DatabaseBackend, MockDatabase, MockExecResult};
+
+    fn create_mock_package(id: i32, name: &str) -> packages::Model {
+        packages::Model {
+            id,
+            name: name.to_string(),
+            level: 1,
+            sync_interval_hours: 24,
+            l0_repo_url: Some("https://github.com/example/repo".to_string()),
+            description: Some("Test package".to_string()),
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_list_packages_empty() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<packages::Model, _, _>([vec![]])
+            .into_connection();
+
+        let state = AppState::without_external_clients(db);
+        let result = list_packages(State(state)).await;
+
+        assert!(result.is_ok());
+        let response = result.unwrap();
+        assert_eq!(response.0.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_list_packages_with_data() {
+        let mock_packages = vec![
+            create_mock_package(1, "glibc"),
+            create_mock_package(2, "gcc"),
+        ];
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results([mock_packages])
