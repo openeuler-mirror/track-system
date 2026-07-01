@@ -408,3 +408,46 @@ mod tests {
         let diff = CommitDiff {
             l1_ahead: vec![],
             l2_ahead: vec![],
+        };
+
+        let result = service
+            .build_detailed_diff(&tracking, &diff, "git_comparison")
+            .unwrap();
+
+        assert_eq!(result["commits_ahead"]["count"], 0);
+        assert_eq!(result["commits_behind"]["count"], 0);
+        assert_eq!(result["summary"]["needs_backport"], false);
+        assert_eq!(result["summary"]["needs_forward_port"], false);
+    }
+
+    #[tokio::test]
+    async fn test_save_report() {
+        let now = Utc::now();
+
+        // Create a mock report that will be returned after insert
+        let report_model = tracking_reports::Model {
+            id: 1,
+            tracking_id: 1,
+            generated_at: now,
+            diff_summary: json!({
+                "tracking_id": 1,
+                "commits_ahead": 2,
+            }),
+            representative_changes: None,
+            source: "auto".to_string(),
+            status: "completed".to_string(),
+            failure_reason: None,
+            created_at: now,
+            updated_at: now,
+        };
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results([[report_model]])
+            .into_connection();
+
+        let service = ComparisonService::new(&db);
+
+        let report = ComparisonReport {
+            tracking_id: 1,
+            commits_behind: 0,
+            commits_ahead: 2,
