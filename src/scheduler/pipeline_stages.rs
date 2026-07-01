@@ -1961,3 +1961,55 @@ Summary: Test package
             spec_version: None,
             spec_release: None,
         };
+
+        let inserted_report = tracking_reports::Model {
+            id: 99,
+            tracking_id: tracking_model.id,
+            generated_at: Utc::now(),
+            diff_summary: serde_json::json!({}),
+            representative_changes: None,
+            source: "pipeline".to_string(),
+            status: "success".to_string(),
+            failure_reason: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<packages::Model, _, _>(vec![vec![package_model.clone()]])
+            .append_query_results::<compare_reports::Model, _, _>(vec![vec![compare_model.clone()]])
+            .append_query_results::<l1_commit_records::Model, _, _>(vec![
+                vec![commit_model.clone()],
+            ])
+            .append_query_results::<tracking_reports::Model, _, _>(vec![vec![
+                inserted_report.clone()
+            ]])
+            .into_connection();
+
+        let executor = PipelineExecutor::new(&db, None);
+        let mut prev = std::collections::HashMap::new();
+        let diff_details = serde_json::json!({"report_id": 42});
+        let stage = StageResult::success(
+            PipelineStage::DiffComparison,
+            "ok".to_string(),
+            Utc::now(),
+            diff_details,
+        );
+        prev.insert(PipelineStage::DiffComparison, stage);
+
+        let result = executor
+            .stage_report_generation(&tracking_model, &prev)
+            .await
+            .unwrap();
+        assert_eq!(result.report_status, "success".to_string());
+        assert!(result.report_id > 0);
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_stage_report_generation_calls_risk_create() {
+        use crate::entities::{
+            compare_reports, l1_commit_records, packages, tracking, tracking_reports,
+        };
+        use chrono::{TimeZone, Utc};
+        use httpmock::prelude::*;
