@@ -254,3 +254,46 @@ async fn update_package(
 
     match api_client
         .put::<_, PackageDto>(&format!("/packages/{}", pkg.id), &request)
+        .await
+    {
+        Ok(_) => {
+            println!("{} 软件包更新成功", "✓".green().bold());
+            Ok(())
+        }
+        Err(e) => {
+            println!("{} 更新软件包失败: {}", "✗".red().bold(), e);
+            Err(e.into())
+        }
+    }
+}
+
+/// 删除软件包
+async fn remove_package(api_client: &ApiClient, name: String, confirm: bool) -> Result<()> {
+    if !confirm {
+        println!("{}", "危险操作：删除软件包需要 --confirm 参数".yellow());
+        return Ok(());
+    }
+
+    println!("正在删除软件包: {}", name.cyan());
+
+    let pkg_opt = find_package_by_name(api_client, &name).await?;
+    let pkg = match pkg_opt {
+        Some(p) => p,
+        None => bail!("未找到软件包: {}", name),
+    };
+
+    match api_client
+        .delete_no_content(&format!("/packages/{}", pkg.id))
+        .await
+    {
+        Ok(_) => {
+            println!("{} 软件包删除成功", "✓".green().bold());
+            Ok(())
+        }
+        Err(e) => {
+            println!("{} 删除软件包失败: {}", "✗".red().bold(), e);
+            Err(e.into())
+        }
+    }
+}
+
