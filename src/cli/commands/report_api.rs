@@ -221,3 +221,48 @@ pub async fn export_report(
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cli::client::ClientConfig;
+    use mockito::Server;
+    use tempfile::NamedTempFile;
+
+    async fn setup_test_server() -> (mockito::ServerGuard, ApiClient) {
+        let server = Server::new_async().await;
+        let config = ClientConfig {
+            server_url: server.url(),
+            auth_token: Some("test_token".to_string()),
+            timeout: 30,
+            verify_ssl: true,
+        };
+        let client = ApiClient::new(config).unwrap();
+        (server, client)
+    }
+
+    #[tokio::test]
+    async fn test_list_reports() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/reports?page=1&page_size=10")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "data": {
+                        "items": [
+                            {
+                                "id": 1,
+                                "tracking_id": 10,
+                                "report_type": "comparison",
+                                "package_name": "test-package",
+                                "status": "completed",
+                                "created_at": "2024-01-01T00:00:00Z",
+                                "updated_at": "2024-01-01T01:00:00Z"
+                            }
+                        ],
+                        "total": 1,
+                        "page": 1,
+                        "page_size": 10,
+                        "total_pages": 1
