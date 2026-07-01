@@ -117,3 +117,43 @@ async fn check_all_health(api_client: &ApiClient) -> Result<()> {
     }
 
     Ok(())
+}
+
+/// 检查特定组件健康状态
+async fn check_component_health(api_client: &ApiClient, component: &str) -> Result<()> {
+    println!(
+        "{}",
+        format!("正在检查 {} 组件健康状态...", component).cyan()
+    );
+
+    let health: serde_json::Value = api_client
+        .get(&format!("/health?component={}", component))
+        .await?;
+
+    println!("\n{}", format!("=== {} 健康状态 ===", component).bold());
+
+    let status = health["status"].as_str().unwrap_or("unknown");
+    let status_display = match status {
+        "healthy" => "健康".green(),
+        "degraded" => "降级".yellow(),
+        "unhealthy" => "不健康".red(),
+        _ => "未知".white(),
+    };
+    println!("状态: {}", status_display);
+
+    // 显示详细信息
+    if let Some(details) = health["details"].as_object() {
+        println!("\n详细信息:");
+        for (key, value) in details {
+            println!("  {}: {}", key, value);
+        }
+    }
+
+    // 显示错误信息
+    if let Some(error) = health["error"].as_str() {
+        println!("\n{}: {}", "错误".red(), error);
+    }
+
+    Ok(())
+}
+
