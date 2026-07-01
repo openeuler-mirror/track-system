@@ -47,3 +47,52 @@ fn parse_owner_repo(input: &str) -> Result<(String, String)> {
             let owner = parts[1];
             let mut repo = parts[2];
             if let Some(stripped) = repo.strip_suffix(".git") {
+                repo = stripped;
+            }
+            return Ok((owner.to_string(), repo.to_string()));
+        } else {
+            return Err(anyhow!(
+                "无效的仓库URL，需形如 https://host/owner/repo(.git)"
+            ));
+        }
+    }
+
+    // 非 URL 形式，支持 / : & 分隔
+    let sep = if trimmed.contains('/') {
+        '/'
+    } else if trimmed.contains(':') {
+        ':'
+    } else if trimmed.contains('&') {
+        '&'
+    } else {
+        return Err(anyhow!(
+            "无效的仓库格式，请使用 owner/repo、owner:repo 或完整URL"
+        ));
+    };
+
+    let mut iter = trimmed.split(sep);
+    let owner = iter.next().unwrap_or_default().to_string();
+    let repo = iter.next().unwrap_or_default().to_string();
+    if owner.is_empty() || repo.is_empty() {
+        return Err(anyhow!(
+            "无效的仓库格式，请使用 owner/repo、owner:repo 或完整URL"
+        ));
+    }
+    Ok((owner, repo))
+}
+
+/// 解析 distro 参数为数值 ID（目前不支持按名称查询）
+fn parse_distro_id(input: &str) -> Result<i32> {
+    input
+        .parse::<i32>()
+        .map_err(|_| anyhow!("发行版未提供查询 API，请使用数值 ID"))
+}
+
+/// 解析 package 名称或 ID
+async fn resolve_package_id(api_client: &ApiClient, input: &str) -> Result<i32> {
+    if let Ok(id) = input.parse::<i32>() {
+        return Ok(id);
+    }
+
+    // 目前服务端不支持按名称查询，拉取列表后匹配
+    let packages: Vec<PackageDto> = api_client.get("/packages").await?;
