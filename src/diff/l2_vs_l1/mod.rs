@@ -1421,3 +1421,56 @@ impl L2VsL1Comparator {
                     "L1 新增了 {} 个功能补丁，建议评估这些新功能是否适用于 L2",
                     feature_patches.len()
                 ),
+                affected_files: feature_patches.iter().map(|p| p.filename.clone()).collect(),
+                estimated_effort: EffortLevel::Medium,
+            });
+        }
+
+        Ok(recommendations)
+    }
+
+    /// 生成配置变更建议（Medium 优先级）
+    fn generate_config_recommendations(
+        &self,
+        spec_diff: &SpecDiff,
+    ) -> Result<Vec<SyncRecommendation>> {
+        let mut recommendations = Vec::new();
+
+        // BuildRequires 变更
+        if !spec_diff.build_requires_added.is_empty()
+            || !spec_diff.build_requires_removed.is_empty()
+        {
+            let mut description_parts = Vec::new();
+
+            if !spec_diff.build_requires_added.is_empty() {
+                description_parts.push(format!(
+                    "新增 {} 个 BuildRequires: {}",
+                    spec_diff.build_requires_added.len(),
+                    spec_diff.build_requires_added.join(", ")
+                ));
+            }
+
+            if !spec_diff.build_requires_removed.is_empty() {
+                description_parts.push(format!(
+                    "删除 {} 个 BuildRequires: {}",
+                    spec_diff.build_requires_removed.len(),
+                    spec_diff.build_requires_removed.join(", ")
+                ));
+            }
+
+            recommendations.push(SyncRecommendation {
+                priority: SyncPriority::Medium,
+                recommendation_type: SyncType::ConfigUpdate,
+                description: format!(
+                    "L1 的 BuildRequires 发生变更：{}。建议同步以确保构建依赖正确",
+                    description_parts.join("；")
+                ),
+                affected_files: vec!["*.spec".to_string()],
+                estimated_effort: EffortLevel::Low,
+            });
+        }
+
+        // configure 选项变更
+        if !spec_diff.configure_options_added.is_empty()
+            || !spec_diff.configure_options_removed.is_empty()
+        {
