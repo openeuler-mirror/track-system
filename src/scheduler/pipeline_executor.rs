@@ -839,3 +839,52 @@ mod tests {
         };
 
         let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results(vec![vec![job_model.clone()]])
+            .into_connection();
+        use crate::scheduler::PipelineStateManager;
+        let state_mgr = Arc::new(PipelineStateManager::new(Arc::new(db)));
+
+        let db2 = sea_orm::MockDatabase::new(sea_orm::DatabaseBackend::Postgres).into_connection();
+        let mut executor = PipelineExecutor::new(&db2, None);
+        executor.state_manager = Some(state_mgr.clone());
+
+        state_mgr.create_state(1, 10).unwrap();
+        let progress = executor.get_job_progress(1).await.unwrap();
+        assert_eq!(progress.job_id, 1);
+        assert_eq!(progress.tracking_id, 10);
+    }
+
+    #[tokio::test]
+    async fn test_get_job_progress_without_state_manager() {
+        use crate::entities::sync_jobs;
+        use chrono::Utc;
+
+        let job_model = sync_jobs::Model {
+            id: 1,
+            tracking_id: 1,
+            job_kind: "sync".to_string(),
+            scheduled_at: Utc::now(),
+            started_at: Some(Utc::now()),
+            finished_at: None,
+            status: "running".to_string(),
+            error: None,
+            attempt_count: 0,
+            priority: 0,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let db = sea_orm::MockDatabase::new(sea_orm::DatabaseBackend::Postgres)
+            .append_query_results(vec![vec![job_model]])
+            .into_connection();
+
+        let executor = PipelineExecutor::new(&db, None);
+        let result = executor.get_job_progress(1).await;
+
+        assert!(result.is_ok());
+        let progress = result.unwrap();
+        assert_eq!(progress.job_id, 1);
+        assert_eq!(progress.status, "running");
+        assert_eq!(progress.progress_percent, 0.0);
+    }
+}
