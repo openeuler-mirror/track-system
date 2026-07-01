@@ -102,3 +102,56 @@ pub enum Commands {
     },
 
     /// 软件包管理命令
+    Package {
+        #[command(subcommand)]
+        action: PackageAction,
+    },
+
+    /// 发行版管理命令
+    #[command(hide = true)]
+    Distro {
+        #[command(subcommand)]
+        action: DistroAction,
+    },
+
+    /// 跟踪配置管理命令
+    Tracking {
+        #[command(subcommand)]
+        action: TrackingAction,
+    },
+
+    /// 系统状态查询命令
+    #[command(hide = true)]
+    Status {
+        #[command(subcommand)]
+        action: StatusAction,
+    },
+
+    /// 健康检查命令
+    #[command(hide = true)]
+    Health {
+        #[command(subcommand)]
+        action: HealthAction,
+    },
+
+    /// 服务器管理命令
+    #[command(hide = true)]
+    Server {
+        #[command(subcommand)]
+        action: ServerAction,
+    },
+
+    /// 报告管理命令
+    Report {
+        #[command(subcommand)]
+        action: ReportAction,
+    },
+}
+
+// ============== Sync Commands ==============
+
+#[derive(Subcommand, Debug)]
+pub enum SyncAction {
+    /// 执行单个tracking的数据同步
+    #[command(about = "Run sync for a specific tracking")]
+    Run {
