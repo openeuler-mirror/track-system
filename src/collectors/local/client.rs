@@ -440,3 +440,52 @@ impl LocalClient {
         // 获取 tree
         let tree = commit
             .tree()
+            .map_err(|e| ApiError::Unknown(format!("Failed to get tree: {}", e)))?;
+
+        let mut spec_path = None;
+        let mut spec_content = None;
+        let mut spec_content_base64 = None;
+        let mut spec_version = None;
+        let mut spec_release = None;
+        let mut spec_sha256 = None;
+        let mut patches = Vec::new();
+        let mut source_files = Vec::new();
+        let mut file_count = 0;
+
+        // 遍历 tree
+        tree.walk(git2::TreeWalkMode::PreOrder, |root, entry| {
+            file_count += 1;
+            let path = format!("{}{}", root, entry.name().unwrap_or(""));
+
+            // 获取文件内容
+            if let Ok(object) = entry.to_object(repo) {
+                if let Some(blob) = object.as_blob() {
+                    let content = blob.content();
+
+                    // 检查是否是 spec 文件
+                    if path.ends_with(".spec") {
+                        if let Ok(text) = String::from_utf8(content.to_vec()) {
+                            spec_content = Some(text.clone());
+                            spec_path = Some(path.clone());
+
+                            // Convert to base64
+                            spec_content_base64 =
+                                Some(base64::engine::general_purpose::STANDARD.encode(content));
+
+                            // Calculate SHA256
+                            let mut hasher = Sha256::new();
+                            hasher.update(content);
+                            spec_sha256 = Some(format!("{:x}", hasher.finalize()));
+
+                            // 尝试提取版本号和发行版号
+                            for line in text.lines() {
+                                if line.starts_with("Version:") {
+                                    spec_version = Some(
+                                        line.trim_start_matches("Version:").trim().to_string(),
+                                    );
+                                } else if line.starts_with("Release:") {
+                                    spec_release = Some(
+                                        line.trim_start_matches("Release:").trim().to_string(),
+                                    );
+                                }
+                            }
