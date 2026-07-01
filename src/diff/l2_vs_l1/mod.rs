@@ -50,3 +50,56 @@ pub struct L2Snapshot {
     pub package_name: String,
     /// 版本号
     pub version: String,
+    /// spec 文件内容
+    pub spec_content: String,
+    /// spec 文件哈希
+    pub spec_sha256: String,
+    /// patch 文件列表
+    pub patches: Vec<PatchFile>,
+    /// 源文件列表
+    pub source_files: Vec<SourceFile>,
+    /// 定制内容
+    pub customizations: Vec<Customization>,
+    /// commit 记录列表
+    pub commits: Vec<CommitEntry>,
+    /// 快照时间
+    pub snapshot_at: DateTime<Utc>,
+}
+
+/// Patch 文件
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PatchFile {
+    /// 文件名
+    pub filename: String,
+    /// 文件路径
+    pub path: String,
+    /// 内容哈希（SHA256）
+    pub content_hash: String,
+    /// 文件大小
+    pub size: u64,
+    /// 是否已应用
+    pub applied: bool,
+}
+
+/// 源文件
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SourceFile {
+    /// 文件名
+    pub filename: String,
+    /// 文件路径
+    pub path: String,
+    /// 内容哈希（SHA256）
+    pub content_hash: String,
+    /// 文件大小
+    pub size: u64,
+}
+
+/// 定制内容
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Customization {
+    /// 定制类型
+    pub customization_type: CustomizationType,
+    /// 描述
+    pub description: String,
+    /// 影响的文件
+    pub affected_files: Vec<String>,
