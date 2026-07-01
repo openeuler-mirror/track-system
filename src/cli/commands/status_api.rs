@@ -173,3 +173,45 @@ async fn show_rate_limit(api_client: &ApiClient) -> Result<()> {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cli::client::ClientConfig;
+    use mockito::Server;
+
+    async fn setup_test_server() -> (mockito::ServerGuard, ApiClient) {
+        let server = Server::new_async().await;
+        let config = ClientConfig {
+            server_url: server.url(),
+            auth_token: Some("test_token".to_string()),
+            timeout: 30,
+            verify_ssl: true,
+        };
+        let client = ApiClient::new(config).unwrap();
+        (server, client)
+    }
+
+    #[tokio::test]
+    async fn test_show_overview() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/status")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "data": {
+                        "status": "healthy",
+                        "version": "1.0.0",
+                        "uptime": 3600,
+                        "database": {
+                            "connected": true,
+                            "pool_size": 10
+                        },
+                        "scheduler": {
+                            "running": true,
+                            "active_jobs": 5,
+                            "pending_jobs": 2
+                        }
+                    }
