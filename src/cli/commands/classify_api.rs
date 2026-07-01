@@ -118,3 +118,42 @@ async fn run_classification_daemon(
     Ok(())
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cli::client::ClientConfig;
+    use mockito::{Server, ServerGuard};
+
+    async fn setup_test_server() -> (ServerGuard, ApiClient) {
+        let server = Server::new_async().await;
+        let config = ClientConfig {
+            server_url: server.url(),
+            auth_token: Some("test_token".to_string()),
+            timeout: 30,
+            verify_ssl: true,
+        };
+        let client = ApiClient::new(config).unwrap();
+        (server, client)
+    }
+
+    #[tokio::test]
+    async fn test_process_classification() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("POST", "/api/classify/process")
+            .match_body(mockito::Matcher::Json(serde_json::json!({
+                "limit": 10
+            })))
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "processed": 10,
+                    "success": 8,
+                    "failed": 2
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
