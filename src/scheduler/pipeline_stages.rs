@@ -1599,3 +1599,55 @@ Summary: Test package
             last_l1_commit_sha: None,
             last_l2_commit_sha: None,
             created_at: Utc::now(),
+            updated_at: Utc::now(),
+            last_error: None,
+        };
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+        let executor = PipelineExecutor::new(&db, None);
+        let result = executor.get_l1_version_info(&tracking_model).await.unwrap();
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_save_comparison_reports_basic() {
+        let tracking_model = tracking::Model {
+            id: 1,
+            package_id: 1,
+            distro_id: 1,
+            l1_branch: "main".to_string(),
+            l1_repo_owner: "owner".to_string(),
+            l1_repo_name: "repo".to_string(),
+            l2_branch: "local".to_string(),
+            l2_repo_path: "/path".to_string(),
+            tracking_status: "idle".to_string(),
+            last_sync_time: Some(Utc::now()),
+            last_l1_commit_sha: None,
+            last_l2_commit_sha: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            last_error: None,
+        };
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+
+        let executor = PipelineExecutor::new(&db, None);
+
+        let l2_report = diff::l2_vs_l1::L2VsL1Report {
+            id: None,
+            package_name: "pkg".to_string(),
+            spec_diff: diff::l2_vs_l1::SpecDiff {
+                version_diff: None,
+                content_identical: true,
+                diff_summary: String::new(),
+                key_changes: vec![],
+                detailed_comparison: None,
+                build_requires_added: vec![],
+                build_requires_removed: vec![],
+                configure_options_added: vec![],
+                configure_options_removed: vec![],
+            },
+            patch_diff: diff::l2_vs_l1::PatchDiff {
+                l1_total: 0,
+                l2_total: 0,
+                l2_added: vec![],
