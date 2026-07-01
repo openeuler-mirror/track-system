@@ -285,3 +285,51 @@ impl<'a> SyncService<'a> {
                     use crate::component::normalize_spec_path;
                     use crate::spec::parse_spec;
                     let mut spec_version: Option<String> = None;
+                    let mut spec_release: Option<String> = None;
+
+                    // 尝试通过 Gitee API 获取该 commit 的 spec 内容
+                    // URL 形如：/contents/<spec_path>?ref=<commitsha>
+                    // 我们复用 GiteeClient::get_file_content，并将 branch 参数传入 commit.sha
+                    if let Ok(token) = std::env::var("GITEE_TOKEN") {
+                        if !token.trim().is_empty() {
+                            // 构建客户端
+                            let client = GiteeClient::new(token).ok();
+                            if let Some(client) = client {
+                                let spec_path = normalize_spec_path(&tracking.l1_repo_name, None);
+                                match client
+                                    .get_file_content(
+                                        &tracking.l1_repo_owner,
+                                        &tracking.l1_repo_name,
+                                        &spec_path,
+                                        &commit.sha,
+                                    )
+                                    .await
+                                {
+                                    Ok(file) => {
+                                        // Base64 解码并解析
+                                        if let Ok(decoded) = client.decode_content(&file.content) {
+                                            let info = parse_spec(&decoded);
+                                            if !info.version.is_empty() {
+                                                spec_version = Some(info.version);
+                                            }
+                                            if !info.release.is_empty() {
+                                                spec_release = Some(info.release);
+                                            }
+                                        }
+                                    }
+                                    Err(_e) => {
+                                        // 拉取失败则忽略，不阻塞提交保存
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    (spec_version, spec_release)
+                };
+
+                // 如果该版本-发布组合已被非机器人提交占用，则跳过机器人的重复提交
+                if let Some(ver) = spec_version_opt.as_ref() {
+                    let rel_key = spec_release_opt.clone().unwrap_or_default();
+                    let key = (ver.clone(), rel_key.clone());
+                    let is_bot = is_openeuler_ci_bot(&commit.author, &commit.email);
