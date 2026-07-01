@@ -1527,3 +1527,56 @@ impl L2VsL1Comparator {
                     .map(|s| s.filename.clone())
                     .collect(),
                 estimated_effort: EffortLevel::Low,
+            });
+        }
+
+        // L1 修改的源文件
+        if !source_diff.l2_modified.is_empty() {
+            recommendations.push(SyncRecommendation {
+                priority: SyncPriority::Low,
+                recommendation_type: SyncType::ConfigUpdate,
+                description: format!(
+                    "L1 修改了 {} 个源文件，建议检查变更内容",
+                    source_diff.l2_modified.len()
+                ),
+                affected_files: source_diff
+                    .l2_modified
+                    .iter()
+                    .map(|m| m.filename.clone())
+                    .collect(),
+                estimated_effort: EffortLevel::Low,
+            });
+        }
+
+        Ok(recommendations)
+    }
+
+    /// 生成定制内容保留建议（Low 优先级）
+    fn generate_customization_recommendations(
+        &self,
+        customization_analysis: &CustomizationAnalysis,
+    ) -> Result<Vec<SyncRecommendation>> {
+        let mut recommendations = Vec::new();
+
+        if customization_analysis.total_customizations > 0 {
+            // 检查是否有安全加固定制
+            let has_security = customization_analysis
+                .by_type
+                .get("SecurityHardening")
+                .map(|items| !items.is_empty())
+                .unwrap_or(false);
+
+            let priority = if has_security {
+                SyncPriority::High // 安全加固定制需要特别注意
+            } else {
+                SyncPriority::Low
+            };
+
+            recommendations.push(SyncRecommendation {
+                priority,
+                recommendation_type: SyncType::ConfigUpdate,
+                description: format!(
+                    "L2 包含 {} 项定制内容，同步 L1 更新时需要特别注意保留这些定制。{}",
+                    customization_analysis.total_customizations,
+                    if has_security {
+                        "特别注意：包含安全加固定制，必须保留"
