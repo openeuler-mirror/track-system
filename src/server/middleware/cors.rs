@@ -90,3 +90,49 @@ impl CorsConfig {
         self.max_age = seconds;
         self
     }
+
+    /// 从环境变量加载配置
+    pub fn from_env() -> Self {
+        let allowed_origins = std::env::var("CORS_ALLOWED_ORIGINS")
+            .ok()
+            .map(|s| s.split(',').map(|s| s.trim().to_string()).collect())
+            .unwrap_or_else(|| vec!["*".to_string()]);
+
+        let allow_credentials = std::env::var("CORS_ALLOW_CREDENTIALS")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(true);
+
+        let max_age = std::env::var("CORS_MAX_AGE")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(3600);
+
+        Self {
+            allowed_origins,
+            allow_credentials,
+            max_age,
+            ..Default::default()
+        }
+    }
+
+    /// 构建 CorsLayer
+    pub fn build(&self) -> CorsLayer {
+        let mut cors = CorsLayer::new();
+
+        // 配置允许的来源
+        if self.allowed_origins.contains(&"*".to_string()) {
+            cors = cors.allow_origin(Any);
+        } else {
+            let origins: Vec<HeaderValue> = self
+                .allowed_origins
+                .iter()
+                .filter_map(|origin| origin.parse().ok())
+                .collect();
+            cors = cors.allow_origin(origins);
+        }
+
+        // 配置允许的方法
+        cors = cors.allow_methods(self.allowed_methods.clone());
+
+        // 配置允许的头
