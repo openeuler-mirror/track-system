@@ -130,3 +130,48 @@ async fn list_snapshots(api_client: &ApiClient, tracking_id: Option<i32>) -> Res
     }
 
     println!("\n{}", "=== 快照列表 ===".bold());
+    println!(
+        "{:<10} {:<15} {:<20} {:<30}",
+        "ID", "Tracking ID", "标签", "创建时间"
+    );
+    println!("{}", "-".repeat(75));
+
+    for snapshot in snapshots {
+        let id = snapshot["id"].as_i64().unwrap_or(0);
+        let tracking_id = snapshot["tracking_id"].as_i64().unwrap_or(0);
+        let tag = snapshot["tag"].as_str().unwrap_or("-");
+        let created_at_raw = snapshot["created_at"].as_str().unwrap_or("-");
+        let created_at = chrono::DateTime::parse_from_rfc3339(created_at_raw)
+            .map(|dt| dt.with_timezone(&chrono::Utc))
+            .ok()
+            .map(|dt| format_datetime_local(&dt))
+            .unwrap_or_else(|| created_at_raw.to_string());
+
+        println!(
+            "{:<10} {:<15} {:<20} {:<30}",
+            id, tracking_id, tag, created_at
+        );
+    }
+
+    Ok(())
+}
+
+/// 删除快照
+async fn delete_snapshot(api_client: &ApiClient, snapshot_id: i32) -> Result<()> {
+    println!("{}", format!("正在删除快照 {}...", snapshot_id).cyan());
+
+    match api_client
+        .delete_no_content(&format!("/snapshot/{}", snapshot_id))
+        .await
+    {
+        Ok(_) => {
+            println!("{}", "✓ 快照已删除".green());
+            Ok(())
+        }
+        Err(e) => {
+            println!("{} 删除快照失败: {}", "✗".red().bold(), e);
+            Err(e.into())
+        }
+    }
+}
+
