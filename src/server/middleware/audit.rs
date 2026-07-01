@@ -82,3 +82,45 @@ impl AuditMiddleware {
             resource_id,
             method,
             full_path,
+            addr.ip().to_string(),
+            user_agent,
+            status_code,
+            duration,
+        )
+        .await
+        {
+            error!(error = %e, "记录审计日志失败");
+        }
+
+        response
+    }
+}
+
+/// 从路径中提取资源类型和资源 ID
+fn extract_resource_info(path: &str) -> (String, Option<String>) {
+    let parts: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
+
+    if parts.len() < 2 {
+        return ("unknown".to_string(), None);
+    }
+
+    // 跳过 "api" 前缀
+    let start_idx = if parts[0] == "api" { 1 } else { 0 };
+
+    if start_idx >= parts.len() {
+        return ("unknown".to_string(), None);
+    }
+
+    let resource_type = parts[start_idx].to_string();
+
+    // 尝试提取资源 ID (通常是路径中的数字或最后一个部分)
+    let resource_id = if parts.len() > start_idx + 1 {
+        let potential_id = parts[start_idx + 1];
+        // 检查是否是数字或看起来像 ID
+        if potential_id.parse::<i64>().is_ok() || potential_id.len() < 50 {
+            Some(potential_id.to_string())
+        } else {
+            None
+        }
+    } else {
+        None
