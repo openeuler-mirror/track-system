@@ -618,3 +618,48 @@ mod tests {
         assert_eq!(result.message, "同步成功");
         assert!(result.is_success());
         assert!(!result.is_skipped());
+    }
+
+    #[test]
+    fn test_sync_result_skipped() {
+        let result = SyncResult::skipped("Tracking未激活");
+
+        assert_eq!(result.status, SyncStatus::Skipped);
+        assert_eq!(result.commits_synced, 0);
+        assert_eq!(result.issues_synced, 0);
+        assert_eq!(result.message, "Tracking未激活");
+        assert!(!result.is_success());
+        assert!(result.is_skipped());
+    }
+
+    #[test]
+    fn test_sync_result_failed() {
+        let result = SyncResult::failed("网络错误");
+
+        assert_eq!(result.status, SyncStatus::Failed);
+        assert_eq!(result.commits_synced, 0);
+        assert_eq!(result.issues_synced, 0);
+        assert_eq!(result.message, "网络错误");
+        assert!(!result.is_success());
+        assert!(!result.is_skipped());
+    }
+
+    #[test]
+    fn test_sync_result_clone() {
+        let result = SyncResult::success(3, 2);
+        let cloned = result.clone();
+
+        assert_eq!(result.status, cloned.status);
+        assert_eq!(result.commits_synced, cloned.commits_synced);
+        assert_eq!(result.issues_synced, cloned.issues_synced);
+        assert_eq!(result.message, cloned.message);
+    }
+
+    #[tokio::test]
+    async fn test_sync_tracking_not_found() {
+        use sea_orm::{DatabaseBackend, MockDatabase};
+
+        // Mock empty result for find_by_id
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<crate::entities::tracking::Model, _, _>(vec![vec![]])
+            .into_connection();
