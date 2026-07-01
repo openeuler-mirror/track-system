@@ -514,3 +514,55 @@ impl<'a> PipelineExecutor<'a> {
         let l1_vs_l0_diff = l1_vs_l0.as_ref().map(|r| serde_json::json!({
                 "version_behind": r.version_behind,
                 "current_version": r.current_version,
+                "latest_stable": r.latest_stable,
+                "latest_version": r.latest_version,
+                "upgradable_versions": r.upgradable_versions.len(),
+                "upgradable_versions_list": r.upgradable_versions.iter().map(|v| serde_json::json!({
+                    "version": v.version,
+                    "release_date": v.release_date,
+                    "is_security_release": v.is_security_release,
+                    "breaking_changes": v.breaking_changes,
+                })).collect::<Vec<_>>(),
+                "patches_merged": r.patch_analysis.merged_in_upstream.len(),
+                "patches_merged_list": r.patch_analysis.merged_in_upstream.iter().map(|p| serde_json::json!({
+                    "filename": p.filename,
+                    "description": p.description,
+                    "applied": p.applied,
+                    "content_hash": p.content_hash,
+                })).collect::<Vec<_>>(),
+                "patches_still_needed": r.patch_analysis.still_needed.len(),
+                "patches_still_needed_list": r.patch_analysis.still_needed.iter().map(|p| serde_json::json!({
+                    "filename": p.filename,
+                    "description": p.description,
+                    "applied": p.applied,
+                    "content_hash": p.content_hash,
+                })).collect::<Vec<_>>(),
+                "patches_can_be_removed": r.patch_analysis.can_be_removed_after_upgrade,
+                "cves_fixed": r.cve_analysis.fixed_in_upstream.len(),
+                "cves_fixed_list": r.cve_analysis.fixed_in_upstream.iter().map(|c| serde_json::json!({
+                    "cve_id": c.cve_id,
+                    "patch_file": c.patch_file,
+                    "description": c.description,
+                    "severity": c.severity,
+                })).collect::<Vec<_>>(),
+                "cves_not_fixed": r.cve_analysis.not_fixed_in_upstream.len(),
+                "cves_not_fixed_list": r.cve_analysis.not_fixed_in_upstream.iter().map(|c| serde_json::json!({
+                    "cve_id": c.cve_id,
+                    "patch_file": c.patch_file,
+                    "description": c.description,
+                    "severity": c.severity,
+                })).collect::<Vec<_>>(),
+                "recommendations": r.recommendations,
+            }));
+
+        // 创建报告记录
+        let report = crate::entities::compare_reports::ActiveModel {
+            tracking_id: Set(tracking.id),
+            generated_at: Set(Utc::now()),
+            l2_vs_l1_diff: Set(l2_vs_l1_diff),
+            l1_vs_l0_diff: Set(l1_vs_l0_diff),
+            status: Set("success".to_string()),
+            failure_reason: Set(None),
+            created_at: Set(Utc::now()),
+            updated_at: Set(Utc::now()),
+            ..Default::default()
