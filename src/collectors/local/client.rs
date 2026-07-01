@@ -342,3 +342,52 @@ impl GitClient for LocalClient {
             content,
             encoding: "base64".to_string(),
             download_url: format!("file://{}/{}", self.repo_path.display(), path),
+        })
+    }
+}
+
+#[async_trait]
+impl Collector for LocalClient {
+    async fn collect(&self, config: &CollectConfig) -> ApiResult<CollectResult> {
+        self.validate_config(config)?;
+
+        // 获取仓库名称
+        let repo_name = self
+            .repo_path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("unknown")
+            .to_string();
+
+        // 构建 CommitsParams
+        let mut params = CommitsParams::new(&config.branch);
+        if let Some(since) = config.since {
+            params = params.since(since);
+        }
+        if let Some(until) = config.until {
+            params = params.until(until);
+        }
+        if let Some(limit) = config.limit {
+            params = params.per_page(limit);
+        }
+
+        // 获取 commits
+        let commits = self.get_commits("", "", params).await?;
+
+        // 转换为 CommitMetadata
+        let commit_metadata: Vec<CommitMetadata> = commits.into_iter().map(|c| c.into()).collect();
+
+        // 尝试获取快照数据（如果是 L1/L2）
+        let snapshot = {
+            let repo = self.open_repo()?;
+            self.collect_snapshot(&repo, &config.branch).ok()
+        };
+
+        Ok(CollectResult {
+            level: "l0".to_string(), // 默认，调用者可以修改
+            platform: Platform::Local.as_str().to_string(),
+            owner: None,
+            repo: repo_name,
+            branch: config.branch.clone(),
+            collected_at: Utc::now(),
+            commits: commit_metadata,
