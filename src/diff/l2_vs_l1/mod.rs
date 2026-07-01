@@ -894,3 +894,56 @@ impl L2VsL1Comparator {
         if !detailed_comparison.configure_options_removed.is_empty() {
             key_changes.push(format!(
                 "删除 configure 选项: {}",
+                detailed_comparison.configure_options_removed.join(" ")
+            ));
+        }
+
+        if detailed_comparison.sources_changed {
+            key_changes.push("Source 文件列表变化".to_string());
+        }
+
+        if detailed_comparison.patches_changed {
+            key_changes.push("Patch 文件列表变化".to_string());
+        }
+
+        Ok(SpecDiff {
+            version_diff,
+            content_identical,
+            diff_summary,
+            key_changes,
+            detailed_comparison: Some(detailed_comparison.clone()),
+            build_requires_added: detailed_comparison.build_requires_added.clone(),
+            build_requires_removed: detailed_comparison.build_requires_removed.clone(),
+            configure_options_added: detailed_comparison.configure_options_added.clone(),
+            configure_options_removed: detailed_comparison.configure_options_removed.clone(),
+        })
+    }
+
+    /// 对比版本关系
+    fn compare_version_relationship(
+        &self,
+        l1_version: &str,
+        l2_version: &str,
+    ) -> Result<VersionRelationship> {
+        match (
+            VersionParser::parse(l1_version),
+            VersionParser::parse(l2_version),
+        ) {
+            (Ok(v1), Ok(v2)) => {
+                if v2.is_newer_than(&v1) {
+                    Ok(VersionRelationship::L2Newer)
+                } else if v1.is_newer_than(&v2) {
+                    Ok(VersionRelationship::L2Older)
+                } else {
+                    Ok(VersionRelationship::Same)
+                }
+            }
+            _ => Ok(VersionRelationship::Incomparable),
+        }
+    }
+
+    /// 对比 patch 文件
+    fn compare_patches(
+        &self,
+        l1_patches: &[PatchFile],
+        l2_patches: &[PatchFile],
