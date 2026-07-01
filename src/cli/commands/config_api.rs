@@ -247,3 +247,44 @@ mod tests {
         let result = validate_config(Some(config_path.to_str().unwrap().to_string())).await;
         assert!(result.is_ok(), "Result failed: {:?}", result.err());
     }
+
+    #[tokio::test]
+    async fn test_validate_config_not_exists() {
+        let result = validate_config(Some("/nonexistent/config.toml".to_string())).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_show_config_json_format() {
+        let config = ClientConfig {
+            server_url: "http://test.com".to_string(),
+            auth_token: None,
+            timeout: 30,
+            verify_ssl: true,
+        };
+
+        let result = show_config_json(&config, None);
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+    }
+
+    #[tokio::test]
+    async fn test_show_config_json_section() {
+        let config = ClientConfig {
+            server_url: "http://test.com".to_string(),
+            auth_token: Some("token".to_string()),
+            timeout: 30,
+            verify_ssl: true,
+        };
+
+        let result = show_config_json(&config, Some("server".to_string()));
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+
+        let result = show_config_json(&config, Some("timeout".to_string()));
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+    }
+
+    #[tokio::test]
+    async fn test_show_config_yaml_format() {
+        let config = ClientConfig {
+            server_url: "http://test.com".to_string(),
+            auth_token: None,
