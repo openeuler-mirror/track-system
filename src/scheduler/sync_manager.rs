@@ -424,3 +424,50 @@ impl<'a> SyncManager<'a> {
 
         Ok(job)
     }
+
+    async fn find_latest_sync_job(
+        &self,
+        tracking_id: i32,
+    ) -> anyhow::Result<Option<sync_jobs::Model>> {
+        let job = SyncJobsEntity::find()
+            .filter(sync_jobs::Column::TrackingId.eq(tracking_id))
+            .filter(sync_jobs::Column::JobKind.eq(SYNC_JOB_KIND))
+            .order_by_desc(sync_jobs::Column::ScheduledAt)
+            .one(self.db)
+            .await?;
+
+        Ok(job)
+    }
+
+    async fn ensure_sync_job(&self, tracking_id: i32) -> anyhow::Result<sync_jobs::Model> {
+        if let Some(job) = self.find_active_sync_job(tracking_id).await? {
+            return Ok(job);
+        }
+
+        let now = Utc::now();
+        let job = sync_jobs::ActiveModel {
+            tracking_id: Set(tracking_id),
+            job_kind: Set(SYNC_JOB_KIND.to_string()),
+            scheduled_at: Set(now),
+            started_at: Set(None),
+            finished_at: Set(None),
+            status: Set(STATUS_PENDING.to_string()),
+            error: Set(None),
+            attempt_count: Set(0),
+            priority: Set(0),
+            created_at: Set(now),
+            updated_at: Set(now),
+            ..Default::default()
+        };
+
+        let inserted = job.insert(self.db).await?;
+        Telemetry::sync_job_queued(tracking_id, inserted.id, 0);
+        Ok(inserted)
+    }
+}
+
+/// 判断是否需要同步
+fn should_sync(
+    track: &tracking::Model,
+    package: &packages::Model,
+    now: chrono::DateTime<Utc>,
