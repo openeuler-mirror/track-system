@@ -238,3 +238,52 @@ impl Config {
         Ok(())
     }
 }
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            database: DatabaseConfig {
+                db_type: "sqlite".to_string(),
+                sqlite: Some(SqliteConfig {
+                    path: "track_system.db".to_string(),
+                }),
+                postgresql: None,
+            },
+            api: ApiConfig {
+                gitee: GiteeConfig {
+                    token: String::new(),
+                    base_url: "https://gitee.com/api/v5".to_string(),
+                },
+                github: GithubConfig {
+                    token: String::new(),
+                    base_url: "https://api.github.com".to_string(),
+                },
+            },
+            scheduler: SchedulerConfig {
+                max_concurrent_jobs: 10,
+                job_timeout_secs: 1800,
+                cleanup_interval_secs: 3600,
+                health_check_interval_secs: 30,
+            },
+            rate_limit: RateLimitConfig {
+                gitee_per_minute: 60,
+                github_per_minute: 5000,
+                burst_size: 10,
+            },
+            packages: vec![],
+            distros: vec![],
+            trackings: vec![],
+            server: ServerConfig {
+                host: "0.0.0.0".to_string(),
+                port: 3000,
+                log_level: "info".to_string(),
+            },
+            logging: LoggingConfig {
+                level: "info".to_string(),
+                format: "pretty".to_string(),
+                output: "stdout".to_string(),
+                file_path: None,
+            },
+        }
+    }
+}
