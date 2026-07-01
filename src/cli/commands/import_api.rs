@@ -191,3 +191,51 @@ async fn import_single_file(
     let request = ImportRequest {
         tracking_id,
         snapshot,
+    };
+
+    // 发送导入请求
+    match api_client
+        .post::<_, ApiResponse<ImportResponse>>(endpoint, &request)
+        .await
+    {
+        Ok(response) => {
+            let data = response
+                .data
+                .ok_or_else(|| anyhow::anyhow!("API 响应缺少 data 字段"))?;
+            println!("{} 导入成功", "✓".green().bold());
+            println!("  快照 ID: {}", data.snapshot_id.cyan());
+            println!("  跟踪配置 ID: {}", data.tracking_id);
+            println!("  文件数量: {}", data.file_count);
+            println!("  导入时间: {}", format_datetime_local(&data.imported_at));
+            Ok(())
+        }
+        Err(e) => {
+            println!("{} 导入失败: {}", "✗".red().bold(), e);
+            Err(e.into())
+        }
+    }
+}
+
+/// 批量导入文件
+/// tracking_id 将从每个 JSON 文件的 repo 字段自动解析
+async fn import_batch_files(api_client: &ApiClient, files: Vec<PathBuf>) -> Result<()> {
+    println!("开始批量导入 {} 个文件", files.len());
+    println!();
+
+    let mut success_count = 0;
+    let mut failed_count = 0;
+    let mut total_files = 0;
+
+    for (i, file) in files.iter().enumerate() {
+        println!("[{}/{}] 导入文件: {}", i + 1, files.len(), file.display());
+
+        let content = fs::read_to_string(file)?;
+
+        let package_name = extract_repo_from_json(&content)?;
+        // 从 JSON 文件解析 tracking_id
+        match resolve_tracking_id_from_package(api_client, &package_name).await {
+            Ok(tracking_id) => {
+                println!("  解析到 tracking_id: {}", tracking_id);
+                match import_single_file(api_client, file, tracking_id).await {
+                    Ok(_) => {
+                        success_count += 1;
