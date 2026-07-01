@@ -317,3 +317,46 @@ mod tests {
 
         let mock_client = MockGitClient::new();
         let adapter = GitClientCollectorAdapter::new(mock_client, Platform::Local);
+        assert_eq!(adapter.name(), "LocalCollector");
+    }
+
+    #[tokio::test]
+    async fn test_collect_success() {
+        let mut mock_client = MockGitClient::new();
+
+        // Mock get_commits
+        mock_client
+            .expect_get_commits()
+            .times(1)
+            .returning(|_, _, _| {
+                Ok(vec![Commit {
+                    sha: "sha".to_string(),
+                    title: "title".to_string(),
+                    message: "message".to_string(),
+                    author_name: "author".to_string(),
+                    author_email: "email".to_string(),
+                    author_date: Utc::now(),
+                    committer_name: "committer".to_string(),
+                    committer_email: "email".to_string(),
+                    committer_date: Utc::now(),
+                    html_url: "url".to_string(),
+                    stats: None,
+                }])
+            });
+
+        // Mock get_file_content for spec
+        let content = "Name: test\nVersion: 1.2.3\nRelease: 1\n";
+        let encoded = BASE64_STANDARD.encode(content);
+        mock_client
+            .expect_get_file_content()
+            .times(1)
+            .returning(move |_, _, _, _| {
+                Ok(FileContent {
+                    name: "test.spec".to_string(),
+                    path: "test.spec".to_string(),
+                    sha: "sha".to_string(),
+                    size: 100,
+                    content: encoded.clone(),
+                    encoding: "base64".to_string(),
+                    download_url: "https://example.com/test.spec".to_string(),
+                })
