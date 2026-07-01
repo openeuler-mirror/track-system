@@ -220,3 +220,40 @@ mod tests {
             .create_async()
             .await;
 
+        let result = execute_info(&client).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_execute_info_failure() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/health")
+            .with_status(503)
+            .create_async()
+            .await;
+
+        let result = execute_info(&client).await;
+        assert!(result.is_err(), "Expected failure but got success");
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_execute_config_show() {
+        let (_server, client) = setup_test_server().await;
+
+        // Test show config - should not fail even without environment setup
+        let result = execute_config(&client, None, None, true).await;
+        // May succeed or fail depending on config file existence, we just test it doesn't panic
+        let _ = result;
+    }
+
+    #[tokio::test]
+    async fn test_execute_with_ping_action() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/health")
+            .with_status(200)
