@@ -2002,3 +2002,55 @@ impl Default for L2VsL1Comparator {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Utc;
+    use sea_orm::{DatabaseBackend, MockDatabase};
+
+    // 辅助函数：创建测试用的 RepositorySnapshot
+    fn create_test_snapshot() -> RepositorySnapshot {
+        use crate::snapshot::types::SnapshotOrigin;
+        use crate::snapshot::types::SpecEntry;
+        use base64::Engine;
+
+        let spec_content = r#"
+Name: testpkg
+Version: 1.0.0
+Release: 1%{?dist}
+Summary: Test package
+
+BuildRequires: gcc
+
+%description
+Test package
+"#;
+
+        let spec_base64 = base64::engine::general_purpose::STANDARD.encode(spec_content);
+
+        RepositorySnapshot {
+            tracking_id: 1,
+            origin: SnapshotOrigin::L1,
+            spec: Some(SpecEntry {
+                path: "testpkg.spec".to_string(),
+                version: Some("1.0.0".to_string()),
+                release: Some("1".to_string()),
+                sha256: "spec_hash".to_string(),
+                content_base64: spec_base64,
+            }),
+            files: vec![
+                FileEntry {
+                    path: "test.patch".to_string(),
+                    sha256: "patch_hash".to_string(),
+                    size: 100,
+                    is_binary: false,
+                },
+                FileEntry {
+                    path: "source.tar.gz".to_string(),
+                    sha256: "source_hash".to_string(),
+                    size: 1000,
+                    is_binary: false,
+                },
+            ],
+            commits: vec![],
+            generated_at: Utc::now(),
