@@ -305,3 +305,55 @@ pub async fn import_l2_metadata(
         tracking_id: request.tracking_id,
         file_count: request.snapshot.files.len(),
         imported_at: now,
+    };
+
+    Ok(Json(ApiResponse::created(response)))
+}
+
+/// GET /api/metadata/l0
+///
+/// 列出 L0 元数据快照
+pub async fn list_l0_metadata(
+    State(_state): State<AppState>,
+    Query(query): Query<MetadataListQuery>,
+) -> ApiResult<Json<ApiResponse<Vec<MetadataSummary>>>> {
+    // TODO: 实现 L0 元数据列表查询
+    // 1. 从数据库查询 L0 快照列表
+    // 2. 应用过滤条件（tracking_id）
+    // 3. 返回结果
+
+    let _tracking_id = query.tracking_id;
+
+    // 临时实现：返回空列表
+    Ok(Json(ApiResponse::success(vec![])))
+}
+
+/// GET /api/metadata/l0/:id
+///
+/// 获取 L0 元数据详情
+pub async fn get_l0_metadata(
+    State(_state): State<AppState>,
+    Path(id): Path<String>,
+) -> ApiResult<Json<ApiResponse<MetadataDetail>>> {
+    // TODO: 实现 L0 元数据详情查询
+    // 1. 从数据库查询指定 ID 的 L0 快照
+    // 2. 如果不存在，返回 404
+    // 3. 返回快照详情
+
+    // 临时实现：返回模拟数据
+    let detail = MetadataDetail {
+        id: id.clone(),
+        tracking_id: 1,
+        level: "l0".to_string(),
+        file_count: 0,
+        imported_at: chrono::Utc::now(),
+    };
+
+    Ok(Json(ApiResponse::success(detail)))
+}
+
+pub async fn delete_l0_metadata(
+    State(_state): State<AppState>,
+    Path(id): Path<String>,
+) -> ApiResult<axum::http::StatusCode> {
+    // TODO: 实现 L0 元数据删除
