@@ -1064,3 +1064,54 @@ Patch1: fix.patch
         };
 
         let err = collect_files(SnapshotOrigin::L2, Some(&spec), None)
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("spec 内容不是有效的 UTF-8"));
+    }
+
+    #[tokio::test]
+    async fn test_export_l1_snapshot_tracking_not_found() {
+        use crate::entities::tracking;
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<tracking::Model, _, _>(vec![vec![]])
+            .into_connection();
+
+        let result = export_l1_snapshot(
+            &db,
+            1,
+            None,
+            PathBuf::from("/tmp/track-system-metadata-bridge-test.json"),
+        )
+        .await;
+
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("tracking configuration not found"));
+    }
+
+    #[tokio::test]
+    async fn test_import_snapshot_tracking_not_found() {
+        use crate::entities::tracking;
+        use std::io::Write;
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<tracking::Model, _, _>(vec![vec![]])
+            .into_connection();
+
+        let temp_dir = tempfile::tempdir().unwrap();
+        let file_path = temp_dir.path().join("snapshot.json");
+        let mut f = std::fs::File::create(&file_path).unwrap();
+        write!(f, "{{\"tracking_id\": 1, \"origin\": \"L2\", \"files\": [], \"commits\": [], \"issues\": [], \"generated_at\": \"{}\"}}", Utc::now().to_rfc3339()).unwrap();
+
+        let result = import_snapshot(&db, 1, &file_path).await;
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("tracking configuration not found"));
+    }
+
+    #[tokio::test]
