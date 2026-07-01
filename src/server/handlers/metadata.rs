@@ -511,3 +511,54 @@ async fn import_l0_commit(
         .await?;
 
     if existing.is_some() {
+        return Ok(false); // 已存在，跳过
+    }
+
+    // 构建 metadata JSON
+    let metadata = serde_json::json!({
+        "title": commit.title,
+        "message": commit.message,
+        "url": commit.url,
+        "stats": commit.stats,
+        "primary_change_type": commit.primary_change_type,
+        "cve_list": commit.cve_list,
+    });
+
+    // 插入新记录
+    let new_commit = l0_commits::ActiveModel {
+        package_id: Set(package_id),
+        repo: Set(commit.url.clone().unwrap_or_default()),
+        commit_sha: Set(commit.sha.clone()),
+        summary: Set(commit.title.clone()),
+        authored_at: Set(commit.authored_at),
+        metadata: Set(Some(metadata)),
+        created_at: Set(chrono::Utc::now()),
+        updated_at: Set(chrono::Utc::now()),
+        ..Default::default()
+    };
+
+    L0Commits::insert(new_commit).exec(db).await?;
+    Ok(true)
+}
+
+/// 导入 commit record 到数据库（L1）
+async fn import_commit_record(
+    db: &sea_orm::DatabaseConnection,
+    tracking_id: i32,
+    commit: &crate::snapshot::types::CommitEntry,
+) -> anyhow::Result<bool> {
+    use crate::entities::{l1_commit_records, prelude::*};
+    use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
+
+    // 检查是否已存在
+    let existing = L1CommitRecords::find()
+        .filter(l1_commit_records::Column::TrackingId.eq(tracking_id))
+        .filter(l1_commit_records::Column::CommitSha.eq(&commit.sha))
+        .one(db)
+        .await?;
+
+    if existing.is_some() {
+        return Ok(false); // 已存在，跳过
+    }
+
+    // 转换 CVE 列表
