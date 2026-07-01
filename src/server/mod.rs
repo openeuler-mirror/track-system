@@ -25,3 +25,31 @@ use crate::collectors::{gitea::GiteaClient, gitee::GiteeClient};
 
 use self::{
     routes::{
+        backport_routes, compare_routes, component_routes, health_routes, metadata_routes,
+        package_routes, reports_routes, sync_routes, tracking_routes,
+    },
+    state::AppState,
+};
+
+/// 创建 Axum 应用
+pub fn create_app(db: Arc<DatabaseConnection>) -> Router {
+    let gitee = env::var("GITEE_ACCESS_TOKEN")
+        .ok()
+        .and_then(|token| GiteeClient::new(token).ok());
+
+    let gitea = match env::var("GITEA_ACCESS_TOKEN") {
+        Ok(token) => {
+            let base = env::var("GITEA_API_BASE")
+                .unwrap_or_else(|_| "https://work.ctyun.cn/git/api/v1".to_string());
+            GiteaClient::new(base, token).ok()
+        }
+        Err(_) => None,
+    };
+
+    let state = AppState::new(db, gitee, gitea);
+
+    create_app_with_state(state)
+}
+
+/// 使用自定义 AppState 创建 Axum 应用
+pub fn create_app_with_state(state: AppState) -> Router {
