@@ -72,3 +72,40 @@ async fn execute_config(
     if let Some(new_token) = token {
         config.set_auth_token(Some(new_token.clone()));
         println!(
+            "{} 认证 Token: {}...",
+            "✓".green(),
+            &new_token[..new_token.len().min(10)].yellow()
+        );
+        changed = true;
+    }
+
+    if changed {
+        // 验证配置
+        config.validate()?;
+
+        // 保存配置
+        config.save()?;
+        println!();
+        println!("{} 配置已保存", "✓".green().bold());
+        println!("配置文件: {}", ClientConfig::config_path()?.display());
+    } else {
+        println!("{}", "未指定任何配置项".yellow());
+        println!("使用 --url 设置服务器地址");
+        println!("使用 --token 设置认证 token");
+        println!("使用 --show 显示当前配置");
+    }
+
+    Ok(())
+}
+
+/// 测试服务器连接
+async fn execute_ping(api_client: &ApiClient) -> Result<()> {
+    println!("正在测试服务器连接...");
+    println!("服务器: {}", api_client.config().server_url.cyan());
+    println!();
+
+    match api_client.ping().await {
+        Ok(true) => {
+            println!("{} 服务器连接成功", "✓".green().bold());
+            Ok(())
+        }
