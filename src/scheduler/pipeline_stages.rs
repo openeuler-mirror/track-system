@@ -359,3 +359,55 @@ impl<'a> PipelineExecutor<'a> {
         let l0_info = self.get_l0_version_info(tracking).await?;
         if l0_info.is_none() {
             warn!(
+                tracking_id = tracking.id,
+                "缺少 L0 版本信息，跳过 L1 vs L0 对比"
+            );
+            return Ok(None);
+        }
+
+        // 获取 L1 版本信息（从 commit_records 和快照）
+        let l1_info = self.get_l1_version_info(tracking).await?;
+        if l1_info.is_none() {
+            warn!(
+                tracking_id = tracking.id,
+                "缺少 L1 版本信息，跳过 L1 vs L0 对比"
+            );
+            return Ok(None);
+        }
+
+        // 使用 L1VsL0Comparator
+        let comparator = L1VsL0Comparator::new();
+        let report = comparator
+            .compare(&l0_info.unwrap(), &l1_info.unwrap())
+            .await
+            .context("L1 vs L0 对比失败")?;
+
+        info!(
+            tracking_id = tracking.id,
+            version_behind = report.version_behind,
+            "L1 vs L0 对比完成"
+        );
+
+        Ok(Some(report))
+    }
+
+    /// 获取 L0 版本信息
+    async fn get_l0_version_info(
+        &self,
+        tracking: &tracking::Model,
+    ) -> Result<Option<diff::l1_vs_l0::L0VersionInfo>> {
+        use crate::entities::{l0_commits, prelude::*};
+        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
+
+        // 从 l0_commits 表获取版本信息
+        let l0_commits = L0Commits::find()
+            .filter(l0_commits::Column::PackageId.eq(tracking.package_id))
+            .order_by_desc(l0_commits::Column::AuthoredAt)
+            .all(self.db)
+            .await?
+            .into_iter()
+            .take(100)
+            .collect::<Vec<_>>();
+
+        if l0_commits.is_empty() {
+            return Ok(None);
