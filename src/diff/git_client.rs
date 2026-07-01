@@ -405,3 +405,48 @@ mod tests {
         let l1 = vec![commit1.clone()];
         let l2 = vec![commit1, commit2.clone()];
 
+        let diff = GitRepositoryClient::compute_diff(&l1, &l2);
+        assert_eq!(diff.l1_ahead.len(), 0);
+        assert_eq!(diff.l2_ahead.len(), 1);
+        assert_eq!(diff.l2_ahead[0].sha, "def456");
+    }
+
+    #[test]
+    fn test_compute_diff_both_different() {
+        let commit1 = GitCommit {
+            sha: "aaa".to_string(),
+            message: "first".to_string(),
+            author: "test".to_string(),
+            author_email: "test@example.com".to_string(),
+            committed_at: Utc::now(),
+            files_changed: 1,
+        };
+
+        let commit2 = GitCommit {
+            sha: "bbb".to_string(),
+            message: "second".to_string(),
+            author: "test".to_string(),
+            author_email: "test@example.com".to_string(),
+            committed_at: Utc::now(),
+            files_changed: 1,
+        };
+
+        let commit3 = GitCommit {
+            sha: "ccc".to_string(),
+            message: "third".to_string(),
+            author: "test".to_string(),
+            author_email: "test@example.com".to_string(),
+            committed_at: Utc::now(),
+            files_changed: 1,
+        };
+
+        let l1 = vec![commit1.clone(), commit2.clone()];
+        let l2 = vec![commit1, commit3.clone()];
+
+        let diff = GitRepositoryClient::compute_diff(&l1, &l2);
+        assert_eq!(diff.l1_ahead.len(), 1);
+        assert_eq!(diff.l2_ahead.len(), 1);
+        assert_eq!(diff.l1_ahead[0].sha, "bbb");
+        assert_eq!(diff.l2_ahead[0].sha, "ccc");
+    }
+}
