@@ -353,3 +353,52 @@ mod tests_basic {
         let db = MockDatabase::new(DatabaseBackend::Postgres)
             .append_query_results::<(tracking::Model, Option<packages::Model>), _, _>(vec![vec![]])
             .into_connection();
+        let db = Arc::new(db);
+
+        let config = SchedulerConfig::default();
+        let (manager, _wake_rx) = SchedulerManager::new(db, None, config);
+        let results = manager.execute_round().await.unwrap();
+        assert_eq!(results.len(), 0);
+    }
+}
+
+#[cfg(test)]
+mod tests_extra {
+    use super::*;
+    use sea_orm::{DatabaseBackend, MockDatabase};
+
+    #[tokio::test]
+    async fn test_scheduler_manager_lifecycle() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+        let db = Arc::new(db);
+        let config = SchedulerConfig::default();
+
+        let (mut manager, _rx) = SchedulerManager::new(db, None, config);
+
+        assert!(!manager.get_scheduler_status().await.unwrap().running);
+
+        manager.start().await.unwrap();
+        assert!(manager.get_scheduler_status().await.unwrap().running);
+
+        manager.stop().await.unwrap();
+        assert!(!manager.get_scheduler_status().await.unwrap().running);
+    }
+
+    #[tokio::test]
+    async fn test_wake() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+        let db = Arc::new(db);
+        let config = SchedulerConfig::default();
+
+        let (manager, mut rx) = SchedulerManager::new(db, None, config);
+
+        manager.wake(Some(123));
+
+        if let Some(signal) = rx.recv().await {
+            match signal {
+                WakeSignal::Specific(id) => assert_eq!(id, 123),
+                _ => panic!("Expected WakeSignal::Specific"),
+            }
+        } else {
+            panic!("Expected wake signal");
+        }
