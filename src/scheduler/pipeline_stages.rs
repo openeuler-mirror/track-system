@@ -1031,3 +1031,55 @@ mod tests {
         assert!(result.snapshot_path.is_some());
         assert!(result.snapshot_checksum.is_some());
     }
+
+    #[test]
+    fn test_l1_ingestion_result_no_new_data() {
+        let result = L1IngestionResult {
+            commits_synced: 0,
+            issues_synced: 0,
+            has_new_data: false,
+            snapshot_path: None,
+            snapshot_checksum: None,
+        };
+
+        assert_eq!(result.commits_synced, 0);
+        assert_eq!(result.issues_synced, 0);
+        assert!(!result.has_new_data);
+        assert!(result.snapshot_path.is_none());
+        assert!(result.snapshot_checksum.is_none());
+    }
+
+    #[test]
+    fn test_l2_snapshot_result_with_data() {
+        let result = L2SnapshotResult {
+            snapshot_id: Some(123),
+            snapshot_path: Some("/tmp/l2.json".to_string()),
+            files_count: 50,
+            has_new_data: true,
+        };
+
+        assert_eq!(result.snapshot_id, Some(123));
+        assert!(result.snapshot_path.is_some());
+        assert_eq!(result.files_count, 50);
+        assert!(result.has_new_data);
+    }
+
+    #[test]
+    fn test_l2_snapshot_result_no_data() {
+        let result = L2SnapshotResult {
+            snapshot_id: None,
+            snapshot_path: None,
+            files_count: 0,
+            has_new_data: false,
+        };
+
+        assert!(result.snapshot_id.is_none());
+        assert!(result.snapshot_path.is_none());
+        assert_eq!(result.files_count, 0);
+        assert!(!result.has_new_data);
+    }
+
+    #[test]
+    fn test_diff_comparison_result_with_changes() {
+        let result = DiffComparisonResult {
+            report_id: Some(456),
