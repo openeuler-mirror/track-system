@@ -1949,3 +1949,56 @@ impl L2VsL1Comparator {
 
                 let has_release = rel_patterns.iter().any(|pattern| {
                     message_lower.contains(&pattern.to_lowercase())
+                        || title_lower.contains(&pattern.to_lowercase())
+                });
+
+                if has_version && has_release {
+                    tracing::info!(
+                        "找到匹配 version={} release={:?} 的基线 commit: {} ({})",
+                        version,
+                        release,
+                        commit.sha,
+                        commit.title
+                    );
+                    return (Some(commit.clone()), Some(idx));
+                }
+            }
+        }
+
+        // 策略 2: 查找只匹配 version 的 commit
+        for (idx, commit) in commits.iter().enumerate() {
+            let message_lower = commit.message.to_lowercase();
+            let title_lower = commit.title.to_lowercase();
+
+            let has_version = version_patterns.iter().any(|pattern| {
+                message_lower.contains(&pattern.to_lowercase())
+                    || title_lower.contains(&pattern.to_lowercase())
+            });
+
+            if has_version {
+                tracing::info!(
+                    "找到匹配 version={} 的基线 commit（无 release 匹配）: {} ({})",
+                    version,
+                    commit.sha,
+                    commit.title
+                );
+                return (Some(commit.clone()), Some(idx));
+            }
+        }
+
+        // 策略 3: 未找到匹配的 commit
+        tracing::warn!(
+            "未找到匹配 version={} release={:?} 的基线 commit",
+            version,
+            release
+        );
+        (None, None)
+    }
+}
+
+impl Default for L2VsL1Comparator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
