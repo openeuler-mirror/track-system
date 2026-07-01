@@ -249,3 +249,43 @@ mod tests {
         let _collector = client.as_collector();
     }
 
+    #[tokio::test]
+    async fn test_get_repository() {
+        let server = MockServer::start();
+        let client = GitLabClient::with_base_url(server.base_url(), "token").unwrap();
+
+        let repo_response = json!({
+            "id": 1,
+            "name": "test-repo",
+            "path_with_namespace": "owner/test-repo",
+            "web_url": "http://localhost/owner/test-repo",
+            "description": "test repo",
+            "visibility": "public",
+            "created_at": "2023-01-01T00:00:00Z",
+            "last_activity_at": "2023-01-01T00:00:00Z",
+            "default_branch": "main",
+            "http_url_to_repo": "http://localhost/owner/test-repo.git"
+        });
+
+        let mock = server.mock(|when, then| {
+            when.method(GET)
+                .path("/projects/owner%2Ftest-repo")
+                .header("PRIVATE-TOKEN", "token");
+            then.status(200).json_body(repo_response);
+        });
+
+        let result = client.get_repository("owner", "test-repo").await;
+        mock.assert();
+        assert!(result.is_ok());
+        let repo = result.unwrap();
+        assert_eq!(repo.name, "test-repo");
+    }
+
+    #[tokio::test]
+    async fn test_get_branches() {
+        let server = MockServer::start();
+        let client = GitLabClient::with_base_url(server.base_url(), "token").unwrap();
+
+        let branch_response = json!([
+            {
+                "name": "main",
