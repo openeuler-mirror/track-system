@@ -810,3 +810,31 @@ mod tests {
                 let s = trimmed.trim_start();
                 if s.is_empty() || s.starts_with('-') {
                     continue;
+                }
+
+                if let Some(name) = s.split_whitespace().next() {
+                    commands.push(name.to_string());
+                }
+            }
+        }
+
+        commands
+    }
+
+    #[test]
+    #[serial]
+    fn cli_help_hides_unused_top_level_commands() {
+        let _ = Cli::try_parse_from(["track-cli", "--help", "--lang", "zh-CN"]);
+
+        let mut cmd = Cli::command();
+        i18n::init_i18n(Some("zh-CN"));
+        i18n::apply_clap_i18n(&mut cmd, "track_cli");
+        i18n::apply_help_i18n(&mut cmd, "track_cli", "zh-CN");
+        let mut buf = Vec::new();
+        cmd.write_long_help(&mut buf).unwrap();
+        let help = String::from_utf8(buf).unwrap();
+
+        let root_commands = root_commands_from_help(&help);
+
+        for hidden in [
+            "health", "status", "distro", "config", "compare", "l0", "workflow", "classify",
