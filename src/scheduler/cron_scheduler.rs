@@ -35,3 +35,40 @@ impl<'a> CronScheduler<'a> {
         }
     }
 
+    /// 运行调度循环（定期执行待处理任务）
+    pub async fn run_scheduler_loop(&self, interval_secs: u64) -> Result<()> {
+        info!("启动调度器循环，间隔: {}秒", interval_secs);
+
+        loop {
+            match self.check_and_queue_pending_tasks().await {
+                Ok(count) => {
+                    if count > 0 {
+                        info!("发现 {} 个待同步任务", count);
+                    }
+                }
+                Err(e) => {
+                    tracing::error!("检查待处理任务失败: {}", e);
+                }
+            }
+
+            tokio::time::sleep(Duration::from_secs(interval_secs)).await;
+        }
+    }
+
+    /// 检查并入队待处理的同步任务
+    async fn check_and_queue_pending_tasks(&self) -> Result<usize> {
+        let pending_tasks = self
+            .sync_manager
+            .get_pending_sync_tasks_ordered(false)
+            .await?;
+        let count = pending_tasks.len();
+
+        for tracking in pending_tasks {
+            // 尝试入队，如果已有待处理或运行中的任务则跳过
+            let _ = self.sync_manager.queue_sync_job(tracking.id, 0).await;
+        }
+
+        Ok(count)
+    }
+}
+
