@@ -1370,3 +1370,54 @@ Patch1: fix.patch
     #[tokio::test]
     async fn test_build_repository_snapshot_repo_path_missing_bails() {
         let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+        let tracking_model = make_tracking_model(1);
+
+        let result = build_repository_snapshot(
+            &db,
+            &tracking_model,
+            SnapshotOrigin::L2,
+            Some(Path::new("/tmp/track-system-repo-does-not-exist")),
+        )
+        .await;
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("does not exist"));
+    }
+
+    #[tokio::test]
+    async fn test_build_repository_snapshot_l2_loads_from_db_when_no_repo_path() {
+        let now = Utc::now();
+        let payload = json!({
+            "level": "l2",
+            "platform": "gitee",
+            "owner": null,
+            "repo": "repo",
+            "branch": "main",
+            "collected_at": now.to_rfc3339(),
+            "commits": [],
+            "snapshot": null,
+            "files": [{
+                "path": "a.patch",
+                "sha256": "h",
+                "size": 0,
+                "is_binary": false
+            }],
+            "spec": {
+                "path": "pkg.spec",
+                "version": "1.0.0",
+                "release": "1",
+                "content_base64": "",
+                "sha256": "s"
+            },
+            "issues": [{
+                "number": 1,
+                "title": "t",
+                "state": "open",
+                "author": "a",
+                "created_at": now.to_rfc3339(),
+                "updated_at": now.to_rfc3339(),
+                "closed_at": null,
+                "labels": []
+            }]
+        });
+
