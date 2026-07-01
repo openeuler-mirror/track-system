@@ -447,3 +447,47 @@ mod tests {
         let mut mock_client = MockGitClient::new();
         let content = "Name: test\nVersion: 1.2.3\nRelease: 1\n";
         let encoded = BASE64_STANDARD.encode(content);
+
+        mock_client
+            .expect_get_file_content()
+            .times(1)
+            .returning(move |_, _, _, _| {
+                Ok(FileContent {
+                    name: "test.spec".to_string(),
+                    path: "test.spec".to_string(),
+                    sha: "sha".to_string(),
+                    size: 100,
+                    content: encoded.clone(),
+                    encoding: "base64".to_string(),
+                    download_url: "https://example.com/test.spec".to_string(),
+                })
+            });
+
+        let adapter = GitClientCollectorAdapter::new(mock_client, Platform::GitHub);
+        let spec = adapter.collect_spec("owner", "repo", "main").await;
+
+        assert!(spec.is_some());
+        let s = spec.unwrap();
+        assert_eq!(s.version, "1.2.3");
+        assert_eq!(s.release, "1");
+    }
+
+    #[tokio::test]
+    async fn test_collect_spec_failure() {
+        let mut mock_client = MockGitClient::new();
+
+        mock_client
+            .expect_get_file_content()
+            .times(1)
+            .returning(|_, _, _, _| {
+                Err(crate::collectors::error::ApiError::NotFoundError(
+                    "not found".to_string(),
+                ))
+            });
+
+        let adapter = GitClientCollectorAdapter::new(mock_client, Platform::GitHub);
+        let spec = adapter.collect_spec("owner", "repo", "main").await;
+
+        assert!(spec.is_none());
+    }
+}
