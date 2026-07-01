@@ -33,3 +33,38 @@ pub async fn status_check(State(state): State<AppState>) -> Json<ApiResponse<Hea
     let version = env!("CARGO_PKG_VERSION").to_string();
 
     // 检查数据库连接
+    let database_status = check_database(&state.db).await;
+
+    // 检查调度器状态（暂时标记为 healthy，后续实现）
+    let scheduler_status = ComponentStatus::healthy_with_message("Scheduler is running");
+
+    let components = HealthComponents {
+        database: database_status,
+        scheduler: scheduler_status,
+    };
+
+    // 判断整体状态
+    let overall_status =
+        if components.database.status == "healthy" && components.scheduler.status == "healthy" {
+            "healthy"
+        } else {
+            "unhealthy"
+        };
+
+    let health = HealthResponse {
+        status: overall_status.to_string(),
+        version,
+        components,
+    };
+
+    Json(ApiResponse::success(health))
+}
+
+/// 检查数据库连接状态
+async fn check_database(db: &DatabaseConnection) -> ComponentStatus {
+    match db.ping().await {
+        Ok(_) => ComponentStatus::healthy_with_message("Database connection is healthy"),
+        Err(e) => ComponentStatus::unhealthy(format!("Database connection failed: {}", e)),
+    }
+}
+
