@@ -136,3 +136,49 @@ impl CorsConfig {
         cors = cors.allow_methods(self.allowed_methods.clone());
 
         // 配置允许的头
+        let headers: Vec<HeaderName> = self
+            .allowed_headers
+            .iter()
+            .filter_map(|h| h.parse().ok())
+            .collect();
+        cors = cors.allow_headers(headers);
+
+        // 配置是否允许凭证
+        if self.allow_credentials {
+            cors = cors.allow_credentials(true);
+        }
+
+        // 配置预检请求缓存时间
+        cors = cors.max_age(std::time::Duration::from_secs(self.max_age));
+
+        cors
+    }
+}
+
+/// 创建默认的 CORS 中间件
+pub fn create_cors_layer() -> CorsLayer {
+    CorsConfig::default().build()
+}
+
+/// 创建宽松的 CORS 中间件（开发环境）
+pub fn create_permissive_cors_layer() -> CorsLayer {
+    CorsConfig::new()
+        .with_origins(vec!["*".to_string()])
+        .with_credentials(false)
+        .build()
+}
+
+/// 创建严格的 CORS 中间件（生产环境）
+pub fn create_strict_cors_layer(allowed_origins: Vec<String>) -> CorsLayer {
+    CorsConfig::new()
+        .with_origins(allowed_origins)
+        .with_credentials(true)
+        .with_max_age(3600)
+        .build()
+}
+
+/// 创建从环境变量配置的 CORS 中间件
+pub fn create_cors_layer_from_env() -> CorsLayer {
+    CorsConfig::from_env().build()
+}
+
