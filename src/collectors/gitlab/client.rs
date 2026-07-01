@@ -125,3 +125,45 @@ impl GitLabClient {
                     .unwrap_or(body.as_str())
                     .to_string()
             } else {
+                body
+            };
+
+            // 处理错误
+            let error = ApiError::from_status(status.as_u16(), message.clone());
+
+            // 判断是否需要重试
+            if error.is_retryable() && retries < MAX_RETRIES {
+                retries += 1;
+                tokio::time::sleep(Duration::from_secs(2u64.pow(retries))).await;
+                continue;
+            }
+
+            return Err(error);
+        }
+    }
+}
+
+#[async_trait]
+impl GitClient for GitLabClient {
+    async fn get_repository(&self, owner: &str, repo: &str) -> ApiResult<Repository> {
+        let project_path = self.encode_project_path(owner, repo);
+        let url = format!("{}/projects/{}", self.base_url, project_path);
+
+        let gitlab_repo: GitLabRepository = self.get(&url).await?;
+        Ok(gitlab_repo.into())
+    }
+
+    async fn get_branches(&self, owner: &str, repo: &str) -> ApiResult<Vec<Branch>> {
+        let project_path = self.encode_project_path(owner, repo);
+        let url = format!(
+            "{}/projects/{}/repository/branches",
+            self.base_url, project_path
+        );
+
+        let gitlab_branches: Vec<GitLabBranch> = self.get(&url).await?;
+        Ok(gitlab_branches.into_iter().map(|b| b.into()).collect())
+    }
+
+    async fn get_commits(
+        &self,
+        owner: &str,
