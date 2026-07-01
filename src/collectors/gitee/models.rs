@@ -144,3 +144,52 @@ impl From<GiteeCommit> for Commit {
                 .date
                 .parse::<DateTime<Utc>>()
                 .unwrap_or_else(|_| Utc::now()),
+            html_url: commit.html_url,
+            stats: commit.stats.map(|s| CommitStats {
+                additions: s.additions,
+                deletions: s.deletions,
+                total: s.total,
+            }),
+        }
+    }
+}
+
+/// Gitee 文件内容响应
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GiteeFileContent {
+    pub name: String,
+    pub path: String,
+    pub sha: String,
+    pub size: u64,
+    pub content: String,
+    pub encoding: String,
+    pub download_url: String,
+}
+
+impl From<GiteeFileContent> for FileContent {
+    fn from(file: GiteeFileContent) -> Self {
+        Self {
+            name: file.name,
+            path: file.path,
+            sha: file.sha,
+            size: file.size,
+            content: file.content,
+            encoding: file.encoding,
+            download_url: file.download_url,
+        }
+    }
+}
+
+/// Gitee API 错误响应
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GiteeError {
+    pub message: String,
+}
+
+/// Gitee Issue 响应
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GiteeIssue {
+    pub number: i64,
+    pub title: String,
+    pub state: String,
+    pub html_url: String,
