@@ -980,3 +980,54 @@ impl<'a> PipelineExecutor<'a> {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::diff;
+    use crate::entities::{l0_commits, l2_snapshots, packages, tracking};
+    use chrono::Utc;
+    use sea_orm::{DatabaseBackend, MockDatabase};
+    use serial_test::serial;
+    use std::env;
+
+    struct EnvVarGuard {
+        key: String,
+        previous: Option<String>,
+    }
+
+    impl EnvVarGuard {
+        fn set(key: &str, value: &str) -> Self {
+            let previous = env::var(key).ok();
+            env::set_var(key, value);
+            Self {
+                key: key.to_string(),
+                previous,
+            }
+        }
+    }
+
+    impl Drop for EnvVarGuard {
+        fn drop(&mut self) {
+            match &self.previous {
+                Some(v) => env::set_var(&self.key, v),
+                None => env::remove_var(&self.key),
+            }
+        }
+    }
+
+    #[test]
+    fn test_l1_ingestion_result_has_new_data() {
+        let result = L1IngestionResult {
+            commits_synced: 5,
+            issues_synced: 0,
+            has_new_data: true,
+            snapshot_path: Some("/tmp/test.json".to_string()),
+            snapshot_checksum: Some("abc123".to_string()),
+        };
+
+        assert_eq!(result.commits_synced, 5);
+        assert_eq!(result.issues_synced, 0);
+        assert!(result.has_new_data);
+        assert!(result.snapshot_path.is_some());
+        assert!(result.snapshot_checksum.is_some());
+    }
