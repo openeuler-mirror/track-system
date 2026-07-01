@@ -37,3 +37,42 @@ impl From<GitLabRepository> for Repository {
             full_name: repo.path_with_namespace,
             description: repo.description,
             html_url: repo.web_url,
+            default_branch: repo.default_branch,
+            created_at: repo.created_at,
+            updated_at: repo.last_activity_at,
+        }
+    }
+}
+
+/// GitLab 分支信息
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GitLabBranch {
+    pub name: String,
+    pub commit: GitLabBranchCommit,
+    pub protected: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GitLabBranchCommit {
+    pub id: String,
+}
+
+impl From<GitLabBranch> for Branch {
+    fn from(branch: GitLabBranch) -> Self {
+        Self {
+            name: branch.name,
+            commit_sha: branch.commit.id,
+            protected: branch.protected,
+        }
+    }
+}
+
+/// GitLab Commit 信息
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GitLabCommit {
+    pub id: String,
+    pub short_id: String,
+    #[serde(default)]
+    pub title: Option<String>,
+    pub message: String,
+    pub author_name: String,
