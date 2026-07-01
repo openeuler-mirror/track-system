@@ -410,3 +410,47 @@ mod tests {
             report_type: "l1_vs_l0".to_string(),
             package_name: "redis".to_string(),
             status: "completed".to_string(),
+            content: content.clone(),
+            created_at: now,
+            updated_at: now,
+        };
+        assert_eq!(detail.id, 1);
+        assert_eq!(detail.tracking_id, 10);
+        assert_eq!(detail.content, content);
+    }
+
+    #[test]
+    fn test_export_format_query_defaults() {
+        let query = ExportFormatQuery { format: None };
+        assert!(query.format.is_none());
+
+        let query_with_format = ExportFormatQuery {
+            format: Some(ExportFormat::Json),
+        };
+        assert!(query_with_format.format.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_list_reports_pagination_validation() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+        let state = AppState::without_external_clients(db);
+
+        // Test invalid page (0)
+        let query = ReportListQuery {
+            page: Some(0),
+            page_size: Some(10),
+            tracking_id: None,
+            report_type: None,
+            status: None,
+        };
+        let result = list_reports(State(state.clone()), Query(query)).await;
+        assert!(result.is_err());
+        if let Err(ApiError::BadRequest(msg)) = result {
+            assert!(msg.contains("Page must be >= 1"));
+        }
+
+        // Test invalid page_size (101)
+        let query = ReportListQuery {
+            page: Some(1),
+            page_size: Some(101),
+            tracking_id: None,
