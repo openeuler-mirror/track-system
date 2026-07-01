@@ -669,3 +669,55 @@ impl<'a> PipelineExecutor<'a> {
 
         // 获取 package 信息
         use crate::entities::prelude::*;
+        let package = Packages::find_by_id(tracking.package_id)
+            .one(self.db)
+            .await?
+            .context("未找到关联的软件包记录")?;
+        let package_name = package.name.clone();
+
+        let risk_create_url = std::env::var("RISK_CREATE_URL")
+            .unwrap_or_else(|_| "http://localhost:8899/risk/create/inner".to_string());
+        let risk_create_enabled = std::env::var("RISK_CREATE_ENABLED")
+            .unwrap_or_else(|_| "true".to_string())
+            .to_lowercase()
+            != "false";
+
+        let risk_timeout_secs: u64 = std::env::var("RISK_HTTP_TIMEOUT_SECS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(5);
+
+        let risk_client = if risk_create_enabled {
+            Some(
+                Client::builder()
+                    .timeout(Duration::from_secs(risk_timeout_secs))
+                    .build()
+                    .context("创建 Risk HTTP 客户端失败")?,
+            )
+        } else {
+            None
+        };
+
+        // 存储每个commit的独立信息
+        let mut commit_reports = Vec::new();
+        let mut base_version = String::new();
+        let mut base_release = String::new();
+
+        // 从 diff_result 中获取 report_id，然后查询 compare_reports 表
+        if let Some(diff_stage) = diff_result {
+            if let Some(report_id) = diff_stage.details.get("report_id").and_then(|v| v.as_i64()) {
+                // 查询 compare_reports 表获取对比数据
+                if let Some(compare_report) = CompareReports::find_by_id(report_id as i32)
+                    .one(self.db)
+                    .await?
+                {
+                    // 从 l2_vs_l1_diff 中提取 commit_diff 信息
+                    if let Some(l2_vs_l1_diff) = &compare_report.l2_vs_l1_diff {
+                        if let Some(commit_diff) = l2_vs_l1_diff.get("commit_diff") {
+                            // 获取 base_version_release
+                            if let Some(version_release) = commit_diff.get("base_version_release") {
+                                if let Some(version) =
+                                    version_release.get(0).and_then(|v| v.as_str())
+                                {
+                                    base_version = version.to_string();
+                                    info!(tracking_id = tracking.id, base_version = %base_version, "获取到 base_commit 版本");
