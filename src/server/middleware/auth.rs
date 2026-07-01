@@ -269,3 +269,40 @@ pub fn get_current_user(request: &Request) -> Option<Claims> {
     request.extensions().get::<Claims>().cloned()
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_claims_creation() {
+        let claims = Claims::new(
+            "user123".to_string(),
+            "testuser".to_string(),
+            "admin".to_string(),
+            24,
+        );
+
+        assert_eq!(claims.sub, "user123");
+        assert_eq!(claims.username, "testuser");
+        assert_eq!(claims.role, "admin");
+        assert!(!claims.is_expired());
+    }
+
+    #[test]
+    fn test_token_generation_and_verification() {
+        let config = AuthConfig::new("test-secret".to_string(), 24);
+        let generator = JwtTokenGenerator::new(config);
+
+        // 生成 token
+        let token = generator
+            .generate_token(
+                "user123".to_string(),
+                "testuser".to_string(),
+                "admin".to_string(),
+            )
+            .unwrap();
+
+        // 验证 token
+        let claims = generator.verify_token(&token).unwrap();
+
+        assert_eq!(claims.sub, "user123");
