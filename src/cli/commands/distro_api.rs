@@ -76,3 +76,42 @@ async fn list_distros(api_client: &ApiClient) -> Result<()> {
     }
 
     println!("\n{}", "=== 发行版列表 ===".bold());
+    println!("{:<10} {:<20} {:<15} {:<30}", "ID", "名称", "版本", "描述");
+    println!("{}", "-".repeat(75));
+
+    for distro in distros {
+        let id = distro["id"].as_i64().unwrap_or(0);
+        let name = distro["name"].as_str().unwrap_or("-");
+        let version = distro["version"].as_str().unwrap_or("-");
+        let description = distro["description"].as_str().unwrap_or("-");
+
+        println!(
+            "{:<10} {:<20} {:<15} {:<30}",
+            id, name, version, description
+        );
+    }
+
+    Ok(())
+}
+
+/// 显示发行版详情
+async fn show_distro(api_client: &ApiClient, name_or_id: String) -> Result<()> {
+    println!(
+        "{}",
+        format!("正在获取发行版 {} 的详情...", name_or_id).cyan()
+    );
+
+    // 尝试作为 ID 解析
+    let url = if let Ok(id) = name_or_id.parse::<i32>() {
+        format!("/distros/{}", id)
+    } else {
+        format!("/distros/by-name/{}", name_or_id)
+    };
+
+    let distro: serde_json::Value = api_client.get(&url).await?;
+
+    println!("\n{}", "=== 发行版详情 ===".bold());
+    println!("ID: {}", distro["id"]);
+    println!("名称: {}", distro["name"]);
+    println!("版本: {}", distro["version"]);
+    println!("描述: {}", distro["description"].as_str().unwrap_or("-"));
