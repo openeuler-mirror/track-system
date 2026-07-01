@@ -376,3 +376,51 @@ impl<'a> SyncManager<'a> {
 
         active.updated_at = Set(now);
         active.update(self.db).await?;
+
+        if let Some(job) = self.find_latest_sync_job(tracking_id).await? {
+            let job_id = job.id;
+            let mut job_active: sync_jobs::ActiveModel = job.into();
+            match &outcome {
+                CompletionOutcome::Success => {
+                    job_active.status = Set(STATUS_SUCCEEDED.to_string());
+                    job_active.error = Set(None);
+                }
+                CompletionOutcome::Failure { message } => {
+                    job_active.status = Set(STATUS_FAILED.to_string());
+                    job_active.error = Set(Some(message.clone()));
+                }
+                CompletionOutcome::Skipped { reason } => {
+                    job_active.status = Set(STATUS_SUCCEEDED.to_string());
+                    job_active.error = Set(Some(reason.clone()));
+                }
+            }
+            job_active.finished_at = Set(Some(now));
+            job_active.updated_at = Set(now);
+            job_active.update(self.db).await?;
+
+            let telemetry_success = matches!(
+                outcome,
+                CompletionOutcome::Success | CompletionOutcome::Skipped { .. }
+            );
+            Telemetry::sync_job_completed(tracking_id, job_id, telemetry_success);
+        }
+
+        Ok(())
+    }
+}
+
+impl<'a> SyncManager<'a> {
+    async fn find_active_sync_job(
+        &self,
+        tracking_id: i32,
+    ) -> anyhow::Result<Option<sync_jobs::Model>> {
+        let job = SyncJobsEntity::find()
+            .filter(sync_jobs::Column::TrackingId.eq(tracking_id))
+            .filter(sync_jobs::Column::JobKind.eq(SYNC_JOB_KIND))
+            .filter(sync_jobs::Column::Status.is_in(vec![STATUS_PENDING, STATUS_RUNNING]))
+            .order_by_desc(sync_jobs::Column::ScheduledAt)
+            .one(self.db)
+            .await?;
+
+        Ok(job)
+    }
