@@ -87,3 +87,48 @@ pub struct TrackingResponse {
     pub id: i32,
     pub package_id: i32,
     pub distro_id: i32,
+    pub l1_repo_owner: String,
+    pub l1_repo_name: String,
+    pub l1_branch: String,
+    pub l2_branch: String,
+    pub l2_repo_path: String,
+    pub tracking_status: String,
+    pub last_sync_time: Option<chrono::DateTime<chrono::Utc>>,
+    pub last_l1_commit_sha: Option<String>,
+    pub last_l2_commit_sha: Option<String>,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl From<tracking::Model> for TrackingResponse {
+    fn from(model: tracking::Model) -> Self {
+        Self {
+            id: model.id,
+            package_id: model.package_id,
+            distro_id: model.distro_id,
+            l1_repo_owner: model.l1_repo_owner,
+            l1_repo_name: model.l1_repo_name,
+            l1_branch: model.l1_branch,
+            l2_branch: model.l2_branch,
+            l2_repo_path: model.l2_repo_path,
+            tracking_status: model.tracking_status,
+            last_sync_time: model.last_sync_time,
+            last_l1_commit_sha: model.last_l1_commit_sha,
+            last_l2_commit_sha: model.last_l2_commit_sha,
+            created_at: model.created_at,
+            updated_at: model.updated_at,
+        }
+    }
+}
+
+/// GET /api/tracking
+///
+/// 查询跟踪配置列表（支持分页和过滤）
+pub async fn list_tracking(
+    State(state): State<AppState>,
+    Query(query): Query<TrackingListQuery>,
+) -> ApiResult<Json<ApiResponse<PaginatedResponse<TrackingResponse>>>> {
+    let page = query.page.unwrap_or(1);
+    let page_size = query.page_size.unwrap_or(10);
+
+    // 验证分页参数
