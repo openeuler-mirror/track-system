@@ -578,3 +578,52 @@ mod tests {
     #[test]
     fn test_extract_repo_from_json() {
         let json = r#"{"repo": "test-package", "commits": []}"#;
+        let result = extract_repo_from_json(json);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "test-package");
+    }
+
+    #[test]
+    fn test_extract_repo_from_json_missing() {
+        let json = r#"{"commits": []}"#;
+        let result = extract_repo_from_json(json);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_extract_repo_from_json_invalid_json() {
+        let result = extract_repo_from_json("not-json");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_snapshot_or_convert_valid_snapshot() {
+        let json = create_test_snapshot_json();
+        let result = parse_snapshot_or_convert(&json, 1);
+        assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+        let snapshot = result.unwrap();
+        assert_eq!(snapshot.tracking_id, 1);
+        assert_eq!(snapshot.commits.len(), 1);
+    }
+
+    #[test]
+    fn test_parse_snapshot_or_convert_generic_json() {
+        let json = serde_json::json!({
+            "level": "l1",
+            "collected_at": "2024-01-01T00:00:00Z",
+            "commits": [
+                {
+                    "sha": "def456",
+                    "message": "Generic commit",
+                    "author": "Generic Author",
+                    "date": "2024-01-01T00:00:00Z",
+                    "additions": 5,
+                    "deletions": 3,
+                    "files_changed": 1
+                }
+            ]
+        })
+        .to_string();
+
+        let result = parse_snapshot_or_convert(&json, 2);
+        assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
