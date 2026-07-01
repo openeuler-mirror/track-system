@@ -308,3 +308,54 @@ impl<'a> PipelineExecutor<'a> {
             );
             return Ok(None);
         }
+
+        // 反序列化快照
+        let l1_snapshot: crate::snapshot::types::RepositorySnapshot =
+            serde_json::from_value(l1_record.as_ref().unwrap().payload.clone())
+                .context("解析 L1 快照 payload 失败")?;
+        let l2_snapshot: crate::snapshot::types::RepositorySnapshot =
+            serde_json::from_value(l2_record.as_ref().unwrap().payload.clone())
+                .context("解析 L2 快照 payload 失败")?;
+
+        let comparator = diff::l2_vs_l1::L2VsL1Comparator::new();
+        let l1_snap = diff::l2_vs_l1::L2VsL1Comparator::create_l1_snapshot(
+            package_name.clone(),
+            &l1_snapshot,
+        )
+        .context("构建 L1 快照失败")?;
+        let l2_snap = diff::l2_vs_l1::L2VsL1Comparator::create_l2_snapshot(
+            package_name.clone(),
+            &l2_snapshot,
+        )
+        .context("构建 L2 快照失败")?;
+
+        // 执行对比
+        let report = comparator
+            .compare(&l1_snap, &l2_snap, self.db, tracking.id)
+            .await
+            .context("L2 vs L1 内容对比失败")?;
+
+        info!(
+            tracking_id = tracking.id,
+            l1_patches = l1_snap.patches.len(),
+            l2_patches = l2_snap.patches.len(),
+            has_spec_changes = !report.spec_diff.content_identical,
+            "L2 vs L1 对比完成"
+        );
+
+        Ok(Some(report))
+    }
+
+    /// 执行 L1 vs L0 对比
+    async fn compare_l1_vs_l0(
+        &self,
+        tracking: &tracking::Model,
+    ) -> Result<Option<diff::l1_vs_l0::L1VsL0Report>> {
+        use crate::diff::l1_vs_l0::L1VsL0Comparator;
+
+        info!(tracking_id = tracking.id, "执行 L1 vs L0 对比");
+
+        // 获取 L0 版本信息（从 l0_commits 表）
+        let l0_info = self.get_l0_version_info(tracking).await?;
+        if l0_info.is_none() {
+            warn!(
