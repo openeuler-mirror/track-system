@@ -314,3 +314,56 @@ pub enum SyncType {
     /// 新功能
     NewFeature,
     /// 配置更新
+    ConfigUpdate,
+}
+
+/// 工作量级别
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum EffortLevel {
+    /// 低（< 1 小时）
+    Low,
+    /// 中（1-4 小时）
+    Medium,
+    /// 高（> 4 小时）
+    High,
+}
+
+/// 合并冲突
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MergeConflict {
+    /// 冲突类型
+    pub conflict_type: ConflictType,
+    /// 描述
+    pub description: String,
+    /// 涉及的文件
+    pub files: Vec<String>,
+    /// 解决建议
+    pub resolution_hint: String,
+}
+
+/// 冲突类型
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum ConflictType {
+    /// 版本冲突
+    VersionConflict,
+    /// Patch 冲突
+    PatchConflict,
+    /// 文件修改冲突
+    FileModificationConflict,
+    /// 配置冲突
+    ConfigurationConflict,
+}
+
+/// L2 vs L1 对比器
+pub struct L2VsL1Comparator;
+
+impl L2VsL1Comparator {
+    /// 创建新的对比器
+    pub fn new() -> Self {
+        Self
+    }
+
+    /// 从 RepositorySnapshot 创建 L1 快照
+    pub fn create_l1_snapshot(
+        package_name: String,
+        snapshot: &RepositorySnapshot,
