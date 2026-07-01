@@ -207,3 +207,55 @@ pub enum ClassifyAction {
     #[command(about = "Process pending classification jobs")]
     Process {
         /// 处理数量限制
+        #[arg(default_value = "100")]
+        limit: usize,
+    },
+
+    /// 处理指定tracking的分类任务
+    #[command(about = "Process classification for specific tracking")]
+    ProcessTracking {
+        /// Tracking ID
+        tracking_id: i32,
+
+        /// 处理数量限制
+        #[arg(default_value = "100")]
+        limit: usize,
+    },
+
+    /// 以守护进程方式运行分类任务队列
+    #[command(about = "Run classification queue in daemon mode")]
+    Daemon {
+        /// 检查间隔（秒）
+        #[arg(long, default_value = "60")]
+        interval: u64,
+
+        /// 每轮处理的批大小
+        #[arg(long, default_value = "100")]
+        batch_size: usize,
+    },
+}
+
+// ============== Workflow Commands ==============
+
+#[derive(Subcommand, Debug)]
+pub enum WorkflowAction {
+    /// 执行工作流
+    #[command(about = "Execute a workflow")]
+    Execute {
+        /// 工作流文件路径
+        workflow_file: String,
+
+        /// 额外的变量 (key=value 格式)
+        #[arg(long)]
+        var: Vec<String>,
+    },
+
+    /// 列出所有可用的工作流
+    #[command(about = "List available workflows")]
+    List,
+
+    /// 验证工作流定义
+    #[command(about = "Validate workflow definition")]
+    Validate {
+        /// 工作流文件路径
+        workflow_file: String,
