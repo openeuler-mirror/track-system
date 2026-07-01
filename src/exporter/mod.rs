@@ -146,3 +146,53 @@ impl<'a> MetadataExporter<'a> {
                 self.export_sql(
                     export_path,
                     export_time,
+                    packages,
+                    distros,
+                    trackings,
+                    commits,
+                )
+                .await?
+            }
+        };
+
+        let path_display = export_path.to_string_lossy();
+        Telemetry::snapshot_export_completed(None, path_display.as_ref(), result.export_time);
+
+        Ok(result)
+    }
+
+    /// 查询要导出的数据
+    async fn fetch_data(
+        &self,
+        options: &ExportOptions,
+    ) -> Result<
+        (
+            Vec<serde_json::Value>,
+            Vec<serde_json::Value>,
+            Vec<serde_json::Value>,
+            Option<Vec<serde_json::Value>>,
+        ),
+        DbErr,
+    > {
+        use crate::entities::{distros, l1_commit_records, packages, tracking};
+
+        // 查询软件包
+        let mut packages_query = packages::Entity::find();
+        if options.incremental {
+            if let Some(since) = options.since {
+                packages_query = packages_query.filter(packages::Column::UpdatedAt.gt(since));
+            }
+        }
+        let packages_data = packages_query.all(self.db).await?;
+        let packages_json: Vec<serde_json::Value> = packages_data
+            .iter()
+            .map(|p| {
+                serde_json::json!({
+                    "id": p.id,
+                    "name": p.name,
+                    "level": p.level,
+                    "sync_interval_hours": p.sync_interval_hours,
+                    "created_at": p.created_at,
+                    "updated_at": p.updated_at,
+                })
+            })
