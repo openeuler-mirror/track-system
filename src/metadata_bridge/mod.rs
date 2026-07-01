@@ -251,3 +251,54 @@ fn collect_files(
             // 内容哈希无法获取，采用路径字符串的哈希作为占位，避免空值
             let sha = sha256_hex(path.as_bytes());
             entries.push(FileEntry {
+                path,
+                size: 0,
+                sha256: sha,
+                is_binary: false,
+            });
+        }
+
+        // 生成 FileEntry：源文件（例如 tarball 等）
+        for s in parsed.sources.iter() {
+            let path = s.trim().to_string();
+            if path.is_empty() {
+                continue;
+            }
+            let sha = sha256_hex(path.as_bytes());
+            // 根据扩展名粗略判断二进制性质
+            let is_binary = path.ends_with(".tar")
+                || path.ends_with(".tar.gz")
+                || path.ends_with(".tar.bz2")
+                || path.ends_with(".xz")
+                || path.ends_with(".zip")
+                || path.ends_with(".tgz");
+            entries.push(FileEntry {
+                path,
+                size: 0,
+                sha256: sha,
+                is_binary,
+            });
+        }
+
+        // 去重与排序
+        entries.sort_by(|a, b| a.path.cmp(&b.path));
+        entries.dedup_by(|a, b| a.path == b.path);
+        return Ok(entries);
+    }
+
+    // 3) 无仓库、无 spec 的情况，返回空列表
+    Ok(entries)
+}
+
+async fn collect_spec(
+    origin: SnapshotOrigin,
+    tracking: &crate::entities::tracking::Model,
+    repo_path: Option<&Path>,
+) -> Result<Option<SpecEntry>> {
+    // 1) 优先从本地仓库读取（与原实现保持向后兼容）
+    if let Some(root) = repo_path {
+        info!(
+            tracking_id = tracking.id,
+            repo_path = %root.display(),
+            "开始收集本地仓库 spec 文件"
+        );
