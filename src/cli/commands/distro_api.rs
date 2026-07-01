@@ -115,3 +115,42 @@ async fn show_distro(api_client: &ApiClient, name_or_id: String) -> Result<()> {
     println!("名称: {}", distro["name"]);
     println!("版本: {}", distro["version"]);
     println!("描述: {}", distro["description"].as_str().unwrap_or("-"));
+    println!("创建时间: {}", distro["created_at"]);
+    println!("更新时间: {}", distro["updated_at"]);
+
+    // 显示关联的 tracking 数量
+    if let Some(tracking_count) = distro["tracking_count"].as_i64() {
+        println!("\n关联的 tracking 数量: {}", tracking_count);
+    }
+
+    Ok(())
+}
+
+/// 删除发行版
+async fn remove_distro(api_client: &ApiClient, name: String, confirm: bool) -> Result<()> {
+    if !confirm {
+        println!("{}", "警告: 此操作将删除发行版及其所有关联数据".yellow());
+        print!("是否继续? (y/N): ");
+        use std::io::{self, Write};
+        io::stdout().flush()?;
+
+        let mut input = String::new();
+        io::stdin().read_line(&mut input)?;
+
+        if !input.trim().eq_ignore_ascii_case("y") {
+            println!("已取消");
+            return Ok(());
+        }
+    }
+
+    println!("{}", format!("正在删除发行版 {}...", name).cyan());
+
+    let _result: serde_json::Value = api_client
+        .delete(&format!("/distros/by-name/{}", name))
+        .await?;
+
+    println!("{}", "✓ 发行版已删除".green());
+
+    Ok(())
+}
+
