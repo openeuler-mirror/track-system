@@ -201,3 +201,53 @@ impl L1VsL0Comparator {
             &version_comparison,
             &patch_analysis,
             &cve_analysis,
+            &upgradable_versions,
+        )?;
+
+        Ok(L1VsL0Report {
+            id: None,
+            package_name: l1_info.package_name.clone(),
+            current_version: l1_info.current_version.clone(),
+            latest_stable: l0_info.latest_stable.clone(),
+            latest_version: l0_info.latest_version.clone(),
+            version_behind: version_comparison.behind_count,
+            upgradable_versions,
+            patch_analysis,
+            cve_analysis,
+            recommendations,
+            created_at: Utc::now(),
+        })
+    }
+
+    /// 对比版本
+    fn compare_versions(
+        &self,
+        current: &str,
+        latest_stable: &str,
+        latest: &str,
+        all_versions: &[VersionTag],
+    ) -> Result<VersionComparison> {
+        // 解析当前版本
+        let current_version = VersionParser::parse(current)?;
+
+        // 解析最新稳定版本
+        let latest_stable_version = VersionParser::parse(latest_stable)?;
+
+        // 解析最新版本
+        let latest_version = VersionParser::parse(latest)?;
+
+        // 解析所有版本
+        let parsed_versions: Vec<Version> = all_versions
+            .iter()
+            .filter_map(|tag| VersionParser::parse(&tag.version).ok())
+            .collect();
+
+        // 计算落后的版本数（只计算稳定版本）
+        let behind_count = VersionParser::count_versions_behind(&current_version, &parsed_versions);
+
+        // 判断是否过时
+        let is_outdated = current_version.is_older_than(&latest_stable_version);
+
+        // 判断是否有更新的稳定版本
+        let has_newer_stable = current_version.is_older_than(&latest_stable_version);
+
