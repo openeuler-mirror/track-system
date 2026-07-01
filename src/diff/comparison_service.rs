@@ -451,3 +451,46 @@ mod tests {
             tracking_id: 1,
             commits_behind: 0,
             commits_ahead: 2,
+            diff_summary: json!({
+                "tracking_id": 1,
+                "commits_ahead": 2,
+            }),
+            source: "auto".to_string(),
+        };
+
+        let result = service.save_report(&report).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_get_latest_report_found() {
+        let now = Utc::now();
+        let report_model = tracking_reports::Model {
+            id: 1,
+            tracking_id: 1,
+            generated_at: now,
+            diff_summary: json!({"test": "data"}),
+            representative_changes: None,
+            source: "auto".to_string(),
+            status: "completed".to_string(),
+            failure_reason: None,
+            created_at: now,
+            updated_at: now,
+        };
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results([[report_model.clone()]])
+            .into_connection();
+
+        let service = ComparisonService::new(&db);
+        let result = service.get_latest_report(1).await.unwrap();
+
+        assert!(result.is_some());
+        let report = result.unwrap();
+        assert_eq!(report.id, 1);
+        assert_eq!(report.tracking_id, 1);
+        assert_eq!(report.source, "auto");
+    }
+
+    #[tokio::test]
+    async fn test_get_latest_report_not_found() {
