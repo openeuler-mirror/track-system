@@ -42,3 +42,47 @@ impl WorkflowEngine {
     pub fn new(config: WorkflowConfig) -> Result<Self> {
         config.validate()?;
 
+        let mut task_status = HashMap::new();
+        for task in &config.tasks {
+            task_status.insert(task.name.clone(), TaskStatus::Pending);
+        }
+
+        Ok(Self {
+            config,
+            task_status,
+            task_results: HashMap::new(),
+        })
+    }
+
+    /// 从 YAML 文件创建工作流引擎
+    pub fn from_file(path: &str) -> Result<Self> {
+        let config = WorkflowConfig::from_file(path)?;
+        Self::new(config)
+    }
+
+    /// 执行工作流
+    pub async fn execute(&mut self, executor: &TaskExecutor) -> Result<()> {
+        info!("开始执行工作流: {}", self.config.name);
+        info!("工作流版本: {}", self.config.version);
+        info!("任务总数: {}", self.config.tasks.len());
+        info!("执行策略: {:?}", self.config.execution_policy);
+        info!("");
+
+        match self.config.execution_policy {
+            ExecutionPolicy::Sequential => self.execute_sequential(executor).await,
+            ExecutionPolicy::Parallel => self.execute_parallel(executor).await,
+            ExecutionPolicy::DAG => self.execute_dag(executor).await,
+        }
+    }
+
+    /// 顺序执行工作流任务
+    async fn execute_sequential(&mut self, executor: &TaskExecutor) -> Result<()> {
+        for task in &self.config.tasks.clone() {
+            info!("执行任务: {}", task.name);
+
+            // 检查是否所有依赖都已完成
+            for dep in &task.depends_on {
+                if let Some(TaskStatus::Success) = self.task_status.get(dep) {
+                    continue;
+                } else {
+                    info!("    跳过任务，依赖 {} 未完成", dep);
