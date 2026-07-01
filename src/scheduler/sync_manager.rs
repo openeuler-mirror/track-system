@@ -471,3 +471,51 @@ fn should_sync(
     track: &tracking::Model,
     package: &packages::Model,
     now: chrono::DateTime<Utc>,
+) -> bool {
+    if matches!(track.tracking_status.as_str(), "paused" | "archived") {
+        return false;
+    }
+
+    // 如果正在同步，跳过
+    if track.tracking_status == "syncing" {
+        return false;
+    }
+
+    // 获取上次同步时间
+    let last_sync = match track.last_sync_time {
+        Some(t) => t,
+        None => return true, // 从未同步过，需要同步
+    };
+
+    let interval_hours = package.sync_interval_hours as i64;
+    if interval_hours <= 0 {
+        return true;
+    }
+
+    let interval = chrono::Duration::hours(interval_hours);
+    let base_time = package.created_at;
+    let next_sync = next_aligned_after(base_time, interval, last_sync);
+
+    // 如果当前时间已经超过下次同步时间，需要同步
+    now >= next_sync
+}
+
+fn next_aligned_after(
+    base_time: chrono::DateTime<Utc>,
+    interval: chrono::Duration,
+    after: chrono::DateTime<Utc>,
+) -> chrono::DateTime<Utc> {
+    let interval_secs = interval.num_seconds();
+    if interval_secs <= 0 {
+        return base_time;
+    }
+
+    if after < base_time {
+        return base_time;
+    }
+
+    let elapsed_secs = (after - base_time).num_seconds();
+    let next_k = elapsed_secs.div_euclid(interval_secs) + 1;
+    base_time + chrono::Duration::seconds(interval_secs.saturating_mul(next_k))
+}
+
