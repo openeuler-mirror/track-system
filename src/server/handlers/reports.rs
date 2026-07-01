@@ -44,3 +44,49 @@ pub struct ReportSummary {
     /// 报告 ID
     pub id: i64,
     /// 跟踪配置 ID
+    pub tracking_id: i32,
+    /// 报告类型（l1_vs_l0, l2_vs_l1）
+    pub report_type: String,
+    /// 软件包名称
+    pub package_name: String,
+    /// 报告状态
+    pub status: String,
+    /// 创建时间
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    /// 更新时间
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+/// 报告详情
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReportDetail {
+    /// 报告 ID
+    pub id: i64,
+    /// 跟踪配置 ID
+    pub tracking_id: i32,
+    /// 报告类型
+    pub report_type: String,
+    /// 软件包名称
+    pub package_name: String,
+    /// 报告状态
+    pub status: String,
+    /// 报告内容（JSON）
+    pub content: serde_json::Value,
+    /// 创建时间
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    /// 更新时间
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+/// 报告导出格式
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ExportFormat {
+    Json,
+    Yaml,
+    Markdown,
+    Html,
+}
+
+/// GET /api/reports
+///
