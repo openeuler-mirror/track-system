@@ -86,3 +86,47 @@ async fn restore_snapshot(api_client: &ApiClient, snapshot_id: i64, force: bool)
             return Ok(());
         }
     }
+
+    let result: serde_json::Value = api_client
+        .post(
+            &format!("/snapshot/{}/restore", snapshot_id),
+            &serde_json::json!({
+                "force": force
+            }),
+        )
+        .await?;
+
+    println!("{}", "✓ 快照已恢复".green());
+    println!("恢复的记录数: {}", result["restored_records"]);
+    let restored_at = result["restored_at"].as_str().unwrap_or("-");
+    let restored_at = chrono::DateTime::parse_from_rfc3339(restored_at)
+        .map(|dt| dt.with_timezone(&chrono::Utc))
+        .ok()
+        .map(|dt| format_datetime_local(&dt))
+        .unwrap_or_else(|| restored_at.to_string());
+    println!("恢复时间: {}", restored_at);
+
+    Ok(())
+}
+
+/// 列出快照
+async fn list_snapshots(api_client: &ApiClient, tracking_id: Option<i32>) -> Result<()> {
+    let url = if let Some(id) = tracking_id {
+        format!("/snapshot/list?tracking_id={}", id)
+    } else {
+        "/snapshot/list".to_string()
+    };
+
+    println!("{}", "正在获取快照列表...".cyan());
+
+    let result: serde_json::Value = api_client.get(&url).await?;
+    let snapshots = result["snapshots"]
+        .as_array()
+        .ok_or_else(|| anyhow::anyhow!("无效的响应格式"))?;
+
+    if snapshots.is_empty() {
+        println!("{}", "没有快照".yellow());
+        return Ok(());
+    }
+
+    println!("\n{}", "=== 快照列表 ===".bold());
