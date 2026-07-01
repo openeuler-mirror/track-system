@@ -613,3 +613,55 @@ async fn import_issue(
     let existing = Issues::find()
         .filter(issues::Column::TrackingId.eq(tracking_id))
         .filter(issues::Column::IssueNumber.eq(&issue.number))
+        .one(db)
+        .await?;
+
+    if existing.is_some() {
+        return Ok(false); // 已存在，跳过
+    }
+
+    // 转换 labels
+    let labels_json = if !issue.labels.is_empty() {
+        Some(serde_json::to_value(&issue.labels)?)
+    } else {
+        None
+    };
+
+    // 插入新记录
+    let new_issue = issues::ActiveModel {
+        tracking_id: Set(tracking_id),
+        issue_number: Set(issue.number.clone()),
+        title: Set(issue.title.clone()),
+        state: Set(issue.state.clone()),
+        author: Set(issue.author.clone()),
+        api_url: Set(String::new()), // 从快照中无法获取
+        labels: Set(labels_json),
+        created_at: Set(issue.updated_at), // 使用 updated_at 作为创建时间
+        updated_at: Set(issue.updated_at),
+        closed_at: Set(None),
+        raw_payload: Set(None),
+        ..Default::default()
+    };
+
+    Issues::insert(new_issue).exec(db).await?;
+    Ok(true)
+}
+
+/// 计算快照校验和
+fn calculate_snapshot_checksum(snapshot_json: &serde_json::Value) -> String {
+    use sha2::{Digest, Sha256};
+    let json_str = serde_json::to_string(snapshot_json).unwrap_or_default();
+    let mut hasher = Sha256::new();
+    hasher.update(json_str.as_bytes());
+    format!("{:x}", hasher.finalize())
+}
+
+/// 触发对比任务
+async fn trigger_comparison_task(state: &AppState, tracking_id: i32) -> anyhow::Result<()> {
+    // 使用 SyncManager 入队同步作业
+    let sync_manager = state.scheduler();
+    sync_manager.queue_sync_job(tracking_id, 0).await?;
+    tracing::info!("已为 tracking_id={} 入队同步作业", tracking_id);
+    Ok(())
+}
+
