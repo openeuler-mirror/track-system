@@ -100,3 +100,54 @@ pub async fn import_l0_metadata(
             Ok(false) => commits_skipped += 1,
             Err(e) => {
                 tracing::warn!("导入 L0 commit {} 失败: {}", commit.sha, e);
+                commits_skipped += 1;
+            }
+        }
+    }
+
+    // 3. 更新跟踪配置的最后同步时间
+    let now = chrono::Utc::now();
+    let mut tracking_active: crate::entities::tracking::ActiveModel = tracking.into();
+    tracking_active.last_sync_time = Set(Some(now));
+    tracking_active.updated_at = Set(now);
+    tracking_active
+        .update(state.db.as_ref())
+        .await
+        .map_err(ApiError::DatabaseError)?;
+
+    // 4. 触发对比任务（可选）
+    if let Err(e) = trigger_comparison_task(&state, request.tracking_id).await {
+        tracing::warn!("触发对比任务失败: {}", e);
+    }
+
+    // 生成快照 ID（使用时间戳和 tracking_id）
+    let snapshot_id = format!("l0-{}-{}", request.tracking_id, now.timestamp());
+
+    tracing::info!(
+        "L0 元数据导入完成: snapshot_id={}, commits_imported={}, commits_skipped={}",
+        snapshot_id,
+        commits_imported,
+        commits_skipped
+    );
+
+    let response = ImportResponse {
+        snapshot_id,
+        tracking_id: request.tracking_id,
+        file_count: request.snapshot.files.len(),
+        imported_at: now,
+    };
+
+    Ok(Json(ApiResponse::created(response)))
+}
+
+/// POST /api/metadata/l1
+///
+/// 导入 L1（发行版）元数据
+pub async fn import_l1_metadata(
+    State(state): State<AppState>,
+    Json(request): Json<ImportL1Request>,
+) -> ApiResult<Json<ApiResponse<ImportResponse>>> {
+    use crate::entities::prelude::*;
+    use sea_orm::{EntityTrait, Set};
+
+    // 验证请求
