@@ -36,3 +36,41 @@ pub async fn execute(api_client: &ApiClient, action: SyncAction) -> Result<()> {
 
 /// 执行单个 tracking 的同步
 async fn run_sync(api_client: &ApiClient, tracking_id: i32) -> Result<()> {
+    println!("{}", "正在提交同步任务...".cyan());
+
+    let result: serde_json::Value = api_client
+        .post(
+            &format!("/sync/{}/queue", tracking_id),
+            &serde_json::json!({}),
+        )
+        .await?;
+
+    println!("{}", "✓ 同步任务已提交".green());
+    println!("任务 ID: {}", result["job_id"]);
+    println!("状态: {}", result["status"]);
+
+    Ok(())
+}
+
+/// 执行所有待处理的同步任务
+async fn run_all_sync(api_client: &ApiClient) -> Result<()> {
+    println!("{}", "正在获取所有待同步的 tracking...".cyan());
+
+    // 获取所有 active 状态的 tracking
+    let result: serde_json::Value = api_client.get("/tracking?status=active").await?;
+    let trackings = result["data"]
+        .as_array()
+        .ok_or_else(|| anyhow::anyhow!("无效的响应格式"))?;
+
+    if trackings.is_empty() {
+        println!("{}", "没有待同步的 tracking".yellow());
+        return Ok(());
+    }
+
+    println!("找到 {} 个待同步的 tracking", trackings.len());
+
+    let mut success_count = 0;
+    let mut failed_count = 0;
+
+    for tracking in trackings {
+        let tracking_id = tracking["id"]
