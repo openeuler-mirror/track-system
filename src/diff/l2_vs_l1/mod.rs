@@ -1000,3 +1000,55 @@ impl L2VsL1Comparator {
         })
     }
 
+    /// 对比源文件
+    fn compare_source_files(
+        &self,
+        l1_sources: &[SourceFile],
+        l2_sources: &[SourceFile],
+    ) -> Result<SourceDiff> {
+        // 构建哈希映射
+        let l1_map: HashMap<String, &SourceFile> =
+            l1_sources.iter().map(|s| (s.filename.clone(), s)).collect();
+
+        let l2_map: HashMap<String, &SourceFile> =
+            l2_sources.iter().map(|s| (s.filename.clone(), s)).collect();
+
+        let mut l2_added = Vec::new();
+        let mut l2_removed = Vec::new();
+        let mut l2_modified = Vec::new();
+
+        // 检查 L2 的源文件
+        for l2_source in l2_sources {
+            if let Some(l1_source) = l1_map.get(&l2_source.filename) {
+                // 文件名相同，检查内容
+                if l1_source.content_hash != l2_source.content_hash {
+                    l2_modified.push(SourceModification {
+                        filename: l2_source.filename.clone(),
+                        l1_hash: l1_source.content_hash.clone(),
+                        l2_hash: l2_source.content_hash.clone(),
+                    });
+                }
+            } else {
+                // L2 新增的源文件
+                l2_added.push(l2_source.clone());
+            }
+        }
+
+        // 检查 L1 有但 L2 没有的源文件
+        for l1_source in l1_sources {
+            if !l2_map.contains_key(&l1_source.filename) {
+                l2_removed.push(l1_source.clone());
+            }
+        }
+
+        Ok(SourceDiff {
+            l1_total: l1_sources.len(),
+            l2_total: l2_sources.len(),
+            l2_added,
+            l2_removed,
+            l2_modified,
+        })
+    }
+
+    /// 分析定制内容影响
+    ///
