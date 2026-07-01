@@ -62,3 +62,19 @@ impl Formatter for JsonFormatter {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_format_pretty() {
+        let formatter = JsonFormatter::new();
+        let data = json!({
+            "name": "test",
+            "value": 123
+        });
+
+        let result = formatter.format(&data).unwrap();
+        assert!(result.contains("name"));
+        assert!(result.contains("test"));
