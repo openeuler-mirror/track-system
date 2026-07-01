@@ -167,3 +167,24 @@ async fn log_audit(
     Ok(())
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_resource_info() {
+        let (resource_type, resource_id) = extract_resource_info("/api/packages/123");
+        assert_eq!(resource_type, "packages");
+        assert_eq!(resource_id, Some("123".to_string()));
+
+        let (resource_type, resource_id) = extract_resource_info("/api/tracking");
+        assert_eq!(resource_type, "tracking");
+        assert_eq!(resource_id, None);
+
+        let (resource_type, resource_id) = extract_resource_info("/api/reports/abc-def");
+        assert_eq!(resource_type, "reports");
+        assert_eq!(resource_id, Some("abc-def".to_string()));
+    }
+
+    #[test]
+    fn test_audit_action_from_method() {
