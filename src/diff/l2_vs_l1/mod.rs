@@ -2843,3 +2843,56 @@ Summary: Test package
         let (base, idx) =
             L2VsL1Comparator::find_base_commit(std::slice::from_ref(&commit), "1.0.0", Some("9"));
         assert!(base.is_some());
+        assert_eq!(idx, Some(0));
+    }
+
+    #[test]
+    fn test_find_base_commit_none() {
+        let commit = CommitEntry {
+            sha: "s".to_string(),
+            title: "no match".to_string(),
+            message: "no match".to_string(),
+            author: "a".to_string(),
+            authored_at: Utc::now(),
+            url: None,
+            stats: crate::snapshot::types::ChangeStats {
+                additions: 0,
+                deletions: 0,
+                files_changed: 0,
+            },
+            primary_change_type: None,
+            cve_list: vec![],
+        };
+
+        let (base, idx) = L2VsL1Comparator::find_base_commit(&[commit], "1.0.0", Some("1"));
+        assert!(base.is_none());
+        assert!(idx.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_compare_commit_db_uses_l2_record_version_release() {
+        use crate::entities::{l1_commit_records, l2_commit_records};
+        use sea_orm::MockDatabase;
+        use serde_json::json;
+
+        let now = Utc::now();
+        let l2_model = l2_commit_records::Model {
+            id: 1,
+            tracking_id: 1,
+            commit_sha: "l2sha".to_string(),
+            commit_message: "msg".to_string(),
+            author_name: "a".to_string(),
+            author_email: "a@a".to_string(),
+            committed_at: now,
+            change_type: None,
+            primary_change_type: None,
+            cve_list: None,
+            spec_changed: true,
+            patch_stats: None,
+            classification_status: "done".to_string(),
+            classification_notes: None,
+            sync_status: "idle".to_string(),
+            synced_to_l2_commit: None,
+            synced_at: None,
+            api_url: "http://example".to_string(),
+            fetched_at: now,
