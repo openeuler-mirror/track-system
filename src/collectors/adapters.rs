@@ -230,3 +230,46 @@ impl<T: GitClient> GitClientCollectorAdapter<T> {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::collectors::error::ApiResult;
+    use crate::collectors::traits::{Commit, CommitsParams, FileContent, GitClient};
+    use async_trait::async_trait;
+    use mockall::mock;
+
+    mock! {
+        pub GitClient {}
+        #[async_trait]
+        impl GitClient for GitClient {
+            async fn get_repository(&self, owner: &str, repo: &str) -> ApiResult<crate::collectors::traits::Repository>;
+            async fn get_branches(&self, owner: &str, repo: &str) -> ApiResult<Vec<crate::collectors::traits::Branch>>;
+            async fn get_commits(&self, owner: &str, repo: &str, params: CommitsParams) -> ApiResult<Vec<Commit>>;
+            async fn get_file_content(&self, owner: &str, repo: &str, path: &str, branch: &str) -> ApiResult<FileContent>;
+        }
+    }
+
+    #[test]
+    fn test_normalize_spec_path() {
+        assert_eq!(normalize_spec_path("my-repo"), "my-repo.spec");
+        assert_eq!(normalize_spec_path("my-repo.spec"), "my-repo.spec");
+    }
+
+    #[test]
+    fn test_extract_spec_version() {
+        let content = "Name: test\nVersion: 1.2.3\nRelease: 1\n";
+        assert_eq!(extract_spec_version(content), Some("1.2.3".to_string()));
+
+        let content_with_spaces = "Name: test\nVersion :  1.2.3  \nRelease: 1\n";
+        assert_eq!(
+            extract_spec_version(content_with_spaces),
+            Some("1.2.3".to_string())
+        );
+
+        let content_missing = "Name: test\nRelease: 1\n";
+        assert_eq!(extract_spec_version(content_missing), None);
+    }
+
+    #[test]
+    fn test_extract_spec_release() {
+        let content = "Name: test\nVersion: 1.2.3\nRelease: 1%{?dist}\n";
