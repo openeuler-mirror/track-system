@@ -568,3 +568,46 @@ pub trait Collector: Send + Sync {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_platform_from_str() {
+        assert_eq!(Platform::from_str("github"), Some(Platform::GitHub));
+        assert_eq!(Platform::from_str("Github"), Some(Platform::GitHub));
+        assert_eq!(Platform::from_str("gitlab"), Some(Platform::GitLab));
+        assert_eq!(Platform::from_str("gitee"), Some(Platform::Gitee));
+        assert_eq!(Platform::from_str("gitea"), Some(Platform::Gitea));
+        assert_eq!(Platform::from_str("local"), Some(Platform::Local));
+        assert_eq!(Platform::from_str("unknown"), None);
+    }
+
+    #[test]
+    fn test_platform_display() {
+        assert_eq!(format!("{}", Platform::GitHub), "github");
+        assert_eq!(format!("{}", Platform::GitLab), "gitlab");
+        assert_eq!(format!("{}", Platform::Gitee), "gitee");
+        assert_eq!(format!("{}", Platform::Gitea), "gitea");
+        assert_eq!(format!("{}", Platform::Local), "local");
+    }
+
+    #[test]
+    fn test_pagination_params_default() {
+        let params = PaginationParams::default();
+        assert_eq!(params.page, 1);
+        assert_eq!(params.per_page, 30);
+    }
+
+    #[test]
+    fn test_issue_state() {
+        assert_eq!(IssueState::Open.as_query_value(), "open");
+        assert_eq!(IssueState::Closed.as_query_value(), "closed");
+        assert_eq!(IssueState::All.as_query_value(), "all");
+
+        assert_eq!(IssueState::parse_str("open"), IssueState::Open);
+        assert_eq!(IssueState::parse_str("closed"), IssueState::Closed);
+        assert_eq!(IssueState::parse_str("other"), IssueState::All);
+
+        assert_eq!(format!("{}", IssueState::Open), "open");
+    }
