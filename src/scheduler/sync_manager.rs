@@ -234,3 +234,51 @@ impl<'a> SyncManager<'a> {
         // 过滤出需要同步的任务
         let mut pending_tasks = Vec::new();
         for (track, package_opt) in results {
+            info!("Checking track {} with package {:?}", track.id, package_opt);
+            if let Some(package) = package_opt {
+                if should_sync(&track, &package, now) || wake_up {
+                    pending_tasks.push(track);
+                }
+            }
+        }
+
+        Ok(pending_tasks)
+    }
+
+    /// 开始同步任务
+    pub async fn start_sync_task(&self, tracking_id: i32) -> anyhow::Result<()> {
+        let track = Tracking::find_by_id(tracking_id)
+            .one(self.db)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Tracking {} not found", tracking_id))?;
+
+        if matches!(track.tracking_status.as_str(), "paused" | "archived") {
+            return Err(anyhow::anyhow!(
+                "Tracking {} is {}, cannot start sync task",
+                tracking_id,
+                track.tracking_status
+            ));
+        }
+
+        let job = self.ensure_sync_job(tracking_id).await?;
+        let mut job_active: sync_jobs::ActiveModel = job.clone().into();
+        let attempts = job.attempt_count + 1;
+        job_active.status = Set(STATUS_RUNNING.to_string());
+        job_active.started_at = Set(Some(Utc::now()));
+        job_active.finished_at = Set(None);
+        job_active.error = Set(None);
+        job_active.attempt_count = Set(attempts);
+        job_active.updated_at = Set(Utc::now());
+        job_active.update(self.db).await?;
+        Telemetry::sync_job_started(tracking_id, job.id, attempts);
+
+        let mut active: tracking::ActiveModel = track.into();
+        active.tracking_status = Set("syncing".to_string());
+        active.updated_at = Set(Utc::now());
+        active.update(self.db).await?;
+
+        Ok(())
+    }
+
+    /// 完成同步任务
+    pub async fn complete_sync_task(&self, tracking_id: i32, success: bool) -> anyhow::Result<()> {
