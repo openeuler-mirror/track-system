@@ -81,3 +81,45 @@ async fn validate_config(path: Option<String>) -> Result<()> {
     let config_path = get_config_path(path)?;
 
     if !config_path.exists() {
+        anyhow::bail!("配置文件不存在: {}", config_path.display());
+    }
+
+    println!("{}", "正在验证配置文件...".cyan());
+
+    // 读取并解析配置
+    let content = fs::read_to_string(&config_path)?;
+    let config: ClientConfig = toml::from_str(&content)?;
+
+    println!("{}", "✓ 配置文件格式正确".green());
+    println!("\n配置内容:");
+    println!("  服务器地址: {}", config.server_url);
+    println!(
+        "  认证 Token: {}",
+        if config.auth_token.is_some() {
+            "已配置".green()
+        } else {
+            "未配置".yellow()
+        }
+    );
+    println!("  超时时间: {} 秒", config.timeout);
+
+    // 验证服务器地址格式
+    if !config.server_url.starts_with("http://") && !config.server_url.starts_with("https://") {
+        println!(
+            "\n{}: 服务器地址应以 http:// 或 https:// 开头",
+            "警告".yellow()
+        );
+    }
+
+    Ok(())
+}
+
+/// 显示配置
+async fn show_config(section: Option<String>, format: String) -> Result<()> {
+    let config_path = get_default_config_path()?;
+
+    if !config_path.exists() {
+        anyhow::bail!(
+            "配置文件不存在: {}\n请先运行 'track-cli config init' 初始化配置",
+            config_path.display()
+        );
