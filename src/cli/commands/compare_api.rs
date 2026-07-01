@@ -303,3 +303,48 @@ mod tests {
         mock.assert_async().await;
     }
 
+    #[tokio::test]
+    async fn test_compare_l2_vs_l1() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("POST", "/api/compare/l2-vs-l1")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "data": {
+                        "task_id": "task-456",
+                        "status": "pending",
+                        "created_at": "2024-01-01T00:00:00Z"
+                    }
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = compare_l2_vs_l1(&client, 2, None, None).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_get_compare_status() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/compare/tasks/task-789")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "data": {
+                        "task_id": "task-789",
+                        "status": "completed",
+                        "progress": 100,
+                        "message": "Task completed successfully",
+                        "created_at": "2024-01-01T00:00:00Z",
+                        "updated_at": "2024-01-01T01:00:00Z",
+                        "completed_at": "2024-01-01T01:00:00Z",
+                        "report_id": 123
