@@ -187,3 +187,51 @@ impl<'a> SyncExecutor<'a> {
             discovered: pending_tasks.len(),
             ..Default::default()
         };
+
+        if max_tasks == 0 {
+            return Ok(stats);
+        }
+
+        let limit = max_tasks.min(stats.discovered);
+        for tracking in pending_tasks.into_iter().take(limit) {
+            match self.execute_sync(tracking.id).await {
+                Ok(outcome) => stats.record_outcome(tracking.id, &outcome),
+                Err(err) => {
+                    error!(
+                        tracking_id = tracking.id,
+                        error = %err,
+                        "同步任务执行失败，继续处理下一个"
+                    );
+                    stats.record_error(tracking.id, err.to_string());
+                }
+            }
+        }
+
+        if stats.discovered > limit {
+            info!(
+                pending = stats.discovered - limit,
+                "达到限流阈值，剩余同步任务保留至下次调度"
+            );
+        }
+
+        Ok(stats)
+    }
+
+    /// 执行指定列表中的同步任务
+    pub async fn execute_batch(&self, tracking_ids: Vec<i32>) -> SyncExecutionStats {
+        let mut stats = SyncExecutionStats {
+            discovered: tracking_ids.len(),
+            ..Default::default()
+        };
+
+        for tracking_id in tracking_ids {
+            match self.execute_sync(tracking_id).await {
+                Ok(outcome) => stats.record_outcome(tracking_id, &outcome),
+                Err(err) => stats.record_error(tracking_id, err.to_string()),
+            }
+        }
+
+        stats
+    }
+}
+
