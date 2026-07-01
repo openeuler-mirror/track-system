@@ -177,3 +177,48 @@ pub async fn list_tracking(
 pub async fn create_tracking(
     State(state): State<AppState>,
     Json(req): Json<CreateTrackingRequest>,
+) -> ApiResult<Json<ApiResponse<TrackingResponse>>> {
+    // 验证请求
+    if req.package_id <= 0 {
+        return Err(ApiError::BadRequest("Invalid package_id".to_string()));
+    }
+    if req.l1_repo_owner.is_empty() {
+        return Err(ApiError::BadRequest(
+            "l1_repo_owner is required".to_string(),
+        ));
+    }
+    if req.l1_repo_name.is_empty() {
+        return Err(ApiError::BadRequest("l1_repo_name is required".to_string()));
+    }
+
+    // 检查 package 是否存在
+    let _package = Packages::find_by_id(req.package_id)
+        .one(state.db.as_ref())
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("Package {} not found", req.package_id)))?;
+
+    println!(
+        "Creating tracking for package {} and distro {} and l1_repo_owner {} 
+               and l1_repo_name {} and l1_branch {} and l2_branch {} and l2_repo_path {}",
+        req.package_id,
+        req.distro_id,
+        req.l1_repo_owner,
+        req.l1_repo_name,
+        req.l1_branch,
+        req.l2_branch,
+        req.l2_repo_path
+    );
+    // // 检查 distro 是否存在，避免外键约束错误
+    // let _distro = Distros::find_by_id(req.distro_id)
+    //     .one(state.db.as_ref())
+    //     .await?
+    //     .ok_or_else(|| ApiError::NotFound(format!("Distro {} not found", req.distro_id)))?;
+
+    let now = Utc::now();
+    let tracking = tracking::ActiveModel {
+        package_id: Set(req.package_id),
+        distro_id: Set(req.distro_id),
+        l1_repo_owner: Set(req.l1_repo_owner),
+        l1_repo_name: Set(req.l1_repo_name),
+        l1_branch: Set(req.l1_branch),
+        l2_branch: Set(req.l2_branch),
