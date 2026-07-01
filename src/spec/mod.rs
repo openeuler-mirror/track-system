@@ -79,3 +79,44 @@ impl SpecFile {
                         None => format!("%{{{}}}", name),
                     }
                 })
+                .to_string();
+
+            if replaced == expanded {
+                break;
+            }
+
+            expanded = replaced;
+            iterations += 1;
+        }
+
+        for pattern in ["%{?dist}", "%{?scl:", "%{!?scl:", "%{?scl_prefix}"] {
+            expanded = expanded.replace(pattern, "");
+        }
+
+        expanded.replace('}', "").trim().to_string()
+    }
+
+    fn format_version(raw: &str) -> String {
+        let version = raw.trim();
+        if version.is_empty() {
+            return String::new();
+        }
+
+        let parts: Vec<&str> = version.split('.').take(3).collect();
+        if parts.is_empty() {
+            version.to_string()
+        } else {
+            parts.join(".")
+        }
+    }
+}
+
+/// 解析 spec 内容，返回版本与 release 信息
+pub fn parse_spec(content: &str) -> SpecInfo {
+    let parsed = SpecFile::parse(content);
+    SpecInfo {
+        version: parsed.version,
+        release: parsed.release,
+    }
+}
+
