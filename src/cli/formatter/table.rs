@@ -138,3 +138,49 @@ impl TableFormatter {
         let top_border = col_widths
             .iter()
             .map(|w| "─".repeat(w + 2))
+            .collect::<Vec<_>>()
+            .join("┬");
+        output.push_str(&format!("┌{}┐\n", top_border));
+
+        // 渲染表头
+        let header_line = headers
+            .iter()
+            .enumerate()
+            .map(|(i, h)| format!(" {:<width$} ", h, width = col_widths[i]))
+            .collect::<Vec<_>>()
+            .join("│");
+
+        if self.use_color {
+            output.push_str(&format!("│{}│\n", header_line.bold()));
+        } else {
+            output.push_str(&format!("│{}│\n", header_line));
+        }
+
+        // 渲染表头分隔线
+        let header_separator = col_widths
+            .iter()
+            .map(|w| "─".repeat(w + 2))
+            .collect::<Vec<_>>()
+            .join("┼");
+        output.push_str(&format!("├{}┤\n", header_separator));
+
+        // 渲染数据行
+        for (idx, row) in rows.iter().enumerate() {
+            let row_line = row
+                .iter()
+                .enumerate()
+                .map(|(i, cell)| {
+                    if i < col_widths.len() {
+                        format!(" {:<width$} ", cell, width = col_widths[i])
+                    } else {
+                        format!(" {} ", cell)
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join("│");
+            output.push_str(&format!("│{}│\n", row_line));
+
+            // 如果不是最后一行，添加行分隔符
+            if idx < rows.len() - 1 {
+                let row_separator = col_widths
+                    .iter()
