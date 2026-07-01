@@ -525,3 +525,56 @@ impl L2VsL1Comparator {
                 content_hash: f.sha256.clone(),
                 size: f.size,
                 applied: true, // 假设所有 patch 都已应用
+            })
+            .collect();
+
+        Ok(patches)
+    }
+
+    /// 提取源文件
+    fn extract_source_files(files: &[FileEntry]) -> Result<Vec<SourceFile>> {
+        let source_files = files
+            .iter()
+            .filter(|f| {
+                // 排除 patch 文件和 spec 文件
+                !f.path.ends_with(".patch")
+                    && !f.path.ends_with(".diff")
+                    && !f.path.ends_with(".spec")
+            })
+            .map(|f| SourceFile {
+                filename: f.path.split('/').next_back().unwrap_or(&f.path).to_string(),
+                path: f.path.clone(),
+                content_hash: f.sha256.clone(),
+                size: f.size,
+            })
+            .collect();
+
+        Ok(source_files)
+    }
+
+    /// 分析定制内容
+    ///
+    /// 从 spec 文件和 patch 文件中识别各种类型的定制内容：
+    /// - 版本变更
+    /// - 功能修改
+    /// - 配置修改
+    /// - 安全加固
+    /// - 性能优化
+    fn analyze_customizations(
+        spec_content: &str,
+        patches: &[PatchFile],
+    ) -> Result<Vec<Customization>> {
+        let mut customizations = Vec::new();
+
+        // 1. 分析 spec 文件中的定制内容
+        customizations.extend(Self::analyze_spec_customizations(spec_content)?);
+
+        // 2. 分析 patch 文件中的定制内容
+        customizations.extend(Self::analyze_patch_customizations(patches)?);
+
+        Ok(customizations)
+    }
+
+    /// 分析 spec 文件中的定制内容
+    fn analyze_spec_customizations(spec_content: &str) -> Result<Vec<Customization>> {
+        let mut customizations = Vec::new();
