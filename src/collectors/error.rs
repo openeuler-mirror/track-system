@@ -82,3 +82,34 @@ impl ApiError {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_from_status() {
+        // Test AuthenticationError
+        let err = ApiError::from_status(401, "Unauthorized".to_string());
+        assert!(matches!(err, ApiError::AuthenticationError(_)));
+
+        let err = ApiError::from_status(403, "Forbidden".to_string());
+        assert!(matches!(err, ApiError::AuthenticationError(_)));
+
+        // Test NotFoundError
+        let err = ApiError::from_status(404, "Not Found".to_string());
+        assert!(matches!(err, ApiError::NotFoundError(_)));
+
+        // Test RateLimitError
+        let err = ApiError::from_status(429, "Too Many Requests".to_string());
+        assert!(matches!(err, ApiError::RateLimitError(_)));
+
+        // Test ServerError
+        let err = ApiError::from_status(500, "Internal Server Error".to_string());
+        assert!(matches!(err, ApiError::ServerError(_)));
+
+        let err = ApiError::from_status(503, "Service Unavailable".to_string());
+        assert!(matches!(err, ApiError::ServerError(_)));
+
+        // Test Unknown
+        let err = ApiError::from_status(400, "Bad Request".to_string());
+        assert!(matches!(err, ApiError::Unknown(_)));
