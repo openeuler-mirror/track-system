@@ -714,3 +714,53 @@ mod tests {
         let result = validate_import_request(0, &snapshot);
         assert!(result.is_err());
     }
+
+    #[test]
+    fn test_validate_import_request_mismatched_tracking_id() {
+        let snapshot = create_test_snapshot(1);
+        let result = validate_import_request(2, &snapshot);
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_import_l0_metadata_invalid_tracking() {
+        use sea_orm::{DatabaseBackend, MockDatabase};
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<crate::entities::tracking::Model, _, _>([vec![]])
+            .into_connection();
+        let state = AppState::without_external_clients(db);
+
+        let snapshot = create_test_snapshot(999);
+        let request = ImportL0Request {
+            tracking_id: 999,
+            snapshot,
+        };
+
+        let result = import_l0_metadata(State(state), Json(request)).await;
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), ApiError::NotFound(_)));
+    }
+
+    fn create_commit_entry(sha: &str) -> crate::snapshot::types::CommitEntry {
+        crate::snapshot::types::CommitEntry {
+            sha: sha.to_string(),
+            title: "title".to_string(),
+            message: "message".to_string(),
+            author: "author".to_string(),
+            authored_at: Utc::now(),
+            url: Some("https://example.com/commit".to_string()),
+            stats: crate::snapshot::types::ChangeStats {
+                additions: 1,
+                deletions: 1,
+                files_changed: 1,
+            },
+            primary_change_type: Some("feature".to_string()),
+            cve_list: vec!["CVE-2024-0001".to_string()],
+        }
+    }
+
+    fn create_issue_entry(number: &str) -> crate::snapshot::types::IssueEntry {
+        crate::snapshot::types::IssueEntry {
+            number: number.to_string(),
+            title: "issue title".to_string(),
+            state: "open".to_string(),
