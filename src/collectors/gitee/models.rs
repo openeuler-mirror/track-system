@@ -193,3 +193,52 @@ pub struct GiteeIssue {
     pub title: String,
     pub state: String,
     pub html_url: String,
+    pub user: GiteeIssueUser,
+    #[serde(default)]
+    pub labels: Vec<GiteeIssueLabel>,
+    pub created_at: String,
+    pub updated_at: String,
+    #[serde(default)]
+    pub finished_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GiteeIssueUser {
+    pub login: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GiteeIssueLabel {
+    pub name: String,
+}
+
+impl From<GiteeIssue> for Issue {
+    fn from(issue: GiteeIssue) -> Self {
+        let raw = serde_json::to_value(&issue).unwrap_or(Value::Null);
+        let created_at = issue
+            .created_at
+            .parse::<DateTime<Utc>>()
+            .unwrap_or_else(|_| Utc::now());
+        let updated_at = issue
+            .updated_at
+            .parse::<DateTime<Utc>>()
+            .unwrap_or_else(|_| Utc::now());
+        let closed_at = issue
+            .finished_at
+            .and_then(|ts| ts.parse::<DateTime<Utc>>().ok());
+        let labels = issue.labels.into_iter().map(|l| l.name).collect();
+
+        Issue {
+            number: issue.number,
+            title: issue.title,
+            state: IssueState::parse_str(&issue.state),
+            author: issue.user.login,
+            api_url: issue.html_url,
+            labels,
+            created_at,
+            updated_at,
+            closed_at,
+            raw_payload: raw,
+        }
+    }
+}
