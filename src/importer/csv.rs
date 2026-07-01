@@ -121,3 +121,44 @@ impl<'a> CsvImporter<'a> {
                 2 => 12, // 重要软件 12 小时
                 3 => 24, // 普通软件 24 小时
                 _ => 12, // 默认 12 小时
+            }
+        });
+
+        let now = Utc::now();
+
+        // 检查是否已存在
+        let existing = Packages::find()
+            .filter(packages::Column::Name.eq(&record.name))
+            .one(self.db)
+            .await?;
+
+        let created = if let Some(pkg) = existing {
+            // 更新现有软件包
+            let mut active: packages::ActiveModel = pkg.into();
+            active.level = Set(record.level);
+            active.sync_interval_hours = Set(sync_interval_hours);
+            active.l0_repo_url = Set(record.l0_repo_url);
+            active.description = Set(record.description);
+            active.updated_at = Set(now);
+            active.update(self.db).await?;
+            false
+        } else {
+            // 创建新软件包
+            let package = packages::ActiveModel {
+                name: Set(record.name),
+                level: Set(record.level),
+                sync_interval_hours: Set(sync_interval_hours),
+                l0_repo_url: Set(record.l0_repo_url),
+                description: Set(record.description),
+                created_at: Set(now),
+                updated_at: Set(now),
+                ..Default::default()
+            };
+            package.insert(self.db).await?;
+            true
+        };
+
+        Ok(created)
+    }
+
+    /// 导入 CSV 字符串（用于测试）
