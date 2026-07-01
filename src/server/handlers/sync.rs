@@ -224,3 +224,39 @@ mod tests {
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), StatusCode::SERVICE_UNAVAILABLE);
     }
+
+    #[tokio::test]
+    async fn test_execute_round_no_scheduler() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+        let state = AppState::without_external_clients(db);
+
+        let request = ExecuteRoundRequest { max_jobs: Some(5) };
+        let result = execute_round_handler(State(state), Json(request)).await;
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), StatusCode::SERVICE_UNAVAILABLE);
+    }
+
+    #[test]
+    fn test_queue_sync_response_serialization() {
+        let response = QueueSyncResponse { queued_job_id: 123 };
+        let json = serde_json::to_string(&response).unwrap();
+        assert!(json.contains("\"queued_job_id\":123"));
+    }
+
+    #[test]
+    fn test_trigger_sync_response_serialization() {
+        let response = TriggerSyncResponse {
+            job_id: 456,
+            tracking_id: 1,
+            message: "Test message".to_string(),
+        };
+        let json = serde_json::to_string(&response).unwrap();
+        assert!(json.contains("\"job_id\":456"));
+        assert!(json.contains("\"tracking_id\":1"));
+    }
+
+    #[test]
+    fn test_scheduler_status_response_serialization() {
+        let response = SchedulerStatusResponse {
+            running: true,
+            active_jobs: 5,
