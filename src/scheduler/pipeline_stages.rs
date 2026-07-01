@@ -1186,3 +1186,55 @@ mod tests {
         });
 
         let snapshot_model = l2_snapshots::Model {
+            id: 1,
+            tracking_id: 1,
+            snapshot_type: "l2".to_string(),
+            payload: snapshot_payload,
+            created_at: Utc::now(),
+            checksum: "checksum".to_string(),
+        };
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![snapshot_model]])
+            .into_connection();
+
+        let executor = PipelineExecutor::new(&db, None);
+        let result = executor.stage_l2_snapshot(&tracking_model).await;
+
+        assert!(result.is_ok());
+        let res = result.unwrap();
+        assert_eq!(res.snapshot_id, Some(1));
+        assert_eq!(res.files_count, 1);
+        assert!(res.has_new_data);
+    }
+
+    #[tokio::test]
+    async fn test_stage_l2_snapshot_repo_exists() {
+        use crate::entities::tracking;
+        use chrono::Utc;
+        use sea_orm::{DatabaseBackend, MockDatabase};
+        use tempfile::tempdir;
+
+        let temp_dir = tempdir().unwrap();
+        let l2_repo_path = temp_dir.path().to_str().unwrap().to_string();
+
+        let tracking_model = tracking::Model {
+            id: 1,
+            package_id: 1,
+            distro_id: 1,
+            l1_branch: "main".to_string(),
+            l1_repo_owner: "owner".to_string(),
+            l1_repo_name: "repo".to_string(),
+            l2_branch: "local".to_string(),
+            l2_repo_path: l2_repo_path.clone(),
+            tracking_status: "idle".to_string(),
+            last_sync_time: Some(Utc::now()),
+            last_l1_commit_sha: None,
+            last_l2_commit_sha: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            last_error: None,
+        };
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+
