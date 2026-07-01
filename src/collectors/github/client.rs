@@ -182,3 +182,49 @@ impl GitClient for GitHubClient {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::collectors::traits::CommitsParams;
+    use httpmock::prelude::*;
+    use serde_json::json;
+
+    #[tokio::test]
+    async fn test_github_client_new() {
+        let client = GitHubClient::new("token").unwrap();
+        assert_eq!(client.token, Some("token".to_string()));
+        assert_eq!(client.base_url, GITHUB_API_BASE);
+
+        let client_no_token = GitHubClient::new("").unwrap();
+        assert_eq!(client_no_token.token, None);
+    }
+
+    #[tokio::test]
+    async fn test_github_client_as_collector() {
+        let client = GitHubClient::new("token").unwrap();
+        let _collector = client.as_collector();
+    }
+
+    #[tokio::test]
+    async fn test_get_repository() {
+        let server = MockServer::start();
+        let client = GitHubClient::for_testing("token", server.base_url()).unwrap();
+
+        let repo_response = json!({
+            "id": 1,
+            "name": "test-repo",
+            "full_name": "owner/test-repo",
+            "html_url": "http://localhost/owner/test-repo",
+            "description": "test repo",
+            "private": false,
+            "created_at": "2023-01-01T00:00:00Z",
+            "updated_at": "2023-01-01T00:00:00Z",
+            "default_branch": "main",
+            "clone_url": "http://localhost/owner/test-repo.git"
+        });
+
+        let _mock = server.mock(|when, then| {
+            when.method(GET)
+                .path("/repos/owner/test-repo")
+                .header("Authorization", "Bearer token");
+            then.status(200).json_body(repo_response);
