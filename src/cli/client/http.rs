@@ -216,3 +216,24 @@ impl ApiClient {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_create_client() {
+        let config = ClientConfig::default();
+        let client = ApiClient::new(config);
+        assert!(client.is_ok());
+    }
+
+    #[test]
+    fn test_invalid_config() {
+        let config = ClientConfig {
+            server_url: "".to_string(),
+            ..Default::default()
+        };
+        let client = ApiClient::new(config);
+        assert!(client.is_err());
+    }
+}
