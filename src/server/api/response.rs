@@ -242,3 +242,27 @@ impl ComponentStatus {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_api_response_success() {
+        let response = ApiResponse::success("test data");
+        assert_eq!(response.code, 200);
+        assert_eq!(response.message, "Success");
+        assert_eq!(response.data, Some("test data"));
+    }
+
+    #[test]
+    fn test_api_response_created() {
+        let response = ApiResponse::created(42);
+        assert_eq!(response.code, 201);
+        assert_eq!(response.message, "Created");
+        assert_eq!(response.data, Some(42));
+    }
+
+    #[test]
+    fn test_paginated_response() {
+        let items = vec![1, 2, 3];
+        let response = PaginatedResponse::new(items, 100, 1, 10);
