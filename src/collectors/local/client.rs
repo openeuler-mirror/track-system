@@ -243,3 +243,53 @@ impl GitClient for LocalClient {
             let author_email = author.email().unwrap_or("").to_string();
             let committer_name = committer.name().unwrap_or("Unknown").to_string();
             let committer_email = committer.email().unwrap_or("").to_string();
+            let title = commit.summary().unwrap_or("").to_string();
+            let message = commit.message().unwrap_or("").to_string();
+
+            // 计算统计信息（如果有父提交）
+            let stats = if commit.parent_count() > 0 {
+                if let Ok(parent) = commit.parent(0) {
+                    if let (Ok(parent_tree), Ok(commit_tree)) = (parent.tree(), commit.tree()) {
+                        if let Ok(diff) =
+                            repo.diff_tree_to_tree(Some(&parent_tree), Some(&commit_tree), None)
+                        {
+                            if let Ok(stats) = diff.stats() {
+                                Some(crate::collectors::traits::CommitStats {
+                                    additions: stats.insertions() as u32,
+                                    deletions: stats.deletions() as u32,
+                                    total: (stats.insertions() + stats.deletions()) as u32,
+                                })
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
+            commits.push(Commit {
+                sha: oid.to_string(),
+                title,
+                message,
+                author_name,
+                author_email,
+                author_date: datetime,
+                committer_name,
+                committer_email,
+                committer_date: datetime,
+                html_url: format!("file://{}/commit/{}", self.repo_path.display(), oid),
+                stats,
+            });
+        }
+
+        Ok(commits)
+    }
+
