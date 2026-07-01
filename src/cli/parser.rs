@@ -312,3 +312,55 @@ pub enum CompareAction {
 
         /// 输出文件路径
         #[arg(long)]
+        output: Option<String>,
+    },
+}
+
+// ============== Snapshot Commands ==============
+
+#[derive(Subcommand, Debug)]
+pub enum SnapshotAction {
+    /// 创建L2快照
+    #[command(about = "Create L2 snapshot")]
+    Create {
+        /// Tracking ID
+        tracking_id: i32,
+
+        /// 快照标签
+        #[arg(long)]
+        tag: Option<String>,
+    },
+
+    /// 恢复L2快照
+    #[command(about = "Restore L2 snapshot")]
+    Restore {
+        /// Snapshot ID
+        snapshot_id: i64,
+
+        /// 是否覆盖现有数据
+        #[arg(long)]
+        force: bool,
+    },
+
+    /// 列出快照
+    #[command(about = "List snapshots")]
+    List {
+        /// Tracking ID（可选）
+        tracking_id: Option<i32>,
+    },
+
+    /// 删除快照
+    #[command(about = "Delete snapshot")]
+    Delete {
+        /// Snapshot ID
+        snapshot_id: i32,
+    },
+}
+
+// ============== Export Commands ==============
+
+#[derive(Subcommand, Debug)]
+pub enum ExportAction {
+    /// 导出元数据
+    #[command(about = "Export metadata")]
+    Metadata {
