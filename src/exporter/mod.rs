@@ -345,3 +345,53 @@ impl<'a> MetadataExporter<'a> {
                 "INSERT INTO packages (id, name, level, sync_interval_hours) VALUES ({}, '{}', {}, {});",
                 id, name, level, sync_interval
             ));
+        }
+
+        // 生成 distros 的 INSERT 语句
+        for distro in &distros {
+            let id = distro["id"].as_i64().unwrap_or(0);
+            let name = distro["name"].as_str().unwrap_or("");
+            let version = distro["version"].as_str().unwrap_or("");
+            let platform = distro["platform"].as_str().unwrap_or("");
+            let base_url = distro["base_url"].as_str().unwrap_or("");
+
+            sql_statements.push(format!(
+                "INSERT INTO distros (id, name, version, platform, base_url) VALUES ({}, '{}', '{}', '{}', '{}');",
+                id, name, version, platform, base_url
+            ));
+        }
+
+        // 生成 tracking 的 INSERT 语句
+        for track in &trackings {
+            let id = track["id"].as_i64().unwrap_or(0);
+            let package_id = track["package_id"].as_i64().unwrap_or(0);
+            let distro_id = track["distro_id"].as_i64().unwrap_or(0);
+            let l1_branch = track["l1_branch"].as_str().unwrap_or("");
+            let l1_repo_owner = track["l1_repo_owner"].as_str().unwrap_or("");
+            let l1_repo_name = track["l1_repo_name"].as_str().unwrap_or("");
+            let l2_branch = track["l2_branch"].as_str().unwrap_or("");
+            let l2_repo_path = track["l2_repo_path"].as_str().unwrap_or("");
+
+            sql_statements.push(format!(
+                "INSERT INTO tracking (id, package_id, distro_id, l1_branch, l1_repo_owner, l1_repo_name, l2_branch, l2_repo_path) VALUES ({}, {}, {}, '{}', '{}', '{}', '{}', '{}');",
+                id, package_id, distro_id, l1_branch, l1_repo_owner, l1_repo_name, l2_branch, l2_repo_path
+            ));
+        }
+
+        // 写入 SQL 文件
+        let sql_content = sql_statements.join("\n");
+        std::fs::write(path, &sql_content)
+            .map_err(|e| DbErr::Custom(format!("File write error: {}", e)))?;
+
+        Ok(ExportResult {
+            success: true,
+            exported_packages: packages.len(),
+            exported_distros: distros.len(),
+            exported_trackings: trackings.len(),
+            exported_commits: commits.as_ref().map(|c| c.len()).unwrap_or(0),
+            export_time,
+            checksum: None,
+            error: None,
+        })
+    }
+}
