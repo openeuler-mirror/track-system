@@ -86,3 +86,47 @@ pub async fn fetch_component_commits<C: GitClient + ?Sized>(
 }
 
 fn from_commit(commit: Commit) -> ComponentCommit {
+    ComponentCommit {
+        sha: commit.sha,
+        message: commit.message,
+        author_name: commit.author_name,
+        author_email: commit.author_email,
+        authored_at: commit.author_date,
+        url: commit.html_url,
+        additions: commit.stats.as_ref().map(|s| s.additions),
+        deletions: commit.stats.as_ref().map(|s| s.deletions),
+        total: commit.stats.as_ref().map(|s| s.total),
+    }
+}
+
+fn decode_file_content(file: &FileContent) -> Result<String> {
+    if file.encoding.to_lowercase() != "base64" {
+        return Err(anyhow!("unsupported encoding: {}", file.encoding));
+    }
+
+    let normalized = file.content.replace('\n', "");
+    let decoded = BASE64
+        .decode(normalized.as_bytes())
+        .map_err(|err| anyhow!("failed to decode base64 content: {}", err))?;
+
+    String::from_utf8(decoded).map_err(|err| anyhow!("invalid utf-8 content: {}", err))
+}
+
+pub fn normalize_spec_path(repo: &str, spec: Option<&str>) -> String {
+    let candidate = spec.unwrap_or(repo);
+    if candidate.ends_with(".spec") {
+        candidate.to_string()
+    } else {
+        format!("{}.spec", candidate)
+    }
+}
+
+/// 将解析结果转换为公共结构
+pub fn to_public_spec(name: &str, info: SpecInfo) -> ComponentSpec {
+    ComponentSpec {
+        name: name.to_string(),
+        version: info.version,
+        release: info.release,
+    }
+}
+
