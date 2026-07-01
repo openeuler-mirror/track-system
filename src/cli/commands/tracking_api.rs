@@ -390,3 +390,53 @@ mod tests {
     fn test_parse_owner_repo_invalid() {
         let result = parse_owner_repo("invalid");
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_distro_id() {
+        assert_eq!(parse_distro_id("123").unwrap(), 123);
+        assert!(parse_distro_id("abc").is_err());
+    }
+
+    #[tokio::test]
+    async fn test_resolve_package_id_numeric() {
+        let (mut _server, client) = setup_test_server().await;
+        let result = resolve_package_id(&client, "42").await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), 42);
+    }
+
+    #[tokio::test]
+    async fn test_resolve_package_id_by_name() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/packages")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!([
+                    {
+                        "id": 1,
+                        "name": "test-package",
+                        "level": 1,
+                        "sync_interval_hours": 24,
+                        "l0_repo_url": "https://example.com/repo",
+                        "description": "Test package",
+                        "created_at": "2024-01-01T00:00:00Z",
+                        "updated_at": "2024-01-01T00:00:00Z"
+                    }
+                ])
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = resolve_package_id(&client, "test-package").await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        assert_eq!(result.unwrap(), 1);
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_show_tracking() {
