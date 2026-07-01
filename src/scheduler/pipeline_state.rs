@@ -314,3 +314,39 @@ mod tests {
         use crate::entities::sync_jobs;
         use sea_orm::{DatabaseBackend, MockDatabase};
 
+        let job_model = sync_jobs::Model {
+            id: 11,
+            tracking_id: 200,
+            job_kind: "sync".to_string(),
+            scheduled_at: Utc::now(),
+            started_at: Some(Utc::now()),
+            finished_at: None,
+            status: "running".to_string(),
+            error: None,
+            attempt_count: 0,
+            priority: 0,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<sync_jobs::Model, _, _>(vec![vec![job_model.clone()]])
+            .append_query_results::<sync_jobs::Model, _, _>(vec![vec![job_model.clone()]])
+            .into_connection();
+        let db = std::sync::Arc::new(db);
+        let manager = PipelineStateManager::new(db);
+
+        manager.create_state(11, 200).unwrap();
+        manager.start_stage(11, PipelineStage::L2Snapshot).unwrap();
+        manager
+            .complete_stage(11, PipelineStage::L2Snapshot)
+            .unwrap();
+        let progress = manager.get_progress(11).await.unwrap();
+        assert_eq!(progress.job_id, 11);
+        assert_eq!(progress.tracking_id, 200);
+        assert!(progress.progress_percent >= 0.0);
+        manager.cleanup_state(11);
+        let progress2 = manager.get_progress(11).await.unwrap();
+        assert_eq!(progress2.job_id, 11);
+    }
+}
