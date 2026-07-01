@@ -77,3 +77,43 @@ async fn check_all_health(api_client: &ApiClient) -> Result<()> {
             .and_then(|v| v.as_str())
             .unwrap_or("unknown");
         let sched_display = match sched_status {
+            "running" => "运行中".green(),
+            "stopped" => "已停止".yellow(),
+            _ => "未知".white(),
+        };
+        println!("  状态: {}", sched_display);
+
+        if let Some(active_jobs) = scheduler.get("active_jobs").and_then(|v| v.as_i64()) {
+            println!("  活动任务: {}", active_jobs);
+        }
+
+        if let Some(pending_jobs) = scheduler.get("pending_jobs").and_then(|v| v.as_i64()) {
+            println!("  待处理任务: {}", pending_jobs);
+        }
+    }
+
+    // API 状态
+    if let Some(api) = health["api"].as_object() {
+        println!("\n{}", "API:".bold());
+        let api_status = api
+            .get("status")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown");
+        let api_display = match api_status {
+            "available" => "可用".green(),
+            "unavailable" => "不可用".red(),
+            _ => "未知".white(),
+        };
+        println!("  状态: {}", api_display);
+
+        if let Some(version) = api.get("version").and_then(|v| v.as_str()) {
+            println!("  版本: {}", version);
+        }
+    }
+
+    // 时间戳
+    if let Some(timestamp) = health["timestamp"].as_str() {
+        println!("\n检查时间: {}", timestamp);
+    }
+
+    Ok(())
