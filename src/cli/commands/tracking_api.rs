@@ -440,3 +440,52 @@ mod tests {
 
     #[tokio::test]
     async fn test_show_tracking() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/tracking/10")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "data": {
+                        "id": 10,
+                        "package_id": 1,
+                        "distro_id": 2,
+                        "l1_repo_owner": "owner",
+                        "l1_repo_name": "repo",
+                        "l1_branch": "main",
+                        "l2_branch": "openEuler-24.03-LTS",
+                        "l2_repo_path": "packages/repo",
+                        "tracking_status": "active",
+                        "last_sync_time": null,
+                        "last_l1_commit_sha": null,
+                        "last_l2_commit_sha": null,
+                        "created_at": "2024-01-01T00:00:00Z",
+                        "updated_at": "2024-01-01T00:00:00Z"
+                    }
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = show_tracking(&client, 10).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_list_tracking() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/tracking?page=1&page_size=10")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "data": {
+                        "items": [
+                            {
+                                "id": 1,
