@@ -85,3 +85,47 @@ impl SchedulerManager {
             total_jobs_executed: 0,
             last_execution: None,
         };
+
+        let (wake_tx, wake_rx) = mpsc::unbounded_channel();
+
+        let manager = Self {
+            db,
+            client,
+            config,
+            status: Arc::new(RwLock::new(status)),
+            wake_tx,
+        };
+
+        (manager, wake_rx)
+    }
+
+    /// 启动调度器
+    pub async fn start(&mut self) -> Result<()> {
+        info!("启动调度器管理器");
+
+        let mut status = self.status.write().await;
+        status.running = true;
+
+        info!(
+            max_concurrent_jobs = self.config.max_concurrent_jobs,
+            "调度器已启动"
+        );
+
+        Ok(())
+    }
+
+    /// 停止调度器
+    pub async fn stop(&mut self) -> Result<()> {
+        info!("停止调度器管理器");
+
+        let mut status = self.status.write().await;
+        status.running = false;
+
+        info!("调度器已停止");
+
+        Ok(())
+    }
+
+    /// 手动触发同步
+    pub async fn trigger_manual_sync(&self, tracking_id: i32) -> Result<i64> {
+        info!(tracking_id = tracking_id, "手动触发同步");
