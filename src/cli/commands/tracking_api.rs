@@ -194,3 +194,52 @@ async fn list_tracking(
     status: Option<String>,
 ) -> Result<()> {
     println!("正在获取跟踪配置列表...");
+
+    let mut query = format!("?page=1&page_size={}", limit);
+
+    if let Some(pkg) = package {
+        let pkg_id = resolve_package_id(api_client, &pkg).await?;
+        query.push_str(&format!("&package_id={}", pkg_id));
+    }
+    if let Some(st) = status {
+        query.push_str(&format!("&tracking_status={}", st));
+    }
+
+    match api_client
+        .get::<ApiResponse<ListResponse<TrackingDto>>>(&format!("/tracking{}", query))
+        .await
+    {
+        Ok(response) => {
+            let trackings = response.data.items;
+
+            if trackings.is_empty() {
+                println!("{}", "没有找到跟踪配置".yellow());
+                return Ok(());
+            }
+
+            println!();
+            println!("{}", "跟踪配置列表:".bold());
+            println!(
+                "{:<5} {:<15} {:<15} {:<30} {:<10}",
+                "ID", "软件包ID", "发行版ID", "L1 仓库", "状态"
+            );
+            println!("{}", "-".repeat(75));
+
+            for track in trackings {
+                let l1_repo = format!("{}/{}", track.l1_repo_owner, track.l1_repo_name);
+                println!(
+                    "{:<5} {:<15} {:<15} {:<30} {:<10}",
+                    track.id, track.package_id, track.distro_id, l1_repo, track.tracking_status
+                );
+            }
+
+            println!();
+            println!("总计: {} 个跟踪配置", response.data.total);
+            Ok(())
+        }
+        Err(e) => {
+            println!("{} 获取跟踪配置列表失败: {}", "✗".red().bold(), e);
+            Err(e.into())
+        }
+    }
+}
