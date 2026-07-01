@@ -607,3 +607,54 @@ impl L1VsL0Comparator {
             ));
         }
 
+        if !cve_analysis.not_fixed_in_upstream.is_empty() {
+            recommendations.push(format!(
+                "{} 个 CVE 尚未在上游修复，升级后仍需保留相关补丁",
+                cve_analysis.not_fixed_in_upstream.len()
+            ));
+        }
+
+        // 4. 补丁清理建议
+        if patch_analysis.can_be_removed_after_upgrade > 0 {
+            recommendations.push(format!(
+                "升级后可移除 {} 个已合并到上游的补丁",
+                patch_analysis.can_be_removed_after_upgrade
+            ));
+        }
+
+        // 5. Breaking changes 警告
+        let has_breaking_changes = upgradable_versions
+            .iter()
+            .any(|v| !v.breaking_changes.is_empty());
+
+        if has_breaking_changes {
+            recommendations
+                .push("注意：部分可升级版本包含不兼容的变更，升级前请仔细评估影响".to_string());
+        }
+
+        // 6. 如果没有任何建议，添加默认建议
+        if recommendations.is_empty() {
+            recommendations.push("当前版本状态良好，暂无升级建议".to_string());
+        }
+
+        Ok(recommendations)
+    }
+}
+
+impl Default for L1VsL0Comparator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// 版本对比结果（内部使用）
+#[derive(Debug)]
+struct VersionComparison {
+    behind_count: u32,
+    is_outdated: bool,
+    #[allow(dead_code)]
+    has_newer_stable: bool,
+    #[allow(dead_code)]
+    has_newer_latest: bool,
+}
+
