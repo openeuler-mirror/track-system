@@ -27,3 +27,32 @@ pub struct Model {
     pub metadata: Option<JsonValue>,
     pub created_at: DateTimeUtc,
     pub updated_at: DateTimeUtc,
+}
+
+#[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+pub enum Relation {
+    #[sea_orm(
+        belongs_to = "super::packages::Entity",
+        from = "Column::PackageId",
+        to = "super::packages::Column::Id",
+        on_delete = "Cascade",
+        on_update = "NoAction"
+    )]
+    Packages,
+    #[sea_orm(has_many = "super::backport_candidates::Entity")]
+    BackportCandidates,
+}
+
+impl Related<super::packages::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Packages.def()
+    }
+}
+
+impl Related<super::backport_candidates::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::BackportCandidates.def()
+    }
+}
+
+impl ActiveModelBehavior for ActiveModel {}
