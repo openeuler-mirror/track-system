@@ -1341,3 +1341,55 @@ mod tests {
         let executor = PipelineExecutor::new(&db, None);
         let prev = std::collections::HashMap::new();
         let result = executor
+            .stage_diff_comparison(&tracking_model, &prev)
+            .await
+            .unwrap();
+
+        assert_eq!(result.report_id, Some(42));
+        assert_eq!(result.files_changed, 0);
+        assert!(!result.has_spec_changes);
+    }
+
+    #[tokio::test]
+    async fn test_compare_l2_vs_l1_missing_snapshots() {
+        let tracking_model = tracking::Model {
+            id: 1,
+            package_id: 1,
+            distro_id: 1,
+            l1_branch: "main".to_string(),
+            l1_repo_owner: "owner".to_string(),
+            l1_repo_name: "repo".to_string(),
+            l2_branch: "local".to_string(),
+            l2_repo_path: "/path".to_string(),
+            tracking_status: "idle".to_string(),
+            last_sync_time: Some(Utc::now()),
+            last_l1_commit_sha: None,
+            last_l2_commit_sha: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            last_error: None,
+        };
+
+        let package_model = packages::Model {
+            id: 1,
+            name: "pkg".to_string(),
+            level: 1,
+            sync_interval_hours: 24,
+            l0_repo_url: None,
+            description: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<packages::Model, _, _>(vec![vec![package_model]])
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![]])
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![]])
+            .into_connection();
+
+        let executor = PipelineExecutor::new(&db, None);
+        let result = executor.compare_l2_vs_l1(&tracking_model).await.unwrap();
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
