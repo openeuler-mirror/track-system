@@ -40,3 +40,45 @@ impl AuditMiddleware {
     ) -> Response {
         let start = Instant::now();
 
+        // 提取请求信息
+        let method = request.method().to_string();
+        let path = request.uri().path().to_string();
+        let query = request.uri().query().map(|q| q.to_string());
+        let user_agent = request
+            .headers()
+            .get("user-agent")
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string());
+
+        let user_id: Option<String> = None;
+
+        // 构建完整路径
+        let full_path = if let Some(q) = query {
+            format!("{}?{}", path, q)
+        } else {
+            path.clone()
+        };
+
+        // 确定操作类型和资源类型
+        let action = audit_logs::AuditAction::from_method_and_path(&method, &path);
+        let (resource_type, resource_id) = extract_resource_info(&path);
+
+        // 执行请求
+        let response = next.run(request).await;
+
+        // 计算处理时长
+        let duration = start.elapsed().as_millis() as i32;
+
+        // 提取响应状态
+        let status = response.status();
+        let status_code = status.as_u16() as i32;
+
+        // 记录审计日志
+        if let Err(e) = log_audit(
+            &db,
+            user_id,
+            action,
+            resource_type,
+            resource_id,
+            method,
+            full_path,
