@@ -74,3 +74,42 @@ pub struct GitHubCommit {
     pub sha: String,
     pub html_url: String,
     pub commit: GitHubCommitInfo,
+    #[serde(default)]
+    pub stats: Option<GitHubCommitStats>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct GitHubCommitInfo {
+    #[serde(default)]
+    pub title: Option<String>,
+    pub message: String,
+    pub author: Option<GitHubCommitAuthor>,
+    pub committer: Option<GitHubCommitAuthor>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct GitHubCommitAuthor {
+    pub name: Option<String>,
+    pub email: Option<String>,
+    pub date: DateTime<Utc>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct GitHubCommitStats {
+    pub additions: u32,
+    pub deletions: u32,
+    pub total: u32,
+}
+
+impl From<GitHubCommitStats> for CommitStats {
+    fn from(stats: GitHubCommitStats) -> Self {
+        CommitStats {
+            additions: stats.additions,
+            deletions: stats.deletions,
+            total: stats.total,
+        }
+    }
+}
+
+impl From<GitHubCommit> for Commit {
+    fn from(commit: GitHubCommit) -> Self {
