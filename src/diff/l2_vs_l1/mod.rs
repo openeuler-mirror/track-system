@@ -472,3 +472,56 @@ impl L2VsL1Comparator {
         package_name: String,
         snapshot: &RepositorySnapshot,
     ) -> Result<L2Snapshot> {
+        // 提取 spec 信息
+        let spec = snapshot
+            .spec
+            .as_ref()
+            .ok_or_else(|| anyhow!("L2 快照缺少 spec 文件"))?;
+
+        let version = spec
+            .version
+            .clone()
+            .ok_or_else(|| anyhow!("无法从 spec 文件提取版本号"))?;
+
+        // 解码 spec 内容
+        use base64::Engine;
+        let spec_content = String::from_utf8(
+            base64::engine::general_purpose::STANDARD
+                .decode(&spec.content_base64)
+                .map_err(|e| anyhow!("解码 spec 内容失败: {}", e))?,
+        )
+        .map_err(|e| anyhow!("spec 内容不是有效的 UTF-8: {}", e))?;
+
+        // 提取 patch 文件
+        let patches = Self::extract_patches(&snapshot.files)?;
+
+        // 提取源文件
+        let source_files = Self::extract_source_files(&snapshot.files)?;
+
+        // 分析定制内容
+        let customizations = Self::analyze_customizations(&spec_content, &patches)?;
+
+        Ok(L2Snapshot {
+            package_name,
+            version,
+            spec_content,
+            spec_sha256: spec.sha256.clone(),
+            patches,
+            source_files,
+            customizations,
+            commits: snapshot.commits.clone(),
+            snapshot_at: snapshot.generated_at,
+        })
+    }
+
+    /// 提取 patch 文件
+    fn extract_patches(files: &[FileEntry]) -> Result<Vec<PatchFile>> {
+        let patches = files
+            .iter()
+            .filter(|f| f.path.ends_with(".patch") || f.path.ends_with(".diff"))
+            .map(|f| PatchFile {
+                filename: f.path.split('/').next_back().unwrap_or(&f.path).to_string(),
+                path: f.path.clone(),
+                content_hash: f.sha256.clone(),
+                size: f.size,
+                applied: true, // 假设所有 patch 都已应用
