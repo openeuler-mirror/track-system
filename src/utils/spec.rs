@@ -344,3 +344,53 @@ impl SpecComparison {
             parts.push(format!(
                 "删除 {} 个 BuildRequires",
                 self.build_requires_removed.len()
+            ));
+        }
+
+        if !self.requires_added.is_empty() {
+            parts.push(format!("新增 {} 个 Requires", self.requires_added.len()));
+        }
+
+        if !self.requires_removed.is_empty() {
+            parts.push(format!("删除 {} 个 Requires", self.requires_removed.len()));
+        }
+
+        if !self.configure_options_added.is_empty() {
+            parts.push(format!(
+                "新增 {} 个 configure 选项",
+                self.configure_options_added.len()
+            ));
+        }
+
+        if !self.configure_options_removed.is_empty() {
+            parts.push(format!(
+                "删除 {} 个 configure 选项",
+                self.configure_options_removed.len()
+            ));
+        }
+
+        if self.sources_changed {
+            parts.push("Source 文件列表变化".to_string());
+        }
+
+        if self.patches_changed {
+            parts.push("Patch 文件列表变化".to_string());
+        }
+
+        if parts.is_empty() {
+            "无差异".to_string()
+        } else {
+            parts.join("；")
+        }
+    }
+
+    /// 是否有重要变更
+    pub fn has_significant_changes(&self) -> bool {
+        self.version_changed
+            || !self.build_requires_added.is_empty()
+            || !self.build_requires_removed.is_empty()
+            || !self.configure_options_added.is_empty()
+            || !self.configure_options_removed.is_empty()
+    }
+}
+
