@@ -293,3 +293,52 @@ impl GitClient for LocalClient {
         Ok(commits)
     }
 
+    async fn get_file_content(
+        &self,
+        _owner: &str,
+        _repo: &str,
+        path: &str,
+        branch: &str,
+    ) -> ApiResult<FileContent> {
+        let repo = self.open_repo()?;
+
+        // 获取分支的 commit
+        let commit_oid = self.get_branch_commit(&repo, branch)?;
+        let commit = repo
+            .find_commit(commit_oid)
+            .map_err(|e| ApiError::Unknown(format!("Failed to find commit: {}", e)))?;
+
+        // 获取 tree
+        let tree = commit
+            .tree()
+            .map_err(|e| ApiError::Unknown(format!("Failed to get tree: {}", e)))?;
+
+        // 查找文件
+        let entry = tree
+            .get_path(Path::new(path))
+            .map_err(|e| ApiError::NotFoundError(format!("File not found: {}", e)))?;
+
+        // 获取 blob
+        let object = entry
+            .to_object(&repo)
+            .map_err(|e| ApiError::Unknown(format!("Failed to get object: {}", e)))?;
+
+        let blob = object
+            .as_blob()
+            .ok_or_else(|| ApiError::InvalidConfig("Path is not a file".to_string()))?;
+
+        // 编码为 base64
+        let content = base64::engine::general_purpose::STANDARD.encode(blob.content());
+
+        Ok(FileContent {
+            name: Path::new(path)
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("")
+                .to_string(),
+            path: path.to_string(),
+            sha: entry.id().to_string(),
+            size: blob.size() as u64,
+            content,
+            encoding: "base64".to_string(),
+            download_url: format!("file://{}/{}", self.repo_path.display(), path),
