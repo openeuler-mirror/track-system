@@ -913,3 +913,53 @@ mod tests {
             "built snapshot"
         );
 
+        let request = ImportL0Request {
+            tracking_id: 1,
+            snapshot,
+        };
+
+        let result = import_l0_metadata(State(state), Json(request)).await;
+        match &result {
+            Ok(resp) => tracing::debug!(
+                test = "test_import_l0_metadata_success",
+                code = resp.0.code,
+                "ok"
+            ),
+            Err(e) => tracing::debug!(test = "test_import_l0_metadata_success", error = %e, "err"),
+        }
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_import_l1_metadata_success_with_commits_and_issues() {
+        init_test_tracing();
+
+        let tracking = create_tracking_model(1, 10);
+        let updated_tracking = create_tracking_model(1, 10);
+        let sync_job = create_sync_job_model(1, 1);
+        let inserted_commit = create_l1_commit_record_model(1, 1, "sha1");
+        let inserted_issue = create_issue_model(1, 1, "1");
+        tracing::debug!(
+            test = "test_import_l1_metadata_success_with_commits_and_issues",
+            tracking_id = tracking.id,
+            package_id = tracking.package_id,
+            "start"
+        );
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<crate::entities::tracking::Model, _, _>(vec![vec![tracking]])
+            .append_query_results::<l1_commit_records::Model, _, _>(vec![vec![]])
+            .append_query_results::<l1_commit_records::Model, _, _>(vec![vec![inserted_commit]])
+            .append_query_results::<issues::Model, _, _>(vec![vec![]])
+            .append_query_results::<issues::Model, _, _>(vec![vec![inserted_issue]])
+            .append_query_results::<crate::entities::tracking::Model, _, _>(vec![vec![
+                updated_tracking,
+            ]])
+            .append_query_results::<sync_jobs::Model, _, _>(vec![vec![]])
+            .append_query_results::<sync_jobs::Model, _, _>(vec![vec![sync_job]])
+            .into_connection();
+
+        let state = AppState::without_external_clients(db);
+
+        let mut snapshot = RepositorySnapshot::new(1, crate::snapshot::types::SnapshotOrigin::L1);
+        snapshot.commits.push(create_commit_entry("sha1"));
