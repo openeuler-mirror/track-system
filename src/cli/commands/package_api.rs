@@ -126,3 +126,45 @@ async fn add_package(
 
 /// 列出软件包
 async fn list_packages(api_client: &ApiClient, limit: u64) -> Result<()> {
+    println!("正在获取软件包列表...");
+
+    // 服务端 /packages 返回 Vec<PackageResponse>
+    match api_client.get::<Vec<PackageDto>>("/packages").await {
+        Ok(packages) => {
+            let packages = if limit > 0 {
+                packages
+                    .into_iter()
+                    .take(limit as usize)
+                    .collect::<Vec<_>>()
+            } else {
+                packages
+            };
+
+            if packages.is_empty() {
+                println!("{}", "没有找到软件包".yellow());
+                return Ok(());
+            }
+
+            println!();
+            println!("{}", "软件包列表:".bold());
+            println!(
+                "{:<5} {:<20} {:<6} {:<8} {:<50}",
+                "ID", "名称", "等级", "间隔", "描述"
+            );
+            println!("{}", "-".repeat(95));
+
+            for pkg in packages {
+                println!(
+                    "{:<5} {:<20} {:<6} {:<8} {:<50}",
+                    pkg.id,
+                    pkg.name.cyan(),
+                    pkg.level,
+                    pkg.sync_interval_hours,
+                    pkg.description.clone().unwrap_or_else(|| "N/A".to_string())
+                );
+            }
+
+            Ok(())
+        }
+        Err(e) => {
+            println!("{} 获取软件包列表失败: {}", "✗".red().bold(), e);
