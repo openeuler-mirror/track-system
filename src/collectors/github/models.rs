@@ -151,3 +151,42 @@ impl From<GitHubCommit> for Commit {
 
         Commit {
             sha: commit.sha,
+            title,
+            message: commit.commit.message,
+            author_name,
+            author_email,
+            author_date,
+            committer_name,
+            committer_email,
+            committer_date,
+            html_url: commit.html_url,
+            stats: commit.stats.map(Into::into),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct GitHubFileContent {
+    pub name: String,
+    pub path: String,
+    pub sha: String,
+    pub size: u64,
+    pub content: String,
+    pub encoding: String,
+    #[serde(default)]
+    pub download_url: String,
+}
+
+impl From<GitHubFileContent> for FileContent {
+    fn from(file: GitHubFileContent) -> Self {
+        FileContent {
+            name: file.name,
+            path: file.path,
+            sha: file.sha,
+            size: file.size,
+            content: file.content,
+            encoding: file.encoding,
+            download_url: file.download_url,
+        }
+    }
+}
