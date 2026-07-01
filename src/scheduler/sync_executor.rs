@@ -235,3 +235,45 @@ impl<'a> SyncExecutor<'a> {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sea_orm::{DatabaseBackend, MockDatabase};
+
+    #[test]
+    fn test_sync_executor_creation() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+        let executor = SyncExecutor::new(&db, None);
+
+        // 验证执行器可以成功创建
+        assert!(executor.client.is_none());
+    }
+
+    #[test]
+    fn test_sync_execution_stats_default() {
+        let stats = SyncExecutionStats::default();
+
+        assert_eq!(stats.discovered, 0);
+        assert_eq!(stats.processed, 0);
+        assert_eq!(stats.succeeded, 0);
+        assert_eq!(stats.skipped, 0);
+        assert_eq!(stats.failed, 0);
+        assert_eq!(stats.errors.len(), 0);
+    }
+
+    #[test]
+    fn test_sync_execution_stats_record_success() {
+        let mut stats = SyncExecutionStats::default();
+        let outcome = SyncResult {
+            status: SyncStatus::Success,
+            commits_synced: 5,
+            issues_synced: 2,
+            message: "Success".to_string(),
+        };
+
+        stats.record_outcome(1, &outcome);
+
+        assert_eq!(stats.processed, 1);
+        assert_eq!(stats.succeeded, 1);
+        assert_eq!(stats.failed, 0);
+        assert_eq!(stats.skipped, 0);
