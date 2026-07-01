@@ -220,3 +220,36 @@ pub struct ParsedPatch {
     pub content: String,
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_cve_from_filename() {
+        let filename = "CVE-2023-1234.patch";
+        let cves = PatchParser::extract_cve_from_filename(filename);
+        assert_eq!(cves.len(), 1);
+        assert_eq!(cves[0], "CVE-2023-1234");
+
+        let filename = "fix-CVE-2023-1234.patch";
+        let cves = PatchParser::extract_cve_from_filename(filename);
+        assert_eq!(cves.len(), 1);
+        assert_eq!(cves[0], "CVE-2023-1234");
+
+        let filename = "0001-CVE-2023-1234-fix-buffer-overflow.patch";
+        let cves = PatchParser::extract_cve_from_filename(filename);
+        assert_eq!(cves.len(), 1);
+        assert_eq!(cves[0], "CVE-2023-1234");
+
+        let filename = "no_cve_here.patch";
+        let cves = PatchParser::extract_cve_from_filename(filename);
+        assert!(cves.is_empty());
+    }
+
+    #[test]
+    fn test_extract_cve_from_content() {
+        let content = r#"
+Subject: [PATCH] Fix CVE-2023-1234 and CVE-2023-5678
+This patch fixes multiple security issues.
+References:
+- https://nvd.nist.gov/vuln/detail/CVE-2023-1234
