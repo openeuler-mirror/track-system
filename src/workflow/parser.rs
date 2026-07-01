@@ -229,3 +229,41 @@ fn default_backoff_multiplier() -> f32 {
     2.0
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_workflow_from_yaml() {
+        let yaml = r#"
+name: test_workflow
+description: Test workflow
+version: 1.0
+tasks:
+  - name: task1
+    task_type: sync
+    parameters:
+      tracking_id: 1
+    depends_on: []
+  - name: task2
+    task_type: classify
+    parameters:
+      limit: 100
+    depends_on:
+      - task1
+"#;
+        let workflow = WorkflowConfig::from_yaml(yaml);
+        assert!(workflow.is_ok());
+        let w = workflow.unwrap();
+        assert_eq!(w.name, "test_workflow");
+        assert_eq!(w.tasks.len(), 2);
+    }
+
+    #[test]
+    fn test_workflow_validation() {
+        let yaml = r#"
+name: test_workflow
+tasks:
+  - name: task1
+    task_type: sync
+    parameters: {}
