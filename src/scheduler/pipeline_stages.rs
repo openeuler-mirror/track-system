@@ -1134,3 +1134,55 @@ mod tests {
     #[test]
     fn test_report_generation_result() {
         let result = ReportGenerationResult {
+            report_id: 999,
+            report_status: "success".to_string(),
+        };
+
+        assert_eq!(result.report_id, 999);
+        assert_eq!(result.report_status, "success");
+    }
+
+    #[tokio::test]
+    async fn test_stage_l2_snapshot_db_exists() {
+        let tracking_model = tracking::Model {
+            id: 1,
+            package_id: 1,
+            distro_id: 1,
+            l1_branch: "main".to_string(),
+            l1_repo_owner: "owner".to_string(),
+            l1_repo_name: "repo".to_string(),
+            l2_branch: "local".to_string(),
+            l2_repo_path: "/nonexistent/path".to_string(),
+            tracking_status: "idle".to_string(),
+            last_sync_time: Some(Utc::now()),
+            last_l1_commit_sha: None,
+            last_l2_commit_sha: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            last_error: None,
+        };
+
+        let snapshot_payload = serde_json::json!({
+            "tracking_id": 1,
+            "generated_at": Utc::now().to_rfc3339(),
+            "origin": "L2",
+            "files": [
+                {
+                    "path": "file1",
+                    "size": 10,
+                    "sha256": "abc123",
+                    "is_binary": false
+                }
+            ],
+            "spec": {
+                "path": "specfile",
+                "sha256": "def456",
+                "version": "1.0",
+                "release": "1",
+                "content_base64": "Y29udGVudA=="
+            },
+            "commits": [],
+            "issues": []
+        });
+
+        let snapshot_model = l2_snapshots::Model {
