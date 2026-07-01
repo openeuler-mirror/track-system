@@ -753,3 +753,51 @@ mod tests {
             .find_upgradable_versions("1.20.0", &all_versions)
             .unwrap();
 
+        // 应该只包含稳定版本
+        assert_eq!(upgradable.len(), 2); // 1.22.0 和 1.23.0
+        assert!(upgradable.iter().any(|v| v.version == "1.23.0"));
+        assert!(
+            upgradable
+                .iter()
+                .find(|v| v.version == "1.23.0")
+                .unwrap()
+                .is_security_release
+        );
+    }
+
+    #[tokio::test]
+    async fn test_patch_analysis() {
+        let comparator = L1VsL0Comparator::new();
+
+        // 准备测试数据
+        let patches = vec![
+            PatchInfo {
+                filename: "0001-backport-fix-buffer-overflow.patch".to_string(),
+                description: "Backport of upstream commit abc123def456: Fix buffer overflow"
+                    .to_string(),
+                applied: true,
+                content_hash: Some("hash1".to_string()),
+            },
+            PatchInfo {
+                filename: "0002-CVE-2023-1234.patch".to_string(),
+                description: "Fix CVE-2023-1234 vulnerability".to_string(),
+                applied: true,
+                content_hash: Some("hash2".to_string()),
+            },
+            PatchInfo {
+                filename: "0003-custom-feature.patch".to_string(),
+                description: "Add custom feature for enterprise".to_string(),
+                applied: true,
+                content_hash: Some("hash3".to_string()),
+            },
+        ];
+
+        let mut changelogs = HashMap::new();
+        changelogs.insert(
+            "1.23.0".to_string(),
+            vec![
+                ChangelogEntry {
+                    entry_type: "bugfix".to_string(),
+                    description: "Fix buffer overflow in parser".to_string(),
+                    commit_sha: Some("abc123def456".to_string()),
+                },
