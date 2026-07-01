@@ -1019,3 +1019,52 @@ mod tests {
             .with_status(200)
             .with_header("content-type", "application/json")
             .with_body(
+                serde_json::json!({
+                    "code": 200,
+                    "message": "success",
+                    "data": null
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let err = resolve_tracking_id_from_package(&client, "test-package")
+            .await
+            .unwrap_err();
+        let msg = format!("{err}");
+        assert!(msg.contains("空响应"));
+        packages_mock.assert_async().await;
+        tracking_mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_resolve_tracking_id_package_not_found() {
+        let (mut server, client) = setup_test_server().await;
+
+        let packages_mock = server
+            .mock("GET", "/api/packages")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(serde_json::json!([]).to_string())
+            .create_async()
+            .await;
+
+        let result = resolve_tracking_id_from_package(&client, "nonexistent").await;
+        assert!(result.is_err());
+        packages_mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_import_batch_files_partial_failure_bails() {
+        let (mut server, client) = setup_test_server().await;
+
+        let file1_json = serde_json::json!({
+            "repo": "test-package",
+            "tracking_id": 100,
+            "generated_at": "2024-01-01T00:00:00Z",
+            "origin": "L1",
+            "files": [
+                {"path": "a.patch", "sha256": "x", "size": 1, "is_binary": false}
+            ],
+            "spec": null,
