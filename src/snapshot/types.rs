@@ -30,3 +30,36 @@ pub struct SpecEntry {
     pub release: Option<String>,
     pub content_base64: String,
 }
+
+/// 变更统计信息
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub struct ChangeStats {
+    pub additions: i32,
+    pub deletions: i32,
+    pub files_changed: i32,
+}
+
+/// Commit 信息
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CommitEntry {
+    pub sha: String,
+    pub title: String,
+    pub message: String,
+    pub author: String,
+    pub authored_at: DateTime<Utc>,
+    pub url: Option<String>,
+    pub stats: ChangeStats,
+    pub primary_change_type: Option<String>,
+    pub cve_list: Vec<String>,
+}
+
+/// Issue 信息
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct IssueEntry {
+    pub number: String,
+    pub title: String,
+    pub state: String,
+    pub author: String,
+    pub labels: Vec<String>,
+    pub updated_at: DateTime<Utc>,
+}
