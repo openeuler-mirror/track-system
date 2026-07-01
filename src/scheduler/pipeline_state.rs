@@ -206,3 +206,39 @@ impl PipelineStateManager {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::scheduler::pipeline_executor::PipelineStage;
+
+    #[test]
+    fn test_pipeline_state_lifecycle() {
+        let mut state = PipelineState::new(1, 100);
+        assert_eq!(state.job_id, 1);
+        assert_eq!(state.tracking_id, 100);
+        assert!(state.current_stage.is_none());
+        assert!(state.completed_stages.is_empty());
+
+        // Start a stage
+        state.start_stage(PipelineStage::L1Ingestion);
+        assert_eq!(state.current_stage, Some(PipelineStage::L1Ingestion));
+        assert!(state
+            .stage_start_times
+            .contains_key(&PipelineStage::L1Ingestion));
+
+        // Complete the stage
+        state.complete_stage(PipelineStage::L1Ingestion);
+        assert!(state.current_stage.is_none());
+        assert_eq!(state.completed_stages.len(), 1);
+        assert_eq!(state.completed_stages[0], PipelineStage::L1Ingestion);
+
+        // Progress calculation (approximate, depends on total stages)
+        assert!(state.progress_percent() > 0.0);
+    }
+
+    #[test]
+    fn test_pipeline_cancellation() {
+        let mut state = PipelineState::new(1, 100);
+        assert!(!state.is_cancelled());
+
+        state.request_cancel();
