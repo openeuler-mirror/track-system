@@ -2422,3 +2422,56 @@ Summary: Test package
             .generate_bugfix_recommendations(&patch_diff)
             .unwrap();
         assert_eq!(recs.len(), 1);
+        assert_eq!(recs[0].recommendation_type, SyncType::BugFix);
+        assert_eq!(recs[0].affected_files, vec!["fix-bug.patch".to_string()]);
+    }
+
+    #[test]
+    fn test_generate_feature_recommendations_excludes_fix_and_security() {
+        let comparator = L2VsL1Comparator::new();
+        let patch_diff = PatchDiff {
+            l1_total: 3,
+            l2_total: 0,
+            l2_added: vec![],
+            l2_removed: vec![
+                PatchFile {
+                    filename: "add-foo.patch".to_string(),
+                    path: "add-foo.patch".to_string(),
+                    content_hash: "h1".to_string(),
+                    size: 1,
+                    applied: true,
+                },
+                PatchFile {
+                    filename: "fix-crash.patch".to_string(),
+                    path: "fix-crash.patch".to_string(),
+                    content_hash: "h2".to_string(),
+                    size: 1,
+                    applied: true,
+                },
+                PatchFile {
+                    filename: "security-hardening.patch".to_string(),
+                    path: "security-hardening.patch".to_string(),
+                    content_hash: "h3".to_string(),
+                    size: 1,
+                    applied: true,
+                },
+            ],
+            l2_modified: vec![],
+            identical: vec![],
+        };
+        let recs = comparator
+            .generate_feature_recommendations(&patch_diff)
+            .unwrap();
+        assert_eq!(recs.len(), 1);
+        assert_eq!(recs[0].recommendation_type, SyncType::NewFeature);
+        assert_eq!(recs[0].affected_files, vec!["add-foo.patch".to_string()]);
+    }
+
+    #[test]
+    fn test_generate_config_recommendations_for_buildrequires_and_configure() {
+        let comparator = L2VsL1Comparator::new();
+        let spec_diff = SpecDiff {
+            version_diff: None,
+            content_identical: false,
+            diff_summary: "x".to_string(),
+            key_changes: vec![],
