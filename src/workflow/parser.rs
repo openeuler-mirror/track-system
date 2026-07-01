@@ -136,3 +136,49 @@ impl WorkflowConfig {
                 }
             }
         }
+
+        // 验证执行策略与任务依赖的兼容性
+        if self.execution_policy == ExecutionPolicy::Sequential {
+            for task in &self.tasks {
+                if task.parallel {
+                    anyhow::bail!("顺序执行模式下任务 {} 不能设置为并行", task.name);
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// 按依赖关系排序任务
+    pub fn topological_sort(&self) -> Result<Vec<&TaskConfig>> {
+        let mut sorted = Vec::new();
+        let mut visited = std::collections::HashSet::new();
+        let mut temp_visited = std::collections::HashSet::new();
+
+        fn visit<'a>(
+            task_name: &str,
+            tasks: &'a [TaskConfig],
+            sorted: &mut Vec<&'a TaskConfig>,
+            visited: &mut std::collections::HashSet<String>,
+            temp_visited: &mut std::collections::HashSet<String>,
+        ) -> Result<()> {
+            if visited.contains(task_name) {
+                return Ok(());
+            }
+
+            if temp_visited.contains(task_name) {
+                anyhow::bail!("任务依赖中存在循环: {}", task_name);
+            }
+
+            temp_visited.insert(task_name.to_string());
+
+            if let Some(task) = tasks.iter().find(|t| t.name == task_name) {
+                for dep in &task.depends_on {
+                    visit(dep, tasks, sorted, visited, temp_visited)?;
+                }
+                sorted.push(task);
+            }
+
+            temp_visited.remove(task_name);
+            visited.insert(task_name.to_string());
+            Ok(())
