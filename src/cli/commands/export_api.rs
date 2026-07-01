@@ -59,3 +59,34 @@ async fn export_metadata(
     }
 
     Ok(())
+}
+
+/// 导出报告
+async fn export_report(
+    api_client: &ApiClient,
+    report_id: i32,
+    format: String,
+    output: Option<String>,
+) -> Result<()> {
+    println!(
+        "{}",
+        format!("正在导出报告 {} (格式: {})...", report_id, format).cyan()
+    );
+
+    let url = format!("/export/report/{}?format={}", report_id, format);
+
+    let content: String = api_client.get(&url).await?;
+
+    // 保存到文件或输出到控制台
+    if let Some(output_path) = output {
+        fs::write(&output_path, &content)?;
+        println!("{}", "✓ 报告已导出".green());
+        println!("文件: {}", output_path);
+        println!("大小: {} bytes", content.len());
+    } else {
+        println!("{}", content);
+    }
+
+    Ok(())
+}
+
