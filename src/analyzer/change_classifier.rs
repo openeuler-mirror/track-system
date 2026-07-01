@@ -152,3 +152,35 @@ mod tests {
 
         // Backport
         assert_eq!(
+            ChangeClassifier::classify_by_message("Backport from upstream", &[]),
+            ChangeType::Backport
+        );
+        assert_eq!(
+            ChangeClassifier::classify_by_message("Cherry-pick commit abc", &[]),
+            ChangeType::Backport
+        );
+
+        // Bugfix
+        assert_eq!(
+            ChangeClassifier::classify_by_message("Fix bug #123", &[]),
+            ChangeType::Bugfix
+        );
+        assert_eq!(
+            ChangeClassifier::classify_by_message("Resolve issue with login", &[]),
+            ChangeType::Bugfix
+        );
+
+        // Unknown
+        assert_eq!(
+            ChangeClassifier::classify_by_message("Update dependencies", &[]),
+            ChangeType::Unknown
+        );
+    }
+
+    #[tokio::test]
+    async fn test_classify_commit() {
+        let db = MockDatabase::new(sea_orm::DatabaseBackend::Postgres)
+            .append_query_results(vec![vec![l1_commit_records::Model {
+                id: 1,
+                tracking_id: 1,
+                commit_sha: "sha1".to_string(),
