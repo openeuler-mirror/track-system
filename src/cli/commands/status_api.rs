@@ -85,3 +85,47 @@ async fn show_overview(api_client: &ApiClient) -> Result<()> {
             println!();
 
             // 数据库状态
+            println!("{}", "数据库:".bold());
+            println!(
+                "  连接状态: {}",
+                if status.database.connected {
+                    "已连接".green()
+                } else {
+                    "未连接".red()
+                }
+            );
+            println!("  连接池大小: {}", status.database.pool_size);
+            println!();
+
+            // 调度器状态
+            println!("{}", "调度器:".bold());
+            println!(
+                "  运行状态: {}",
+                if status.scheduler.running {
+                    "运行中".green()
+                } else {
+                    "已停止".red()
+                }
+            );
+            println!("  活动任务: {}", status.scheduler.active_jobs);
+            println!("  待处理任务: {}", status.scheduler.pending_jobs);
+
+            Ok(())
+        }
+        Err(e) => {
+            println!("{} 获取系统状态失败: {}", "✗".red().bold(), e);
+            Err(e.into())
+        }
+    }
+}
+
+/// 显示调度器状态
+async fn show_scheduler(api_client: &ApiClient) -> Result<()> {
+    println!("正在获取调度器状态...");
+    println!();
+
+    match api_client
+        .get::<ApiResponse<SchedulerStatus>>("/status/scheduler")
+        .await
+    {
+        Ok(response) => {
