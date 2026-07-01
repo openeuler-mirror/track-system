@@ -121,3 +121,44 @@ impl<'a> AuditService<'a> {
             duration: Set(None),
             error_message: Set(None),
             created_at: Set(Utc::now()),
+            ..Default::default()
+        };
+
+        audit_log.insert(self.db).await?;
+
+        Ok(())
+    }
+}
+
+/// 从路径中提取资源类型和资源 ID
+fn extract_resource_info(path: &str) -> (String, Option<String>) {
+    let parts: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
+
+    if parts.len() < 2 {
+        return ("unknown".to_string(), None);
+    }
+
+    // 跳过 "api" 前缀
+    let start_idx = if parts[0] == "api" { 1 } else { 0 };
+
+    if start_idx >= parts.len() {
+        return ("unknown".to_string(), None);
+    }
+
+    let resource_type = parts[start_idx].to_string();
+
+    // 尝试提取资源 ID
+    let resource_id = if parts.len() > start_idx + 1 {
+        let potential_id = parts[start_idx + 1];
+        if potential_id.parse::<i64>().is_ok() || potential_id.len() < 50 {
+            Some(potential_id.to_string())
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    (resource_type, resource_id)
+}
+
