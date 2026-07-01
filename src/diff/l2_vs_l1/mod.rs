@@ -736,3 +736,56 @@ impl L2VsL1Comparator {
             }
 
             // 5. 检查版本相关补丁
+            if filename_lower.contains("version")
+                || filename_lower.contains("upgrade")
+                || filename_lower.contains("downgrade")
+            {
+                customizations.push(Customization {
+                    customization_type: CustomizationType::VersionChange,
+                    description: format!("版本变更补丁: {}", patch.filename),
+                    affected_files: vec![patch.path.clone()],
+                });
+                continue;
+            }
+
+            // 6. 检查特定功能关键词
+            let feature_keywords = [
+                "feature",
+                "add-",
+                "enable-",
+                "disable-",
+                "support-",
+                "implement",
+            ];
+
+            if feature_keywords
+                .iter()
+                .any(|kw| filename_lower.contains(kw))
+            {
+                customizations.push(Customization {
+                    customization_type: CustomizationType::FeatureModification,
+                    description: format!("功能修改补丁: {}", patch.filename),
+                    affected_files: vec![patch.path.clone()],
+                });
+            }
+        }
+
+        Ok(customizations)
+    }
+
+    /// 执行内容对比（使用数据库获取 L2/L1 版本匹配的基线 commit）
+    pub async fn compare(
+        &self,
+        l1_snapshot: &L1Snapshot,
+        l2_snapshot: &L2Snapshot,
+        db: &DatabaseConnection,
+        tracking_id: i32,
+    ) -> Result<L2VsL1Report> {
+        // 1. 对比 spec 文件
+        let spec_diff = self.compare_spec(l1_snapshot, l2_snapshot)?;
+
+        // 2. 对比 patch 文件
+        tracing::info!(
+            "对比 {} 个 L1 patch 文件和 {} 个 L2 patch 文件",
+            l1_snapshot.patches.len(),
+            l2_snapshot.patches.len()
