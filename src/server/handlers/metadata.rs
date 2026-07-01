@@ -254,3 +254,54 @@ pub async fn import_l2_metadata(
     // 计算快照校验和
     let checksum = calculate_snapshot_checksum(&snapshot_json);
 
+    let now = chrono::Utc::now();
+    let snapshot_id = format!("l2-{}-{}", request.tracking_id, now.timestamp());
+
+    let l2_snapshot = crate::entities::l2_snapshots::ActiveModel {
+        tracking_id: Set(request.tracking_id),
+        snapshot_type: Set("l2".to_string()),
+        checksum: Set(checksum.clone()),
+        payload: Set(snapshot_json),
+        created_at: Set(now),
+        ..Default::default()
+    };
+
+    let inserted_snapshot = L2Snapshots::insert(l2_snapshot)
+        .exec(state.db.as_ref())
+        .await
+        .map_err(ApiError::DatabaseError)?;
+
+    tracing::info!(
+        "L2 快照已保存: id={}, tracking_id={}, checksum={}",
+        inserted_snapshot.last_insert_id,
+        request.tracking_id,
+        checksum
+    );
+
+    // 3. 更新跟踪配置的最后同步时间
+    let mut tracking_active: crate::entities::tracking::ActiveModel = tracking.into();
+    tracking_active.last_sync_time = Set(Some(now));
+    tracking_active.updated_at = Set(now);
+    tracking_active
+        .update(state.db.as_ref())
+        .await
+        .map_err(ApiError::DatabaseError)?;
+
+    // 4. 触发 L2 vs L1 对比任务（可选）
+    if let Err(e) = trigger_comparison_task(&state, request.tracking_id).await {
+        tracing::warn!("触发对比任务失败: {}", e);
+    }
+
+    tracing::info!(
+        "L2 元数据导入完成: snapshot_id={}, files={}, commits={}, issues={}",
+        snapshot_id,
+        request.snapshot.files.len(),
+        request.snapshot.commits.len(),
+        request.snapshot.issues.len()
+    );
+
+    let response = ImportResponse {
+        snapshot_id,
+        tracking_id: request.tracking_id,
+        file_count: request.snapshot.files.len(),
+        imported_at: now,
