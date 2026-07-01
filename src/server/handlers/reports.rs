@@ -228,3 +228,49 @@ pub async fn export_report(
     use sea_orm::*;
 
     // 验证 ID
+    if id <= 0 {
+        return Err(ApiError::BadRequest("Invalid report ID".to_string()));
+    }
+
+    let export_format = format.format.unwrap_or(ExportFormat::Json);
+
+    // 从数据库查询报告
+    let report = TrackingReports::find_by_id(id as i32)
+        .find_also_related(Tracking)
+        .one(state.db.as_ref())
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("Report {} not found", id)))?;
+
+    let (report_model, tracking_opt) = report;
+
+    // 获取 package 名称
+    let package_name = if let Some(tracking_model) = tracking_opt {
+        Packages::find_by_id(tracking_model.package_id)
+            .one(state.db.as_ref())
+            .await?
+            .map(|p| p.name)
+            .unwrap_or_else(|| "unknown".to_string())
+    } else {
+        "unknown".to_string()
+    };
+
+    // 根据格式转换报告内容
+    let content = match export_format {
+        ExportFormat::Json => {
+            let export_data = serde_json::json!({
+                "id": report_model.id,
+                "tracking_id": report_model.tracking_id,
+                "report_type": report_model.source,
+                "package_name": package_name,
+                "status": report_model.status,
+                "generated_at": report_model.generated_at,
+                "diff_summary": report_model.diff_summary,
+                "representative_changes": report_model.representative_changes,
+                "created_at": report_model.created_at,
+                "updated_at": report_model.updated_at,
+            });
+            serde_json::to_string_pretty(&export_data)
+                .map_err(|e| ApiError::InternalError(format!("JSON serialization failed: {}", e)))?
+        }
+        ExportFormat::Yaml => {
+            format!(
