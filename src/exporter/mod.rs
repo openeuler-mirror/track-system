@@ -246,3 +246,52 @@ impl<'a> MetadataExporter<'a> {
                     "updated_at": t.updated_at,
                 })
             })
+            .collect();
+
+        // 查询 commit 记录（如果需要）
+        let commits_json = if options.include_commits {
+            let commits_data = l1_commit_records::Entity::find().all(self.db).await?;
+            let commits: Vec<serde_json::Value> = commits_data
+                .iter()
+                .map(|c| {
+                    serde_json::json!({
+                        "id": c.id,
+                        "tracking_id": c.tracking_id,
+                        "commit_sha": c.commit_sha,
+                        "commit_message": c.commit_message,
+                        "author_name": c.author_name,
+                        "author_email": c.author_email,
+                        "committed_at": c.committed_at,
+                        "sync_status": c.sync_status,
+                        "api_url": c.api_url,
+                        "fetched_at": c.fetched_at,
+                        "files_changed_count": c.files_changed_count,
+                        "additions": c.additions,
+                        "deletions": c.deletions,
+                        "created_at": c.created_at,
+                        "updated_at": c.updated_at,
+                    })
+                })
+                .collect();
+            Some(commits)
+        } else {
+            None
+        };
+
+        Ok((packages_json, distros_json, trackings_json, commits_json))
+    }
+
+    /// 导出为 JSON 格式
+    async fn export_json(
+        &self,
+        path: &Path,
+        export_time: DateTime<Utc>,
+        packages: Vec<serde_json::Value>,
+        distros: Vec<serde_json::Value>,
+        trackings: Vec<serde_json::Value>,
+        commits: Option<Vec<serde_json::Value>>,
+    ) -> Result<ExportResult, DbErr> {
+        let metadata = ExportedMetadata {
+            export_time,
+            packages: packages.clone(),
+            distros: distros.clone(),
