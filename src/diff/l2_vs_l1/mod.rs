@@ -1105,3 +1105,56 @@ impl L2VsL1Comparator {
                         security_items.len()
                     ));
                 }
+            }
+
+            // 版本变更需要注意
+            if let Some(version_items) = by_type.get("VersionChange") {
+                if !version_items.is_empty() {
+                    highlights.push(format!(
+                        "包含 {} 项版本变更，可能影响升级策略",
+                        version_items.len()
+                    ));
+                }
+            }
+
+            // 功能修改可能导致冲突
+            if let Some(feature_items) = by_type.get("FeatureModification") {
+                if feature_items.len() >= 3 {
+                    highlights.push(format!(
+                        "包含 {} 项功能修改，同步时可能需要重新适配",
+                        feature_items.len()
+                    ));
+                }
+            }
+
+            if !highlights.is_empty() {
+                summary_parts.push("\n重点关注:".to_string());
+                summary_parts.extend(highlights.into_iter().map(|h| format!("  {}", h)));
+            }
+
+            summary_parts.join("\n")
+        };
+
+        Ok(CustomizationAnalysis {
+            total_customizations: customizations.len(),
+            by_type,
+            summary,
+        })
+    }
+
+    /// 生成同步建议
+    ///
+    /// 识别 L1 的重要更新并生成同步建议列表，按优先级排序：
+    /// 1. Critical（紧急）：安全补丁、CVE 修复
+    /// 2. High（高）：版本升级、重要 Bug 修复
+    /// 3. Medium（中）：一般补丁、功能更新
+    /// 4. Low（低）：配置更新、文档变更
+    fn generate_sync_recommendations(
+        &self,
+        spec_diff: &SpecDiff,
+        patch_diff: &PatchDiff,
+        source_diff: &SourceDiff,
+        customization_analysis: &CustomizationAnalysis,
+    ) -> Result<Vec<SyncRecommendation>> {
+        let mut recommendations = Vec::new();
+
