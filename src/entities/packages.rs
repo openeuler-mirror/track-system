@@ -28,3 +28,33 @@ pub struct Model {
     pub created_at: DateTimeUtc,
     pub updated_at: DateTimeUtc,
 }
+
+#[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+pub enum Relation {
+    #[sea_orm(has_many = "super::tracking::Entity")]
+    Tracking,
+    #[sea_orm(has_many = "super::l0_commits::Entity")]
+    L0Commits,
+    #[sea_orm(has_many = "super::backport_candidates::Entity")]
+    BackportCandidates,
+}
+
+impl Related<super::tracking::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Tracking.def()
+    }
+}
+
+impl Related<super::l0_commits::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::L0Commits.def()
+    }
+}
+
+impl Related<super::backport_candidates::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::BackportCandidates.def()
+    }
+}
+
+impl ActiveModelBehavior for ActiveModel {}
