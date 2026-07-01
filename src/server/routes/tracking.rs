@@ -12,3 +12,18 @@
 //! 跟踪配置管理路由
 
 use axum::{
+    routing::{delete, get, post, put},
+    Router,
+};
+
+use crate::server::{handlers::tracking, state::AppState};
+
+/// 创建跟踪配置管理路由
+pub fn tracking_routes() -> Router<AppState> {
+    Router::new()
+        .route("/tracking", get(tracking::list_tracking))
+        .route("/tracking", post(tracking::create_tracking))
+        .route("/tracking/:id", get(tracking::get_tracking))
+        .route("/tracking/:id", put(tracking::update_tracking))
+        .route("/tracking/:id", delete(tracking::delete_tracking))
+}
