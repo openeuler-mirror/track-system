@@ -252,3 +252,38 @@ mod tests {
 
         let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
         let state = AppState::without_external_clients(db);
+
+        let params = ComponentCommitParams {
+            platform: None,
+            owner: None,
+            branch: None,
+            page: 1,
+            per_page: 20,
+        };
+
+        let result =
+            list_component_commits(State(state), Path("glibc".to_string()), Query(params)).await;
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), StatusCode::SERVICE_UNAVAILABLE);
+    }
+
+    #[tokio::test]
+    async fn test_handle_single_component_error_without_clients() {
+        use sea_orm::{DatabaseBackend, MockDatabase};
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+        let state = AppState::without_external_clients(db);
+
+        let request = ComponentRequest {
+            name: "glibc".to_string(),
+            platform: None,
+            owner: None,
+            branch: None,
+            spec: None,
+        };
+
+        let result = handle_single_component(&state, request).await;
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), StatusCode::SERVICE_UNAVAILABLE);
+    }
+}
