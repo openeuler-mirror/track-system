@@ -1685,3 +1685,56 @@ impl L2VsL1Comparator {
                     resolution_hint: "建议先确认 L2 的版本变更原因，再决定是否回退或保持"
                         .to_string(),
                 });
+            }
+        }
+
+        // 2. Patch 冲突
+        if !patch_diff.l2_modified.is_empty() {
+            conflicts.push(MergeConflict {
+                conflict_type: ConflictType::PatchConflict,
+                description: format!(
+                    "{} 个补丁在 L1 和 L2 中都存在但内容不同",
+                    patch_diff.l2_modified.len()
+                ),
+                files: patch_diff
+                    .l2_modified
+                    .iter()
+                    .map(|m| m.filename.clone())
+                    .collect(),
+                resolution_hint: "需要人工对比补丁内容，决定保留哪个版本或合并变更".to_string(),
+            });
+        }
+
+        // 3. 文件修改冲突
+        if !source_diff.l2_modified.is_empty() {
+            // 检查是否有关键文件被修改
+            let critical_files: Vec<_> = source_diff
+                .l2_modified
+                .iter()
+                .filter(|m| {
+                    m.filename.ends_with(".conf")
+                        || m.filename.ends_with(".cfg")
+                        || m.filename.ends_with(".ini")
+                })
+                .collect();
+
+            if !critical_files.is_empty() {
+                conflicts.push(MergeConflict {
+                    conflict_type: ConflictType::FileModificationConflict,
+                    description: format!(
+                        "{} 个配置文件在 L1 和 L2 中都被修改",
+                        critical_files.len()
+                    ),
+                    files: critical_files.iter().map(|m| m.filename.clone()).collect(),
+                    resolution_hint: "配置文件冲突可能影响系统行为，需要仔细对比并合并".to_string(),
+                });
+            }
+        }
+
+        // 4. spec 文件内容冲突
+        if !spec_diff.content_identical && !spec_diff.key_changes.is_empty() {
+            conflicts.push(MergeConflict {
+                conflict_type: ConflictType::ConfigurationConflict,
+                description: "spec 文件存在关键变更，可能导致构建冲突".to_string(),
+                files: vec!["*.spec".to_string()],
+                resolution_hint: "建议对比 spec 文件的具体变更，确保构建配置兼容".to_string(),
