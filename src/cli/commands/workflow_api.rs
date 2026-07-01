@@ -42,3 +42,48 @@ async fn execute_workflow(
     println!("{}", format!("正在执行工作流: {}...", workflow_file).cyan());
 
     // 读取工作流文件
+    let workflow_content = fs::read_to_string(&workflow_file)?;
+
+    // 解析变量
+    let mut variables = std::collections::HashMap::new();
+    for var in vars {
+        let parts: Vec<&str> = var.splitn(2, '=').collect();
+        if parts.len() == 2 {
+            variables.insert(parts[0].to_string(), parts[1].to_string());
+        }
+    }
+
+    let result: serde_json::Value = api_client
+        .post(
+            "/workflow/execute",
+            &serde_json::json!({
+                "workflow": workflow_content,
+                "variables": variables
+            }),
+        )
+        .await?;
+
+    println!("{}", "✓ 工作流已提交".green());
+    println!("执行 ID: {}", result["execution_id"]);
+    println!("状态: {}", result["status"]);
+
+    Ok(())
+}
+
+/// 列出所有可用的工作流
+async fn list_workflows(api_client: &ApiClient) -> Result<()> {
+    println!("{}", "正在获取工作流列表...".cyan());
+
+    let result: serde_json::Value = api_client.get("/workflow/list").await?;
+    let workflows = result["workflows"]
+        .as_array()
+        .ok_or_else(|| anyhow::anyhow!("无效的响应格式"))?;
+
+    if workflows.is_empty() {
+        println!("{}", "没有可用的工作流".yellow());
+        return Ok(());
+    }
+
+    println!("\n{}", "=== 可用工作流 ===".bold());
+    for workflow in workflows {
+        let name = workflow["name"].as_str().unwrap_or("unknown");
