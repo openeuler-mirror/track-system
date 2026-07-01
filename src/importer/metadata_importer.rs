@@ -45,3 +45,50 @@ pub struct CollectedMetadata {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RepoInfo {
+    pub description: Option<String>,
+    pub stars: u32,
+    pub forks: u32,
+    pub open_issues: u32,
+    pub default_branch: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CommitInfo {
+    pub sha: String,
+    pub message: String,
+    pub author_name: String,
+    pub author_email: String,
+    pub author_date: DateTime<Utc>,
+    pub committer_name: String,
+    pub committer_email: String,
+    pub committer_date: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct IssueInfo {
+    pub number: i64,
+    pub title: String,
+    pub state: String,
+    pub author: Option<String>,
+    pub labels: Option<Vec<String>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub closed_at: Option<DateTime<Utc>>,
+}
+
+/// 导入结果统计
+#[derive(Debug)]
+pub struct ImportResult {
+    pub commits_imported: usize,
+    pub commits_skipped: usize,
+    pub issues_imported: usize,
+    pub issues_skipped: usize,
+    pub success: bool,
+    pub message: String,
+}
+
+impl ImportResult {
+    pub fn success(
+        commits_imported: usize,
