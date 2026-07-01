@@ -611,3 +611,46 @@ mod tests {
 
         assert_eq!(format!("{}", IssueState::Open), "open");
     }
+
+    #[test]
+    fn test_commits_params() {
+        let params = CommitsParams::new("main")
+            .page(2)
+            .per_page(50)
+            .since(Utc::now())
+            .until(Utc::now());
+
+        assert_eq!(params.branch, "main");
+        assert_eq!(params.page, 2);
+        assert_eq!(params.per_page, 50);
+        assert!(params.since.is_some());
+        assert!(params.until.is_some());
+    }
+
+    #[test]
+    fn test_issue_params_default() {
+        let params = IssueParams::default();
+        assert_eq!(params.state, IssueState::Open);
+        assert_eq!(params.page, 1);
+        assert_eq!(params.per_page, 20);
+        assert!(params.since.is_none());
+    }
+
+    #[test]
+    fn test_collect_config_builder() {
+        let config = CollectConfig::new(Platform::GitHub, "main")
+            .with_remote("owner", "repo")
+            .with_token("token")
+            .with_api_url("url")
+            .with_limit(10)
+            .with_level("l2")
+            .with_since(Utc::now())
+            .with_until(Utc::now())
+            .with_local_path("/path");
+
+        assert_eq!(config.platform, Platform::GitHub);
+        assert_eq!(config.branch, "main");
+        assert_eq!(config.owner, Some("owner".to_string()));
+        assert_eq!(config.repo, Some("repo".to_string()));
+        assert_eq!(config.token, Some("token".to_string()));
+        assert_eq!(config.api_url, Some("url".to_string()));
