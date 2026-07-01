@@ -41,3 +41,47 @@ struct CompareTaskResponse {
 }
 
 /// 对比状态响应
+#[derive(Debug, Serialize, Deserialize)]
+struct CompareStatusResponse {
+    task_id: String,
+    status: CompareStatus,
+    progress: u8,
+    message: Option<String>,
+    created_at: chrono::DateTime<chrono::Utc>,
+    updated_at: chrono::DateTime<chrono::Utc>,
+    completed_at: Option<chrono::DateTime<chrono::Utc>>,
+    report_id: Option<i64>,
+}
+
+/// API 响应包装
+#[derive(Debug, Serialize, Deserialize)]
+struct ApiResponse<T> {
+    data: T,
+}
+
+/// L1 vs L0 对比请求
+#[derive(Debug, Serialize, Deserialize)]
+struct CompareL1VsL0Request {
+    tracking_id: i32,
+    l0_snapshot_id: Option<String>,
+    l1_snapshot_id: Option<String>,
+}
+
+/// L2 vs L1 对比请求
+#[derive(Debug, Serialize, Deserialize)]
+struct CompareL2VsL1Request {
+    tracking_id: i32,
+    l1_snapshot_id: Option<String>,
+    l2_snapshot_id: Option<String>,
+}
+
+/// 执行对比命令
+pub async fn execute(api_client: &ApiClient, action: CompareAction) -> Result<()> {
+    match action {
+        CompareAction::Tracking { tracking_id } => {
+            // 默认执行 L2 vs L1 对比
+            compare_l2_vs_l1(api_client, tracking_id, None, None).await
+        }
+        CompareAction::Report { format, output } => {
+            generate_report(api_client, format, output).await
+        }
