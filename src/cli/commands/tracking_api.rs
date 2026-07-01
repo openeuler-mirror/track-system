@@ -292,3 +292,52 @@ async fn update_tracking_status(api_client: &ApiClient, id: i32, enabled: bool) 
     let request = UpdateTrackingRequest {
         l1_repo_owner: None,
         l1_repo_name: None,
+        l1_branch: None,
+        l2_branch: None,
+        l2_repo_path: None,
+        tracking_status: Some(if enabled {
+            "active".to_string()
+        } else {
+            "paused".to_string()
+        }),
+    };
+
+    match api_client
+        .put::<_, ApiResponse<TrackingDto>>(&format!("/tracking/{}", id), &request)
+        .await
+    {
+        Ok(_) => {
+            println!("{} 跟踪配置{}成功", "✓".green().bold(), action);
+            Ok(())
+        } 
+        Err(e) => {
+            println!("{} {}跟踪配置失败: {}", "✗".red().bold(), action, e);
+            Err(e.into())
+        }
+    }
+}
+
+/// 删除跟踪配置
+async fn remove_tracking(api_client: &ApiClient, id: i32, confirm: bool) -> Result<()> {
+    if !confirm {
+        println!("{}", "危险操作：删除跟踪配置需要 --confirm 参数".yellow());
+        return Ok(());
+    }
+
+    println!("正在删除跟踪配置: {}", id);
+
+    match api_client
+        .delete_no_content(&format!("/tracking/{}", id))
+        .await
+    {
+        Ok(_) => {
+            println!("{} 跟踪配置删除成功", "✓".green().bold());
+            Ok(())
+        }
+        Err(e) => {
+            println!("{} 删除跟踪配置失败: {}", "✗".red().bold(), e);
+            Err(e.into())
+        }
+    }
+}
+
