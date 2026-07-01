@@ -132,3 +132,34 @@ mod tests {
 
         let inserted_job = crate::entities::sync_jobs::Model {
             id: 1,
+            tracking_id: 1,
+            job_kind: "sync".to_string(),
+            scheduled_at: Utc::now(),
+            started_at: None,
+            finished_at: None,
+            status: "pending".to_string(),
+            error: None,
+            attempt_count: 0,
+            priority: 0,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<(tracking::Model, Option<packages::Model>), _, _>(vec![vec![(
+                tracking_model.clone(),
+                Some(package_model.clone()),
+            )]])
+            .append_query_results::<crate::entities::sync_jobs::Model, _, _>(vec![vec![]])
+            .append_query_results::<crate::entities::sync_jobs::Model, _, _>(vec![vec![
+                inserted_job,
+            ]])
+            .into_connection();
+
+        let scheduler = CronScheduler::new(&db);
+        let result = scheduler.check_and_queue_pending_tasks().await;
+
+        assert!(result.is_ok(), "Expected OK, got Err: {:?}", result.err());
+        assert_eq!(result.unwrap(), 1);
+    }
+}
