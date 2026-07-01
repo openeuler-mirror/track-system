@@ -35,3 +35,40 @@ async fn execute_config(
     _api_client: &ApiClient,
     url: Option<String>,
     token: Option<String>,
+    show: bool,
+) -> Result<()> {
+    if show {
+        // 显示当前配置
+        let config = ClientConfig::from_env()?;
+        println!("{}", "当前服务器配置:".bold());
+        println!("  服务器地址: {}", config.server_url.cyan());
+        println!(
+            "  认证 Token: {}",
+            config
+                .auth_token
+                .as_ref()
+                .map(|t| format!("{}...", &t[..t.len().min(10)]))
+                .unwrap_or_else(|| "未设置".to_string())
+                .yellow()
+        );
+        println!("  超时时间: {} 秒", config.timeout);
+        println!("  SSL 验证: {}", config.verify_ssl);
+        println!();
+        println!("配置文件路径: {}", ClientConfig::config_path()?.display());
+        return Ok(());
+    }
+
+    // 加载现有配置
+    let mut config = ClientConfig::from_env()?;
+    let mut changed = false;
+
+    // 更新配置
+    if let Some(new_url) = url {
+        config.set_server_url(new_url.clone());
+        println!("{} 服务器地址: {}", "✓".green(), new_url.cyan());
+        changed = true;
+    }
+
+    if let Some(new_token) = token {
+        config.set_auth_token(Some(new_token.clone()));
+        println!(
