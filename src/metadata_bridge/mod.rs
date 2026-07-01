@@ -962,3 +962,54 @@ async fn persist_l2_commits(
     Ok(())
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::entities::l2_snapshots;
+    use crate::entities::{issues, l1_commit_records, tracking};
+    use crate::snapshot::types::SnapshotOrigin;
+    use chrono::Utc;
+    use sea_orm::{DatabaseBackend, MockDatabase};
+    use serde_json::json;
+
+    #[test]
+    fn test_extract_spec_version_basic() {
+        let content = "Name: a\nVersion: 1.2.3\nRelease: 1\n";
+        assert_eq!(extract_spec_version(content), Some("1.2.3".to_string()));
+    }
+
+    #[test]
+    fn test_extract_spec_version_with_spaces() {
+        let content = "Version :   2.0.0-rc1\n";
+        assert_eq!(extract_spec_version(content), Some("2.0.0-rc1".to_string()));
+    }
+
+    #[test]
+    fn test_extract_spec_version_missing() {
+        let content = "Name: a\nRelease: 1\n";
+        assert_eq!(extract_spec_version(content), None);
+    }
+
+    #[test]
+    fn test_extract_spec_release_strips_macros_and_braces() {
+        let content = "Release: 9%{?dist}\n";
+        assert_eq!(extract_spec_release(content), Some("9".to_string()));
+    }
+
+    #[test]
+    fn test_extract_spec_release_strips_scl_macros() {
+        let content = "Release: 1%{?scl:foo}%{!?scl:bar}%{?scl_prefix}\n";
+        assert_eq!(extract_spec_release(content), Some("1foobar".to_string()));
+    }
+
+    #[test]
+    fn test_sha256_hex_known_value() {
+        let got = sha256_hex(b"hello world");
+        assert_eq!(
+            got,
+            "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
+        );
+    }
+
+    #[test]
+    fn test_collect_files_from_spec_parses_patches_and_sources() {
