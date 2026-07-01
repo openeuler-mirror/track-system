@@ -569,3 +569,53 @@ mod tests {
         let track = create_test_tracking(None, "idle");
         let package = create_test_package(2, 12, Utc::now() - Duration::hours(48));
         let now = Utc::now();
+
+        assert!(should_sync(&track, &package, now));
+    }
+
+    #[test]
+    fn test_should_sync_time_expired() {
+        let base = Utc::now() - Duration::hours(100);
+        let last_sync = base + Duration::hours(13); // 已执行到第 13 小时
+        let track = create_test_tracking(Some(last_sync), "idle");
+        let package = create_test_package(2, 12, base); // 12小时间隔
+        let now = base + Duration::hours(24);
+
+        assert!(should_sync(&track, &package, now));
+    }
+
+    #[test]
+    fn test_should_not_sync_time_not_expired() {
+        let base = Utc::now() - Duration::hours(100);
+        let last_sync = base + Duration::hours(13);
+        let track = create_test_tracking(Some(last_sync), "idle");
+        let package = create_test_package(2, 12, base);
+        let now = base + Duration::hours(23);
+
+        assert!(!should_sync(&track, &package, now));
+    }
+
+    #[test]
+    fn test_should_not_sync_when_syncing() {
+        let base = Utc::now() - Duration::hours(100);
+        let last_sync = base + Duration::hours(13);
+        let track = create_test_tracking(Some(last_sync), "syncing");
+        let package = create_test_package(2, 12, base);
+        let now = base + Duration::hours(24);
+
+        assert!(!should_sync(&track, &package, now)); // 但是状态是syncing，不应该再次同步
+    }
+
+    #[test]
+    fn test_should_not_sync_when_paused() {
+        let base = Utc::now() - Duration::hours(100);
+        let last_sync = base + Duration::hours(13);
+        let track = create_test_tracking(Some(last_sync), "paused");
+        let package = create_test_package(2, 12, base);
+        let now = base + Duration::hours(24);
+
+        assert!(!should_sync(&track, &package, now));
+    }
+
+    #[test]
+    fn test_should_sync_uses_package_import_time_as_anchor() {
