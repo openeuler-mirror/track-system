@@ -1083,3 +1083,54 @@ mod tests {
     fn test_diff_comparison_result_with_changes() {
         let result = DiffComparisonResult {
             report_id: Some(456),
+            files_changed: 10,
+            has_spec_changes: true,
+        };
+
+        assert_eq!(result.report_id, Some(456));
+        assert_eq!(result.files_changed, 10);
+        assert!(result.has_spec_changes);
+    }
+
+    #[test]
+    fn test_diff_comparison_result_no_changes() {
+        let result = DiffComparisonResult {
+            report_id: Some(789),
+            files_changed: 0,
+            has_spec_changes: false,
+        };
+
+        assert_eq!(result.report_id, Some(789));
+        assert_eq!(result.files_changed, 0);
+        assert!(!result.has_spec_changes);
+    }
+
+    #[test]
+    fn test_classification_result_with_cves() {
+        let result = ClassificationResult {
+            classified_count: 15,
+            cve_count: 3,
+            needs_review_count: 2,
+        };
+
+        assert_eq!(result.classified_count, 15);
+        assert_eq!(result.cve_count, 3);
+        assert_eq!(result.needs_review_count, 2);
+    }
+
+    #[test]
+    fn test_classification_result_no_cves() {
+        let result = ClassificationResult {
+            classified_count: 10,
+            cve_count: 0,
+            needs_review_count: 0,
+        };
+
+        assert_eq!(result.classified_count, 10);
+        assert_eq!(result.cve_count, 0);
+        assert_eq!(result.needs_review_count, 0);
+    }
+
+    #[test]
+    fn test_report_generation_result() {
+        let result = ReportGenerationResult {
