@@ -188,3 +188,25 @@ mod tests {
 
     #[test]
     fn test_audit_action_from_method() {
+        assert_eq!(
+            audit_logs::AuditAction::from_method_and_path("GET", "/api/packages"),
+            audit_logs::AuditAction::Read
+        );
+        assert_eq!(
+            audit_logs::AuditAction::from_method_and_path("POST", "/api/packages"),
+            audit_logs::AuditAction::Create
+        );
+        assert_eq!(
+            audit_logs::AuditAction::from_method_and_path("PUT", "/api/packages/1"),
+            audit_logs::AuditAction::Update
+        );
+        assert_eq!(
+            audit_logs::AuditAction::from_method_and_path("DELETE", "/api/packages/1"),
+            audit_logs::AuditAction::Delete
+        );
+        assert_eq!(
+            audit_logs::AuditAction::from_method_and_path("POST", "/api/compare/l1-vs-l0"),
+            audit_logs::AuditAction::Execute
+        );
+    }
+}
