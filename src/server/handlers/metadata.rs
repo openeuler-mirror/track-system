@@ -963,3 +963,53 @@ mod tests {
 
         let mut snapshot = RepositorySnapshot::new(1, crate::snapshot::types::SnapshotOrigin::L1);
         snapshot.commits.push(create_commit_entry("sha1"));
+        snapshot.issues.push(create_issue_entry("1"));
+        tracing::debug!(
+            test = "test_import_l1_metadata_success_with_commits_and_issues",
+            snapshot_tracking_id = snapshot.tracking_id,
+            commits = snapshot.commits.len(),
+            issues = snapshot.issues.len(),
+            files = snapshot.files.len(),
+            origin = ?snapshot.origin,
+            first_commit_sha = %snapshot.commits.first().map(|c| c.sha.as_str()).unwrap_or(""),
+            first_issue_number = %snapshot.issues.first().map(|i| i.number.as_str()).unwrap_or(""),
+            "built snapshot"
+        );
+
+        let request = ImportL1Request {
+            tracking_id: 1,
+            snapshot,
+        };
+
+        let result = import_l1_metadata(State(state), Json(request)).await;
+        match &result {
+            Ok(resp) => tracing::debug!(
+                test = "test_import_l1_metadata_success_with_commits_and_issues",
+                code = resp.0.code,
+                data = ?resp.0.data,
+                "ok"
+            ),
+            Err(e) => tracing::debug!(
+                test = "test_import_l1_metadata_success_with_commits_and_issues",
+                error = %e,
+                "err"
+            ),
+        }
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_import_l2_metadata_success() {
+        init_test_tracing();
+
+        let tracking = create_tracking_model(1, 10);
+        let updated_tracking = create_tracking_model(1, 10);
+        let sync_job = create_sync_job_model(1, 1);
+        let inserted_snapshot = crate::entities::l2_snapshots::Model {
+            id: 1,
+            tracking_id: 1,
+            snapshot_type: "l2".to_string(),
+            checksum: "checksum".to_string(),
+            payload: serde_json::json!({}),
+            created_at: Utc::now(),
+        };
