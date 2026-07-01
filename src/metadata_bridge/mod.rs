@@ -1625,3 +1625,54 @@ Patch1: fix.patch
             author: "u".to_string(),
             labels: vec![],
             updated_at: now,
+        };
+
+        let tmp = tempfile::tempdir().unwrap();
+        let p_l1 = tmp.path().join("l1.json");
+        let p_l2 = tmp.path().join("l2.json");
+        let p_u = tmp.path().join("u.json");
+
+        let m1 = l2_snapshots::Model {
+            id: 1,
+            tracking_id: 1,
+            snapshot_type: "l1".to_string(),
+            checksum: "c1".to_string(),
+            payload: json!({}),
+            created_at: now,
+        };
+        let m2 = l2_snapshots::Model {
+            id: 2,
+            tracking_id: 1,
+            snapshot_type: "l2".to_string(),
+            checksum: "c2".to_string(),
+            payload: json!({}),
+            created_at: now,
+        };
+        let m3 = l2_snapshots::Model {
+            id: 3,
+            tracking_id: 1,
+            snapshot_type: "unknown".to_string(),
+            checksum: "c3".to_string(),
+            payload: json!({}),
+            created_at: now,
+        };
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![m1]])
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![m2]])
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![m3]])
+            .into_connection();
+
+        for (origin, path) in [
+            (SnapshotOrigin::L1, &p_l1),
+            (SnapshotOrigin::L2, &p_l2),
+            (SnapshotOrigin::Unknown, &p_u),
+        ] {
+            let mut snapshot = RepositorySnapshot::new(1, origin);
+            snapshot.files = vec![file_entry.clone()];
+            snapshot.commits = vec![commit_entry.clone()];
+            snapshot.issues = vec![issue_entry.clone()];
+            snapshot.spec = Some(SpecEntry {
+                path: "pkg.spec".to_string(),
+                version: Some("1.0.0".to_string()),
+                release: Some("1".to_string()),
