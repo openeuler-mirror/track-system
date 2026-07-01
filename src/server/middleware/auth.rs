@@ -306,3 +306,41 @@ mod tests {
         let claims = generator.verify_token(&token).unwrap();
 
         assert_eq!(claims.sub, "user123");
+        assert_eq!(claims.username, "testuser");
+        assert_eq!(claims.role, "admin");
+    }
+
+    #[test]
+    fn test_token_refresh() {
+        let config = AuthConfig::new("test-secret".to_string(), 24);
+        let generator = JwtTokenGenerator::new(config);
+
+        // 生成原始 token
+        let old_token = generator
+            .generate_token(
+                "user123".to_string(),
+                "testuser".to_string(),
+                "admin".to_string(),
+            )
+            .unwrap();
+
+        // 刷新 token
+        let new_token = generator.refresh_token(&old_token).unwrap();
+
+        // 验证新 token
+        let claims = generator.verify_token(&new_token).unwrap();
+
+        assert_eq!(claims.sub, "user123");
+        assert_eq!(claims.username, "testuser");
+    }
+
+    #[test]
+    fn test_invalid_token() {
+        let config = AuthConfig::new("test-secret".to_string(), 24);
+        let generator = JwtTokenGenerator::new(config);
+
+        // 尝试验证无效 token
+        let result = generator.verify_token("invalid-token");
+
+        assert!(result.is_err());
+    }
