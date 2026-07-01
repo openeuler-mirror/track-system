@@ -577,3 +577,42 @@ mod tests {
         // Test valid repo
         let temp_dir = setup_test_repo();
         let result = LocalClient::new(temp_dir.path());
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_get_repository() {
+        let temp_dir = setup_test_repo();
+        let client = LocalClient::new(temp_dir.path()).unwrap();
+
+        let result = client.get_repository("owner", "repo").await;
+        assert!(result.is_ok());
+        let repo = result.unwrap();
+        assert_eq!(
+            repo.html_url,
+            format!("file://{}", temp_dir.path().display())
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_branches() {
+        let temp_dir = setup_test_repo();
+        let client = LocalClient::new(temp_dir.path()).unwrap();
+
+        let result = client.get_branches("owner", "repo").await;
+        assert!(result.is_ok());
+        let branches = result.unwrap();
+        assert_eq!(branches.len(), 1);
+        assert_eq!(branches[0].name, "master");
+    }
+
+    #[tokio::test]
+    async fn test_get_commits() {
+        let temp_dir = setup_test_repo();
+        let client = LocalClient::new(temp_dir.path()).unwrap();
+
+        let params = CommitsParams::new("master");
+        let result = client.get_commits("owner", "repo", params).await;
+        assert!(result.is_ok());
+        let commits = result.unwrap();
+        assert_eq!(commits.len(), 1);
