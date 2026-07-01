@@ -95,3 +95,52 @@ pub struct GiteeCommitDetail {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GiteeUser {
+    pub name: String,
+    pub email: String,
+    pub date: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GiteeCommitStats {
+    pub additions: u32,
+    pub deletions: u32,
+    pub total: u32,
+}
+
+impl From<GiteeCommit> for Commit {
+    fn from(commit: GiteeCommit) -> Self {
+        let derived_title = commit
+            .commit
+            .title
+            .as_ref()
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| {
+                commit
+                    .commit
+                    .message
+                    .lines()
+                    .next()
+                    .map(|s| s.trim().to_string())
+                    .unwrap_or_default()
+            });
+
+        Self {
+            sha: commit.sha,
+            title: derived_title,
+            message: commit.commit.message,
+            author_name: commit.commit.author.name,
+            author_email: commit.commit.author.email,
+            author_date: commit
+                .commit
+                .author
+                .date
+                .parse::<DateTime<Utc>>()
+                .unwrap_or_else(|_| Utc::now()),
+            committer_name: commit.commit.committer.name,
+            committer_email: commit.commit.committer.email,
+            committer_date: commit
+                .commit
+                .committer
+                .date
+                .parse::<DateTime<Utc>>()
+                .unwrap_or_else(|_| Utc::now()),
