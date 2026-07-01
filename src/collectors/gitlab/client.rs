@@ -328,3 +328,43 @@ mod tests {
                 "committer_name": "committer",
                 "committer_email": "email",
                 "committed_date": "2023-01-01T00:00:00Z",
+                "title": "title",
+                "web_url": "url",
+                "stats": {
+                    "total": 10,
+                    "additions": 5,
+                    "deletions": 5
+                }
+            }
+        ]);
+
+        let _mock = server.mock(|when, then| {
+            when.method(GET)
+                .path("/projects/owner%2Ftest-repo/repository/commits")
+                .query_param("ref_name", "main")
+                .query_param("page", "1")
+                .query_param("per_page", "30")
+                .query_param("with_stats", "true")
+                .header("PRIVATE-TOKEN", "token");
+            then.status(200).json_body(commits_response);
+        });
+
+        let params = CommitsParams::new("main");
+        let result = client.get_commits("owner", "test-repo", params).await;
+        // mock.assert();
+        assert!(result.is_ok(), "Result error: {:?}", result.err());
+        let commits = result.unwrap();
+        assert_eq!(commits.len(), 1);
+        assert_eq!(commits[0].sha, "sha");
+    }
+
+    #[tokio::test]
+    async fn test_get_file_content() {
+        let server = MockServer::start();
+        let client = GitLabClient::with_base_url(server.base_url(), "token").unwrap();
+
+        let file_response = json!({
+            "file_name": "file.txt",
+            "file_path": "file.txt",
+            "commit_id": "sha",
+            "size": 100,
