@@ -1013,3 +1013,53 @@ mod tests {
             payload: serde_json::json!({}),
             created_at: Utc::now(),
         };
+        tracing::debug!(
+            test = "test_import_l2_metadata_success",
+            tracking_id = tracking.id,
+            package_id = tracking.package_id,
+            "start"
+        );
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<crate::entities::tracking::Model, _, _>(vec![vec![tracking]])
+            .append_query_results::<crate::entities::l2_snapshots::Model, _, _>(vec![vec![
+                inserted_snapshot,
+            ]])
+            .append_query_results::<crate::entities::tracking::Model, _, _>(vec![vec![
+                updated_tracking,
+            ]])
+            .append_query_results::<sync_jobs::Model, _, _>(vec![vec![]])
+            .append_query_results::<sync_jobs::Model, _, _>(vec![vec![sync_job]])
+            .into_connection();
+
+        let state = AppState::without_external_clients(db);
+
+        let snapshot = RepositorySnapshot::new(1, crate::snapshot::types::SnapshotOrigin::L2);
+        tracing::debug!(
+            test = "test_import_l2_metadata_success",
+            snapshot_tracking_id = snapshot.tracking_id,
+            commits = snapshot.commits.len(),
+            issues = snapshot.issues.len(),
+            files = snapshot.files.len(),
+            origin = ?snapshot.origin,
+            "built snapshot"
+        );
+
+        let request = ImportL2Request {
+            tracking_id: 1,
+            snapshot,
+        };
+
+        let result = import_l2_metadata(State(state), Json(request)).await;
+        match &result {
+            Ok(resp) => tracing::debug!(
+                test = "test_import_l2_metadata_success",
+                code = resp.0.code,
+                data = ?resp.0.data,
+                "ok"
+            ),
+            Err(e) => tracing::debug!(test = "test_import_l2_metadata_success", error = %e, "err"),
+        }
+        assert!(result.is_ok());
+    }
+}
