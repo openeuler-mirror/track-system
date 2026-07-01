@@ -218,3 +218,47 @@ impl WorkflowEngine {
             .count();
         let failed = self
             .task_status
+            .values()
+            .filter(|s| **s == TaskStatus::Failed)
+            .count();
+        let pending = self
+            .task_status
+            .values()
+            .filter(|s| **s == TaskStatus::Pending)
+            .count();
+        let skipped = self
+            .task_status
+            .values()
+            .filter(|s| **s == TaskStatus::Skipped)
+            .count();
+
+        WorkflowSummary {
+            name: self.config.name.clone(),
+            total,
+            success,
+            failed,
+            pending,
+            skipped,
+        }
+    }
+}
+
+/// 工作流执行摘要
+pub struct WorkflowSummary {
+    pub name: String,
+    pub total: usize,
+    pub success: usize,
+    pub failed: usize,
+    pub pending: usize,
+    pub skipped: usize,
+}
+
+impl std::fmt::Display for WorkflowSummary {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "工作流: {}\n  总任务: {}\n  成功: {}\n  失败: {}\n  待处理: {}\n  跳过: {}",
+            self.name, self.total, self.success, self.failed, self.pending, self.skipped
+        )
+    }
+}
