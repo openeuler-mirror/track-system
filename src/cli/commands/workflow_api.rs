@@ -320,3 +320,51 @@ mod tests {
         let (mut server, client) = setup_test_server().await;
         let workflow_file = create_temp_workflow_file("workflow: valid");
 
+        let mock = server
+            .mock("POST", "/api/workflow/validate")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "valid": true
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result =
+            validate_workflow(&client, workflow_file.path().to_str().unwrap().to_string()).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_validate_workflow_invalid() {
+        let (mut server, client) = setup_test_server().await;
+        let workflow_file = create_temp_workflow_file("workflow: invalid");
+
+        let mock = server
+            .mock("POST", "/api/workflow/validate")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "valid": false,
+                    "errors": [
+                        "Missing required field: steps",
+                        "Invalid syntax on line 5"
+                    ]
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result =
+            validate_workflow(&client, workflow_file.path().to_str().unwrap().to_string()).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
