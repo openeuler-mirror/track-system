@@ -94,3 +94,51 @@ fn extract_repo_from_json(content: &str) -> Result<String> {
     ))
 }
 
+/// 根据 package name 查询对应的 tracking_id
+async fn resolve_tracking_id_from_package(
+    api_client: &ApiClient,
+    package_name: &str,
+) -> Result<i32> {
+    // 1. 查询 package 列表，找到匹配的 package_id
+    let packages: Vec<PackageDto> = api_client
+        .get("/packages")
+        .await
+        .map_err(|e| anyhow!("查询 package 列表失败: {}", e))?;
+
+    let package = packages
+        .iter()
+        .find(|p| p.name == package_name)
+        .ok_or_else(|| anyhow!("未找到名称为 '{}' 的 package", package_name))?;
+
+    let package_id = package.id;
+
+    // 2. 查询该 package 的 tracking 配置
+    let query = format!("?page=1&page_size=100&package_id={}", package_id);
+    let response: ApiResponse<ListResponse<TrackingDto>> = api_client
+        .get(&format!("/tracking{}", query))
+        .await
+        .map_err(|e| anyhow!("查询 tracking 配置失败: {}", e))?;
+
+    let trackings = response.data.ok_or_else(|| anyhow!("空响应"))?.items;
+
+    if trackings.is_empty() {
+        return Err(anyhow!(
+            "package '{}' (ID: {}) 没有关联的 tracking 配置，请先创建",
+            package_name,
+            package_id
+        ));
+    }
+
+    // 3. 优先选择状态为 active 的 tracking
+    let active_tracking = trackings
+        .iter()
+        .find(|t| t.tracking_status == "active")
+        .or_else(|| trackings.first());
+
+    if let Some(tracking) = active_tracking {
+        if trackings.len() > 1 {
+            println!(
+                "  {} package '{}' 有 {} 个 tracking 配置，使用 tracking_id: {} (状态: {})",
+                "ℹ".cyan(),
+                package_name,
+                trackings.len(),
