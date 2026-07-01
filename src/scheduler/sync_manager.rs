@@ -92,3 +92,51 @@ impl<'a> SyncManager<'a> {
         Ok(inserted)
     }
 
+    /// 更新跟踪配置的上次同步时间
+    pub async fn update_last_sync(
+        &self,
+        tracking_id: i32,
+        last_sync: chrono::DateTime<Utc>,
+    ) -> anyhow::Result<()> {
+        let track = Tracking::find_by_id(tracking_id)
+            .one(self.db)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Tracking {} not found", tracking_id))?;
+
+        let mut active: tracking::ActiveModel = track.into();
+        active.last_sync_time = Set(Some(last_sync));
+        active.updated_at = Set(Utc::now());
+        active.update(self.db).await?;
+
+        Ok(())
+    }
+
+    /// 计算下次同步时间
+    pub async fn calculate_next_sync_time(
+        &self,
+        tracking_id: i32,
+    ) -> anyhow::Result<chrono::DateTime<Utc>> {
+        let track = Tracking::find_by_id(tracking_id)
+            .one(self.db)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Tracking {} not found", tracking_id))?;
+
+        // 获取关联的软件包信息
+        let package = track
+            .find_related(Packages)
+            .one(self.db)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Package not found for tracking {}", tracking_id))?;
+
+        let interval_hours = package.sync_interval_hours as i64;
+        if interval_hours <= 0 {
+            return Ok(package.created_at);
+        }
+
+        let interval = chrono::Duration::hours(interval_hours);
+        let base_time = package.created_at;
+        let reference_time = track.last_sync_time.unwrap_or(base_time - interval);
+        let next_sync = next_aligned_after(base_time, interval, reference_time);
+
+        Ok(next_sync)
+    }
