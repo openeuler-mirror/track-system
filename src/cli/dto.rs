@@ -34,3 +34,39 @@ pub struct PackageDto {
 pub struct DistroDto {
     pub id: i32,
     pub name: String,
+    pub version: String,
+    pub description: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// 跟踪配置 DTO
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrackingDto {
+    pub id: i32,
+    pub package_id: i32,
+    pub distro_id: i32,
+    pub l1_repo_owner: String,
+    pub l1_repo_name: String,
+    pub l1_branch: String,
+    pub l2_branch: String,
+    pub l2_repo_path: String,
+    pub tracking_status: String,
+    pub last_sync_time: Option<DateTime<Utc>>,
+    pub last_l1_commit_sha: Option<String>,
+    pub last_l2_commit_sha: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// L2 快照信息 DTO
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct L2SnapshotDto {
+    pub id: i32,
+    pub tracking_id: i32,
+    pub commit_hash: String,
+    pub commit_message: String,
+    pub commit_author: String,
+    pub commit_date: DateTime<Utc>,
+    pub spec_version: Option<String>,
+    pub spec_release: Option<String>,
