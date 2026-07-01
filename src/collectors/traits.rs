@@ -257,3 +257,54 @@ pub struct IssueParams {
     pub state: IssueState,
     pub page: u32,
     pub per_page: u32,
+    pub since: Option<DateTime<Utc>>,
+}
+
+impl Default for IssueParams {
+    fn default() -> Self {
+        Self {
+            state: IssueState::Open,
+            page: 1,
+            per_page: 20,
+            since: None,
+        }
+    }
+}
+
+// ============================================================================
+// 统一的 Collector 接口
+// ============================================================================
+
+use std::path::PathBuf;
+
+/// 采集平台类型
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum Platform {
+    GitHub,
+    GitLab,
+    Gitee,
+    Gitea,
+    Local,
+}
+
+#[allow(clippy::should_implement_trait)]
+impl Platform {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Platform::GitHub => "github",
+            Platform::GitLab => "gitlab",
+            Platform::Gitee => "gitee",
+            Platform::Gitea => "gitea",
+            Platform::Local => "local",
+        }
+    }
+
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s.to_lowercase().as_str() {
+            "github" => Some(Platform::GitHub),
+            "gitlab" => Some(Platform::GitLab),
+            "gitee" => Some(Platform::Gitee),
+            "gitea" => Some(Platform::Gitea),
+            "local" => Some(Platform::Local),
+            _ => None,
+        }
