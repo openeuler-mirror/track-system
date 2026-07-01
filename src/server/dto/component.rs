@@ -29,3 +29,34 @@ pub struct ComponentRequest {
 /// 批量查询请求
 #[derive(Debug, Deserialize)]
 pub struct ComponentQueryRequest {
+    pub components: Vec<ComponentRequest>,
+}
+
+/// 组件查询参数
+#[derive(Debug, Deserialize)]
+pub struct ComponentQueryParams {
+    #[serde(default)]
+    pub owner: Option<String>,
+    #[serde(default)]
+    pub branch: Option<String>,
+    #[serde(default)]
+    pub spec: Option<String>,
+    #[serde(default)]
+    pub platform: Option<String>,
+}
+
+/// 组件信息响应
+#[derive(Debug, Serialize)]
+pub struct ComponentInfo {
+    pub name: String,
+    pub version: String,
+    pub release: String,
+}
+
+/// commit 查询参数
+#[derive(Debug, Deserialize)]
+pub struct ComponentCommitParams {
+    #[serde(default)]
+    pub owner: Option<String>,
+    #[serde(default)]
+    pub branch: Option<String>,
