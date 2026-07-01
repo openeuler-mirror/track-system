@@ -1393,3 +1393,54 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_compare_l2_vs_l1_with_snapshots() {
+        use crate::entities::l2_snapshots;
+        use crate::snapshot::types::{
+            CommitEntry, FileEntry, RepositorySnapshot, SnapshotOrigin, SpecEntry,
+        };
+        use base64::Engine;
+
+        let tracking_model = tracking::Model {
+            id: 1,
+            package_id: 1,
+            distro_id: 1,
+            l1_branch: "main".to_string(),
+            l1_repo_owner: "owner".to_string(),
+            l1_repo_name: "repo".to_string(),
+            l2_branch: "local".to_string(),
+            l2_repo_path: "/path".to_string(),
+            tracking_status: "idle".to_string(),
+            last_sync_time: Some(Utc::now()),
+            last_l1_commit_sha: None,
+            last_l2_commit_sha: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            last_error: None,
+        };
+
+        let package_model = packages::Model {
+            id: 1,
+            name: "pkg".to_string(),
+            level: 1,
+            sync_interval_hours: 24,
+            l0_repo_url: None,
+            description: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let spec_content = r#"
+Name: pkg
+Version: 1.0.0
+Release: 1
+Summary: Test package
+"#;
+        let spec_base64 = base64::engine::general_purpose::STANDARD.encode(spec_content.as_bytes());
+
+        let spec_entry = SpecEntry {
+            path: "pkg.spec".to_string(),
+            sha256: "spec_hash".to_string(),
+            version: Some("1.0.0".to_string()),
+            release: Some("1".to_string()),
+            content_base64: spec_base64,
+        };
