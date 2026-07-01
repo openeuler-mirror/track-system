@@ -290,3 +290,53 @@ mod tests {
         mock_list.assert_async().await;
         mock_sync1.assert_async().await;
         mock_sync2.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_run_all_sync_empty() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/tracking?status=active")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "data": []
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = run_all_sync(&client).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_run_all_sync_with_failure() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock_list = server
+            .mock("GET", "/api/tracking?status=active")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "data": [
+                        {
+                            "id": 5,
+                            "package_name": "pkg-fail"
+                        }
+                    ]
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let mock_sync = server
+            .mock("POST", "/api/sync/5/queue")
+            .with_status(500)
+            .create_async()
