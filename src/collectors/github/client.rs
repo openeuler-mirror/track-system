@@ -136,3 +136,49 @@ impl GitClient for GitHubClient {
         let repository: GitHubRepository = self.get(&url).await?;
         Ok(repository.into())
     }
+
+    async fn get_branches(&self, owner: &str, repo: &str) -> ApiResult<Vec<Branch>> {
+        let url = format!("{}/repos/{}/{}/branches", self.base_url, owner, repo);
+        let branches: Vec<GitHubBranch> = self.get(&url).await?;
+        Ok(branches.into_iter().map(Into::into).collect())
+    }
+
+    async fn get_commits(
+        &self,
+        owner: &str,
+        repo: &str,
+        params: CommitsParams,
+    ) -> ApiResult<Vec<Commit>> {
+        let mut url = format!(
+            "{}/repos/{}/{}/commits?sha={}&page={}&per_page={}",
+            self.base_url, owner, repo, params.branch, params.page, params.per_page
+        );
+
+        if let Some(since) = params.since {
+            url.push_str(&format!("&since={}", since.to_rfc3339()));
+        }
+
+        if let Some(until) = params.until {
+            url.push_str(&format!("&until={}", until.to_rfc3339()));
+        }
+
+        let commits: Vec<GitHubCommit> = self.get(&url).await?;
+        Ok(commits.into_iter().map(Into::into).collect())
+    }
+
+    async fn get_file_content(
+        &self,
+        owner: &str,
+        repo: &str,
+        path: &str,
+        branch: &str,
+    ) -> ApiResult<FileContent> {
+        let url = format!(
+            "{}/repos/{}/{}/contents/{}?ref={}",
+            self.base_url, owner, repo, path, branch
+        );
+        let file: GitHubFileContent = self.get(&url).await?;
+        Ok(file.into())
+    }
+}
+
