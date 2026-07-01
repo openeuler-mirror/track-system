@@ -2580,3 +2580,56 @@ Summary: Test package
                 patches_changed: false,
             }),
             build_requires_added: vec![],
+            build_requires_removed: vec![],
+            configure_options_added: vec![],
+            configure_options_removed: vec![],
+        };
+        let recs = comparator
+            .generate_dependency_recommendations(&spec_diff)
+            .unwrap();
+        assert_eq!(recs.len(), 1);
+        assert_eq!(recs[0].priority, SyncPriority::Medium);
+        assert!(recs[0].description.contains("运行时依赖"));
+    }
+
+    #[test]
+    fn test_deduplicate_recommendations_removes_duplicates_by_type_and_files() {
+        let file_list = vec!["a".to_string(), "b".to_string()];
+        let r1 = SyncRecommendation {
+            priority: SyncPriority::High,
+            recommendation_type: SyncType::BugFix,
+            description: "1".to_string(),
+            affected_files: file_list.clone(),
+            estimated_effort: EffortLevel::Low,
+        };
+        let r2 = SyncRecommendation {
+            priority: SyncPriority::Critical,
+            recommendation_type: SyncType::BugFix,
+            description: "2".to_string(),
+            affected_files: file_list.clone(),
+            estimated_effort: EffortLevel::High,
+        };
+        let deduped = L2VsL1Comparator::deduplicate_recommendations(vec![r1, r2]);
+        assert_eq!(deduped.len(), 1);
+        assert_eq!(deduped[0].description, "1");
+    }
+
+    #[test]
+    fn test_detect_conflicts_all_types() {
+        let comparator = L2VsL1Comparator::new();
+        let spec_diff = SpecDiff {
+            version_diff: Some(VersionDiff {
+                l1_version: "1.0.0".to_string(),
+                l2_version: "2.0.0".to_string(),
+                relationship: VersionRelationship::L2Newer,
+            }),
+            content_identical: false,
+            diff_summary: "x".to_string(),
+            key_changes: vec!["k".to_string()],
+            detailed_comparison: None,
+            build_requires_added: vec![],
+            build_requires_removed: vec![],
+            configure_options_added: vec![],
+            configure_options_removed: vec![],
+        };
+        let patch_diff = PatchDiff {
