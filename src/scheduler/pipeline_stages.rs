@@ -2064,3 +2064,55 @@ Summary: Test package
         };
 
         let package_model = packages::Model {
+            id: 3,
+            name: "pkg".to_string(),
+            level: 1,
+            sync_interval_hours: 24,
+            l0_repo_url: None,
+            description: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let l2_vs_l1_diff = serde_json::json!({
+            "commit_diff": {
+                "base_version_release": ["1.0", "1"],
+                "behind_commits": [
+                    {"sha": "sha-001"}
+                ]
+            }
+        });
+
+        let compare_model = compare_reports::Model {
+            id: 42,
+            tracking_id: tracking_model.id,
+            generated_at: Utc::now(),
+            l2_vs_l1_diff: Some(l2_vs_l1_diff),
+            l1_vs_l0_diff: None,
+            status: "ok".to_string(),
+            failure_reason: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let commit_model = l1_commit_records::Model {
+            id: 7,
+            tracking_id: tracking_model.id,
+            commit_sha: "sha-001".to_string(),
+            commit_message: "Fix bug".to_string(),
+            author_name: "dev".to_string(),
+            author_email: "dev@example.com".to_string(),
+            committed_at: fixed_time,
+            created_at: Utc::now(),
+            change_type: None,
+            primary_change_type: Some("Bugfix".to_string()),
+            cve_list: None,
+            spec_changed: false,
+            patch_stats: None,
+            classification_status: "pending".to_string(),
+            classification_notes: None,
+            sync_status: "pending".to_string(),
+            synced_to_l2_commit: None,
+            synced_at: None,
+            api_url: "http://example.com/commit/sha-001".to_string(),
+            fetched_at: Utc::now(),
