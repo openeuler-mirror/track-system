@@ -1474,3 +1474,56 @@ impl L2VsL1Comparator {
         if !spec_diff.configure_options_added.is_empty()
             || !spec_diff.configure_options_removed.is_empty()
         {
+            let mut description_parts = Vec::new();
+
+            if !spec_diff.configure_options_added.is_empty() {
+                description_parts.push(format!(
+                    "新增选项: {}",
+                    spec_diff.configure_options_added.join(" ")
+                ));
+            }
+
+            if !spec_diff.configure_options_removed.is_empty() {
+                description_parts.push(format!(
+                    "删除选项: {}",
+                    spec_diff.configure_options_removed.join(" ")
+                ));
+            }
+
+            recommendations.push(SyncRecommendation {
+                priority: SyncPriority::Medium,
+                recommendation_type: SyncType::ConfigUpdate,
+                description: format!(
+                    "L1 的 configure 选项发生变更：{}。建议评估这些变更对 L2 的影响",
+                    description_parts.join("；")
+                ),
+                affected_files: vec!["*.spec".to_string()],
+                estimated_effort: EffortLevel::Medium,
+            });
+        }
+
+        Ok(recommendations)
+    }
+
+    /// 生成源文件更新建议（Low 优先级）
+    fn generate_source_recommendations(
+        &self,
+        source_diff: &SourceDiff,
+    ) -> Result<Vec<SyncRecommendation>> {
+        let mut recommendations = Vec::new();
+
+        // L1 新增的源文件
+        if !source_diff.l2_added.is_empty() {
+            recommendations.push(SyncRecommendation {
+                priority: SyncPriority::Low,
+                recommendation_type: SyncType::NewFeature,
+                description: format!(
+                    "L1 新增了 {} 个源文件，建议检查是否需要同步",
+                    source_diff.l2_added.len()
+                ),
+                affected_files: source_diff
+                    .l2_added
+                    .iter()
+                    .map(|s| s.filename.clone())
+                    .collect(),
+                estimated_effort: EffortLevel::Low,
