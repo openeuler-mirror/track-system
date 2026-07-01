@@ -160,3 +160,35 @@ fn build_recommendation(
     )
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sea_orm::{DatabaseBackend, MockDatabase};
+
+    #[test]
+    fn test_extract_version() {
+        assert_eq!(extract_version("Bump to 1.2.3"), Some("1.2.3".to_string()));
+        assert!(extract_version("no version here").is_none());
+    }
+
+    #[test]
+    fn test_build_patch_path() {
+        assert_eq!(
+            build_patch_path("nginx", "abcdef123456"),
+            "patches/nginx-abcdef12.patch"
+        );
+    }
+
+    #[test]
+    fn test_build_recommendation() {
+        let mut distros = HashMap::new();
+        distros.insert(1, "Fedora 39".to_string());
+
+        let rec = build_recommendation("nginx", &distros, 1, "Fix critical bug", "1.2.3");
+
+        assert!(rec.contains("nginx"));
+        assert!(rec.contains("1.2.3"));
+        assert!(rec.contains("Fedora 39"));
+        assert!(rec.contains("Fix critical bug"));
+    }
+
