@@ -162,3 +162,18 @@ fn extract_resource_info(path: &str) -> (String, Option<String>) {
     (resource_type, resource_id)
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_resource_info() {
+        let (resource_type, resource_id) = extract_resource_info("/api/packages/123");
+        assert_eq!(resource_type, "packages");
+        assert_eq!(resource_id, Some("123".to_string()));
+
+        let (resource_type, resource_id) = extract_resource_info("/api/tracking");
+        assert_eq!(resource_type, "tracking");
+        assert_eq!(resource_id, None);
+    }
+}
