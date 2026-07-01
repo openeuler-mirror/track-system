@@ -495,3 +495,53 @@ impl<'a> PipelineExecutor<'a> {
                     details,
                 ))
             }
+        }
+    }
+
+    /// 获取任务进度
+    pub async fn get_job_progress(&self, job_id: i64) -> Result<JobProgress> {
+        if let Some(state_mgr) = &self.state_manager {
+            // 使用状态管理器获取详细进度
+            state_mgr.get_progress(job_id).await
+        } else {
+            // 回退到基础实现
+            let job = self.get_sync_job(job_id).await?;
+            Ok(JobProgress {
+                job_id,
+                tracking_id: job.tracking_id,
+                current_stage: None,
+                completed_stages: vec![],
+                progress_percent: 0.0,
+                status: job.status,
+            })
+        }
+    }
+
+    /// 取消任务
+    pub async fn cancel_job(&self, job_id: i64) -> Result<()> {
+        info!(job_id = job_id, "请求取消流水线任务");
+
+        if let Some(state_mgr) = &self.state_manager {
+            // 使用状态管理器请求取消
+            state_mgr.request_cancel(job_id)?;
+            state_mgr.update_job_status(job_id, "cancelling").await?;
+            info!(job_id = job_id, "取消请求已记录");
+        } else {
+            warn!(job_id = job_id, "状态管理器未启用，无法取消任务");
+        }
+
+        Ok(())
+    }
+
+    /// 获取 sync_job 记录
+    async fn get_sync_job(&self, job_id: i64) -> Result<sync_jobs::Model> {
+        use crate::entities::prelude::*;
+        use sea_orm::EntityTrait;
+
+        SyncJobs::find_by_id(job_id)
+            .one(self.db)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("SyncJob {} 不存在", job_id))
+    }
+}
+
