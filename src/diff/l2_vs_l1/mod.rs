@@ -3159,3 +3159,56 @@ Summary: Test package
             source_files: vec![],
             commits: vec![],
             snapshot_at: now,
+        };
+        let l2_snapshot = L2Snapshot {
+            package_name: "p".to_string(),
+            version: "9.9.9".to_string(),
+            spec_content: "Name: p\nVersion: 9.9.9\nRelease: 1\n".to_string(),
+            spec_sha256: "b".to_string(),
+            patches: vec![],
+            source_files: vec![],
+            customizations: vec![],
+            commits: vec![],
+            snapshot_at: now,
+        };
+
+        let diff = comparator
+            .compare_commit_db(&l1_snapshot, &l2_snapshot, &db, 1)
+            .await
+            .unwrap();
+        assert!(diff.base_commit.is_none());
+        assert_eq!(diff.behind_commits.len(), 1);
+        assert_eq!(diff.behind_commits[0].sha, "l1sha");
+    }
+
+    #[tokio::test]
+    async fn test_compare_builds_report_without_panicking() {
+        let comparator = L2VsL1Comparator::new();
+        let now = Utc::now();
+
+        let l1_snapshot = L1Snapshot {
+            package_name: "p".to_string(),
+            version: "1.0.0".to_string(),
+            spec_content: "Name: p\nVersion: 1.0.0\nRelease: 1\nBuildRequires: gcc\n".to_string(),
+            spec_sha256: "a".to_string(),
+            patches: vec![PatchFile {
+                filename: "fix.patch".to_string(),
+                path: "fix.patch".to_string(),
+                content_hash: "h1".to_string(),
+                size: 1,
+                applied: true,
+            }],
+            source_files: vec![SourceFile {
+                filename: "x.conf".to_string(),
+                path: "x.conf".to_string(),
+                content_hash: "s1".to_string(),
+                size: 1,
+            }],
+            commits: vec![],
+            snapshot_at: now,
+        };
+
+        let l2_snapshot = L2Snapshot {
+            package_name: "p".to_string(),
+            version: "2.0.0".to_string(),
+            spec_content: "Name: p\nVersion: 2.0.0\nRelease: 1\nBuildRequires: gcc\n".to_string(),
