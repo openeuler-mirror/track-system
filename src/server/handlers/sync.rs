@@ -150,3 +150,42 @@ pub async fn execute_round_handler(
 
             Ok(Json(ExecuteRoundResponse {
                 executed: results.len(),
+                succeeded,
+                failed,
+            }))
+        }
+        Err(err) => {
+            tracing::error!(error = %err, "执行调度轮次失败");
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
+/// 唤醒调度器，立即触发调度
+pub async fn wake_scheduler_handler(
+    State(state): State<AppState>,
+    Json(body): Json<serde_json::Value>,
+) -> Result<Json<WakeSchedulerResponse>, StatusCode> {
+    // 检查是否有调度器管理器
+    let scheduler_manager = state
+        .scheduler_manager
+        .as_ref()
+        .ok_or(StatusCode::SERVICE_UNAVAILABLE)?;
+
+    // 获取可选的 tracking_id
+    let tracking_id = body
+        .get("tracking_id")
+        .and_then(|v| v.as_i64())
+        .map(|v| v as i32);
+
+    // 唤醒调度器
+    let scheduler = scheduler_manager.read().await;
+    scheduler.wake(tracking_id);
+
+    tracing::info!(tracking_id = ?tracking_id, "调度器已被唤醒");
+
+    Ok(Json(WakeSchedulerResponse {
+        message: "调度器已唤醒，将立即执行调度轮次".to_string(),
+    }))
+}
+
