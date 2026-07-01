@@ -367,3 +367,55 @@ impl L2VsL1Comparator {
     pub fn create_l1_snapshot(
         package_name: String,
         snapshot: &RepositorySnapshot,
+    ) -> Result<L1Snapshot> {
+        // 提取 spec 信息并在失败时记录错误日志
+        let spec = match snapshot.spec.as_ref() {
+            Some(s) => s,
+            None => {
+                tracing::error!(
+                    tracking_id = snapshot.tracking_id,
+                    origin = ?snapshot.origin,
+                    files_count = snapshot.files.len(),
+                    "创建 L1 快照失败：缺少 spec 文件"
+                );
+                return Err(anyhow!("L1 快照缺少 spec 文件"));
+            }
+        };
+
+        // 提取版本号并在失败时记录错误日志
+        let version = match spec.version.clone() {
+            Some(v) => v,
+            None => {
+                tracing::error!(
+                    tracking_id = snapshot.tracking_id,
+                    spec_path = %spec.path,
+                    spec_sha256 = %spec.sha256,
+                    "创建 L1 快照失败：无法从 spec 文件提取版本号"
+                );
+                return Err(anyhow!("无法从 spec 文件提取版本号"));
+            }
+        };
+
+        // 解码 spec 内容并在失败时记录错误日志
+        use base64::Engine;
+        let decoded = match base64::engine::general_purpose::STANDARD.decode(&spec.content_base64) {
+            Ok(bytes) => bytes,
+            Err(e) => {
+                tracing::error!(
+                    tracking_id = snapshot.tracking_id,
+                    spec_path = %spec.path,
+                    spec_sha256 = %spec.sha256,
+                    base64_len = spec.content_base64.len(),
+                    error = %e,
+                    "创建 L1 快照失败：解码 spec 内容失败"
+                );
+                return Err(anyhow!("解码 spec 内容失败: {}", e));
+            }
+        };
+
+        let spec_content = match String::from_utf8(decoded) {
+            Ok(s) => s,
+            Err(e) => {
+                tracing::error!(
+                    tracking_id = snapshot.tracking_id,
+                    spec_path = %spec.path,
