@@ -41,3 +41,47 @@ impl Default for SchedulerConfig {
         }
     }
 }
+
+/// 调度器状态
+#[derive(Debug, Clone)]
+pub struct SchedulerStatus {
+    pub running: bool,
+    pub active_jobs: usize,
+    pub pending_jobs: usize,
+    pub total_jobs_executed: usize,
+    pub last_execution: Option<chrono::DateTime<Utc>>,
+}
+
+/// 唤醒信号
+#[derive(Debug, Clone)]
+pub enum WakeSignal {
+    /// 唤醒所有待处理任务
+    All,
+    /// 唤醒指定的 tracking_id
+    Specific(i32),
+}
+
+/// 调度器管理器
+pub struct SchedulerManager {
+    db: Arc<DatabaseConnection>,
+    client: Option<Arc<dyn SyncApiClient>>,
+    config: SchedulerConfig,
+    status: Arc<RwLock<SchedulerStatus>>,
+    /// 用于唤醒调度循环的发送器
+    wake_tx: mpsc::UnboundedSender<WakeSignal>,
+}
+
+impl SchedulerManager {
+    /// 创建新的调度器管理器，返回管理器和接收器
+    pub fn new(
+        db: Arc<DatabaseConnection>,
+        client: Option<Arc<dyn SyncApiClient>>,
+        config: SchedulerConfig,
+    ) -> (Self, mpsc::UnboundedReceiver<WakeSignal>) {
+        let status = SchedulerStatus {
+            running: false,
+            active_jobs: 0,
+            pending_jobs: 0,
+            total_jobs_executed: 0,
+            last_execution: None,
+        };
