@@ -1523,3 +1523,54 @@ Patch1: fix.patch
             classification_status: "pending".to_string(),
             classification_notes: None,
             sync_status: "not_synced".to_string(),
+            synced_to_l2_commit: None,
+            synced_at: None,
+            api_url: "u".to_string(),
+            fetched_at: now,
+            files_changed_count: 3,
+            additions: 10,
+            deletions: 2,
+            created_at: now,
+            updated_at: now,
+            spec_version: None,
+            spec_release: None,
+        };
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<l1_commit_records::Model, _, _>(vec![vec![model]])
+            .into_connection();
+
+        let commits = collect_commits(&db, 1).await.unwrap();
+        assert_eq!(commits.len(), 1);
+        assert_eq!(commits[0].sha, "sha");
+        assert_eq!(commits[0].title, "title");
+        assert_eq!(commits[0].cve_list, vec!["CVE-2025-1234".to_string()]);
+        assert_eq!(commits[0].stats.additions, 10);
+        assert_eq!(commits[0].stats.deletions, 2);
+        assert_eq!(commits[0].stats.files_changed, 3);
+    }
+
+    #[tokio::test]
+    async fn test_collect_issues_parses_labels_from_string_or_array() {
+        let now = Utc::now();
+        let model_newer = issues::Model {
+            id: 2,
+            tracking_id: 1,
+            issue_number: "124".to_string(),
+            title: "t2".to_string(),
+            state: "open".to_string(),
+            author: "a2".to_string(),
+            api_url: "u2".to_string(),
+            labels: Some(json!("single")),
+            created_at: now,
+            updated_at: now,
+            closed_at: None,
+            raw_payload: None,
+        };
+        let model_older = issues::Model {
+            id: 1,
+            tracking_id: 1,
+            issue_number: "123".to_string(),
+            title: "t1".to_string(),
+            state: "open".to_string(),
+            author: "a1".to_string(),
