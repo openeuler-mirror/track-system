@@ -207,3 +207,46 @@ mod tests {
             assert_eq!(sha, "sha2");
         }
     }
+
+    #[test]
+    fn test_diff_spec_same_version() {
+        let l1_spec = SpecEntry {
+            path: "test.spec".to_string(),
+            sha256: "sha1".to_string(),
+            version: Some("1.0.0".to_string()),
+            release: Some("1".to_string()),
+            content_base64: "".to_string(),
+        };
+        let l2_spec = SpecEntry {
+            path: "test.spec".to_string(),
+            sha256: "sha2".to_string(),         // sha changed
+            version: Some("1.0.0".to_string()), // version same
+            release: Some("1".to_string()),
+            content_base64: "".to_string(),
+        };
+
+        let diff = diff_spec(Some(&l1_spec), Some(&l2_spec));
+        assert!(diff.is_none());
+    }
+
+    #[test]
+    fn test_diff_spec_version_changed() {
+        let l1_spec = SpecEntry {
+            path: "test.spec".to_string(),
+            sha256: "sha1".to_string(),
+            version: Some("1.0.1".to_string()),
+            release: Some("1".to_string()),
+            content_base64: "".to_string(),
+        };
+        let l2_spec = SpecEntry {
+            path: "test.spec".to_string(),
+            sha256: "sha2".to_string(),
+            version: Some("1.0.0".to_string()),
+            release: Some("1".to_string()),
+            content_base64: "".to_string(),
+        };
+
+        let diff = diff_spec(Some(&l1_spec), Some(&l2_spec));
+        assert!(diff.is_some());
+        if let Some(SpecDiff::Modified {
+            l1_version,
