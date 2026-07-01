@@ -133,3 +133,48 @@ impl JwtTokenGenerator {
 
     /// 验证 JWT Token
     pub fn verify_token(&self, token: &str) -> Result<Claims, jsonwebtoken::errors::Error> {
+        let token_data = decode::<Claims>(
+            token,
+            &DecodingKey::from_secret(self.config.secret.as_bytes()),
+            &Validation::default(),
+        )?;
+
+        Ok(token_data.claims)
+    }
+
+    /// 刷新 Token
+    pub fn refresh_token(&self, old_token: &str) -> Result<String, jsonwebtoken::errors::Error> {
+        let claims = self.verify_token(old_token)?;
+
+        // 生成新的 token
+        self.generate_token(claims.sub, claims.username, claims.role)
+    }
+}
+
+/// 认证错误
+#[derive(Debug)]
+pub enum AuthError {
+    /// Token 缺失
+    MissingToken,
+    /// Token 无效
+    InvalidToken,
+    /// Token 过期
+    ExpiredToken,
+    /// 权限不足
+    InsufficientPermissions,
+}
+
+impl IntoResponse for AuthError {
+    fn into_response(self) -> Response {
+        let (status, message) = match self {
+            AuthError::MissingToken => (StatusCode::UNAUTHORIZED, "Missing authentication token"),
+            AuthError::InvalidToken => (StatusCode::UNAUTHORIZED, "Invalid authentication token"),
+            AuthError::ExpiredToken => (StatusCode::UNAUTHORIZED, "Token has expired"),
+            AuthError::InsufficientPermissions => {
+                (StatusCode::FORBIDDEN, "Insufficient permissions")
+            }
+        };
+
+        let body = serde_json::json!({
+            "success": false,
+            "error": "AuthenticationError",
