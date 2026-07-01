@@ -94,3 +94,51 @@ pub struct RateLimitConfig {
 pub struct PackageConfig {
     pub name: String,
     pub level: i32,
+    pub sync_interval_hours: i32,
+    pub l0_repo_url: String,
+    pub description: Option<String>,
+}
+
+/// 发行版配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DistroConfig {
+    pub name: String,
+    pub version: String,
+}
+
+/// 跟踪配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrackingConfig {
+    pub package: String,
+    pub distro: String,
+    pub l1: L1Config,
+    pub l2: L2Config,
+    pub status: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct L1Config {
+    pub branch: String,
+    pub repo_owner: String,
+    pub repo_name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct L2Config {
+    pub branch: String,
+    pub repo_path: String,
+}
+
+/// Web 服务器配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ServerConfig {
+    pub host: String,
+    pub port: u16,
+    pub log_level: String,
+}
+
+/// 日志配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LoggingConfig {
+    pub level: String,
+    pub format: String,
