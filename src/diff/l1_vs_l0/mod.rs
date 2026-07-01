@@ -658,3 +658,50 @@ struct VersionComparison {
     has_newer_latest: bool,
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_l1_vs_l0_comparator_creation() {
+        let _comparator = L1VsL0Comparator::new();
+        // 基本创建测试
+    }
+
+    #[tokio::test]
+    async fn test_version_comparison() {
+        let comparator = L1VsL0Comparator::new();
+
+        // 准备测试数据
+        let l0_info = L0VersionInfo {
+            package_name: "nginx".to_string(),
+            latest_stable: "1.24.0".to_string(),
+            latest_version: "1.25.0-beta".to_string(),
+            all_versions: vec![
+                VersionTag {
+                    version: "1.22.0".to_string(),
+                    date: Utc::now(),
+                    changelog: "Bug fixes".to_string(),
+                    is_stable: true,
+                },
+                VersionTag {
+                    version: "1.23.0".to_string(),
+                    date: Utc::now(),
+                    changelog: "New features".to_string(),
+                    is_stable: true,
+                },
+                VersionTag {
+                    version: "1.24.0".to_string(),
+                    date: Utc::now(),
+                    changelog: "Security fixes".to_string(),
+                    is_stable: true,
+                },
+            ],
+            changelogs: HashMap::new(),
+        };
+
+        let l1_info = L1VersionInfo {
+            package_name: "nginx".to_string(),
+            current_version: "1.22.0".to_string(),
+            patches: vec![],
+            cve_patches: vec![],
