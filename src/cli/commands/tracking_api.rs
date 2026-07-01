@@ -243,3 +243,52 @@ async fn list_tracking(
         }
     }
 }
+
+/// 显示跟踪配置详情
+async fn show_tracking(api_client: &ApiClient, id: i32) -> Result<()> {
+    println!("正在获取跟踪配置详情: {}", id);
+
+    match api_client
+        .get::<ApiResponse<TrackingDto>>(&format!("/tracking/{}", id))
+        .await
+    {
+        Ok(response) => {
+            let track = response.data;
+            println!();
+            println!("{}", "跟踪配置详情:".bold());
+            println!("  ID: {}", track.id);
+            println!("  软件包 ID: {}", track.package_id);
+            println!("  发行版 ID: {}", track.distro_id);
+            println!("  L1 仓库: {}/{}", track.l1_repo_owner, track.l1_repo_name);
+            println!("  L1 分支: {}", track.l1_branch);
+            println!("  L2 路径: {}", track.l2_repo_path);
+            println!("  L2 分支: {}", track.l2_branch);
+            println!("  状态: {}", track.tracking_status);
+            if let Some(dt) = track.last_sync_time {
+                println!("  最近同步: {}", format_datetime_local(&dt));
+            }
+            if let Some(sha) = track.last_l1_commit_sha {
+                println!("  最近 L1 提交: {}", sha);
+            }
+            if let Some(sha) = track.last_l2_commit_sha {
+                println!("  最近 L2 提交: {}", sha);
+            }
+            println!("  创建时间: {}", format_datetime_local(&track.created_at));
+            println!("  更新时间: {}", format_datetime_local(&track.updated_at));
+            Ok(())
+        }
+        Err(e) => {
+            println!("{} 获取跟踪配置详情失败: {}", "✗".red().bold(), e);
+            Err(e.into())
+        }
+    }
+}
+
+/// 更新跟踪配置状态
+async fn update_tracking_status(api_client: &ApiClient, id: i32, enabled: bool) -> Result<()> {
+    let action = if enabled { "恢复" } else { "暂停" };
+    println!("正在{}跟踪配置: {}", action, id);
+
+    let request = UpdateTrackingRequest {
+        l1_repo_owner: None,
+        l1_repo_name: None,
