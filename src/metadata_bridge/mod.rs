@@ -403,3 +403,54 @@ async fn collect_spec(
         }
     }
 
+    // 3) 其他情况（无本地仓库路径且非 L1），不采集 spec
+    Ok(None)
+}
+
+async fn collect_commits(db: &DatabaseConnection, tracking_id: i32) -> Result<Vec<CommitEntry>> {
+    let models = L1CommitRecords::find()
+        .filter(crate::entities::l1_commit_records::Column::TrackingId.eq(tracking_id))
+        .order_by_desc(crate::entities::l1_commit_records::Column::CommittedAt)
+        .all(db)
+        .await?;
+
+    let entries = models
+        .into_iter()
+        .map(|model| {
+            let cve_list: Vec<String> = model
+                .cve_list
+                .and_then(|value| serde_json::from_value::<Vec<String>>(value).ok())
+                .unwrap_or_default();
+
+            CommitEntry {
+                sha: model.commit_sha,
+                title: model
+                    .commit_message
+                    .lines()
+                    .next()
+                    .unwrap_or("")
+                    .to_string(),
+                message: model.commit_message,
+                author: model.author_name,
+                authored_at: model.committed_at,
+                url: Some(model.api_url),
+                stats: crate::snapshot::types::ChangeStats {
+                    additions: model.additions,
+                    deletions: model.deletions,
+                    files_changed: model.files_changed_count,
+                },
+                primary_change_type: model.primary_change_type,
+                cve_list,
+            }
+        })
+        .collect();
+
+    Ok(entries)
+}
+
+async fn collect_issues(db: &DatabaseConnection, tracking_id: i32) -> Result<Vec<IssueEntry>> {
+    let models = Issues::find()
+        .filter(crate::entities::issues::Column::TrackingId.eq(tracking_id))
+        .order_by_desc(crate::entities::issues::Column::UpdatedAt)
+        .all(db)
+        .await?;
