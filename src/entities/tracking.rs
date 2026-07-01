@@ -72,3 +72,40 @@ impl Related<super::l1_commit_records::Entity> for Entity {
     }
 }
 
+impl Related<super::issues::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Issues.def()
+    }
+}
+
+impl Related<super::tracking_reports::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::TrackingReports.def()
+    }
+}
+
+impl Related<super::sync_jobs::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::SyncJobs.def()
+    }
+}
+
+impl Related<super::l2_snapshots::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::L2Snapshots.def()
+    }
+}
+
+impl Related<super::distros::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Distros.def()
+    }
+}
+
+impl Related<super::packages::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Packages.def()
+    }
+}
+
+impl ActiveModelBehavior for ActiveModel {}
