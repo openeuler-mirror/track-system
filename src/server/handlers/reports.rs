@@ -365,3 +365,48 @@ mod tests {
     #[test]
     fn test_report_list_query_with_filters() {
         let query = ReportListQuery {
+            page: Some(2),
+            page_size: Some(20),
+            tracking_id: Some(5),
+            report_type: Some("l1_vs_l0".to_string()),
+            status: Some("completed".to_string()),
+        };
+        assert_eq!(query.page, Some(2));
+        assert_eq!(query.page_size, Some(20));
+        assert_eq!(query.tracking_id, Some(5));
+        assert_eq!(query.report_type, Some("l1_vs_l0".to_string()));
+        assert_eq!(query.status, Some("completed".to_string()));
+    }
+
+    #[test]
+    fn test_report_summary_creation() {
+        let now = Utc::now();
+        let summary = ReportSummary {
+            id: 1,
+            tracking_id: 10,
+            report_type: "l2_vs_l1".to_string(),
+            package_name: "nginx".to_string(),
+            status: "completed".to_string(),
+            created_at: now,
+            updated_at: now,
+        };
+        assert_eq!(summary.id, 1);
+        assert_eq!(summary.tracking_id, 10);
+        assert_eq!(summary.report_type, "l2_vs_l1");
+        assert_eq!(summary.package_name, "nginx");
+        assert_eq!(summary.status, "completed");
+    }
+
+    #[test]
+    fn test_report_detail_creation() {
+        let now = Utc::now();
+        let content = serde_json::json!({
+            "changes": ["change1", "change2"],
+            "summary": "Test summary"
+        });
+        let detail = ReportDetail {
+            id: 1,
+            tracking_id: 10,
+            report_type: "l1_vs_l0".to_string(),
+            package_name: "redis".to_string(),
+            status: "completed".to_string(),
