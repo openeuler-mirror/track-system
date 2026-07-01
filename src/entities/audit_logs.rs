@@ -70,3 +70,40 @@ pub enum AuditAction {
     Logout,
 }
 
+impl AuditAction {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Create => "create",
+            Self::Read => "read",
+            Self::Update => "update",
+            Self::Delete => "delete",
+            Self::Execute => "execute",
+            Self::Login => "login",
+            Self::Logout => "logout",
+        }
+    }
+
+    pub fn from_method_and_path(method: &str, path: &str) -> Self {
+        match method {
+            "GET" => Self::Read,
+            "POST" => {
+                if path.contains("/login") {
+                    Self::Login
+                } else if path.contains("/execute") || path.contains("/compare") {
+                    Self::Execute
+                } else {
+                    Self::Create
+                }
+            }
+            "PUT" | "PATCH" => Self::Update,
+            "DELETE" => Self::Delete,
+            _ => Self::Read,
+        }
+    }
+}
+
+impl std::fmt::Display for AuditAction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
