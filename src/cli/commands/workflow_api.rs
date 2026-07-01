@@ -416,3 +416,51 @@ mod tests {
             .with_body(
                 serde_json::json!({
                     "steps": [
+                        {
+                            "name": "Step 1",
+                            "action": "action1"
+                        }
+                    ]
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = dry_run_workflow(
+            &client,
+            workflow_file.path().to_str().unwrap().to_string(),
+            vec!["var=value".to_string()],
+        )
+        .await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_execute_action_list() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/workflow/list")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "workflows": [
+                        {
+                            "name": "test-workflow",
+                            "description": "Test workflow"
+                        }
+                    ]
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = execute(&client, WorkflowAction::List).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+}
