@@ -627,3 +627,52 @@ mod tests {
 
         let result = parse_snapshot_or_convert(&json, 2);
         assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+        let snapshot = result.unwrap();
+        assert_eq!(snapshot.tracking_id, 2);
+        assert_eq!(snapshot.commits.len(), 1);
+        assert_eq!(snapshot.commits[0].sha, "def456");
+    }
+
+    #[test]
+    fn test_parse_snapshot_or_convert_generic_spec_entry_present() {
+        let json = serde_json::json!({
+            "level": "l0",
+            "collected_at": "2024-01-01T00:00:00Z",
+            "spec": {
+                "path": "test.spec",
+                "version": "1.0.0",
+                "release": "1",
+                "content_base64": "dGVzdA==",
+                "sha256": "spec-sha"
+            },
+            "files": [
+                {"path": "a.patch", "sha256": "x", "size": 1, "is_binary": false}
+            ],
+            "commits": [],
+            "issues": []
+        })
+        .to_string();
+
+        let snapshot = parse_snapshot_or_convert(&json, 99).unwrap();
+        assert_eq!(snapshot.origin, SnapshotOrigin::L1);
+        assert!(snapshot.spec.is_some());
+        let spec = snapshot.spec.unwrap();
+        assert_eq!(spec.path, "test.spec");
+        assert_eq!(spec.version.as_deref(), Some("1.0.0"));
+        assert_eq!(spec.release.as_deref(), Some("1"));
+        assert_eq!(spec.content_base64, "dGVzdA==");
+        assert_eq!(spec.sha256, "spec-sha");
+    }
+
+    #[test]
+    fn test_parse_snapshot_or_convert_generic_spec_entry_missing_content() {
+        let json = serde_json::json!({
+            "level": "l1",
+            "collected_at": "2024-01-01T00:00:00Z",
+            "spec": {
+                "path": "test.spec",
+                "content_base64": "",
+                "sha256": "spec-sha"
+            },
+            "commits": [],
+            "issues": []
