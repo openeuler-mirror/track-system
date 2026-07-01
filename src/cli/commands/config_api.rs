@@ -328,3 +328,44 @@ mod tests {
         let result = get_config_path(Some(custom_path.to_string()));
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), PathBuf::from(custom_path));
+    }
+
+    #[test]
+    fn test_get_default_config_path() {
+        let result = get_default_config_path();
+        assert!(result.is_ok());
+        let path = result.unwrap();
+        assert!(path.to_str().unwrap().contains(".track-cli"));
+        assert!(path.to_str().unwrap().ends_with("config.toml"));
+    }
+
+    #[tokio::test]
+    async fn test_execute_init_action() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join("config.toml");
+
+        let action = ConfigAction::Init {
+            path: Some(config_path.to_str().unwrap().to_string()),
+        };
+        let result = execute(action).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        assert!(config_path.exists());
+    }
+
+    #[tokio::test]
+    async fn test_execute_validate_action() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join("config.toml");
+
+        // 先创建配置文件
+        let config = ClientConfig::default();
+        let content = toml::to_string_pretty(&config).unwrap();
+        fs::write(&config_path, content).unwrap();
+
+        let action = ConfigAction::Validate {
+            path: Some(config_path.to_str().unwrap().to_string()),
+        };
+        let result = execute(action).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+    }
+}
