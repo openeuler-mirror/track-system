@@ -223,3 +223,49 @@ pub async fn auth_middleware(
 
 /// 可选的认证中间件
 ///
+/// 如果提供了 token 则验证，否则继续处理请求
+pub async fn optional_auth_middleware(
+    State(config): State<Arc<AuthConfig>>,
+    mut request: Request,
+    next: Next,
+) -> Response {
+    // 尝试提取 token
+    if let Some(token) = extract_bearer_token(request.headers()) {
+        // 验证 token
+        let generator = JwtTokenGenerator::new((*config).clone());
+        if let Ok(claims) = generator.verify_token(&token) {
+            if !claims.is_expired() {
+                // 将 claims 添加到请求扩展中
+                request.extensions_mut().insert(claims);
+            }
+        }
+    }
+
+    next.run(request).await
+}
+
+/// 角色检查中间件
+///
+/// 检查用户是否具有指定的角色
+pub fn require_role(
+    required_role: &'static str,
+) -> impl Clone + Fn(Request, Next) -> Pin<Box<dyn Future<Output = Response> + Send>> {
+    move |request: Request, next: Next| {
+        Box::pin(async move {
+            // 从请求扩展中获取 claims
+            let claims = request.extensions().get::<Claims>().cloned();
+
+            match claims {
+                Some(claims) if claims.role == required_role => next.run(request).await,
+                Some(_) => AuthError::InsufficientPermissions.into_response(),
+                None => AuthError::MissingToken.into_response(),
+            }
+        })
+    }
+}
+
+/// 从请求扩展中获取当前用户的 Claims
+pub fn get_current_user(request: &Request) -> Option<Claims> {
+    request.extensions().get::<Claims>().cloned()
+}
+
