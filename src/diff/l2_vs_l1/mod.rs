@@ -3422,3 +3422,56 @@ CFLAGS="-fstack-protector-strong -D_FORTIFY_SOURCE=2"
     #[test]
     fn test_analyze_patch_customizations_performance() {
         let patches = vec![PatchFile {
+            filename: "performance-optimization.patch".to_string(),
+            path: "/patches/performance-optimization.patch".to_string(),
+            content_hash: "hash1".to_string(),
+            size: 100,
+            applied: true,
+        }];
+
+        let customizations = L2VsL1Comparator::analyze_patch_customizations(&patches).unwrap();
+        assert_eq!(customizations.len(), 1);
+        assert!(matches!(
+            customizations[0].customization_type,
+            CustomizationType::PerformanceOptimization
+        ));
+    }
+
+    #[test]
+    fn test_patch_diff_structure() {
+        let patch = PatchFile {
+            filename: "test.patch".to_string(),
+            path: "/test.patch".to_string(),
+            content_hash: "hash1".to_string(),
+            size: 100,
+            applied: true,
+        };
+
+        let diff = PatchDiff {
+            l1_total: 5,
+            l2_total: 4,
+            l2_added: vec![patch.clone()],
+            l2_removed: vec![],
+            l2_modified: vec![],
+            identical: vec![patch],
+        };
+
+        assert_eq!(diff.l1_total, 5);
+        assert_eq!(diff.l2_total, 4);
+        assert_eq!(diff.l2_added.len(), 1);
+    }
+
+    #[test]
+    fn test_commit_diff_structure() {
+        let diff = CommitDiff {
+            l1_commits_count: 10,
+            l2_commits_count: 8,
+            behind_commits: vec![],
+            base_commit: None,
+            base_version_release: Some(("1.0.0".to_string(), Some("1".to_string()))),
+        };
+
+        assert_eq!(diff.l1_commits_count, 10);
+        assert_eq!(diff.l2_commits_count, 8);
+        assert!(diff.base_commit.is_none());
+        assert!(diff.base_version_release.is_some());
