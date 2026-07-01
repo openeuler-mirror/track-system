@@ -290,3 +290,47 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_update_package() {
+        let mock_package = create_mock_package(1, "glibc");
+        let mut updated_package = mock_package.clone();
+        updated_package.sync_interval_hours = 48;
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results([[mock_package]])
+            .append_query_results([[updated_package.clone()]])
+            .into_connection();
+
+        let state = AppState::without_external_clients(db);
+        let request = UpdatePackageRequest {
+            level: None,
+            sync_interval_hours: Some(48),
+            l0_repo_url: None,
+            description: None,
+        };
+
+        let result = update_package(State(state), Path(1), Json(request)).await;
+        assert!(result.is_ok());
+
+        let response = result.unwrap();
+        assert_eq!(response.0.sync_interval_hours, 48);
+    }
+
+    #[tokio::test]
+    async fn test_update_package_invalid_sync_interval() {
+        let mock_package = create_mock_package(1, "glibc");
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results([[mock_package]])
+            .into_connection();
+
+        let state = AppState::without_external_clients(db);
+        let request = UpdatePackageRequest {
+            level: None,
+            sync_interval_hours: Some(0),
+            l0_repo_url: None,
+            description: None,
+        };
+
+        let result = update_package(State(state), Path(1), Json(request)).await;
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(matches!(err, ApiError::BadRequest(_)));
