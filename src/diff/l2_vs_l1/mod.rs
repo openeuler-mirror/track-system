@@ -2317,3 +2317,56 @@ Summary: Test package
     #[test]
     fn test_analyze_customization_impact_includes_highlights() {
         let comparator = L2VsL1Comparator::new();
+        let customizations = vec![
+            Customization {
+                customization_type: CustomizationType::SecurityHardening,
+                description: "sec".to_string(),
+                affected_files: vec!["a".to_string()],
+            },
+            Customization {
+                customization_type: CustomizationType::VersionChange,
+                description: "ver".to_string(),
+                affected_files: vec!["b".to_string()],
+            },
+            Customization {
+                customization_type: CustomizationType::FeatureModification,
+                description: "f1".to_string(),
+                affected_files: vec!["c".to_string()],
+            },
+            Customization {
+                customization_type: CustomizationType::FeatureModification,
+                description: "f2".to_string(),
+                affected_files: vec!["d".to_string()],
+            },
+            Customization {
+                customization_type: CustomizationType::FeatureModification,
+                description: "f3".to_string(),
+                affected_files: vec!["e".to_string()],
+            },
+        ];
+
+        let analysis = comparator
+            .analyze_customization_impact(&customizations)
+            .unwrap();
+        assert_eq!(analysis.total_customizations, 5);
+        assert!(analysis.by_type.contains_key("SecurityHardening"));
+        assert!(analysis.by_type.contains_key("VersionChange"));
+        assert!(analysis.by_type.contains_key("FeatureModification"));
+        assert!(analysis.summary.contains("重点关注:"));
+        assert!(analysis.summary.contains("安全加固"));
+        assert!(analysis.summary.contains("版本变更"));
+        assert!(analysis.summary.contains("功能修改"));
+    }
+
+    #[test]
+    fn test_generate_security_recommendations_with_cve() {
+        let comparator = L2VsL1Comparator::new();
+        let patch_diff = PatchDiff {
+            l1_total: 1,
+            l2_total: 0,
+            l2_added: vec![],
+            l2_removed: vec![PatchFile {
+                filename: "fix-CVE-2025-12345.patch".to_string(),
+                path: "fix-CVE-2025-12345.patch".to_string(),
+                content_hash: "h".to_string(),
+                size: 1,
