@@ -721,3 +721,55 @@ impl<'a> PipelineExecutor<'a> {
                                 {
                                     base_version = version.to_string();
                                     info!(tracking_id = tracking.id, base_version = %base_version, "获取到 base_commit 版本");
+                                }
+                                if let Some(release) =
+                                    version_release.get(1).and_then(|v| v.as_str())
+                                {
+                                    base_release = release.to_string();
+                                    info!(tracking_id = tracking.id, base_release = %base_release, "获取到 base_commit release");
+                                }
+                            }
+
+                            // 获取 behind_commits 列表
+                            if let Some(behind_commits) =
+                                commit_diff.get("behind_commits").and_then(|v| v.as_array())
+                            {
+                                // 提取 behind_commits 中的 SHA 列表
+                                let behind_commit_shas: Vec<String> = behind_commits
+                                    .iter()
+                                    .filter_map(|c| {
+                                        c.get("sha").and_then(|s| s.as_str()).map(|s| s.to_string())
+                                    })
+                                    .collect();
+
+                                // 从 l1_commit_records 表中获取这些 commit 的详细信息
+                                if !behind_commit_shas.is_empty() {
+                                    let commits = L1CommitRecords::find()
+                                        .filter(
+                                            l1_commit_records::Column::TrackingId.eq(tracking.id),
+                                        )
+                                        .filter(
+                                            l1_commit_records::Column::CommitSha
+                                                .is_in(behind_commit_shas),
+                                        )
+                                        .all(self.db)
+                                        .await?;
+
+                                    // 为每个 commit 创建独立的信息记录
+                                    for commit in commits {
+                                        // 根据 primary_change_type 判断 level
+                                        let level = match commit.primary_change_type.as_deref() {
+                                            Some("CVE") => "High",
+                                            Some("Bugfix") => "Medium",
+                                            Some(_) => "Low",
+                                            None => "Normal",
+                                        };
+
+                                        if let Some(risk_client) = &risk_client {
+                                            let risk_level =
+                                                match commit.primary_change_type.as_deref() {
+                                                    Some("CVE") => 3,
+                                                    Some("Bugfix") => 2,
+                                                    Some(_) => 1,
+                                                    None => 1,
+                                                };
