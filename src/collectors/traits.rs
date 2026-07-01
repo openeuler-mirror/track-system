@@ -464,3 +464,55 @@ pub struct PatchFile {
 
 /// 源码文件信息
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SourceFile {
+    pub path: String,
+    pub sha256: String,
+    pub size: u64,
+}
+
+/// 采集结果
+/// 文件信息（用于 L2 采集）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FileInfo {
+    pub path: String,
+    pub sha256: String,
+    pub size: u64,
+    pub is_binary: bool,
+}
+
+/// Spec 文件信息（用于 L2 采集）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SpecInfo {
+    pub path: String,
+    pub version: String,
+    pub release: String,
+    pub content_base64: String,
+    pub sha256: String,
+}
+
+/// Issue 元数据（简化版）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IssueMetadata {
+    pub number: i64,
+    pub title: String,
+    pub state: String,
+    pub author: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub closed_at: Option<DateTime<Utc>>,
+    pub labels: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CollectResult {
+    /// 层级（l0, l1, l2）
+    pub level: String,
+    /// 平台
+    pub platform: String,
+    /// 仓库所有者
+    pub owner: Option<String>,
+    /// 仓库名称
+    pub repo: String,
+    /// 分支名称
+    pub branch: String,
+    /// 采集时间
