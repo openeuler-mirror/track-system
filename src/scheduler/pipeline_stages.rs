@@ -618,3 +618,54 @@ impl<'a> PipelineExecutor<'a> {
                     active_commit.updated_at = Set(Utc::now());
 
                     active_commit
+                        .update(self.db)
+                        .await
+                        .context("更新 commit 分类失败")?;
+
+                    classified_count += 1;
+                    cve_count += classification.cve_numbers.len();
+
+                    // 检查是否需要人工审核
+                    if classification.primary_type.as_str() == "MixedChange" {
+                        needs_review_count += 1;
+                    }
+                }
+                Err(err) => {
+                    warn!(
+                        commit_id = commit.id,
+                        error = %err,
+                        "分类 commit 失败"
+                    );
+                }
+            }
+        }
+
+        info!(
+            tracking_id = tracking.id,
+            classified_count = classified_count,
+            cve_count = cve_count,
+            needs_review_count = needs_review_count,
+            "变更分类完成"
+        );
+
+        Ok(ClassificationResult {
+            classified_count,
+            cve_count,
+            needs_review_count,
+        })
+    }
+
+    /// 阶段 5: 报告生成
+    pub(super) async fn stage_report_generation(
+        &self,
+        tracking: &tracking::Model,
+        previous_results: &HashMap<PipelineStage, StageResult>,
+    ) -> Result<ReportGenerationResult> {
+        info!(tracking_id = tracking.id, "执行报告生成阶段");
+
+        // 从前面的阶段结果中提取信息
+        let diff_result = previous_results.get(&PipelineStage::DiffComparison);
+        let classification_result = previous_results.get(&PipelineStage::Classification);
+
+        // 获取 package 信息
+        use crate::entities::prelude::*;
