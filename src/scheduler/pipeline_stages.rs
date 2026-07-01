@@ -411,3 +411,55 @@ impl<'a> PipelineExecutor<'a> {
 
         if l0_commits.is_empty() {
             return Ok(None);
+        }
+
+        // TODO: 从 l0_commits 构建 L0VersionInfo
+        // 这里需要解析 commit message 和 tags 来提取版本信息
+        // 暂时返回 None，需要进一步实现
+        warn!(tracking_id = tracking.id, "L0 版本信息提取功能待实现");
+
+        Ok(None)
+    }
+
+    /// 获取 L1 版本信息
+    async fn get_l1_version_info(
+        &self,
+        tracking: &tracking::Model,
+    ) -> Result<Option<diff::l1_vs_l0::L1VersionInfo>> {
+        // TODO: 从 commit_records 和快照提取 L1 版本信息
+        // 需要解析 spec 文件和 patch 文件
+        warn!(tracking_id = tracking.id, "L1 版本信息提取功能待实现");
+
+        Ok(None)
+    }
+
+    /// 保存对比报告
+    async fn save_comparison_reports(
+        &self,
+        tracking: &tracking::Model,
+        l2_vs_l1: &Option<diff::l2_vs_l1::L2VsL1Report>,
+        l1_vs_l0: &Option<diff::l1_vs_l0::L1VsL0Report>,
+    ) -> Result<i64> {
+        use sea_orm::Set;
+
+        // 构建报告摘要，包含详细的 patch 和 commit_diff 信息
+
+        let l2_vs_l1_diff = l2_vs_l1.as_ref().map(|r| serde_json::json!({
+                "patches_added": r.patch_diff.l2_added.len(),
+                "patches_added_list": r.patch_diff.l2_added.iter().map(|p| serde_json::json!({
+                    "filename": p.filename,
+                    "path": p.path,
+                    "content_hash": p.content_hash,
+                    "size": p.size,
+                    "applied": p.applied,
+                })).collect::<Vec<_>>(),
+                "patches_modified": r.patch_diff.l2_modified.len(),
+                "patches_modified_list": r.patch_diff.l2_modified.iter().map(|p| serde_json::json!({
+                    "filename": p.filename,
+                    "l1_hash": p.l1_hash,
+                    "l2_hash": p.l2_hash,
+                })).collect::<Vec<_>>(),
+                "patches_removed": r.patch_diff.l2_removed.len(),
+                "patches_removed_list": r.patch_diff.l2_removed.iter().map(|p| serde_json::json!({
+                    "filename": p.filename,
+                    "path": p.path,
