@@ -266,3 +266,48 @@ mod tests {
                         "page": 1,
                         "page_size": 10,
                         "total_pages": 1
+                    }
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = list_reports(&client, None, None, None, None).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_list_reports_with_filters() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock(
+                "GET",
+                "/api/reports?page=2&page_size=20&tracking_id=5&report_type=diff",
+            )
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "data": {
+                        "items": [],
+                        "total": 0,
+                        "page": 2,
+                        "page_size": 20,
+                        "total_pages": 0
+                    }
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = list_reports(
+            &client,
+            Some(2),
+            Some(20),
+            Some(5),
+            Some("diff".to_string()),
+        )
