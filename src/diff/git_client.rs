@@ -89,3 +89,48 @@ impl GitRepositoryClient {
 
     /// 获取指定分支的 commits
     pub fn get_commits(&self, branch: &str) -> Result<Vec<GitCommit>> {
+        let repo = Repository::open(&self.repo_path).context("打开仓库失败")?;
+
+        // 获取分支引用
+        let branch_name = format!("refs/heads/{}", branch);
+        let obj = repo
+            .revparse_single(&branch_name)
+            .or_else(|_| repo.revparse_single(&format!("remotes/origin/{}", branch)))
+            .context(format!("找不到分支: {}", branch))?;
+
+        // 创建遍历器
+        let mut revwalk = repo.revwalk().context("创建 revwalk 失败")?;
+        revwalk.push(obj.id()).context("设置 revwalk 起点失败")?;
+
+        revwalk
+            .set_sorting(Sort::TIME | Sort::REVERSE)
+            .context("设置排序失败")?;
+
+        let mut commits = Vec::new();
+
+        for oid in revwalk {
+            let oid = oid.context("获取 OID 失败")?;
+            let commit = repo.find_commit(oid).context("查找 commit 失败")?;
+
+            let files_changed = Self::count_files_changed(&repo, &commit)?;
+
+            commits.push(GitCommit {
+                sha: commit.id().to_string(),
+                message: commit
+                    .message()
+                    .unwrap_or("")
+                    .lines()
+                    .next()
+                    .unwrap_or("")
+                    .to_string(),
+                author: commit.author().name().unwrap_or("Unknown").to_string(),
+                author_email: commit.author().email().unwrap_or("").to_string(),
+                committed_at: DateTime::<Utc>::from_timestamp(commit.time().seconds(), 0)
+                    .unwrap_or_else(Utc::now),
+                files_changed,
+            });
+        }
+
+        debug!(branch = branch, count = commits.len(), "获取 commits 完成");
+
+        Ok(commits)
