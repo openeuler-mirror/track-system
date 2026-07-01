@@ -129,3 +129,47 @@ impl SchedulerManager {
     /// 手动触发同步
     pub async fn trigger_manual_sync(&self, tracking_id: i32) -> Result<i64> {
         info!(tracking_id = tracking_id, "手动触发同步");
+
+        let sync_manager = SyncManager::new(&self.db);
+
+        // 创建 sync_job
+        let job = sync_manager
+            .queue_sync_job(tracking_id, 0)
+            .await
+            .context("创建 sync_job 失败")?;
+
+        let job_id = job.id;
+
+        // 执行流水线
+        let executor = PipelineExecutor::new(&self.db, self.client.clone());
+
+        match executor.execute_sync_job(job_id).await {
+            Ok(result) => {
+                info!(
+                    job_id = job_id,
+                    tracking_id = tracking_id,
+                    success = result.success,
+                    "手动同步完成"
+                );
+
+                // 更新状态
+                let mut status = self.status.write().await;
+                status.total_jobs_executed += 1;
+                status.last_execution = Some(Utc::now());
+
+                // 更新 sync_manager 状态
+                if result.success {
+                    sync_manager.complete_sync_task(tracking_id, true).await?;
+                } else {
+                    sync_manager.complete_sync_task(tracking_id, false).await?;
+                }
+            }
+            Err(err) => {
+                error!(
+                    job_id = job_id,
+                    tracking_id = tracking_id,
+                    error = %err,
+                    "手动同步失败"
+                );
+
+                sync_manager.complete_sync_task(tracking_id, false).await?;
