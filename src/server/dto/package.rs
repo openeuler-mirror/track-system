@@ -33,3 +33,38 @@ pub struct UpdatePackageRequest {
     pub description: Option<String>,
 }
 
+/// 软件包响应
+#[derive(Debug, Serialize)]
+pub struct PackageResponse {
+    pub id: i32,
+    pub name: String,
+    pub level: i32,
+    pub sync_interval_hours: i32,
+    pub l0_repo_url: Option<String>,
+    pub description: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+impl From<packages::Model> for PackageResponse {
+    fn from(model: packages::Model) -> Self {
+        Self {
+            id: model.id,
+            name: model.name,
+            level: model.level,
+            sync_interval_hours: model.sync_interval_hours,
+            l0_repo_url: model.l0_repo_url,
+            description: model.description,
+            created_at: model.created_at,
+            updated_at: model.updated_at,
+        }
+    }
+}
+
+/// 跟踪配置响应
+#[derive(Debug, Serialize)]
+pub struct TrackingResponse {
+    pub id: i32,
+    pub package_id: i32,
+    //pub distro_id: i32,
+    pub l1_branch: String,
