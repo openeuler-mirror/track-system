@@ -39,3 +39,27 @@ pub async fn list_backport_candidates_handler(
     ))
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::extract::{Path, State};
+    use sea_orm::{DatabaseBackend, MockDatabase};
+
+    #[tokio::test]
+    async fn test_list_backport_candidates_handler_empty() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<backport_candidates::Model, _, _>([vec![]])
+            .into_connection();
+
+        let state = AppState::without_external_clients(db);
+        let result = list_backport_candidates_handler(Path(1), State(state)).await;
+
+        assert!(result.is_ok());
+        let response = result.unwrap();
+        assert_eq!(response.0.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_list_backport_candidates_handler_with_data() {
+        let mock_candidate = backport_candidates::Model {
+            id: 1,
