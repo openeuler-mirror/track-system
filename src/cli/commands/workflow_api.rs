@@ -272,3 +272,51 @@ mod tests {
             .with_header("content-type", "application/json")
             .with_body(
                 serde_json::json!({
+                    "workflows": [
+                        {
+                            "name": "sync-workflow",
+                            "description": "Synchronize packages"
+                        },
+                        {
+                            "name": "build-workflow",
+                            "description": "Build packages"
+                        }
+                    ]
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = list_workflows(&client).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_list_workflows_empty() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/workflow/list")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "workflows": []
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = list_workflows(&client).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_validate_workflow_valid() {
+        let (mut server, client) = setup_test_server().await;
+        let workflow_file = create_temp_workflow_file("workflow: valid");
+
