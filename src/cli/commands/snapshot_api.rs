@@ -273,3 +273,52 @@ mod tests {
         mock.assert_async().await;
     }
 
+    #[tokio::test]
+    async fn test_list_snapshots_all() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/snapshot/list")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "snapshots": [
+                        {
+                            "id": 1,
+                            "tracking_id": 10,
+                            "tag": "v1.0",
+                            "created_at": "2024-01-01T00:00:00Z"
+                        },
+                        {
+                            "id": 2,
+                            "tracking_id": 20,
+                            "tag": "v2.0",
+                            "created_at": "2024-01-02T00:00:00Z"
+                        }
+                    ]
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = list_snapshots(&client, None).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_list_snapshots_by_tracking() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/snapshot/list?tracking_id=10")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "snapshots": [
+                        {
+                            "id": 1,
+                            "tracking_id": 10,
