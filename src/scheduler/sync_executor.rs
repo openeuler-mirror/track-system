@@ -92,3 +92,51 @@ impl<'a> SyncExecutor<'a> {
 
         // 获取tracking配置
         let tracking = self
+            .sync_manager
+            .get_tracking(tracking_id)
+            .await
+            .context("获取tracking配置失败")?;
+
+        // 执行实际的同步操作
+        let outcome = match self.do_sync(&tracking).await {
+            Ok(result) => result,
+            Err(err) => {
+                self.sync_manager
+                    .complete_sync_task(tracking_id, false)
+                    .await
+                    .context("完成同步任务失败")?;
+
+                error!(tracking_id = tracking_id, error = %err, "同步任务执行失败");
+                Telemetry::sync_job_failed(tracking_id, 0, &err.to_string());
+                return Err(err);
+            }
+        };
+
+        self.sync_manager
+            .complete_sync_task_with_result(tracking_id, &outcome)
+            .await
+            .context("更新同步任务结果失败")?;
+
+        match outcome.status {
+            SyncStatus::Success => {
+                info!(tracking_id = tracking_id, "同步任务执行成功");
+                Telemetry::sync_job_succeeded(tracking_id, 0);
+            }
+            SyncStatus::Skipped => {
+                warn!(
+                    tracking_id = tracking_id,
+                    reason = %outcome.message,
+                    "同步任务被跳过"
+                );
+            }
+            SyncStatus::Failed => {
+                error!(
+                    tracking_id = tracking_id,
+                    reason = %outcome.message,
+                    "同步任务标记为失败"
+                );
+                Telemetry::sync_job_failed(tracking_id, 0, &outcome.message);
+            }
+        }
+
+        Ok(outcome)
