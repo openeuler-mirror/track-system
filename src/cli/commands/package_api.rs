@@ -168,3 +168,46 @@ async fn list_packages(api_client: &ApiClient, limit: u64) -> Result<()> {
         }
         Err(e) => {
             println!("{} 获取软件包列表失败: {}", "✗".red().bold(), e);
+            Err(e.into())
+        }
+    }
+}
+
+/// 显示软件包详情
+async fn show_package(api_client: &ApiClient, name_or_id: String) -> Result<()> {
+    println!("正在获取软件包详情: {}", name_or_id.cyan());
+
+    // 优先按 ID 查询，否则按名称客户端过滤
+    if let Ok(id) = name_or_id.parse::<i32>() {
+        match api_client
+            .get::<PackageDto>(&format!("/packages/{}", id))
+            .await
+        {
+            Ok(pkg) => {
+                print_package_detail(&pkg);
+                Ok(())
+            }
+            Err(e) => {
+                println!("{} 获取软件包详情失败: {}", "✗".red().bold(), e);
+                Err(e.into())
+            }
+        }
+    } else {
+        match find_package_by_name(api_client, &name_or_id).await? {
+            Some(pkg) => {
+                print_package_detail(&pkg);
+                Ok(())
+            }
+            None => {
+                println!("{} 未找到软件包: {}", "✗".red().bold(), name_or_id);
+                Ok(())
+            }
+        }
+    }
+}
+
+fn print_package_detail(pkg: &PackageDto) {
+    println!();
+    println!("{}", "软件包详情:".bold());
+    println!("  ID: {}", pkg.id);
+    println!("  名称: {}", pkg.name.cyan());
