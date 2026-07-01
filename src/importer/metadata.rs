@@ -193,3 +193,52 @@ impl<'a> MetadataImporter<'a> {
             return Ok(false);
         }
 
+        // 插入新记录
+        let now = Utc::now();
+        let distro = distros::ActiveModel {
+            name: Set(name.to_string()),
+            version: Set(version.to_string()),
+            platform: Set(platform.to_string()),
+            base_url: Set(base_url.to_string()),
+            created_at: Set(now),
+            updated_at: Set(now),
+            ..Default::default()
+        };
+
+        distro.insert(self.db).await?;
+        Ok(true)
+    }
+
+    /// 导入单个跟踪配置
+    async fn import_tracking(
+        &self,
+        tracking_json: &serde_json::Value,
+        _options: &ImportOptions,
+    ) -> Result<bool, DbErr> {
+        use crate::entities::{prelude::Tracking, tracking};
+
+        let package_id = tracking_json["package_id"].as_i64().unwrap_or(0) as i32;
+        let distro_id = tracking_json["distro_id"].as_i64().unwrap_or(0) as i32;
+        let l1_branch = tracking_json["l1_branch"].as_str().unwrap_or("");
+        let l1_repo_owner = tracking_json["l1_repo_owner"].as_str().unwrap_or("");
+        let l1_repo_name = tracking_json["l1_repo_name"].as_str().unwrap_or("");
+        let l2_branch = tracking_json["l2_branch"].as_str().unwrap_or("");
+        let l2_repo_path = tracking_json["l2_repo_path"].as_str().unwrap_or("");
+        let tracking_status = tracking_json["tracking_status"].as_str().unwrap_or("idle");
+
+        // 检查是否已存在
+        let existing = Tracking::find()
+            .filter(tracking::Column::PackageId.eq(package_id))
+            .filter(tracking::Column::DistroId.eq(distro_id))
+            .one(self.db)
+            .await?;
+
+        if existing.is_some() {
+            // 已存在，跳过
+            return Ok(false);
+        }
+
+        // 插入新记录
+        let now = Utc::now();
+        let track = tracking::ActiveModel {
+            package_id: Set(package_id),
