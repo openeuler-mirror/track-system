@@ -153,3 +153,26 @@ mod tests {
             sha: "dummy".into(),
             size: 4,
             content: "VGVzdA==".into(),
+            encoding: "base64".into(),
+            download_url: String::new(),
+        };
+
+        let decoded = decode_file_content(&file).unwrap();
+        assert_eq!(decoded, "Test");
+    }
+
+    #[test]
+    fn decode_invalid_encoding() {
+        let file = FileContent {
+            name: "nginx.spec".into(),
+            path: "nginx.spec".into(),
+            sha: "dummy".into(),
+            size: 4,
+            content: "VGVzdA==".into(),
+            encoding: "plain".into(),
+            download_url: String::new(),
+        };
+
+        assert!(decode_file_content(&file).is_err());
+    }
+}
