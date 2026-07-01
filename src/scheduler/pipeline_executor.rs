@@ -643,3 +643,52 @@ mod tests {
     fn test_diff_comparison_result_serialization() {
         let result = DiffComparisonResult {
             report_id: Some(456),
+            files_changed: 15,
+            has_spec_changes: true,
+        };
+
+        let json = serde_json::to_value(&result).unwrap();
+        assert_eq!(json["report_id"], 456);
+        assert_eq!(json["files_changed"], 15);
+        assert_eq!(json["has_spec_changes"], true);
+    }
+
+    #[test]
+    fn test_classification_result_serialization() {
+        let result = ClassificationResult {
+            classified_count: 20,
+            cve_count: 3,
+            needs_review_count: 7,
+        };
+
+        let json = serde_json::to_value(&result).unwrap();
+        assert_eq!(json["classified_count"], 20);
+        assert_eq!(json["cve_count"], 3);
+        assert_eq!(json["needs_review_count"], 7);
+    }
+
+    #[test]
+    fn test_report_generation_result_serialization() {
+        let result = ReportGenerationResult {
+            report_id: 789,
+            report_status: "completed".to_string(),
+        };
+
+        let json = serde_json::to_value(&result).unwrap();
+        assert_eq!(json["report_id"], 789);
+        assert_eq!(json["report_status"], "completed");
+    }
+
+    #[test]
+    fn test_backport_suggestion_result_serialization() {
+        let result = BackportSuggestionResult {
+            candidates_count: 12,
+            l0_commits_checked: 100,
+        };
+
+        let json = serde_json::to_value(&result).unwrap();
+        assert_eq!(json["candidates_count"], 12);
+        assert_eq!(json["l0_commits_checked"], 100);
+    }
+
+    #[test]
