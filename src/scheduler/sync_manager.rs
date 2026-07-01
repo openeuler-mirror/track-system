@@ -519,3 +519,53 @@ fn next_aligned_after(
     base_time + chrono::Duration::seconds(interval_secs.saturating_mul(next_k))
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Duration;
+
+    fn create_test_tracking(
+        last_sync: Option<chrono::DateTime<Utc>>,
+        status: &str,
+    ) -> tracking::Model {
+        tracking::Model {
+            id: 1,
+            package_id: 1,
+            distro_id: 1,
+            l1_branch: "main".to_string(),
+            l1_repo_owner: "owner".to_string(),
+            l1_repo_name: "repo".to_string(),
+            l2_branch: "local".to_string(),
+            l2_repo_path: "/path".to_string(),
+            tracking_status: status.to_string(),
+            last_sync_time: last_sync,
+            last_l1_commit_sha: None,
+            last_l2_commit_sha: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            last_error: None,
+        }
+    }
+
+    fn create_test_package(
+        level: i32,
+        interval: i32,
+        created_at: chrono::DateTime<Utc>,
+    ) -> packages::Model {
+        packages::Model {
+            id: 1,
+            name: "test-pkg".to_string(),
+            level,
+            sync_interval_hours: interval,
+            l0_repo_url: None,
+            description: None,
+            created_at,
+            updated_at: Utc::now(),
+        }
+    }
+
+    #[test]
+    fn test_should_sync_never_synced() {
+        let track = create_test_tracking(None, "idle");
+        let package = create_test_package(2, 12, Utc::now() - Duration::hours(48));
+        let now = Utc::now();
