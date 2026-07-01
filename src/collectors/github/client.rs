@@ -90,3 +90,49 @@ impl GitHubClient {
     async fn get<T: serde::de::DeserializeOwned>(&self, url: &str) -> ApiResult<T> {
         let mut retries = 0;
 
+        loop {
+            let mut request = self.client.get(url);
+
+            if let Some(token) = &self.token {
+                request = request.bearer_auth(token);
+            }
+
+            let response = request.send().await?;
+            let status = response.status();
+
+            if status.is_success() {
+                return response.json::<T>().await.map_err(ApiError::from);
+            }
+
+            let body = response.text().await.unwrap_or_default();
+            let message = if let Ok(json) = serde_json::from_str::<serde_json::Value>(&body) {
+                json.get("message")
+                    .and_then(|m| m.as_str())
+                    .unwrap_or(body.as_str())
+                    .to_string()
+            } else if body.is_empty() {
+                format!("HTTP {}", status.as_u16())
+            } else {
+                body
+            };
+
+            let error = ApiError::from_status(status.as_u16(), message);
+
+            if error.is_retryable() && retries < MAX_RETRIES {
+                retries += 1;
+                tokio::time::sleep(Duration::from_secs(2u64.pow(retries))).await;
+                continue;
+            }
+
+            return Err(error);
+        }
+    }
+}
+
+#[async_trait]
+impl GitClient for GitHubClient {
+    async fn get_repository(&self, owner: &str, repo: &str) -> ApiResult<Repository> {
+        let url = format!("{}/repos/{}/{}", self.base_url, owner, repo);
+        let repository: GitHubRepository = self.get(&url).await?;
+        Ok(repository.into())
+    }
