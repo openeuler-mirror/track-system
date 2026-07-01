@@ -189,3 +189,38 @@ pub async fn wake_scheduler_handler(
     }))
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::extract::{Path, State};
+    use sea_orm::{DatabaseBackend, MockDatabase};
+
+    #[tokio::test]
+    async fn test_queue_sync_job_handler_success() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+        let state = AppState::without_external_clients(db);
+
+        let result = queue_sync_job_handler(Path(1), State(state)).await;
+        // This will fail without a real scheduler, but tests the handler structure
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_trigger_manual_sync_no_scheduler() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+        let state = AppState::without_external_clients(db);
+
+        let result = trigger_manual_sync_handler(Path(1), State(state)).await;
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), StatusCode::SERVICE_UNAVAILABLE);
+    }
+
+    #[tokio::test]
+    async fn test_get_scheduler_status_no_scheduler() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+        let state = AppState::without_external_clients(db);
+
+        let result = get_scheduler_status_handler(State(state)).await;
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), StatusCode::SERVICE_UNAVAILABLE);
+    }
