@@ -174,3 +174,47 @@ impl GitClient for GiteeClient {
         let gitee_commits: Vec<GiteeCommit> = self.get(&url).await?;
         Ok(gitee_commits.into_iter().map(Into::into).collect())
     }
+
+    async fn get_file_content(
+        &self,
+        owner: &str,
+        repo: &str,
+        path: &str,
+        branch: &str,
+    ) -> ApiResult<FileContent> {
+        let url = format!(
+            "{}/repos/{}/{}/contents/{}?ref={}",
+            self.base_url, owner, repo, path, branch
+        );
+        let gitee_file: GiteeFileContent = self.get(&url).await?;
+        Ok(gitee_file.into())
+    }
+}
+
+#[async_trait]
+impl IssueClient for GiteeClient {
+    async fn get_issues(
+        &self,
+        owner: &str,
+        repo: &str,
+        params: IssueParams,
+    ) -> ApiResult<Vec<Issue>> {
+        let mut url = format!(
+            "{}/repos/{}/{}/issues?page={}&per_page={}&state={}",
+            self.base_url,
+            owner,
+            repo,
+            params.page,
+            params.per_page,
+            params.state.as_query_value()
+        );
+
+        if let Some(since) = params.since {
+            url.push_str(&format!("&since={}", since.to_rfc3339()));
+        }
+
+        let issues: Vec<GiteeIssue> = self.get(&url).await?;
+        Ok(issues.into_iter().map(Into::into).collect())
+    }
+}
+
