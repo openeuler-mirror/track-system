@@ -131,3 +131,47 @@ impl PatchParser {
             || content_lower.contains("upstream commit")
         {
             return true;
+        }
+
+        false
+    }
+
+    /// 提取上游 commit SHA（如果是 backport patch）
+    pub fn extract_upstream_commit(content: &str) -> Option<String> {
+        // 查找常见的 commit 引用格式（不区分大小写）
+        let content_lower = content.to_lowercase();
+
+        let patterns = [
+            r"upstream commit[:\s]+([0-9a-f]{7,40})",
+            r"cherry-pick[:\s]+([0-9a-f]{7,40})",
+            r"backport[:\s]+([0-9a-f]{7,40})",
+            r"\(commit[:\s]+([0-9a-f]{7,40})\)",
+        ];
+
+        for pattern in &patterns {
+            if let Ok(re) = Regex::new(pattern) {
+                if let Some(cap) = re.captures(&content_lower) {
+                    if let Some(m) = cap.get(1) {
+                        return Some(m.as_str().to_string());
+                    }
+                }
+            }
+        }
+
+        None
+    }
+
+    /// 读取并解析 patch 文件
+    pub fn parse_file(path: &Path) -> Result<ParsedPatch> {
+        let content = std::fs::read_to_string(path)
+            .with_context(|| format!("无法读取 patch 文件: {:?}", path))?;
+
+        let filename = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("unknown")
+            .to_string();
+
+        Ok(Self::parse(&filename, &content))
+    }
+
