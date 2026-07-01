@@ -78,3 +78,19 @@ mod tests {
         let result = formatter.format(&data).unwrap();
         assert!(result.contains("name"));
         assert!(result.contains("test"));
+        assert!(result.contains('\n')); // 美化输出包含换行
+    }
+
+    #[test]
+    fn test_format_compact() {
+        let formatter = JsonFormatter::new().with_pretty(false);
+        let data = json!({
+            "name": "test",
+            "value": 123
+        });
+
+        let result = formatter.format(&data).unwrap();
+        assert!(result.contains("name"));
+        assert!(!result.contains('\n')); // 紧凑输出不包含换行
+    }
+}
