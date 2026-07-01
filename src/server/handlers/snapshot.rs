@@ -95,3 +95,42 @@ pub async fn delete_snapshot(
     Ok(axum::http::StatusCode::NO_CONTENT)
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::entities::l2_snapshots;
+    use axum::extract::Query;
+    use sea_orm::{DatabaseBackend, MockDatabase};
+
+    #[tokio::test]
+    async fn test_list_snapshots_all() {
+        let mock_snapshot = l2_snapshots::Model {
+            id: 1,
+            tracking_id: 10,
+            snapshot_type: "L2".to_string(),
+            checksum: "abc123".to_string(),
+            payload: serde_json::json!({
+                "tag": "v1.0.0",
+                "files": []
+            }),
+            created_at: chrono::Utc::now(),
+        };
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results([[mock_snapshot.clone()]])
+            .into_connection();
+
+        let state = AppState::without_external_clients(db);
+        let query = ListSnapshotsQuery { tracking_id: None };
+
+        let result = list_snapshots(State(state), Query(query)).await;
+        assert!(result.is_ok());
+
+        let response = result.unwrap();
+        let snapshots = response.0["snapshots"].as_array().unwrap();
+        assert_eq!(snapshots.len(), 1);
+        assert_eq!(snapshots[0]["id"], 1);
+        assert_eq!(snapshots[0]["tracking_id"], 10);
+        assert_eq!(snapshots[0]["tag"], "v1.0.0");
+    }
+
