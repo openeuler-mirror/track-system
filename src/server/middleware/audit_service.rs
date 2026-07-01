@@ -39,3 +39,44 @@ impl<'a> AuditService<'a> {
         ip_address: Option<String>,
         user_agent: Option<String>,
         response_status: i32,
+        duration_ms: i32,
+    ) -> Result<(), sea_orm::DbErr> {
+        let action = audit_logs::AuditAction::from_method_and_path(method, path);
+        let (resource_type, resource_id) = extract_resource_info(path);
+
+        let audit_log = audit_logs::ActiveModel {
+            user_id: Set(user_id),
+            action: Set(action.to_string()),
+            resource_type: Set(resource_type),
+            resource_id: Set(resource_id),
+            method: Set(method.to_string()),
+            path: Set(path.to_string()),
+            ip_address: Set(ip_address),
+            user_agent: Set(user_agent),
+            request_body: Set(None),
+            response_status: Set(response_status),
+            response_body: Set(None),
+            duration: Set(Some(duration_ms)),
+            error_message: Set(None),
+            created_at: Set(Utc::now()),
+            ..Default::default()
+        };
+
+        audit_log.insert(self.db).await?;
+
+        Ok(())
+    }
+
+    /// 记录数据变更
+    pub async fn log_data_change(
+        &self,
+        user_id: Option<String>,
+        action: audit_logs::AuditAction,
+        resource_type: &str,
+        resource_id: &str,
+        details: Option<serde_json::Value>,
+    ) -> Result<(), sea_orm::DbErr> {
+        let audit_log = audit_logs::ActiveModel {
+            user_id: Set(user_id),
+            action: Set(action.to_string()),
+            resource_type: Set(resource_type.to_string()),
