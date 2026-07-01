@@ -1115,3 +1115,54 @@ Patch1: fix.patch
     }
 
     #[tokio::test]
+    async fn test_import_snapshot_tracking_id_mismatch() {
+        use crate::entities::tracking;
+
+        let tracking_model = tracking::Model {
+            id: 2,
+            package_id: 1,
+            distro_id: 1,
+            l1_branch: "main".to_string(),
+            l1_repo_owner: "o".to_string(),
+            l1_repo_name: "r".to_string(),
+            l2_branch: "b".to_string(),
+            l2_repo_path: "/x".to_string(),
+            tracking_status: "idle".to_string(),
+            last_sync_time: None,
+            last_l1_commit_sha: None,
+            last_l2_commit_sha: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            last_error: None,
+        };
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<tracking::Model, _, _>(vec![vec![tracking_model]])
+            .into_connection();
+
+        let temp_dir = tempfile::tempdir().unwrap();
+        let file_path = temp_dir.path().join("snapshot.json");
+        let snapshot = RepositorySnapshot::new(1, SnapshotOrigin::L2);
+        std::fs::write(&file_path, serde_json::to_string(&snapshot).unwrap()).unwrap();
+
+        let result = import_snapshot(&db, 2, &file_path).await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("does not match"));
+    }
+
+    #[tokio::test]
+    async fn test_latest_snapshot_none() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![]])
+            .into_connection();
+
+        let result = latest_snapshot(&db, 1).await.unwrap();
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_latest_snapshot_some() {
+        let payload = json!({
+            "tracking_id": 1,
+            "origin": "L2",
+            "spec": null,
