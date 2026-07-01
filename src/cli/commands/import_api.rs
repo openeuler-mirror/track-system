@@ -529,3 +529,52 @@ fn parse_snapshot_or_convert(
     })
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cli::client::ClientConfig;
+    use mockito::Server;
+    use std::io::Write;
+    use tempfile::NamedTempFile;
+
+    async fn setup_test_server() -> (mockito::ServerGuard, ApiClient) {
+        let server = Server::new_async().await;
+        let config = ClientConfig {
+            server_url: server.url(),
+            auth_token: Some("test_token".to_string()),
+            timeout: 30,
+            verify_ssl: true,
+        };
+        let client = ApiClient::new(config).unwrap();
+        (server, client)
+    }
+
+    fn create_test_snapshot_json() -> String {
+        serde_json::json!({
+            "tracking_id": 1,
+            "generated_at": "2024-01-01T00:00:00Z",
+            "origin": "L1",
+            "files": [],
+            "commits": [
+                {
+                    "sha": "abc123",
+                    "title": "Test commit",
+                    "message": "Test commit message",
+                    "author": "Test Author",
+                    "authored_at": "2024-01-01T00:00:00Z",
+                    "stats": {
+                        "additions": 10,
+                        "deletions": 5,
+                        "files_changed": 2
+                    },
+                    "cve_list": []
+                }
+            ],
+            "issues": []
+        })
+        .to_string()
+    }
+
+    #[test]
+    fn test_extract_repo_from_json() {
+        let json = r#"{"repo": "test-package", "commits": []}"#;
