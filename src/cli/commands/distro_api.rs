@@ -243,3 +243,47 @@ mod tests {
             .mock("GET", "/api/distros")
             .with_status(200)
             .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "data": [
+                        {
+                            "id": 1,
+                            "name": "Ubuntu",
+                            "version": "22.04",
+                            "description": "Ubuntu LTS"
+                        },
+                        {
+                            "id": 2,
+                            "name": "Debian",
+                            "version": "12",
+                            "description": "Debian Stable"
+                        }
+                    ]
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = list_distros(&client).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_list_distros_empty() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/distros")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "data": []
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
