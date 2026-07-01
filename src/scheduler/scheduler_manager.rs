@@ -305,3 +305,51 @@ impl SchedulerManager {
     }
 }
 
+#[cfg(test)]
+mod tests_basic {
+    use super::*;
+    use sea_orm::{DatabaseBackend, MockDatabase};
+
+    #[tokio::test]
+    async fn test_scheduler_start_stop_status() {
+        let db = Arc::new(MockDatabase::new(DatabaseBackend::Postgres).into_connection());
+        let config = SchedulerConfig::default();
+        let (mut manager, _wake_rx) = SchedulerManager::new(db, None, config);
+
+        manager.start().await.unwrap();
+        let status = manager.get_scheduler_status().await.unwrap();
+        assert!(status.running);
+
+        manager.stop().await.unwrap();
+        let status = manager.get_scheduler_status().await.unwrap();
+        assert!(!status.running);
+    }
+
+    #[tokio::test]
+    async fn test_wake_signals() {
+        let db = Arc::new(MockDatabase::new(DatabaseBackend::Postgres).into_connection());
+        let config = SchedulerConfig::default();
+        let (manager, mut wake_rx) = SchedulerManager::new(db, None, config);
+
+        manager.wake(None);
+        let msg = wake_rx.recv().await.unwrap();
+        match msg {
+            WakeSignal::All => {}
+            _ => panic!("unexpected wake signal"),
+        }
+
+        manager.wake(Some(5));
+        let msg = wake_rx.recv().await.unwrap();
+        match msg {
+            WakeSignal::Specific(id) => assert_eq!(id, 5),
+            _ => panic!("unexpected wake signal"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_execute_round_empty() {
+        use crate::entities::{packages, tracking};
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<(tracking::Model, Option<packages::Model>), _, _>(vec![vec![]])
+            .into_connection();
