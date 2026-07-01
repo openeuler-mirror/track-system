@@ -348,3 +348,47 @@ mod tests {
                         "updated_at": "2024-01-01T01:00:00Z",
                         "completed_at": "2024-01-01T01:00:00Z",
                         "report_id": 123
+                    }
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = get_compare_status(&client, "task-789".to_string()).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_cancel_compare_task() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("DELETE", "/api/compare/tasks/task-999")
+            .with_status(204)
+            .create_async()
+            .await;
+
+        let result = cancel_compare_task(&client, "task-999".to_string()).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_execute_tracking_action() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("POST", "/api/compare/l2-vs-l1")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "data": {
+                        "task_id": "task-tracking",
+                        "status": "pending",
+                        "created_at": "2024-01-01T00:00:00Z"
+                    }
+                })
+                .to_string(),
