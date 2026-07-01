@@ -187,3 +187,50 @@ impl<'a> SyncManager<'a> {
     ) -> anyhow::Result<Vec<tracking::Model>> {
         let now = Utc::now();
 
+        // 查询所有跟踪配置及其关联的软件包，按等级排序
+        let results = Tracking::find()
+            .find_also_related(Packages)
+            .filter(tracking::Column::TrackingStatus.ne("syncing"))
+            .filter(tracking::Column::TrackingStatus.ne("paused"))
+            .filter(tracking::Column::TrackingStatus.ne("archived"))
+            .order_by_asc(packages::Column::Level) // 等级越小越优先（1级 > 2级 > 3级）
+            .all(self.db)
+            .await?;
+
+        // 过滤出需要同步的任务
+        let mut pending_tasks = Vec::new();
+        for (track, package_opt) in results {
+            info!("Checking track {} with package {:?}", track.id, package_opt);
+            if let Some(package) = package_opt {
+                // 如果指定了 tracking_id，只处理匹配的任务
+                // 否则，处理所有任务
+                let id_matches = tracking_id.is_none_or(|id| track.id == id);
+                if id_matches && (should_sync(&track, &package, now) || wake_up) {
+                    pending_tasks.push(track);
+                }
+            }
+        }
+
+        Ok(pending_tasks)
+    }
+
+    /// 获取需要同步的任务列表（按优先级排序）
+    pub async fn get_pending_sync_tasks_ordered(
+        &self,
+        wake_up: bool,
+    ) -> anyhow::Result<Vec<tracking::Model>> {
+        let now = Utc::now();
+
+        // 查询所有跟踪配置及其关联的软件包，按等级排序
+        let results = Tracking::find()
+            .find_also_related(Packages)
+            .filter(tracking::Column::TrackingStatus.ne("syncing"))
+            .filter(tracking::Column::TrackingStatus.ne("paused"))
+            .filter(tracking::Column::TrackingStatus.ne("archived"))
+            .order_by_asc(packages::Column::Level) // 等级越小越优先（1级 > 2级 > 3级）
+            .all(self.db)
+            .await?;
+
+        // 过滤出需要同步的任务
+        let mut pending_tasks = Vec::new();
+        for (track, package_opt) in results {
