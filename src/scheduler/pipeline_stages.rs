@@ -204,3 +204,55 @@ impl<'a> PipelineExecutor<'a> {
         // 导出 L2 快照
         let summary =
             metadata_bridge::export_l2_snapshot(self.db, tracking.id, &l2_repo_path, &output_path)
+                .await
+                .context("导出 L2 快照失败")?;
+
+        info!(
+            tracking_id = tracking.id,
+            files_count = summary.file_count,
+            spec_version = ?summary.spec_version,
+            "L2 快照生成成功"
+        );
+
+        Ok(L2SnapshotResult {
+            snapshot_id: None, // metadata_bridge 已经持久化到数据库
+            snapshot_path: Some(output_path),
+            files_count: summary.file_count,
+            has_new_data: true,
+        })
+    }
+
+    /// 阶段 3: 差异对比
+    pub(super) async fn stage_diff_comparison(
+        &self,
+        tracking: &tracking::Model,
+        _previous_results: &HashMap<PipelineStage, StageResult>,
+    ) -> Result<DiffComparisonResult> {
+        info!(tracking_id = tracking.id, "执行差异对比阶段");
+
+        // 1. 执行 L2 vs L1 对比（内容对比）
+        let l2_vs_l1_result = self.compare_l2_vs_l1(tracking).await?;
+
+        // 2. 执行 L1 vs L0 对比（版本对比）
+        let l1_vs_l0_result = self.compare_l1_vs_l0(tracking).await?;
+
+        // 3. 保存对比报告到数据库
+        let report_id = self
+            .save_comparison_reports(tracking, &l2_vs_l1_result, &l1_vs_l0_result)
+            .await?;
+
+        let files_changed = l2_vs_l1_result
+            .as_ref()
+            .map(|r| r.patch_diff.l2_added.len() + r.patch_diff.l2_modified.len())
+            .unwrap_or(0);
+        let has_spec_changes = l2_vs_l1_result
+            .as_ref()
+            .map(|r| !r.spec_diff.content_identical)
+            .unwrap_or(false);
+
+        info!(
+            tracking_id = tracking.id,
+            files_changed = files_changed,
+            has_spec_changes = has_spec_changes,
+            l1_vs_l0_completed = l1_vs_l0_result.is_some(),
+            l2_vs_l1_completed = l2_vs_l1_result.is_some(),
