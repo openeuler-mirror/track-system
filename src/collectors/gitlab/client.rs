@@ -167,3 +167,46 @@ impl GitClient for GitLabClient {
     async fn get_commits(
         &self,
         owner: &str,
+        repo: &str,
+        params: CommitsParams,
+    ) -> ApiResult<Vec<Commit>> {
+        let project_path = self.encode_project_path(owner, repo);
+        let mut url = format!(
+            "{}/projects/{}/repository/commits?ref_name={}&per_page={}&page={}",
+            self.base_url, project_path, params.branch, params.per_page, params.page
+        );
+
+        // 添加时间范围参数
+        if let Some(since) = params.since {
+            url.push_str(&format!("&since={}", since.to_rfc3339()));
+        }
+        if let Some(until) = params.until {
+            url.push_str(&format!("&until={}", until.to_rfc3339()));
+        }
+
+        // 添加 with_stats 参数以获取统计信息
+        url.push_str("&with_stats=true");
+
+        let gitlab_commits: Vec<GitLabCommit> = self.get(&url).await?;
+        Ok(gitlab_commits.into_iter().map(|c| c.into()).collect())
+    }
+
+    async fn get_file_content(
+        &self,
+        owner: &str,
+        repo: &str,
+        path: &str,
+        branch: &str,
+    ) -> ApiResult<FileContent> {
+        let project_path = self.encode_project_path(owner, repo);
+        let file_path = urlencoding::encode(path);
+        let url = format!(
+            "{}/projects/{}/repository/files/{}?ref={}",
+            self.base_url, project_path, file_path, branch
+        );
+
+        let gitlab_file: GitLabFileContent = self.get(&url).await?;
+        Ok(gitlab_file.into())
+    }
+}
+
