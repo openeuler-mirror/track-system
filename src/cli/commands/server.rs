@@ -109,3 +109,40 @@ async fn execute_ping(api_client: &ApiClient) -> Result<()> {
             println!("{} 服务器连接成功", "✓".green().bold());
             Ok(())
         }
+        Ok(false) => {
+            println!("{} 无法连接到服务器", "✗".red().bold());
+            println!();
+            println!("请检查:");
+            println!("  1. 服务器地址是否正确");
+            println!("  2. track-server 是否正在运行");
+            println!("  3. 网络连接是否正常");
+            anyhow::bail!("服务器连接失败")
+        }
+        Err(e) => {
+            println!("{} 连接测试失败: {}", "✗".red().bold(), e);
+            Err(e.into())
+        }
+    }
+}
+
+/// 获取服务器信息
+async fn execute_info(api_client: &ApiClient) -> Result<()> {
+    println!("正在获取服务器信息...");
+    println!();
+
+    match api_client.health_check().await {
+        Ok(health) => {
+            println!("{}", "服务器信息:".bold());
+            println!("  服务器地址: {}", api_client.config().server_url.cyan());
+            println!();
+            println!("{}", "健康状态:".bold());
+            println!("{}", serde_json::to_string_pretty(&health)?);
+            Ok(())
+        }
+        Err(e) => {
+            println!("{} 获取服务器信息失败: {}", "✗".red().bold(), e);
+            Err(e.into())
+        }
+    }
+}
+
