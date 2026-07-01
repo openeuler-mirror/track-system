@@ -619,3 +619,54 @@ mod tests {
 
     #[test]
     fn test_should_sync_uses_package_import_time_as_anchor() {
+        let base = Utc::now() - Duration::hours(100);
+        let package = create_test_package(2, 12, base);
+
+        let last_sync = base + Duration::hours(13);
+        let track = create_test_tracking(Some(last_sync), "idle");
+
+        let should_run_at_aligned_boundary = base + Duration::hours(24);
+        assert!(should_sync(
+            &track,
+            &package,
+            should_run_at_aligned_boundary
+        ));
+
+        let should_not_run_before_boundary = base + Duration::hours(23);
+        assert!(!should_sync(
+            &track,
+            &package,
+            should_not_run_before_boundary
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_calculate_next_sync_time() {
+        use crate::entities::{packages, tracking};
+        use sea_orm::{DatabaseBackend, MockDatabase};
+
+        let base = Utc::now() - Duration::hours(100);
+        let last_sync = base + Duration::hours(13);
+        let tracking_model = tracking::Model {
+            id: 1,
+            package_id: 1,
+            distro_id: 1,
+            l1_branch: "main".to_string(),
+            l1_repo_owner: "owner".to_string(),
+            l1_repo_name: "repo".to_string(),
+            l2_branch: "local".to_string(),
+            l2_repo_path: "/path".to_string(),
+            tracking_status: "idle".to_string(),
+            last_sync_time: Some(last_sync),
+            last_l1_commit_sha: None,
+            last_l2_commit_sha: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            last_error: None,
+        };
+
+        let package_model = packages::Model {
+            id: 1,
+            name: "test-pkg".to_string(),
+            level: 1,
+            sync_interval_hours: 24,
