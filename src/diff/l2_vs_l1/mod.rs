@@ -419,3 +419,56 @@ impl L2VsL1Comparator {
                 tracing::error!(
                     tracking_id = snapshot.tracking_id,
                     spec_path = %spec.path,
+                    spec_sha256 = %spec.sha256,
+                    error = %e,
+                    "创建 L1 快照失败：spec 内容不是有效的 UTF-8"
+                );
+                return Err(anyhow!("spec 内容不是有效的 UTF-8: {}", e));
+            }
+        };
+
+        // 提取 patch 文件并在失败时记录错误日志
+        let patches = match Self::extract_patches(&snapshot.files) {
+            Ok(p) => p,
+            Err(e) => {
+                tracing::error!(
+                    tracking_id = snapshot.tracking_id,
+                    files_count = snapshot.files.len(),
+                    error = %e,
+                    "创建 L1 快照失败：提取 patch 文件出错"
+                );
+                return Err(e);
+            }
+        };
+
+        // 提取源文件并在失败时记录错误日志
+        let source_files = match Self::extract_source_files(&snapshot.files) {
+            Ok(s) => s,
+            Err(e) => {
+                tracing::error!(
+                    tracking_id = snapshot.tracking_id,
+                    files_count = snapshot.files.len(),
+                    error = %e,
+                    "创建 L1 快照失败：提取源文件出错"
+                );
+                return Err(e);
+            }
+        };
+
+        Ok(L1Snapshot {
+            package_name,
+            version,
+            spec_content,
+            spec_sha256: spec.sha256.clone(),
+            patches,
+            source_files,
+            commits: snapshot.commits.clone(),
+            snapshot_at: snapshot.generated_at,
+        })
+    }
+
+    /// 从 RepositorySnapshot 创建 L2 快照
+    pub fn create_l2_snapshot(
+        package_name: String,
+        snapshot: &RepositorySnapshot,
+    ) -> Result<L2Snapshot> {
