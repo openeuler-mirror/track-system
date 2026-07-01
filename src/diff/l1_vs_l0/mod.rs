@@ -251,3 +251,54 @@ impl L1VsL0Comparator {
         // 判断是否有更新的稳定版本
         let has_newer_stable = current_version.is_older_than(&latest_stable_version);
 
+        // 判断是否有更新的版本（包括预发布）
+        let has_newer_latest = current_version.is_older_than(&latest_version);
+
+        Ok(VersionComparison {
+            behind_count,
+            is_outdated,
+            has_newer_stable,
+            has_newer_latest,
+        })
+    }
+
+    /// 查找可升级版本
+    fn find_upgradable_versions(
+        &self,
+        current: &str,
+        all_versions: &[VersionTag],
+    ) -> Result<Vec<UpgradableVersion>> {
+        // 解析当前版本
+        let current_version = VersionParser::parse(current)?;
+
+        // 过滤出比当前版本新的稳定版本
+        let mut upgradable: Vec<UpgradableVersion> = all_versions
+            .iter()
+            .filter_map(|tag| {
+                // 解析版本
+                let version = VersionParser::parse(&tag.version).ok()?;
+
+                // 只考虑稳定版本且比当前版本新
+                if version.is_stable() && version.is_newer_than(&current_version) {
+                    // 检查是否为安全更新（从 changelog 中判断）
+                    let is_security_release = tag.changelog.to_lowercase().contains("security")
+                        || tag.changelog.to_lowercase().contains("cve");
+
+                    // 提取 breaking changes（简化版本：检查主版本号是否变化）
+                    let breaking_changes = if version.major > current_version.major {
+                        vec![format!(
+                            "主版本号从 {} 升级到 {}，可能包含不兼容的变更",
+                            current_version.major, version.major
+                        )]
+                    } else {
+                        Vec::new()
+                    };
+
+                    Some(UpgradableVersion {
+                        version: tag.version.clone(),
+                        release_date: tag.date,
+                        is_security_release,
+                        breaking_changes,
+                    })
+                } else {
+                    None
