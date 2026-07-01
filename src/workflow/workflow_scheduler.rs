@@ -100,3 +100,26 @@ impl Default for WorkflowScheduler {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_workflow_scheduler_creation() {
+        let scheduler = WorkflowScheduler::new();
+        assert_eq!(scheduler.list_workflows().len(), 0);
+    }
+
+    #[test]
+    fn test_workflow_scheduler_add_workflow() {
+        let mut scheduler = WorkflowScheduler::new();
+        let item = WorkflowScheduleItem {
+            name: "test_workflow".to_string(),
+            workflow_path: "/path/to/workflow.yaml".to_string(),
+            cron_expression: "0 * * * * *".to_string(),
+            enabled: true,
+        };
+        scheduler.add_workflow(item);
+        assert_eq!(scheduler.list_workflows().len(), 1);
+    }
+}
