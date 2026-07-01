@@ -556,3 +556,53 @@ fn extract_spec_release(content: &str) -> Option<String> {
 fn sha256_hex(data: &[u8]) -> String {
     let mut hasher = Sha256::new();
     hasher.update(data);
+    let digest = hasher.finalize();
+    format!("{:x}", digest)
+}
+
+#[derive(Debug, Clone)]
+pub struct RepoCollectionResult {
+    pub commits: Vec<CommitEntry>,
+    pub spec_version: Option<String>,
+    pub spec_release: Option<String>,
+}
+
+fn collect_commits_from_repo(repo_path: &Path) -> Result<RepoCollectionResult> {
+    // 1. 解析 spec 文件获取 version 和 release
+    let (spec_version, spec_release) = parse_spec_from_repo(repo_path)?;
+
+    // 2. 通过 git 命令采集提交信息：SHA、作者、时间、标题，并统计更改数量
+    let repo = repo_path.to_string_lossy().to_string();
+    let output = Command::new("git")
+        .args([
+            "-C",
+            &repo,
+            "log",
+            "--date=iso-strict",
+            "--pretty=format:%H%x1f%an%x1f%ae%x1f%ad%x1f%s",
+            "--numstat",
+        ])
+        .output()
+        .with_context(|| format!("执行 git log 失败: {}", repo))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        error!(
+            repo = %repo,
+            code = ?output.status.code(),
+            stderr = %stderr,
+            "git log 执行失败"
+        );
+        bail!("git log 执行失败: {}", stderr.trim());
+    }
+
+    let delim = '\u{001f}'; // 自定义分隔符 0x1F
+    let mut commits: Vec<CommitEntry> = Vec::new();
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut current: Option<(CommitEntry, i32, i32, i32)> = None; // (entry, additions, deletions, files_changed)
+
+    let cve_re = Regex::new(r"CVE-\d{4}-\d{4,7}").unwrap();
+
+    for line in stdout.lines() {
+        if line.contains(delim) {
