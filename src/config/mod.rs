@@ -46,3 +46,51 @@ pub struct SqliteConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PostgresqlConfig {
+    pub host: String,
+    pub port: u16,
+    pub database: String,
+    pub username: String,
+    pub password: String,
+}
+
+/// API 配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApiConfig {
+    pub gitee: GiteeConfig,
+    pub github: GithubConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GiteeConfig {
+    pub token: String,
+    pub base_url: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GithubConfig {
+    pub token: String,
+    pub base_url: String,
+}
+
+/// 调度器配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SchedulerConfig {
+    pub max_concurrent_jobs: usize,
+    pub job_timeout_secs: u64,
+    pub cleanup_interval_secs: u64,
+    pub health_check_interval_secs: u64,
+}
+
+/// 速率限制配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RateLimitConfig {
+    pub gitee_per_minute: u32,
+    pub github_per_minute: u32,
+    pub burst_size: u32,
+}
+
+/// 软件包配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PackageConfig {
+    pub name: String,
+    pub level: i32,
