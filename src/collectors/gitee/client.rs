@@ -400,3 +400,49 @@ mod tests {
                 "state": "open",
                 "body": "body",
                 "user": {
+                    "name": "user",
+                    "login": "user",
+                    "id": 1
+                },
+                "created_at": "2023-01-01T00:00:00Z",
+                "updated_at": "2023-01-01T00:00:00Z",
+                "html_url": "url",
+                "comments_url": "url"
+            }
+        ]);
+
+        let _mock = server.mock(|when, then| {
+            when.method(GET)
+                .path("/repos/owner/test-repo/issues")
+                .query_param("page", "1")
+                .query_param("per_page", "20") // Default is 20
+                .query_param("state", "open")
+                .query_param("access_token", "token");
+            then.status(200).json_body(issues_response);
+        });
+
+        let params = IssueParams::default();
+        let result = client.get_issues("owner", "test-repo", params).await;
+        // mock.assert();
+        assert!(result.is_ok(), "Result error: {:?}", result.err());
+        let issues = result.unwrap();
+        assert_eq!(issues.len(), 1);
+        assert_eq!(issues[0].title, "title");
+    }
+
+    #[tokio::test]
+    async fn test_retry_mechanism() {
+        let server = MockServer::start();
+        let client = GiteeClient::for_testing("token", server.base_url()).unwrap();
+
+        let mock = server.mock(|when, then| {
+            when.method(GET).path("/repos/owner/test-repo");
+            then.status(500).body("Internal Server Error");
+        });
+
+        let result = client.get_repository("owner", "test-repo").await;
+
+        assert!(result.is_err());
+        mock.assert_calls(4); // 1 initial + 3 retries
+    }
+}
