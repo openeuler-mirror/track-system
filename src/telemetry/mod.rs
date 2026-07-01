@@ -34,3 +34,39 @@ impl Telemetry {
         if success {
             info!(target = "sync", tracking_id, job_id, "sync job succeeded");
         } else {
+            warn!(target = "sync", tracking_id, job_id, "sync job failed");
+        }
+    }
+
+    pub fn sync_job_succeeded(tracking_id: i32, job_id: i64) {
+        info!(target = "sync", tracking_id, job_id, "sync job succeeded");
+    }
+
+    pub fn sync_job_failed(tracking_id: i32, job_id: i64, error: &str) {
+        warn!(
+            target = "sync",
+            tracking_id, job_id, error, "sync job failed"
+        );
+    }
+
+    pub fn ingestion_batch_finished(tracking_id: i32, inserted: usize, skipped: usize) {
+        info!(
+            target = "ingest",
+            tracking_id, inserted, skipped, "ingestion batch finished"
+        );
+    }
+
+    pub fn classification_batch_processed(tracking_id: Option<i32>, processed: usize) {
+        match tracking_id {
+            Some(id) => info!(
+                target = "classification",
+                tracking_id = id,
+                processed,
+                "classification batch processed"
+            ),
+            None => info!(
+                target = "classification",
+                processed, "classification batch processed"
+            ),
+        }
+    }
