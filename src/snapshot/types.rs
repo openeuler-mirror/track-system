@@ -63,3 +63,36 @@ pub struct IssueEntry {
     pub labels: Vec<String>,
     pub updated_at: DateTime<Utc>,
 }
+
+/// 通用仓库快照
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RepositorySnapshot {
+    pub tracking_id: i32,
+    pub generated_at: DateTime<Utc>,
+    pub origin: SnapshotOrigin,
+    pub files: Vec<FileEntry>,
+    pub spec: Option<SpecEntry>,
+    pub commits: Vec<CommitEntry>,
+    pub issues: Vec<IssueEntry>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum SnapshotOrigin {
+    L1,
+    L2,
+    Unknown,
+}
+
+impl RepositorySnapshot {
+    pub fn new(tracking_id: i32, origin: SnapshotOrigin) -> Self {
+        Self {
+            tracking_id,
+            generated_at: Utc::now(),
+            origin,
+            files: Vec::new(),
+            spec: None,
+            commits: Vec::new(),
+            issues: Vec::new(),
+        }
+    }
+}
