@@ -333,3 +333,51 @@ impl<'a> SyncService<'a> {
                     let rel_key = spec_release_opt.clone().unwrap_or_default();
                     let key = (ver.clone(), rel_key.clone());
                     let is_bot = is_openeuler_ci_bot(&commit.author, &commit.email);
+                    if seen_version_release.contains(&key) && is_bot {
+                        // 跳过该机器人提交
+                        continue;
+                    }
+                    // 将该组合标记为已见（作者或机器人都记录，但机器人仅在未见时保留）
+                    if !seen_version_release.contains(&key) {
+                        seen_version_release.insert(key);
+                    }
+                }
+
+                // 创建新记录
+                let new_commit = l1_commit_records::ActiveModel {
+                    tracking_id: Set(tracking_id),
+                    commit_sha: Set(commit.sha.clone()),
+                    commit_message: Set(commit.message.clone()),
+                    author_name: Set(commit.author.clone()),
+                    author_email: Set(commit.email.clone()),
+                    committed_at: Set(commit.date),
+                    change_type: Set(None),
+                    primary_change_type: Set(None),
+                    cve_list: Set(None),
+                    spec_changed: Set(false),
+                    patch_stats: Set(None),
+                    classification_status: Set("pending".to_string()),
+                    classification_notes: Set(None),
+                    sync_status: Set("synced".to_string()),
+                    synced_to_l2_commit: Set(None),
+                    synced_at: Set(None),
+                    api_url: Set(api_url),
+                    fetched_at: Set(Utc::now()),
+                    files_changed_count: Set(commit.files_changed.len() as i32),
+                    additions: Set(0),
+                    deletions: Set(0),
+                    created_at: Set(Utc::now()),
+                    updated_at: Set(Utc::now()),
+                    // 新增：保存解析出的版本与 release
+                    spec_version: Set(spec_version_opt),
+                    spec_release: Set(spec_release_opt),
+                    ..Default::default()
+                };
+
+                new_commit
+                    .insert(self.db)
+                    .await
+                    .context("保存 commit 失败")?;
+
+                saved_count += 1;
+            }
