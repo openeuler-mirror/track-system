@@ -130,3 +130,47 @@ impl GiteeClient {
             if error.is_retryable() && retries < MAX_RETRIES {
                 retries += 1;
                 tokio::time::sleep(Duration::from_secs(2u64.pow(retries))).await;
+                continue;
+            }
+
+            return Err(error);
+        }
+    }
+}
+
+#[async_trait]
+impl GitClient for GiteeClient {
+    async fn get_repository(&self, owner: &str, repo: &str) -> ApiResult<Repository> {
+        let url = format!("{}/repos/{}/{}", self.base_url, owner, repo);
+        let gitee_repo: GiteeRepository = self.get(&url).await?;
+        Ok(gitee_repo.into())
+    }
+
+    async fn get_branches(&self, owner: &str, repo: &str) -> ApiResult<Vec<Branch>> {
+        let url = format!("{}/repos/{}/{}/branches", self.base_url, owner, repo);
+        let gitee_branches: Vec<GiteeBranch> = self.get(&url).await?;
+        Ok(gitee_branches.into_iter().map(Into::into).collect())
+    }
+
+    async fn get_commits(
+        &self,
+        owner: &str,
+        repo: &str,
+        params: CommitsParams,
+    ) -> ApiResult<Vec<Commit>> {
+        let mut url = format!(
+            "{}/repos/{}/{}/commits?sha={}&page={}&per_page={}",
+            self.base_url, owner, repo, params.branch, params.page, params.per_page
+        );
+
+        if let Some(since) = params.since {
+            url.push_str(&format!("&since={}", since.to_rfc3339()));
+        }
+
+        if let Some(until) = params.until {
+            url.push_str(&format!("&until={}", until.to_rfc3339()));
+        }
+
+        let gitee_commits: Vec<GiteeCommit> = self.get(&url).await?;
+        Ok(gitee_commits.into_iter().map(Into::into).collect())
+    }
