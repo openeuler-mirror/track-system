@@ -70,3 +70,39 @@ pub struct L2SnapshotDto {
     pub commit_date: DateTime<Utc>,
     pub spec_version: Option<String>,
     pub spec_release: Option<String>,
+    pub snapshot_data: serde_json::Value,
+    pub created_at: DateTime<Utc>,
+}
+
+/// 同步状态 DTO
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SyncStatusDto {
+    pub tracking_id: i32,
+    pub package_name: String,
+    pub distro_name: String,
+    pub status: String,
+    pub last_sync: Option<DateTime<Utc>>,
+    pub next_sync: Option<DateTime<Utc>>,
+    pub error_message: Option<String>,
+}
+
+/// 创建软件包请求
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreatePackageRequest {
+    pub name: String,
+    pub level: i32,
+    pub sync_interval_hours: i32,
+    pub l0_repo_url: Option<String>,
+    pub description: Option<String>,
+}
+/// 更新软件包请求
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdatePackageRequest {
+    pub level: Option<i32>,
+    pub sync_interval_hours: Option<i32>,
+    pub l0_repo_url: Option<String>,
+    pub description: Option<String>,
+}
+
+/// 创建发行版请求
+#[derive(Debug, Clone, Serialize, Deserialize)]
