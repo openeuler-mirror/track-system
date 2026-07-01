@@ -41,3 +41,47 @@ impl ApiClient {
             .map_err(|e| ApiError::ConfigError(format!("创建 HTTP 客户端失败: {}", e)))?;
 
         Ok(Self { client, config })
+    }
+
+    /// 从配置文件创建客户端
+    pub fn from_config_file() -> ApiResult<Self> {
+        let config = ClientConfig::from_env()?;
+        Self::new(config)
+    }
+
+    /// 获取配置
+    pub fn config(&self) -> &ClientConfig {
+        &self.config
+    }
+
+    /// 构建请求
+    fn build_request(&self, method: Method, path: &str) -> RequestBuilder {
+        let url = format!("{}{}", self.config.api_base_url(), path);
+        let mut builder = self.client.request(method, &url);
+
+        // 添加认证 token
+        if let Some(token) = &self.config.auth_token {
+            builder = builder.bearer_auth(token);
+        }
+
+        // 添加通用 headers
+        builder = builder.header("Content-Type", "application/json");
+
+        builder
+    }
+
+    /// 处理响应
+    async fn handle_response<T: DeserializeOwned>(response: Response) -> ApiResult<T> {
+        let status = response.status();
+
+        if status.is_success() {
+            // 成功响应
+            let data = response
+                .json::<T>()
+                .await
+                .map_err(|e| ApiError::JsonError(format!("解析响应失败: {}", e)))?;
+            Ok(data)
+        } else {
+            // 错误响应
+            let error_text = response
+                .text()
