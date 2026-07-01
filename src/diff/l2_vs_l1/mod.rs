@@ -789,3 +789,55 @@ impl L2VsL1Comparator {
             "对比 {} 个 L1 patch 文件和 {} 个 L2 patch 文件",
             l1_snapshot.patches.len(),
             l2_snapshot.patches.len()
+        );
+        let patch_diff = self.compare_patches(&l1_snapshot.patches, &l2_snapshot.patches)?;
+
+        // 3. 对比源文件
+        let source_diff =
+            self.compare_source_files(&l1_snapshot.source_files, &l2_snapshot.source_files)?;
+
+        // 4. 分析定制内容
+        let customization_analysis =
+            self.analyze_customization_impact(&l2_snapshot.customizations)?;
+
+        // 5. 生成同步建议
+        let sync_recommendations = self.generate_sync_recommendations(
+            &spec_diff,
+            &patch_diff,
+            &source_diff,
+            &customization_analysis,
+        )?;
+
+        // 6. 检测冲突
+        let conflicts = self.detect_conflicts(&spec_diff, &patch_diff, &source_diff)?;
+
+        // 7. 对比 commit（从数据库获取 L2 最新版本并在 L1 中匹配）
+        let commit_diff = self
+            .compare_commit_db(l1_snapshot, l2_snapshot, db, tracking_id)
+            .await?;
+
+        Ok(L2VsL1Report {
+            id: None,
+            package_name: l1_snapshot.package_name.clone(),
+            spec_diff,
+            patch_diff,
+            source_diff,
+            customization_analysis,
+            sync_recommendations,
+            conflicts,
+            commit_diff,
+            created_at: Utc::now(),
+        })
+    }
+
+    /// 对比 spec 文件
+    fn compare_spec(&self, l1: &L1Snapshot, l2: &L2Snapshot) -> Result<SpecDiff> {
+        // 检查内容是否相同
+        let content_identical = l1.spec_sha256 == l2.spec_sha256;
+
+        // 解析两个 spec 文件
+        let l1_spec = SpecParser::parse(&l1.spec_content)?;
+        let l2_spec = SpecParser::parse(&l2.spec_content)?;
+
+        // 执行详细对比
+        let detailed_comparison = SpecParser::compare(&l1_spec, &l2_spec);
