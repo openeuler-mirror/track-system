@@ -2370,3 +2370,55 @@ Summary: Test package
                 path: "fix-CVE-2025-12345.patch".to_string(),
                 content_hash: "h".to_string(),
                 size: 1,
+                applied: true,
+            }],
+            l2_modified: vec![],
+            identical: vec![],
+        };
+        let recs = comparator
+            .generate_security_recommendations(&patch_diff)
+            .unwrap();
+        assert_eq!(recs.len(), 1);
+        assert_eq!(recs[0].priority, SyncPriority::Critical);
+        assert_eq!(recs[0].recommendation_type, SyncType::SecurityPatch);
+        assert!(recs[0].description.contains("CVE-2025-12345"));
+        assert_eq!(recs[0].affected_files.len(), 1);
+    }
+
+    #[test]
+    fn test_generate_bugfix_recommendations_excludes_security_patches() {
+        let comparator = L2VsL1Comparator::new();
+        let patch_diff = PatchDiff {
+            l1_total: 3,
+            l2_total: 0,
+            l2_added: vec![],
+            l2_removed: vec![
+                PatchFile {
+                    filename: "fix-bug.patch".to_string(),
+                    path: "fix-bug.patch".to_string(),
+                    content_hash: "h1".to_string(),
+                    size: 1,
+                    applied: true,
+                },
+                PatchFile {
+                    filename: "security-fix.patch".to_string(),
+                    path: "security-fix.patch".to_string(),
+                    content_hash: "h2".to_string(),
+                    size: 1,
+                    applied: true,
+                },
+                PatchFile {
+                    filename: "CVE-2025-0001.patch".to_string(),
+                    path: "CVE-2025-0001.patch".to_string(),
+                    content_hash: "h3".to_string(),
+                    size: 1,
+                    applied: true,
+                },
+            ],
+            l2_modified: vec![],
+            identical: vec![],
+        };
+        let recs = comparator
+            .generate_bugfix_recommendations(&patch_diff)
+            .unwrap();
+        assert_eq!(recs.len(), 1);
