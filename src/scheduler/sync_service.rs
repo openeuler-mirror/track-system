@@ -93,3 +93,51 @@ impl<'a> SyncService<'a> {
 
         // 根据 repo_owner 推断（简单启发式）
         // 这只是临时方案
+        if tracking.l1_repo_owner.contains("github") {
+            Ok(Platform::GitHub)
+        } else if tracking.l1_repo_owner.contains("gitea") {
+            Ok(Platform::Gitea)
+        } else {
+            // 默认使用 Gitee（当前系统主要使用的平台）
+            Ok(Platform::Gitee)
+        }
+    }
+
+    /// 获取平台对应的认证 token
+    fn get_platform_token(&self, platform: &Platform) -> Result<Option<String>> {
+        let env_var = match platform {
+            Platform::GitHub => "GITHUB_TOKEN",
+            Platform::Gitee => "GITEE_TOKEN",
+            Platform::Gitea => "GITEA_TOKEN",
+            Platform::GitLab => "GITLAB_TOKEN",
+            Platform::Local => return Ok(None), // Local 不需要 token
+        };
+
+        match std::env::var(env_var) {
+            Ok(value) if !value.trim().is_empty() => Ok(Some(value)),
+            _ => {
+                warn!(platform = %platform, "缺少 {} 环境变量", env_var);
+                Ok(None)
+            }
+        }
+    }
+
+    /// 创建对应平台的 Collector
+    fn create_collector(
+        &self,
+        platform: Platform,
+        token: Option<String>,
+    ) -> Result<Box<dyn Collector>> {
+        use crate::collectors::{GitHubClient, GiteaClient, GiteeClient};
+
+        match platform {
+            Platform::GitHub => {
+                let token = token.ok_or_else(|| anyhow::anyhow!("GitHub 需要 token"))?;
+                let client = GitHubClient::new(token)?;
+                let collector = client.as_collector();
+                Ok(Box::new(collector))
+            }
+            Platform::Gitee => {
+                let token = token.ok_or_else(|| anyhow::anyhow!("Gitee 需要 token"))?;
+                let client = GiteeClient::new(token)?;
+                let collector = client.as_collector();
