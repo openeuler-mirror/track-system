@@ -1166,3 +1166,54 @@ Patch1: fix.patch
             "tracking_id": 1,
             "origin": "L2",
             "spec": null,
+            "files": [],
+            "commits": [],
+            "issues": [],
+            "generated_at": Utc::now().to_rfc3339(),
+        });
+        let model = l2_snapshots::Model {
+            id: 1,
+            tracking_id: 1,
+            snapshot_type: "l2".to_string(),
+            checksum: "c".to_string(),
+            payload,
+            created_at: Utc::now(),
+        };
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![model]])
+            .into_connection();
+
+        let result = latest_snapshot(&db, 1).await.unwrap();
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().tracking_id, 1);
+    }
+
+    #[tokio::test]
+    async fn test_load_l2_snapshot_from_db_none() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![]])
+            .into_connection();
+        let result = load_l2_snapshot_from_db(&db, 1).await.unwrap();
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_load_l2_snapshot_from_db_parse_error() {
+        let model = l2_snapshots::Model {
+            id: 1,
+            tracking_id: 1,
+            snapshot_type: "l2".to_string(),
+            checksum: "c".to_string(),
+            payload: json!({"not": "collect_result"}),
+            created_at: Utc::now(),
+        };
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![model]])
+            .into_connection();
+        let result = load_l2_snapshot_from_db(&db, 1).await;
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
