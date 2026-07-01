@@ -66,3 +66,37 @@ impl WorkflowScheduler {
         }
 
         // 这里可以使用 tokio-cron-scheduler 或其他调度库
+
+        Ok(())
+    }
+
+    /// 手动执行一个工作流
+    pub async fn execute_workflow(&self, workflow_name: &str) -> Result<()> {
+        let item = self
+            .items
+            .get(workflow_name)
+            .ok_or_else(|| anyhow::anyhow!("工作流 {} 不存在", workflow_name))?;
+
+        info!("手动执行工作流: {}", workflow_name);
+
+        // 加载工作流
+        let mut engine = WorkflowEngine::from_file(&item.workflow_path)?;
+
+        // 创建执行器并执行
+        let executor = TaskExecutor::new();
+        engine.execute(&executor).await?;
+
+        // 输出摘要
+        let summary = engine.summary();
+        info!("{}", summary);
+
+        Ok(())
+    }
+}
+
+impl Default for WorkflowScheduler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
