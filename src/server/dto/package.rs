@@ -68,3 +68,39 @@ pub struct TrackingResponse {
     pub package_id: i32,
     //pub distro_id: i32,
     pub l1_branch: String,
+    pub l1_repo_owner: String,
+    pub l1_repo_name: String,
+    pub l2_branch: String,
+    pub l2_repo_path: String,
+    pub tracking_status: String,
+    pub last_sync_time: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+impl From<tracking::Model> for TrackingResponse {
+    fn from(model: tracking::Model) -> Self {
+        Self {
+            id: model.id,
+            package_id: model.package_id,
+            //distro_id: model.distro_id,
+            l1_branch: model.l1_branch,
+            l1_repo_owner: model.l1_repo_owner,
+            l1_repo_name: model.l1_repo_name,
+            l2_branch: model.l2_branch,
+            l2_repo_path: model.l2_repo_path,
+            tracking_status: model.tracking_status,
+            last_sync_time: model.last_sync_time,
+            created_at: model.created_at,
+            updated_at: model.updated_at,
+        }
+    }
+}
+
+/// 带跟踪配置的软件包响应
+#[derive(Debug, Serialize)]
+pub struct PackageWithTrackingResponse {
+    #[serde(flatten)]
+    pub package: PackageResponse,
+    pub tracking: Vec<TrackingResponse>,
+}
