@@ -38,3 +38,44 @@ impl<'a> ChangeClassifier<'a> {
 
         let commit_message = &commit.commit_message;
 
+        // 提取 CVE 编号并去重
+        let mut cve_numbers = Self::extract_cve_numbers(commit_message);
+        cve_numbers.sort();
+        cve_numbers.dedup();
+
+        // 基于 commit message 确定变更类型
+        let primary_type = Self::classify_by_message(commit_message, &cve_numbers);
+
+        // 构建分类结果
+        let classification = ChangeClassification {
+            cve_numbers,
+            primary_type,
+            ..Default::default()
+        };
+
+        Ok(classification)
+    }
+
+    /// 批量分类 commits
+    pub async fn batch_classify_commits(
+        &self,
+        commit_ids: Vec<i32>,
+    ) -> Result<Vec<ChangeClassification>> {
+        let mut results = Vec::new();
+        for commit_id in commit_ids {
+            results.push(self.classify_commit(commit_id).await?);
+        }
+        Ok(results)
+    }
+
+    /// 提取 CVE 编号
+    fn extract_cve_numbers(text: &str) -> Vec<String> {
+        let re = Regex::new(r"CVE-\d{4}-\d+").unwrap();
+        re.find_iter(text).map(|m| m.as_str().to_string()).collect()
+    }
+
+    /// 基于 commit message 分类变更类型
+    fn classify_by_message(message: &str, cve_numbers: &[String]) -> ChangeType {
+        let message_lower = message.to_lowercase();
+
+        // 1. 优先识别 CVE（如果提取到 CVE 编号）
