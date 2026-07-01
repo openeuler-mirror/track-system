@@ -29,3 +29,35 @@ pub struct Model {
     pub license: Option<String>,
     #[sea_orm(column_type = "Text")]
     pub sources: String,
+    #[sea_orm(column_type = "Text")]
+    pub patches: String,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub latest_changelog_entry: Option<String>,
+    #[sea_orm(column_type = "Text")]
+    pub full_content: String,
+    pub content_hash: String,
+    #[sea_orm(column_type = "Text")]
+    pub download_url: String,
+    pub fetched_at: DateTimeUtc,
+    pub created_at: DateTimeUtc,
+}
+
+#[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+pub enum Relation {
+    #[sea_orm(
+        belongs_to = "super::l1_commit_records::Entity",
+        from = "Column::CommitRecordId",
+        to = "super::l1_commit_records::Column::Id",
+        on_update = "NoAction",
+        on_delete = "Cascade"
+    )]
+    CommitRecords,
+}
+
+impl Related<super::l1_commit_records::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::CommitRecords.def()
+    }
+}
+
+impl ActiveModelBehavior for ActiveModel {}
