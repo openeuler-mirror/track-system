@@ -708,3 +708,54 @@ fn parse_spec_from_repo(repo_path: &Path) -> Result<(Option<String>, Option<Stri
             .map(|ext| ext == "spec")
             .unwrap_or(false)
         {
+            // 读取 spec 文件内容
+            let content = fs::read(entry.path())?;
+            let spec_text = String::from_utf8_lossy(&content);
+
+            // 解析 version 和 release
+            let version = extract_spec_version(&spec_text);
+            let release = extract_spec_release(&spec_text);
+
+            info!(
+                spec_path = %entry.path().display(),
+                version = ?version,
+                release = ?release,
+                "解析到 spec 文件"
+            );
+
+            return Ok((version, release));
+        }
+    }
+
+    // 未找到 spec 文件
+    Ok((None, None))
+}
+
+// 从数据库收集 L2 commits
+/// 从 l2_snapshots 表加载快照数据并解析
+async fn load_l2_snapshot_from_db(
+    db: &DatabaseConnection,
+    tracking_id: i32,
+) -> Result<Option<RepositorySnapshot>> {
+    use crate::collectors::traits::CollectResult;
+
+    // 查询最新的 L2 快照
+    let snapshot_record = L2Snapshots::find()
+        .filter(l2_snapshots::Column::TrackingId.eq(tracking_id))
+        .order_by_desc(l2_snapshots::Column::CreatedAt)
+        .one(db)
+        .await?;
+
+    let snapshot_record = match snapshot_record {
+        Some(record) => record,
+        None => {
+            info!(tracking_id = tracking_id, "未找到 L2 快照数据");
+            return Ok(None);
+        }
+    };
+
+    info!(
+        tracking_id = tracking_id,
+        snapshot_id = snapshot_record.id,
+        "从数据库加载 L2 快照数据"
+    );
