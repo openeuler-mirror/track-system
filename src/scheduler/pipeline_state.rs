@@ -242,3 +242,39 @@ mod tests {
         assert!(!state.is_cancelled());
 
         state.request_cancel();
+        assert!(state.is_cancelled());
+    }
+
+    #[tokio::test]
+    async fn test_get_progress_from_db_when_not_in_memory() {
+        use crate::entities::sync_jobs;
+        use sea_orm::{DatabaseBackend, MockDatabase};
+
+        let job_model = sync_jobs::Model {
+            id: 1,
+            tracking_id: 100,
+            job_kind: "sync".to_string(),
+            scheduled_at: Utc::now(),
+            started_at: Some(Utc::now()),
+            finished_at: None,
+            status: "completed".to_string(),
+            error: None,
+            attempt_count: 0,
+            priority: 0,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results(vec![vec![job_model]])
+            .into_connection();
+        let db = Arc::new(db);
+        let manager = PipelineStateManager::new(db);
+
+        // Not in memory
+        let progress = manager.get_progress(1).await.unwrap();
+        assert_eq!(progress.job_id, 1);
+        assert_eq!(progress.status, "completed");
+        assert_eq!(progress.progress_percent, 0.0);
+    }
+
