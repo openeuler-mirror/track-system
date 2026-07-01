@@ -282,3 +282,50 @@ impl<'a> SyncManager<'a> {
 
     /// 完成同步任务
     pub async fn complete_sync_task(&self, tracking_id: i32, success: bool) -> anyhow::Result<()> {
+        if success {
+            self.apply_completion(tracking_id, CompletionOutcome::Success)
+                .await
+        } else {
+            self.apply_completion(
+                tracking_id,
+                CompletionOutcome::Failure {
+                    message: "Sync failed".to_string(),
+                },
+            )
+            .await
+        }
+    }
+
+    pub async fn complete_sync_task_with_result(
+        &self,
+        tracking_id: i32,
+        result: &SyncResult,
+    ) -> anyhow::Result<()> {
+        match result.status {
+            SyncStatus::Success => {
+                self.apply_completion(tracking_id, CompletionOutcome::Success)
+                    .await
+            }
+            SyncStatus::Failed => {
+                self.apply_completion(
+                    tracking_id,
+                    CompletionOutcome::Failure {
+                        message: result.message.clone(),
+                    },
+                )
+                .await
+            }
+            SyncStatus::Skipped => {
+                self.apply_completion(
+                    tracking_id,
+                    CompletionOutcome::Skipped {
+                        reason: result.message.clone(),
+                    },
+                )
+                .await
+            }
+        }
+    }
+
+    /// 获取跟踪配置
+    pub async fn get_tracking(&self, tracking_id: i32) -> anyhow::Result<tracking::Model> {
