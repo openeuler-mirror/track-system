@@ -1843,3 +1843,56 @@ impl L2VsL1Comparator {
                 }
             }
         }
+        None
+    }
+
+    /// 在数据库记录中查找匹配 version-release 的基线 commit（精确匹配）
+    ///
+    /// 返回：(基线 commit, commit 在列表中的索引)
+    ///
+    /// 查找策略：
+    /// 1. 优先查找 spec_version 和 spec_release 完全匹配的 commit
+    /// 2. 如果没找到，查找只有 spec_version 匹配的 commit
+    /// 3. 如果还没找到，返回 None
+    fn find_base_commit_from_records(
+        models: &[crate::entities::l1_commit_records::Model],
+        version: &str,
+        release: Option<&str>,
+    ) -> (Option<CommitEntry>, Option<usize>) {
+        if let Some(rel) = release {
+            for (idx, model) in models.iter().enumerate() {
+                if let (Some(spec_ver), Some(spec_rel)) = (&model.spec_version, &model.spec_release)
+                {
+                    if spec_ver == version && spec_rel == rel {
+                        return (Some(Self::model_to_commit_entry(model)), Some(idx));
+                    }
+                }
+            }
+        }
+        for (idx, model) in models.iter().enumerate() {
+            if let Some(spec_ver) = &model.spec_version {
+                if spec_ver == version {
+                    return (Some(Self::model_to_commit_entry(model)), Some(idx));
+                }
+            }
+        }
+        (None, None)
+    }
+
+    /// 将数据库 Model 转换为 CommitEntry
+    fn model_to_commit_entry(model: &crate::entities::l1_commit_records::Model) -> CommitEntry {
+        CommitEntry {
+            sha: model.commit_sha.clone(),
+            title: model
+                .commit_message
+                .lines()
+                .next()
+                .unwrap_or("")
+                .to_string(),
+            message: model.commit_message.clone(),
+            author: model.author_name.clone(),
+            authored_at: model.committed_at,
+            url: Some(model.api_url.clone()),
+            stats: crate::snapshot::types::ChangeStats {
+                additions: model.additions,
+                deletions: model.deletions,
