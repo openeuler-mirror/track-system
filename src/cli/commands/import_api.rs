@@ -921,3 +921,52 @@ mod tests {
                             }
                         ],
                         "total": 1
+                    }
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = resolve_tracking_id_from_package(&client, "test-package").await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        assert_eq!(result.unwrap(), 100);
+        packages_mock_1.assert_async().await;
+        tracking_mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_resolve_tracking_id_tracking_empty() {
+        let (mut server, client) = setup_test_server().await;
+
+        let packages_mock = server
+            .mock("GET", "/api/packages")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!([
+                    {
+                        "id": 10,
+                        "name": "test-package",
+                        "level": 1,
+                        "sync_interval_hours": 24,
+                        "l0_repo_url": "https://github.com/test/test",
+                        "description": "Test package",
+                        "created_at": "2024-01-01T00:00:00Z",
+                        "updated_at": "2024-01-01T00:00:00Z"
+                    }
+                ])
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let tracking_mock = server
+            .mock("GET", "/api/tracking?page=1&page_size=100&package_id=10")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "code": 200,
+                    "message": "success",
+                    "data": {
