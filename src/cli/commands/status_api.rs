@@ -41,3 +41,47 @@ struct DatabaseStatus {
 #[derive(Debug, Serialize, Deserialize)]
 struct SchedulerStatus {
     running: bool,
+    active_jobs: usize,
+    pending_jobs: usize,
+}
+
+/// API 响应包装
+#[derive(Debug, Serialize, Deserialize)]
+struct ApiResponse<T> {
+    data: T,
+}
+
+/// 执行状态查询命令
+pub async fn execute(api_client: &ApiClient, action: StatusAction) -> Result<()> {
+    match action {
+        StatusAction::Overview => show_overview(api_client).await,
+        StatusAction::Scheduler => show_scheduler(api_client).await,
+        StatusAction::RateLimit => show_rate_limit(api_client).await,
+    }
+}
+
+/// 显示系统概览
+async fn show_overview(api_client: &ApiClient) -> Result<()> {
+    println!("正在获取系统状态...");
+    println!();
+
+    match api_client.get::<ApiResponse<SystemStatus>>("/status").await {
+        Ok(response) => {
+            let status = response.data;
+
+            println!("{}", "系统状态概览:".bold());
+            println!();
+
+            // 系统状态
+            let status_str = match status.status.as_str() {
+                "healthy" => "健康".green(),
+                "degraded" => "降级".yellow(),
+                "unhealthy" => "异常".red(),
+                _ => status.status.as_str().into(),
+            };
+            println!("  状态: {}", status_str);
+            println!("  版本: {}", status.version.cyan());
+            println!("  运行时间: {} 秒", status.uptime);
+            println!();
+
+            // 数据库状态
