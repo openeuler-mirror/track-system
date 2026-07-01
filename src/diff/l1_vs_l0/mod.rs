@@ -99,3 +99,54 @@ pub struct CveInfo {
 }
 
 /// L1 vs L0 对比报告
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct L1VsL0Report {
+    /// 报告 ID
+    pub id: Option<i64>,
+    /// 软件包名称
+    pub package_name: String,
+    /// 当前版本
+    pub current_version: String,
+    /// 最新稳定版本
+    pub latest_stable: String,
+    /// 最新版本
+    pub latest_version: String,
+    /// 落后版本数
+    pub version_behind: u32,
+    /// 可升级版本列表
+    pub upgradable_versions: Vec<UpgradableVersion>,
+    /// 补丁分析
+    pub patch_analysis: PatchAnalysis,
+    /// CVE 分析
+    pub cve_analysis: CveAnalysis,
+    /// 升级建议
+    pub recommendations: Vec<String>,
+    /// 生成时间
+    pub created_at: DateTime<Utc>,
+}
+
+/// 可升级版本
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpgradableVersion {
+    /// 版本号
+    pub version: String,
+    /// 发布日期
+    pub release_date: DateTime<Utc>,
+    /// 是否为安全更新
+    pub is_security_release: bool,
+    /// Breaking changes
+    pub breaking_changes: Vec<String>,
+}
+
+/// 补丁分析结果
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PatchAnalysis {
+    /// 总补丁数
+    pub total_patches: usize,
+    /// 已合并到上游的补丁
+    pub merged_in_upstream: Vec<PatchInfo>,
+    /// 仍需保留的补丁
+    pub still_needed: Vec<PatchInfo>,
+    /// 升级后可移除的补丁数
+    pub can_be_removed_after_upgrade: usize,
+}
