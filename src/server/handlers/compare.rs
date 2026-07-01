@@ -278,3 +278,45 @@ mod tests {
         let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
         let state = AppState::without_external_clients(db);
 
+        let request = CompareL2VsL1Request {
+            tracking_id: -1,
+            l1_snapshot_id: None,
+            l2_snapshot_id: None,
+        };
+
+        let result = compare_l2_vs_l1(State(state), Json(request)).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_get_compare_status() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+        let state = AppState::without_external_clients(db);
+
+        let task_id = "test-task-123".to_string();
+        let result = get_compare_status(State(state), Path(task_id.clone())).await;
+
+        assert!(result.is_ok());
+        let response = result.unwrap();
+        assert_eq!(response.0.code, 200);
+        assert!(response.0.data.is_some());
+
+        let status_response = response.0.data.unwrap();
+        assert_eq!(status_response.task_id, task_id);
+        assert_eq!(status_response.status, CompareStatus::Completed);
+        assert_eq!(status_response.progress, 100);
+    }
+
+    #[tokio::test]
+    async fn test_cancel_compare_task() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+        let state = AppState::without_external_clients(db);
+
+        let task_id = "test-task-456".to_string();
+        let result = cancel_compare_task(State(state), Path(task_id)).await;
+
+        assert!(result.is_ok());
+        let status_code = result.unwrap();
+        assert_eq!(status_code, axum::http::StatusCode::NO_CONTENT);
+    }
+}
