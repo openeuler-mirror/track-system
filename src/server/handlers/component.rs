@@ -35,3 +35,41 @@ const DEFAULT_OWNER_GITEA: &str = "sources-CTyunOS";
 const DEFAULT_BRANCH: &str = "master";
 
 pub async fn get_component(
+    State(state): State<AppState>,
+    Path(name): Path<String>,
+    Query(params): Query<ComponentQueryParams>,
+) -> Result<Json<ComponentInfo>, StatusCode> {
+    let (client, owner_default) = select_client(&state, params.platform.as_deref())?;
+    let owner = params.owner.as_deref().unwrap_or(owner_default);
+    let branch = params.branch.as_deref().unwrap_or(DEFAULT_BRANCH);
+    let spec_path = normalize_spec_path(&name, params.spec.as_deref());
+
+    let spec = fetch_component_spec(client, owner, &name, branch, &spec_path)
+        .await
+        .map_err(|_| StatusCode::BAD_GATEWAY)?;
+
+    Ok(Json(ComponentInfo {
+        name: spec.name,
+        version: spec.version,
+        release: spec.release,
+    }))
+}
+
+pub async fn list_components() -> Json<Vec<&'static str>> {
+    Json(vec!["glibc", "gcc", "python"])
+}
+
+pub async fn query_components(
+    State(state): State<AppState>,
+    Json(body): Json<ComponentQueryRequest>,
+) -> Result<Json<Vec<ComponentInfo>>, StatusCode> {
+    let mut results = Vec::with_capacity(body.components.len());
+
+    for component in body.components {
+        let info = handle_single_component(&state, component).await?;
+        results.push(info);
+    }
+
+    Ok(Json(results))
+}
+
