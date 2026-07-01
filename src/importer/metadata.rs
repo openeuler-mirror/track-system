@@ -95,3 +95,52 @@ impl<'a> MetadataImporter<'a> {
             if self.import_distro(distro_json, options).await? {
                 result.imported_distros += 1;
             }
+        }
+
+        // 导入跟踪配置
+        for tracking_json in &metadata.trackings {
+            if self.import_tracking(tracking_json, options).await? {
+                result.imported_trackings += 1;
+            }
+        }
+
+        // 导入 commit 记录（如果有）
+        if let Some(commits) = &metadata.commits {
+            for commit_json in commits {
+                if self.import_commit(commit_json).await? {
+                    result.imported_commits += 1;
+                }
+            }
+        }
+
+        result.success = true;
+        Ok(result)
+    }
+
+    /// 导入单个软件包
+    async fn import_package(
+        &self,
+        pkg_json: &serde_json::Value,
+        options: &ImportOptions,
+    ) -> Result<PackageImportResult, DbErr> {
+        use crate::entities::{packages, prelude::Packages};
+
+        let name = pkg_json["name"].as_str().unwrap_or("");
+        let level = pkg_json["level"].as_i64().unwrap_or(0) as i32;
+        let sync_interval_hours = pkg_json["sync_interval_hours"].as_i64().unwrap_or(12) as i32;
+
+        // 检查是否已存在
+        let existing = Packages::find()
+            .filter(packages::Column::Name.eq(name))
+            .one(self.db)
+            .await?;
+
+        if let Some(existing_pkg) = existing {
+            // 已存在，处理冲突
+            if options.skip_on_conflict {
+                return Ok(PackageImportResult::Skipped);
+            } else if options.update_on_conflict {
+                // 更新
+                let mut pkg: packages::ActiveModel = existing_pkg.into();
+                pkg.level = Set(level);
+                pkg.sync_interval_hours = Set(sync_interval_hours);
