@@ -99,3 +99,54 @@ pub async fn import_snapshot<P: AsRef<Path>>(
         .context("tracking configuration not found")?;
 
     let json = fs::read_to_string(input_path.as_ref())?;
+    let snapshot: RepositorySnapshot = serde_json::from_str(&json)?;
+
+    if snapshot.tracking_id != tracking.id {
+        bail!(
+            "snapshot tracking_id {} does not match target {}",
+            snapshot.tracking_id,
+            tracking.id
+        );
+    }
+
+    persist_snapshot(db, &snapshot, input_path.as_ref()).await
+}
+
+pub async fn latest_snapshot(
+    db: &DatabaseConnection,
+    tracking_id: i32,
+) -> Result<Option<RepositorySnapshot>> {
+    let record = L2Snapshots::find()
+        .filter(l2_snapshots::Column::TrackingId.eq(tracking_id))
+        .order_by_desc(l2_snapshots::Column::CreatedAt)
+        .one(db)
+        .await?;
+
+    if let Some(model) = record {
+        let snapshot: RepositorySnapshot = serde_json::from_value(model.payload)?;
+        Ok(Some(snapshot))
+    } else {
+        Ok(None)
+    }
+}
+
+async fn build_repository_snapshot(
+    db: &DatabaseConnection,
+    tracking: &crate::entities::tracking::Model,
+    origin: SnapshotOrigin,
+    repo_path: Option<&Path>,
+) -> Result<RepositorySnapshot> {
+    if let Some(path) = repo_path {
+        if !path.exists() {
+            bail!("repo path {} does not exist", path.display());
+        }
+    }
+
+    // 特殊处理：L2 无 repo_path 时，尝试从 l2_snapshots 表加载
+    if matches!(origin, SnapshotOrigin::L2) && repo_path.is_none() {
+        if let Some(snapshot) = load_l2_snapshot_from_db(db, tracking.id).await? {
+            return Ok(snapshot);
+        }
+        // 如果没有找到快照数据，回退到从数据库读取 commits
+        info!(
+            tracking_id = tracking.id,
