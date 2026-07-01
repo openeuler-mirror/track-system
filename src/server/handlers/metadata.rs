@@ -562,3 +562,54 @@ async fn import_commit_record(
     }
 
     // 转换 CVE 列表
+    let cve_list_json = if !commit.cve_list.is_empty() {
+        Some(serde_json::to_value(&commit.cve_list)?)
+    } else {
+        None
+    };
+
+    // 插入新记录
+    let new_commit = l1_commit_records::ActiveModel {
+        tracking_id: Set(tracking_id),
+        commit_sha: Set(commit.sha.clone()),
+        commit_message: Set(commit.message.clone()),
+        author_name: Set(commit.author.clone()),
+        author_email: Set(String::new()), // 从快照中无法获取
+        committed_at: Set(commit.authored_at),
+        change_type: Set(None),
+        primary_change_type: Set(commit.primary_change_type.clone()),
+        cve_list: Set(cve_list_json),
+        spec_changed: Set(false),
+        patch_stats: Set(None),
+        classification_status: Set("unclassified".to_string()),
+        classification_notes: Set(None),
+        sync_status: Set("not_synced".to_string()),
+        synced_to_l2_commit: Set(None),
+        synced_at: Set(None),
+        api_url: Set(commit.url.clone().unwrap_or_default()),
+        fetched_at: Set(chrono::Utc::now()),
+        files_changed_count: Set(commit.stats.files_changed),
+        additions: Set(commit.stats.additions),
+        deletions: Set(commit.stats.deletions),
+        created_at: Set(chrono::Utc::now()),
+        updated_at: Set(chrono::Utc::now()),
+        ..Default::default()
+    };
+
+    L1CommitRecords::insert(new_commit).exec(db).await?;
+    Ok(true)
+}
+
+/// 导入 issue 到数据库
+async fn import_issue(
+    db: &sea_orm::DatabaseConnection,
+    tracking_id: i32,
+    issue: &crate::snapshot::types::IssueEntry,
+) -> anyhow::Result<bool> {
+    use crate::entities::{issues, prelude::*};
+    use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
+
+    // 检查是否已存在
+    let existing = Issues::find()
+        .filter(issues::Column::TrackingId.eq(tracking_id))
+        .filter(issues::Column::IssueNumber.eq(&issue.number))
