@@ -140,3 +140,50 @@ impl<'a> MetadataImporter<'a> {
         file_path: &Path,
         tracking_id: i32,
     ) -> Result<ImportResult> {
+        info!("从文件导入元数据: {:?}", file_path);
+
+        // 读取并解析 JSON
+        let content = tokio::fs::read_to_string(file_path)
+            .await
+            .context("读取文件失败")?;
+
+        let metadata: CollectedMetadata =
+            serde_json::from_str(&content).context("解析 JSON 失败")?;
+
+        info!(
+            "解析完成: platform={}, owner={}, repo={}, commits={}, issues={}",
+            metadata.platform,
+            metadata.owner,
+            metadata.repo,
+            metadata.commits.len(),
+            metadata.issues.len()
+        );
+
+        // 导入数据
+        self.import_metadata(&metadata, tracking_id).await
+    }
+
+    /// 导入元数据
+    pub async fn import_metadata(
+        &self,
+        metadata: &CollectedMetadata,
+        tracking_id: i32,
+    ) -> Result<ImportResult> {
+        let mut commits_imported = 0;
+        let mut commits_skipped = 0;
+        let mut issues_imported = 0;
+        let mut issues_skipped = 0;
+
+        // 导入 commits
+        for commit_info in &metadata.commits {
+            match self.import_commit(commit_info, tracking_id).await {
+                Ok(true) => commits_imported += 1,
+                Ok(false) => commits_skipped += 1,
+                Err(e) => {
+                    warn!("导入 commit {} 失败: {}", commit_info.sha, e);
+                    commits_skipped += 1;
+                }
+            }
+        }
+
+        // 导入 issues
