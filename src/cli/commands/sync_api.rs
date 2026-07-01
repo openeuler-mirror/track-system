@@ -491,3 +491,54 @@ mod tests {
             .mock("POST", "/api/sync/99/queue")
             .with_status(200)
             .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "job_id": 999,
+                    "status": "queued"
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = execute(
+            &client,
+            SyncAction::Run {
+                tracking_id: 99,
+                timeout: 3600,
+                continue_on_error: false,
+            },
+        )
+        .await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_execute_status_action() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/status")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "database": {
+                        "status": "ok"
+                    },
+                    "scheduler": {
+                        "status": "ok",
+                        "active_jobs": []
+                    }
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = execute(&client, SyncAction::Status).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+}
