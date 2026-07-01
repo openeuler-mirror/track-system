@@ -359,3 +359,50 @@ mod tests {
             page_size: None,
             package_id: None,
             distro_id: None,
+            tracking_status: None,
+        };
+        assert!(query.page.is_none());
+        assert!(query.package_id.is_none());
+    }
+
+    #[test]
+    fn test_create_tracking_request_validation() {
+        let req = CreateTrackingRequest {
+            package_id: 1,
+            distro_id: 1,
+            l1_repo_owner: "owner".to_string(),
+            l1_repo_name: "repo".to_string(),
+            l1_branch: "main".to_string(),
+            l2_branch: "main".to_string(),
+            l2_repo_path: "/path/to/repo".to_string(),
+            tracking_status: Some("active".to_string()),
+        };
+        assert_eq!(req.package_id, 1);
+        assert_eq!(req.l1_repo_owner, "owner");
+    }
+
+    #[tokio::test]
+    async fn test_list_tracking_invalid_page() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+        let state = AppState::without_external_clients(db);
+
+        let query = TrackingListQuery {
+            page: Some(0), // Invalid: must be >= 1
+            page_size: None,
+            package_id: None,
+            distro_id: None,
+            tracking_status: None,
+        };
+
+        let result = list_tracking(State(state), Query(query)).await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            ApiError::BadRequest(msg) => assert!(msg.contains("Page must be >= 1")),
+            _ => panic!("Expected BadRequest error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_list_tracking_invalid_page_size() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+        let state = AppState::without_external_clients(db);
