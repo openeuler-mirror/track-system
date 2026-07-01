@@ -45,3 +45,51 @@ impl<'a> SyncService<'a> {
     /// 根据 tracking 配置自动选择合适的 Collector 进行数据采集
     pub async fn sync_tracking(&self, tracking_id: i32) -> Result<SyncResult> {
         info!(tracking_id = tracking_id, "开始同步 tracking");
+
+        // 1. 查询 tracking 配置
+        let tracking_entity = Tracking::find_by_id(tracking_id)
+            .one(self.db)
+            .await
+            .context("查询 tracking 失败")?
+            .ok_or_else(|| anyhow::anyhow!("Tracking {} 不存在", tracking_id))?;
+
+        // 检查同步状态：仅对暂停/归档任务跳过
+        if matches!(
+            tracking_entity.tracking_status.as_str(),
+            "paused" | "archived"
+        ) {
+            warn!(
+                tracking_id = tracking_id,
+                status = %tracking_entity.tracking_status,
+                "Tracking 已暂停或归档"
+            );
+            return Ok(SyncResult::skipped("Tracking 未处于可同步状态"));
+        }
+
+        // 2. 确定平台类型
+        // 目前从环境变量或 repo_owner 推断平台
+        let platform = self.infer_platform(&tracking_entity)?;
+
+        // 3. 获取认证 token
+        let token = self.get_platform_token(&platform)?;
+
+        // 4. 创建 Collector
+        let collector = self.create_collector(platform, token)?;
+
+        // 5. 使用 Collector 进行同步
+        self.sync_tracking_with_collector(tracking_id, collector.as_ref())
+            .await
+    }
+
+    /// 推断平台类型
+    ///
+    fn infer_platform(&self, tracking: &tracking::Model) -> Result<Platform> {
+        // 优先从环境变量读取
+        if let Ok(platform_str) = std::env::var("DEFAULT_PLATFORM") {
+            if let Some(platform) = Platform::from_str(&platform_str) {
+                return Ok(platform);
+            }
+        }
+
+        // 根据 repo_owner 推断（简单启发式）
+        // 这只是临时方案
