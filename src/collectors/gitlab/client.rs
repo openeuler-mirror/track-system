@@ -40,3 +40,45 @@ impl GitLabClient {
     }
 
     /// 创建自定义 GitLab 实例的客户端
+    pub fn with_base_url(base_url: impl Into<String>, token: impl Into<String>) -> ApiResult<Self> {
+        let client = Client::builder()
+            .timeout(DEFAULT_TIMEOUT)
+            .user_agent("track-system/0.1.0")
+            .no_proxy()
+            .build()?;
+
+        let token_str = token.into();
+        let token_opt = if token_str.is_empty() {
+            None
+        } else {
+            Some(token_str)
+        };
+
+        Ok(Self {
+            client,
+            token: token_opt,
+            base_url: base_url.into(),
+        })
+    }
+
+    /// 创建带自定义超时的客户端
+    pub fn with_config(
+        base_url: impl Into<String>,
+        token: impl Into<String>,
+        timeout: Duration,
+    ) -> ApiResult<Self> {
+        let client = Client::builder()
+            .timeout(timeout)
+            .user_agent("track-system/0.1.0")
+            .no_proxy()
+            .build()?;
+
+        let token_str = token.into();
+        let token_opt = if token_str.is_empty() {
+            None
+        } else {
+            Some(token_str)
+        };
+
+        Ok(Self {
+            client,
