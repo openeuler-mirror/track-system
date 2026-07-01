@@ -257,3 +257,40 @@ mod tests {
         let mock = server
             .mock("GET", "/api/health")
             .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "status": "healthy"
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = execute(&client, ServerAction::Ping).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_execute_with_info_action() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/health")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "status": "ok"
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = execute(&client, ServerAction::Info).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+}
