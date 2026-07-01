@@ -80,3 +80,44 @@ impl<'a> CsvImporter<'a> {
             stats.total += 1;
 
             match result {
+                Ok(record) => match self.import_package(record).await {
+                    Ok(created) => {
+                        if created {
+                            stats.created += 1;
+                        } else {
+                            stats.updated += 1;
+                        }
+                    }
+                    Err(e) => {
+                        stats.failed += 1;
+                        errors.push(format!("第 {} 行: {}", line_num, e));
+                    }
+                },
+                Err(e) => {
+                    stats.failed += 1;
+                    errors.push(format!("第 {} 行解析错误: {}", line_num, e));
+                }
+            }
+        }
+
+        Ok(ImportResult {
+            success: errors.is_empty(),
+            stats,
+            errors,
+        })
+    }
+
+    /// 导入单个软件包
+    async fn import_package(&self, record: PackageRecord) -> anyhow::Result<bool> {
+        // 验证等级
+        if !(1..=3).contains(&record.level) {
+            return Err(anyhow::anyhow!("等级必须是 1、2 或 3"));
+        }
+
+        // 计算同步间隔（使用自定义值或默认值）
+        let sync_interval_hours = record.sync_interval_hours.unwrap_or({
+            match record.level {
+                1 => 6,  // 关键软件 6 小时
+                2 => 12, // 重要软件 12 小时
+                3 => 24, // 普通软件 24 小时
+                _ => 12, // 默认 12 小时
