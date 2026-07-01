@@ -86,3 +86,47 @@ fn apply_clap_i18n_command(mut cmd: clap::Command, key_prefix: &str) -> clap::Co
     }
 
     let arg_ids: Vec<String> = cmd
+        .get_arguments()
+        .map(|a| a.get_id().to_string())
+        .collect();
+    for arg_id in arg_ids {
+        if let Some(v) = lookup(&format!("{key_prefix}.args.{arg_id}")) {
+            cmd = cmd.mut_arg(arg_id.clone(), |a| a.help(v)).clone();
+        }
+        if let Some(v) = lookup(&format!("{key_prefix}.args_long.{arg_id}")) {
+            cmd = cmd.mut_arg(arg_id.clone(), |a| a.long_help(v)).clone();
+        }
+    }
+
+    let sub_names: Vec<String> = cmd
+        .get_subcommands()
+        .map(|s| s.get_name().to_string())
+        .collect();
+    for name in sub_names {
+        let child_key = format!("{key_prefix}.commands.{name}");
+        cmd = cmd
+            .mut_subcommand(name, |sub| apply_clap_i18n_command(sub, &child_key))
+            .clone();
+    }
+
+    cmd
+}
+
+fn apply_help_i18n_command(
+    mut cmd: clap::Command,
+    root_key: &str,
+    locale: &str,
+    is_root: bool,
+) -> clap::Command {
+    let help_key = format!("{root_key}.help");
+    let mut template = String::new();
+    template.push_str("{about}\n\n");
+
+    let usage_title = lookup(&format!("{help_key}.usage")).unwrap_or_else(|| "Usage".to_string());
+    template.push_str(&format!("{usage_title}: {{usage}}\n\n"));
+
+    let commands_title =
+        lookup(&format!("{help_key}.commands")).unwrap_or_else(|| "Commands".to_string());
+    template.push_str(&format!("{commands_title}:\n{{subcommands}}\n\n"));
+
+    let options_title =
