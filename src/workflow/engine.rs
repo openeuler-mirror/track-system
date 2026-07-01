@@ -174,3 +174,47 @@ impl WorkflowEngine {
                         info!("    跳过任务，依赖 {} 失败", dep);
                         self.task_status
                             .insert(task.name.clone(), TaskStatus::Skipped);
+                        continue;
+                    }
+                    _ => {
+                        info!("    跳过任务，依赖 {} 未完成", dep);
+                        self.task_status
+                            .insert(task.name.clone(), TaskStatus::Skipped);
+                        continue;
+                    }
+                }
+            }
+
+            // 执行任务
+            self.task_status
+                .insert(task.name.clone(), TaskStatus::Running);
+
+            match executor.execute_task(task, &self.config.variables).await {
+                Ok(result) => {
+                    info!("   任务完成");
+                    self.task_status
+                        .insert(task.name.clone(), TaskStatus::Success);
+                    self.task_results.insert(task.name.clone(), result);
+                }
+                Err(e) => {
+                    error!("   任务失败: {}", e);
+                    self.task_status
+                        .insert(task.name.clone(), TaskStatus::Failed);
+                }
+            }
+        }
+
+        info!(" 工作流执行完成");
+        Ok(())
+    }
+
+    /// 获取工作流执行摘要
+    pub fn summary(&self) -> WorkflowSummary {
+        let total = self.task_status.len();
+        let success = self
+            .task_status
+            .values()
+            .filter(|s| **s == TaskStatus::Success)
+            .count();
+        let failed = self
+            .task_status
