@@ -196,3 +196,44 @@ pub async fn cancel_compare_task(
     Ok(axum::http::StatusCode::NO_CONTENT)
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::extract::State;
+    use sea_orm::{DatabaseBackend, MockDatabase};
+
+    #[test]
+    fn test_compare_status_serialization() {
+        let status = CompareStatus::Running;
+        let json = serde_json::to_string(&status).unwrap();
+        assert_eq!(json, "\"running\"");
+    }
+
+    #[test]
+    fn test_compare_status_deserialization() {
+        let json = "\"completed\"";
+        let status: CompareStatus = serde_json::from_str(json).unwrap();
+        assert_eq!(status, CompareStatus::Completed);
+    }
+
+    #[tokio::test]
+    async fn test_compare_l1_vs_l0_valid_request() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+        let state = AppState::without_external_clients(db);
+
+        let request = CompareL1VsL0Request {
+            tracking_id: 1,
+            l0_snapshot_id: Some("snapshot-123".to_string()),
+            l1_snapshot_id: Some("snapshot-456".to_string()),
+        };
+
+        let result = compare_l1_vs_l0(State(state), Json(request)).await;
+        assert!(result.is_ok());
+
+        let response = result.unwrap();
+        assert_eq!(response.0.code, 201);
+        assert!(response.0.data.is_some());
+        let task_response = response.0.data.unwrap();
+        assert_eq!(task_response.status, CompareStatus::Pending);
+    }
+
