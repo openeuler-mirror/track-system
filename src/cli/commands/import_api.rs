@@ -239,3 +239,51 @@ async fn import_batch_files(api_client: &ApiClient, files: Vec<PathBuf>) -> Resu
                 match import_single_file(api_client, file, tracking_id).await {
                     Ok(_) => {
                         success_count += 1;
+                        // 读取文件获取文件数量
+                        if let Ok(content) = fs::read_to_string(file) {
+                            if let Ok(snapshot) =
+                                serde_json::from_str::<RepositorySnapshot>(&content)
+                            {
+                                total_files += snapshot.files.len();
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        println!("  导入失败: {}", e);
+                        failed_count += 1;
+                    }
+                }
+            }
+            Err(e) => {
+                println!("  无法解析 tracking_id: {}", e);
+                failed_count += 1;
+            }
+        }
+        println!();
+    }
+
+    println!("{}", "批量导入完成:".bold());
+    println!("  成功: {}", success_count.to_string().green());
+    println!("  失败: {}", failed_count.to_string().red());
+    println!("  总文件数: {}", total_files);
+
+    if failed_count > 0 {
+        anyhow::bail!("{} 个文件导入失败", failed_count);
+    }
+
+    Ok(())
+}
+
+/// 尝试解析 RepositorySnapshot；失败则按通用采集 JSON 转换为 RepositorySnapshot
+fn parse_snapshot_or_convert(
+    content: &str,
+    tracking_id: i32,
+) -> anyhow::Result<RepositorySnapshot> {
+    // 1) 优先当作 RepositorySnapshot 解析
+    if let Ok(snapshot) = serde_json::from_str::<RepositorySnapshot>(content) {
+        return Ok(snapshot);
+    }
+
+    // 2) 解析为通用 JSON，转换为 RepositorySnapshot
+    let root: Value = serde_json::from_str(content)?;
+
