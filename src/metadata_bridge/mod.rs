@@ -1574,3 +1574,54 @@ Patch1: fix.patch
             title: "t1".to_string(),
             state: "open".to_string(),
             author: "a1".to_string(),
+            api_url: "u1".to_string(),
+            labels: Some(json!(["l1", "l2"])),
+            created_at: now,
+            updated_at: now - chrono::Duration::seconds(1),
+            closed_at: None,
+            raw_payload: None,
+        };
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<issues::Model, _, _>(vec![vec![model_newer, model_older]])
+            .into_connection();
+
+        let got = collect_issues(&db, 1).await.unwrap();
+        assert_eq!(got.len(), 2);
+        assert_eq!(got[0].number, "124");
+        assert_eq!(got[0].labels, vec!["single".to_string()]);
+        assert_eq!(got[1].number, "123");
+        assert_eq!(got[1].labels, vec!["l1".to_string(), "l2".to_string()]);
+    }
+
+    #[tokio::test]
+    async fn test_persist_snapshot_writes_file_and_returns_summary_for_all_origins() {
+        let now = Utc::now();
+        let file_entry = FileEntry {
+            path: "a.txt".to_string(),
+            size: 1,
+            sha256: "h".to_string(),
+            is_binary: false,
+        };
+        let commit_entry = CommitEntry {
+            sha: "sha".to_string(),
+            title: "t".to_string(),
+            message: "m".to_string(),
+            author: "a".to_string(),
+            authored_at: now,
+            url: None,
+            stats: ChangeStats {
+                additions: 1,
+                deletions: 0,
+                files_changed: 1,
+            },
+            primary_change_type: None,
+            cve_list: vec![],
+        };
+        let issue_entry = IssueEntry {
+            number: "1".to_string(),
+            title: "i".to_string(),
+            state: "open".to_string(),
+            author: "u".to_string(),
+            labels: vec![],
+            updated_at: now,
