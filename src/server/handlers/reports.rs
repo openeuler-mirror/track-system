@@ -321,3 +321,47 @@ pub struct ExportFormatQuery {
     pub format: Option<ExportFormat>,
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Utc;
+    use sea_orm::{DatabaseBackend, MockDatabase};
+
+    #[test]
+    fn test_export_format_serialization() {
+        let format = ExportFormat::Json;
+        let json = serde_json::to_string(&format).unwrap();
+        assert_eq!(json, "\"json\"");
+
+        let yaml_format = ExportFormat::Yaml;
+        let yaml_json = serde_json::to_string(&yaml_format).unwrap();
+        assert_eq!(yaml_json, "\"yaml\"");
+
+        let md_format = ExportFormat::Markdown;
+        let md_json = serde_json::to_string(&md_format).unwrap();
+        assert_eq!(md_json, "\"markdown\"");
+
+        let html_format = ExportFormat::Html;
+        let html_json = serde_json::to_string(&html_format).unwrap();
+        assert_eq!(html_json, "\"html\"");
+    }
+
+    #[test]
+    fn test_report_list_query_defaults() {
+        let query = ReportListQuery {
+            page: None,
+            page_size: None,
+            tracking_id: None,
+            report_type: None,
+            status: None,
+        };
+        assert!(query.page.is_none());
+        assert!(query.page_size.is_none());
+        assert!(query.tracking_id.is_none());
+        assert!(query.report_type.is_none());
+        assert!(query.status.is_none());
+    }
+
+    #[test]
+    fn test_report_list_query_with_filters() {
+        let query = ReportListQuery {
