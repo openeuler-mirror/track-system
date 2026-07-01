@@ -28,3 +28,34 @@ pub struct Model {
     pub deletions: i32,
     #[sea_orm(column_type = "Text", nullable)]
     pub patch_url: Option<String>,
+    pub is_spec: bool,
+    pub is_patch: bool,
+    pub created_at: DateTimeUtc,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub patch_content: Option<String>,
+    pub patch_format: Option<String>,
+    pub is_binary: bool,
+    pub old_mode: Option<String>,
+    pub new_mode: Option<String>,
+    pub updated_at: Option<DateTimeUtc>,
+}
+
+#[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+pub enum Relation {
+    #[sea_orm(
+        belongs_to = "super::l1_commit_records::Entity",
+        from = "Column::CommitRecordId",
+        to = "super::l1_commit_records::Column::Id",
+        on_update = "NoAction",
+        on_delete = "Cascade"
+    )]
+    CommitRecords,
+}
+
+impl Related<super::l1_commit_records::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::CommitRecords.def()
+    }
+}
+
+impl ActiveModelBehavior for ActiveModel {}
