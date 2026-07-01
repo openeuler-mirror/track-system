@@ -896,3 +896,51 @@ mod tests {
                 severity: Some("High".to_string()),
             }],
         };
+
+        // 执行完整对比
+        let report = comparator.compare(&l0_info, &l1_info).await.unwrap();
+
+        // 验证报告
+        assert_eq!(report.package_name, "nginx");
+        assert_eq!(report.current_version, "1.22.0");
+        assert_eq!(report.latest_stable, "1.24.0");
+        assert!(report.version_behind > 0);
+
+        // 验证补丁分析
+        assert_eq!(report.patch_analysis.total_patches, 1);
+
+        // 验证 CVE 分析
+        assert_eq!(report.cve_analysis.total_cves, 1);
+        // CVE-2023-1234 应该被识别为已在上游修复（在 1.23.0 的 changelog 中）
+        assert_eq!(report.cve_analysis.fixed_in_upstream.len(), 1);
+        assert_eq!(report.cve_analysis.not_fixed_in_upstream.len(), 0);
+
+        // 验证建议
+        assert!(!report.recommendations.is_empty());
+        // 应该包含 CVE 修复建议
+        assert!(report
+            .recommendations
+            .iter()
+            .any(|r| r.contains("CVE") && r.contains("上游修复")));
+    }
+
+    #[tokio::test]
+    async fn test_cve_analysis_fixed_in_upstream() {
+        let comparator = L1VsL0Comparator::new();
+
+        // 准备测试数据：CVE 已在上游修复
+        let cve_patches = vec![
+            CveInfo {
+                cve_id: "CVE-2023-1234".to_string(),
+                patch_file: "CVE-2023-1234.patch".to_string(),
+                description: "Buffer overflow".to_string(),
+                severity: Some("High".to_string()),
+            },
+            CveInfo {
+                cve_id: "CVE-2023-5678".to_string(),
+                patch_file: "CVE-2023-5678.patch".to_string(),
+                description: "Use after free".to_string(),
+                severity: Some("Critical".to_string()),
+            },
+        ];
+
