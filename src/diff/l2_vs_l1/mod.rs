@@ -1263,3 +1263,56 @@ impl L2VsL1Comparator {
             // CVE 编号由 "CVE-" + 数字 + "-" + 数字组成
             let mut end = 4; // 跳过 "CVE-"
             let chars: Vec<char> = cve_part.chars().collect();
+
+            // 跳过年份部分（4位数字）
+            while end < chars.len() && chars[end].is_ascii_digit() {
+                end += 1;
+            }
+
+            // 跳过中间的 "-"
+            if end < chars.len() && chars[end] == '-' {
+                end += 1;
+            }
+
+            // 跳过编号部分（至少4位数字）
+            while end < chars.len() && chars[end].is_ascii_digit() {
+                end += 1;
+            }
+
+            if end > 4 {
+                Some(cve_part[..end].to_string())
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+
+    /// 生成版本升级建议（High 优先级）
+    fn generate_version_recommendations(
+        &self,
+        spec_diff: &SpecDiff,
+    ) -> Result<Vec<SyncRecommendation>> {
+        let mut recommendations = Vec::new();
+
+        if let Some(version_diff) = &spec_diff.version_diff {
+            match version_diff.relationship {
+                VersionRelationship::L2Older => {
+                    // L2 版本落后，建议升级
+                    recommendations.push(SyncRecommendation {
+                        priority: SyncPriority::High,
+                        recommendation_type: SyncType::VersionUpgrade,
+                        description: format!(
+                            "L2 版本 ({}) 落后于 L1 版本 ({})，建议升级以获取最新功能和修复",
+                            version_diff.l2_version, version_diff.l1_version
+                        ),
+                        affected_files: vec!["*.spec".to_string()],
+                        estimated_effort: EffortLevel::High,
+                    });
+                }
+                VersionRelationship::L2Newer => {
+                    // L2 版本领先，提示可能需要向 L1 贡献
+                    recommendations.push(SyncRecommendation {
+                        priority: SyncPriority::Low,
+                        recommendation_type: SyncType::VersionUpgrade,
