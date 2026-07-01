@@ -36,3 +36,41 @@ impl From<GitHubRepository> for Repository {
             description: repo.description,
             html_url: repo.html_url,
             default_branch: if repo.default_branch.is_empty() {
+                "main".to_string()
+            } else {
+                repo.default_branch
+            },
+            created_at: repo.created_at,
+            updated_at: repo.updated_at,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct GitHubBranch {
+    pub name: String,
+    #[serde(default)]
+    pub protected: bool,
+    pub commit: GitHubBranchCommit,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct GitHubBranchCommit {
+    pub sha: String,
+}
+
+impl From<GitHubBranch> for Branch {
+    fn from(branch: GitHubBranch) -> Self {
+        Branch {
+            name: branch.name,
+            commit_sha: branch.commit.sha,
+            protected: branch.protected,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct GitHubCommit {
+    pub sha: String,
+    pub html_url: String,
+    pub commit: GitHubCommitInfo,
