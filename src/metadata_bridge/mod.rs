@@ -1727,3 +1727,54 @@ Patch1: fix.patch
                 "config",
                 "user.email",
                 "a@b.c",
+            ])
+            .status()
+            .unwrap()
+            .success());
+        assert!(Command::new("git")
+            .args([
+                "-C",
+                repo.to_str().unwrap(),
+                "config",
+                "user.name",
+                "tester",
+            ])
+            .status()
+            .unwrap()
+            .success());
+
+        std::fs::write(
+            repo.join("pkg.spec"),
+            "Name: pkg\nVersion: 1.0.0\nRelease: 1\n",
+        )
+        .unwrap();
+        std::fs::write(repo.join("a.txt"), "hello\n").unwrap();
+
+        assert!(Command::new("git")
+            .args(["-C", repo.to_str().unwrap(), "add", "."])
+            .status()
+            .unwrap()
+            .success());
+        assert!(Command::new("git")
+            .args([
+                "-C",
+                repo.to_str().unwrap(),
+                "commit",
+                "-m",
+                "Fix CVE-2025-1234",
+            ])
+            .status()
+            .unwrap()
+            .success());
+
+        let result = collect_commits_from_repo(repo).unwrap();
+        assert_eq!(result.commits.len(), 1);
+        let c = &result.commits[0];
+        assert_eq!(c.sha.len(), 40);
+        assert_eq!(c.title, "Fix CVE-2025-1234");
+        assert_eq!(c.cve_list, vec!["CVE-2025-1234".to_string()]);
+        assert!(c.stats.files_changed >= 1);
+        assert_eq!(result.spec_version, Some("1.0.0".to_string()));
+        assert_eq!(result.spec_release, Some("1".to_string()));
+    }
+}
