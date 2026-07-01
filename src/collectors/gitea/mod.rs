@@ -69,3 +69,38 @@ impl GiteaClient {
             let status = response.status();
 
             if status.is_success() {
+                return response.json::<T>().await.map_err(ApiError::from);
+            }
+
+            let body = response.text().await.unwrap_or_default();
+            let error = ApiError::from_status(status.as_u16(), body);
+
+            if error.is_retryable() && retries < MAX_RETRIES {
+                retries += 1;
+                tokio::time::sleep(Duration::from_secs(2u64.pow(retries))).await;
+                continue;
+            }
+
+            return Err(error);
+        }
+    }
+}
+
+#[async_trait]
+impl GitClient for GiteaClient {
+    async fn get_repository(&self, owner: &str, repo: &str) -> ApiResult<Repository> {
+        let path = format!("/repos/{}/{}", owner, repo);
+        let repository: GiteaRepository = self.get(&path).await?;
+        Ok(repository.into())
+    }
+
+    async fn get_branches(&self, owner: &str, repo: &str) -> ApiResult<Vec<Branch>> {
+        let path = format!("/repos/{}/{}/branches", owner, repo);
+        let branches: Vec<GiteaBranch> = self.get(&path).await?;
+        Ok(branches.into_iter().map(Into::into).collect())
+    }
+
+    async fn get_commits(
+        &self,
+        owner: &str,
+        repo: &str,
