@@ -353,3 +353,53 @@ async fn collect_spec(
         let owner = tracking.l1_repo_owner.as_str();
         let repo = tracking.l1_repo_name.as_str();
         let branch = tracking.l1_branch.as_str();
+        let spec_path = crate::component::normalize_spec_path(repo, None);
+
+        let token = std::env::var("GITEE_ACCESS_TOKEN")
+            .or_else(|_| std::env::var("GITEE_TOKEN"))
+            .unwrap_or_default();
+        let client = match crate::collectors::GiteeClient::new(token) {
+            Ok(c) => c,
+            Err(e) => {
+                tracing::error!(owner = %owner, repo = %repo, branch = %branch, spec_path = %spec_path, error = %e, "创建 Gitee 客户端失败，无法获取 L1 spec");
+                return Ok(None);
+            }
+        };
+
+        match client
+            .get_file_content(owner, repo, &spec_path, branch)
+            .await
+        {
+            Ok(file) => {
+                // Gitee 返回的 content 为 Base64，需要解码以提取版本与计算 SHA256
+                let normalized = file.content.replace('\n', "");
+                let bytes = match BASE64_STANDARD.decode(normalized.as_bytes()) {
+                    Ok(b) => b,
+                    Err(err) => {
+                        tracing::error!(owner = %owner, repo = %repo, branch = %branch, spec_path = %spec_path, error = %err, "Base64 解码 spec 内容失败");
+                        return Ok(None);
+                    }
+                };
+                let sha = sha256_hex(&bytes);
+                let version = String::from_utf8(bytes.clone())
+                    .ok()
+                    .and_then(|s| extract_spec_version(&s));
+                let release = String::from_utf8(bytes.clone())
+                    .ok()
+                    .and_then(|s| extract_spec_release(&s));
+
+                return Ok(Some(SpecEntry {
+                    path: file.path,
+                    sha256: sha,
+                    version,
+                    release,
+                    content_base64: normalized,
+                }));
+            }
+            Err(err) => {
+                tracing::error!(owner = %owner, repo = %repo, branch = %branch, spec_path = %spec_path, error = %err, "获取 Gitee spec 文件失败");
+                return Ok(None);
+            }
+        }
+    }
+
