@@ -3264,3 +3264,56 @@ Summary: Test package
         // 可能有或没有定制
     }
 
+    #[test]
+    fn test_extract_patches() {
+        let files = vec![
+            FileEntry {
+                path: "fix.patch".to_string(),
+                sha256: "hash1".to_string(),
+                size: 100,
+                is_binary: false,
+            },
+            FileEntry {
+                path: "bugfix.diff".to_string(),
+                sha256: "hash2".to_string(),
+                size: 200,
+                is_binary: false,
+            },
+            FileEntry {
+                path: "source.tar.gz".to_string(),
+                sha256: "hash3".to_string(),
+                size: 1000,
+                is_binary: false,
+            },
+        ];
+
+        let patches = L2VsL1Comparator::extract_patches(&files).unwrap();
+        assert_eq!(patches.len(), 2);
+        assert_eq!(patches[0].filename, "fix.patch");
+        assert_eq!(patches[1].filename, "bugfix.diff");
+    }
+
+    #[test]
+    fn test_extract_source_files() {
+        let files = vec![
+            FileEntry {
+                path: "source.tar.gz".to_string(),
+                sha256: "hash1".to_string(),
+                size: 1000,
+                is_binary: false,
+            },
+            FileEntry {
+                path: "fix.patch".to_string(),
+                sha256: "hash2".to_string(),
+                size: 100,
+                is_binary: false,
+            },
+            FileEntry {
+                path: "test.spec".to_string(),
+                sha256: "hash3".to_string(),
+                size: 500,
+                is_binary: false,
+            },
+        ];
+
+        let sources = L2VsL1Comparator::extract_source_files(&files).unwrap();
