@@ -42,3 +42,47 @@ impl GiteeClient {
     pub fn new(token: impl Into<String>) -> ApiResult<Self> {
         let client = Client::builder()
             .timeout(DEFAULT_TIMEOUT)
+            .user_agent("track-system/0.1.0")
+            .no_proxy()
+            .build()?;
+
+        Ok(Self {
+            client,
+            token: token.into(),
+            base_url: GITEE_API_BASE.to_string(),
+        })
+    }
+
+    /// 创建带自定义配置的客户端
+    pub fn with_config(token: impl Into<String>, timeout: Duration) -> ApiResult<Self> {
+        let client = Client::builder()
+            .timeout(timeout)
+            .user_agent("track-system/0.1.0")
+            .no_proxy()
+            .build()?;
+
+        Ok(Self {
+            client,
+            token: token.into(),
+            base_url: GITEE_API_BASE.to_string(),
+        })
+    }
+
+    /// 创建用于测试的客户端（自定义 base_url）
+    pub fn for_testing(token: impl Into<String>, base_url: impl Into<String>) -> ApiResult<Self> {
+        let client = Client::builder()
+            .timeout(DEFAULT_TIMEOUT)
+            .user_agent("track-system/0.1.0")
+            .no_proxy()
+            .build()?;
+
+        Ok(Self {
+            client,
+            token: token.into(),
+            base_url: base_url.into(),
+        })
+    }
+
+    /// 创建实现了 Collector trait 的适配器
+    pub fn as_collector(self) -> impl Collector {
+        use crate::collectors::{adapters::GitClientCollectorAdapter, traits::Platform};
