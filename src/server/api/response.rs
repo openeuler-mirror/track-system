@@ -144,3 +144,52 @@ impl ErrorResponse {
     pub fn bad_request(message: impl Into<String>) -> Self {
         Self::new(400, message)
     }
+
+    /// 401 Unauthorized
+    pub fn unauthorized(message: impl Into<String>) -> Self {
+        Self::new(401, message)
+    }
+
+    /// 403 Forbidden
+    pub fn forbidden(message: impl Into<String>) -> Self {
+        Self::new(403, message)
+    }
+
+    /// 404 Not Found
+    pub fn not_found(message: impl Into<String>) -> Self {
+        Self::new(404, message)
+    }
+
+    /// 409 Conflict
+    pub fn conflict(message: impl Into<String>) -> Self {
+        Self::new(409, message)
+    }
+
+    /// 500 Internal Server Error
+    pub fn internal_error(message: impl Into<String>) -> Self {
+        Self::new(500, message)
+    }
+}
+
+impl IntoResponse for ErrorResponse {
+    fn into_response(self) -> Response {
+        let status = StatusCode::from_u16(self.code).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+        (status, Json(self)).into_response()
+    }
+}
+
+/// 健康检查响应
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HealthResponse {
+    /// 服务状态
+    pub status: String,
+    /// 版本号
+    pub version: String,
+    /// 服务组件状态
+    pub components: HealthComponents,
+}
+
+/// 服务组件状态
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HealthComponents {
+    /// 数据库状态
