@@ -494,3 +494,47 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_latest_report_not_found() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<tracking_reports::Model, _, _>([[]])
+            .into_connection();
+
+        let service = ComparisonService::new(&db);
+        let result = service.get_latest_report(999).await.unwrap();
+
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_comparison_report_struct() {
+        let report = ComparisonReport {
+            tracking_id: 1,
+            commits_behind: 5,
+            commits_ahead: 3,
+            diff_summary: json!({"key": "value"}),
+            source: "test".to_string(),
+        };
+
+        assert_eq!(report.tracking_id, 1);
+        assert_eq!(report.commits_behind, 5);
+        assert_eq!(report.commits_ahead, 3);
+        assert_eq!(report.source, "test");
+        assert_eq!(report.diff_summary["key"], "value");
+    }
+
+    #[test]
+    fn test_comparison_report_clone() {
+        let report = ComparisonReport {
+            tracking_id: 1,
+            commits_behind: 5,
+            commits_ahead: 3,
+            diff_summary: json!({"key": "value"}),
+            source: "test".to_string(),
+        };
+
+        let cloned = report.clone();
+        assert_eq!(report.tracking_id, cloned.tracking_id);
+        assert_eq!(report.commits_behind, cloned.commits_behind);
+        assert_eq!(report.commits_ahead, cloned.commits_ahead);
+        assert_eq!(report.source, cloned.source);
+    }
+}
