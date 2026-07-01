@@ -12,3 +12,17 @@
 //! 服务器中间件模块
 
 pub mod audit;
+pub mod audit_service;
+pub mod auth;
+pub mod cors;
+
+pub use audit::AuditMiddleware;
+pub use audit_service::AuditService;
+pub use auth::{
+    auth_middleware, get_current_user, optional_auth_middleware, require_role, AuthConfig,
+    AuthError, Claims, JwtTokenGenerator,
+};
+pub use cors::{
+    create_cors_layer, create_cors_layer_from_env, create_permissive_cors_layer,
+    create_strict_cors_layer, CorsConfig,
+};
