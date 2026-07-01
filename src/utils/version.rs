@@ -194,3 +194,52 @@ impl VersionParser {
     /// - 1.2.3-beta.1
     /// - 1.2.3-rc.2
     /// - v1.2.3
+    /// - 1.2.3+build.123
+    pub fn parse(version_str: &str) -> Result<Version> {
+        let raw = version_str.to_string();
+        let version_str = version_str.trim();
+
+        // 移除前缀 'v' 或 'V'
+        let version_str = version_str
+            .strip_prefix('v')
+            .or_else(|| version_str.strip_prefix('V'))
+            .unwrap_or(version_str);
+
+        // 分离构建元数据（+号后面的部分）
+        let (version_part, build) = if let Some(pos) = version_str.find('+') {
+            let (v, b) = version_str.split_at(pos);
+            (v, Some(b[1..].to_string()))
+        } else {
+            (version_str, None)
+        };
+
+        // 分离预发布标识（-号后面的部分）
+        let (core_version, pre_release) = if let Some(pos) = version_part.find('-') {
+            let (v, p) = version_part.split_at(pos);
+            (v, Some(p[1..].to_string()))
+        } else {
+            (version_part, None)
+        };
+
+        // 解析核心版本号（major.minor.patch）
+        let parts: Vec<&str> = core_version.split('.').collect();
+        if parts.is_empty() || parts.len() > 3 {
+            return Err(anyhow!("无效的版本格式: {}", version_str));
+        }
+
+        let major = parts
+            .first()
+            .and_then(|s| s.parse::<u32>().ok())
+            .ok_or_else(|| anyhow!("无法解析主版本号: {}", version_str))?;
+
+        let minor = parts
+            .get(1)
+            .and_then(|s| s.parse::<u32>().ok())
+            .unwrap_or(0);
+
+        let patch = parts
+            .get(2)
+            .and_then(|s| s.parse::<u32>().ok())
+            .unwrap_or(0);
+
+        Ok(Version {
