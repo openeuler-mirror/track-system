@@ -96,3 +96,52 @@ impl Version {
     pub fn is_older_than(&self, other: &Version) -> bool {
         self < other
     }
+}
+
+impl fmt::Display for Version {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.raw)
+    }
+}
+
+impl PartialOrd for Version {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Version {
+    fn cmp(&self, other: &Self) -> Ordering {
+        // 1. 比较主版本号
+        match self.major.cmp(&other.major) {
+            Ordering::Equal => {}
+            ord => return ord,
+        }
+
+        // 2. 比较次版本号
+        match self.minor.cmp(&other.minor) {
+            Ordering::Equal => {}
+            ord => return ord,
+        }
+
+        // 3. 比较修订版本号
+        match self.patch.cmp(&other.patch) {
+            Ordering::Equal => {}
+            ord => return ord,
+        }
+
+        // 4. 比较预发布标识
+        // 规则：有预发布标识的版本 < 无预发布标识的版本
+        match (&self.pre_release, &other.pre_release) {
+            (None, None) => Ordering::Equal,
+            (Some(_), None) => Ordering::Less,
+            (None, Some(_)) => Ordering::Greater,
+            (Some(a), Some(b)) => compare_pre_release(a, b),
+        }
+    }
+}
+
+/// 比较预发布标识
+fn compare_pre_release(a: &str, b: &str) -> Ordering {
+    // 预发布标识优先级：alpha < beta < rc < 其他
+    let priority_a = get_pre_release_priority(a);
