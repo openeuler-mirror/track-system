@@ -130,3 +130,47 @@ impl WorkflowEngine {
             let handle =
                 tokio::spawn(async move { executor.execute_task(&task, &variables).await });
 
+            handles.push((task_name, handle));
+        }
+
+        // 等待所有任务完成
+        for (task_name, handle) in handles {
+            match handle.await {
+                Ok(Ok(result)) => {
+                    info!(" 任务 {} 完成", task_name);
+                    self.task_status
+                        .insert(task_name.clone(), TaskStatus::Success);
+                    self.task_results.insert(task_name, result);
+                }
+                Ok(Err(e)) => {
+                    error!(" 任务 {} 失败: {}", task_name, e);
+                    self.task_status.insert(task_name, TaskStatus::Failed);
+                    return Err(e);
+                }
+                Err(e) => {
+                    error!(" 任务 {} 执行异常: {}", task_name, e);
+                    return Err(anyhow::anyhow!("Task join error: {}", e));
+                }
+            }
+        }
+
+        info!(" 工作流执行完成");
+        Ok(())
+    }
+
+    /// 按 DAG 执行工作流任务
+    async fn execute_dag(&mut self, executor: &TaskExecutor) -> Result<()> {
+        // 使用拓扑排序确定任务执行顺序
+        let sorted_tasks = self.config.topological_sort()?;
+
+        for task in sorted_tasks {
+            info!("执行任务: {}", task.name);
+
+            // 检查是否所有依赖都已完成
+            for dep in &task.depends_on {
+                match self.task_status.get(dep) {
+                    Some(TaskStatus::Success) => continue,
+                    Some(TaskStatus::Failed) => {
+                        info!("    跳过任务，依赖 {} 失败", dep);
+                        self.task_status
+                            .insert(task.name.clone(), TaskStatus::Skipped);
