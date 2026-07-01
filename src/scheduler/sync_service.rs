@@ -429,3 +429,51 @@ impl<'a> SyncService<'a> {
         use crate::entities::{issues, prelude::*};
         use sea_orm::Set;
 
+        // 查询所有 open issues
+        let params = IssueParams {
+            state: IssueState::All,
+            per_page: 100,
+            ..Default::default()
+        };
+
+        let api_issues = client
+            .get_issues(owner, repo, params)
+            .await
+            .context("获取 issues 失败")?;
+
+        info!("获取到 {} 个 issues", api_issues.len());
+
+        let mut synced_count = 0;
+
+        for api_issue in api_issues {
+            // 转换 number 为 String
+            let issue_number_str = api_issue.number.to_string();
+
+            // 检查是否已存在
+            use sea_orm::ColumnTrait;
+            use sea_orm::QueryFilter;
+
+            let existing = Issues::find()
+                .filter(issues::Column::TrackingId.eq(tracking_id))
+                .filter(issues::Column::IssueNumber.eq(&issue_number_str))
+                .one(self.db)
+                .await
+                .context("查询已有 issue 失败")?;
+
+            if existing.is_some() {
+                // 已存在，跳过
+                continue;
+            }
+
+            // 转换 labels 为 JsonValue
+            let labels_json = if api_issue.labels.is_empty() {
+                None
+            } else {
+                Some(serde_json::to_value(&api_issue.labels).unwrap_or(serde_json::Value::Null))
+            };
+
+            // 插入新记录
+            let new_issue = issues::ActiveModel {
+                tracking_id: Set(tracking_id),
+                issue_number: Set(issue_number_str),
+                title: Set(api_issue.title),
