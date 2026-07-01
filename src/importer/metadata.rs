@@ -291,3 +291,52 @@ impl<'a> MetadataImporter<'a> {
         let now = Utc::now();
         let commit = l1_commit_records::ActiveModel {
             tracking_id: Set(tracking_id),
+            commit_sha: Set(commit_sha.to_string()),
+            commit_message: Set(commit_json["commit_message"]
+                .as_str()
+                .unwrap_or("")
+                .to_string()),
+            author_name: Set(commit_json["author_name"]
+                .as_str()
+                .unwrap_or("")
+                .to_string()),
+            author_email: Set(commit_json["author_email"]
+                .as_str()
+                .unwrap_or("")
+                .to_string()),
+            committed_at: Set(committed_at),
+            sync_status: Set(commit_json["sync_status"]
+                .as_str()
+                .unwrap_or("synced")
+                .to_string()),
+            api_url: Set(commit_json["api_url"].as_str().unwrap_or("").to_string()),
+            fetched_at: Set(fetched_at),
+            files_changed_count: Set(
+                commit_json["files_changed_count"].as_i64().unwrap_or(0) as i32
+            ),
+            additions: Set(commit_json["additions"].as_i64().unwrap_or(0) as i32),
+            deletions: Set(commit_json["deletions"].as_i64().unwrap_or(0) as i32),
+            created_at: Set(now),
+            updated_at: Set(now),
+            ..Default::default()
+        };
+
+        commit.insert(self.db).await?;
+
+        ClassificationJobQueue::new(self.db)
+            .enqueue(tracking_id)
+            .await
+            .map_err(|err| DbErr::Custom(format!("enqueue classification job failed: {}", err)))?;
+        Ok(true)
+    }
+}
+
+/// 软件包导入结果
+enum PackageImportResult {
+    /// 已导入
+    Imported,
+    /// 已更新
+    Updated,
+    /// 已跳过
+    Skipped,
+}
