@@ -38,3 +38,43 @@ async fn process_classification(api_client: &ApiClient, limit: usize) -> Result<
     );
 
     let result: serde_json::Value = api_client
+        .post(
+            "/classify/process",
+            &serde_json::json!({
+                "limit": limit
+            }),
+        )
+        .await?;
+
+    println!("{}", "✓ 分类任务已完成".green());
+    println!("处理数量: {}", result["processed"]);
+    println!("成功: {}", result["success"]);
+    println!("失败: {}", result["failed"]);
+
+    Ok(())
+}
+
+/// 处理指定 tracking 的分类任务
+async fn process_tracking_classification(
+    api_client: &ApiClient,
+    tracking_id: i32,
+    limit: usize,
+) -> Result<()> {
+    println!(
+        "{}",
+        format!(
+            "正在处理 tracking {} 的分类任务 (限制: {})...",
+            tracking_id, limit
+        )
+        .cyan()
+    );
+
+    let result: serde_json::Value = api_client
+        .post(
+            &format!("/classify/tracking/{}", tracking_id),
+            &serde_json::json!({
+                "limit": limit
+            }),
+        )
+        .await?;
+
