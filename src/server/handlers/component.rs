@@ -111,3 +111,41 @@ pub async fn list_component_commits(
     ))
 }
 
+fn select_client<'a>(
+    state: &'a AppState,
+    platform: Option<&str>,
+) -> Result<(&'a dyn GitClient, &'static str), StatusCode> {
+    match platform.map(|p| p.to_ascii_lowercase()) {
+        Some(ref p) if p == PLATFORM_GITEA => {
+            let client = state
+                .gitea
+                .as_ref()
+                .ok_or(StatusCode::SERVICE_UNAVAILABLE)?;
+            Ok((client.as_ref(), DEFAULT_OWNER_GITEA))
+        }
+        _ => {
+            let client = state
+                .gitee
+                .as_ref()
+                .ok_or(StatusCode::SERVICE_UNAVAILABLE)?;
+            Ok((client.as_ref(), DEFAULT_OWNER_GITEE))
+        }
+    }
+}
+
+impl From<ComponentCommit> for ComponentCommitDto {
+    fn from(commit: ComponentCommit) -> Self {
+        Self {
+            sha: commit.sha,
+            message: commit.message,
+            author_name: commit.author_name,
+            author_email: commit.author_email,
+            authored_at: commit.authored_at,
+            url: commit.url,
+            additions: commit.additions,
+            deletions: commit.deletions,
+            total: commit.total,
+        }
+    }
+}
+
