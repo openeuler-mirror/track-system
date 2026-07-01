@@ -97,3 +97,52 @@ pub struct ExportedMetadata {
     pub export_time: DateTime<Utc>,
     /// 软件包列表
     pub packages: Vec<serde_json::Value>,
+    /// 发行版列表
+    pub distros: Vec<serde_json::Value>,
+    /// 跟踪配置列表
+    pub trackings: Vec<serde_json::Value>,
+    /// commit 记录列表（可选）
+    pub commits: Option<Vec<serde_json::Value>>,
+}
+
+/// 元数据导出器
+pub struct MetadataExporter<'a> {
+    db: &'a DatabaseConnection,
+}
+
+impl<'a> MetadataExporter<'a> {
+    /// 创建新的导出器
+    pub fn new(db: &'a DatabaseConnection) -> Self {
+        Self { db }
+    }
+
+    /// 导出元数据
+    pub async fn export<P: AsRef<Path>>(
+        &self,
+        path: P,
+        options: &ExportOptions,
+    ) -> Result<ExportResult, DbErr> {
+        let export_time = Utc::now();
+
+        // 查询数据
+        let (packages, distros, trackings, commits) = self.fetch_data(options).await?;
+
+        let export_path = path.as_ref();
+
+        // 根据格式导出
+        let result = match options.format {
+            ExportFormat::Json => {
+                self.export_json(
+                    export_path,
+                    export_time,
+                    packages,
+                    distros,
+                    trackings,
+                    commits,
+                )
+                .await?
+            }
+            ExportFormat::Sql => {
+                self.export_sql(
+                    export_path,
+                    export_time,
