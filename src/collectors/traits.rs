@@ -205,3 +205,55 @@ pub trait GitClient: Send + Sync {
         params: CommitsParams,
     ) -> ApiResult<Vec<Commit>>;
 
+    /// 获取文件内容
+    async fn get_file_content(
+        &self,
+        owner: &str,
+        repo: &str,
+        path: &str,
+        branch: &str,
+    ) -> ApiResult<FileContent>;
+
+    /// 解码 Base64 内容
+    fn decode_content(&self, content: &str) -> ApiResult<String> {
+        use base64::{engine::general_purpose, Engine as _};
+
+        // 移除换行符
+        let cleaned = content.replace('\n', "");
+
+        general_purpose::STANDARD
+            .decode(cleaned.as_bytes())
+            .map_err(|e| super::error::ApiError::Base64Error(e.to_string()))
+            .and_then(|bytes| {
+                String::from_utf8(bytes)
+                    .map_err(|e| super::error::ApiError::Base64Error(e.to_string()))
+            })
+    }
+}
+
+/// Issues 客户端扩展接口
+#[async_trait]
+pub trait IssueClient: Send + Sync {
+    async fn get_issues(
+        &self,
+        owner: &str,
+        repo: &str,
+        params: IssueParams,
+    ) -> ApiResult<Vec<Issue>>;
+
+    async fn get_issue_events(
+        &self,
+        _owner: &str,
+        _repo: &str,
+        _issue_number: i64,
+    ) -> ApiResult<Vec<IssueEvent>> {
+        Ok(Vec::new())
+    }
+}
+
+/// Issues 查询参数
+#[derive(Debug, Clone)]
+pub struct IssueParams {
+    pub state: IssueState,
+    pub page: u32,
+    pub per_page: u32,
