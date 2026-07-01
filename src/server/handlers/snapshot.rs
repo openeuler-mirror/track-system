@@ -62,3 +62,36 @@ pub async fn list_snapshots(
                 .payload
                 .get("tag")
                 .and_then(|v| v.as_str())
+                .map(str::to_string);
+            SnapshotListItem {
+                id: m.id,
+                tracking_id: m.tracking_id,
+                tag,
+                created_at: m.created_at,
+            }
+        })
+        .collect();
+
+    Ok(Json(serde_json::json!({ "snapshots": items })))
+}
+
+/// DELETE /api/snapshot/:id
+///
+pub async fn delete_snapshot(
+    State(state): State<AppState>,
+    Path(id): Path<i32>,
+) -> ApiResult<axum::http::StatusCode> {
+    use crate::entities::prelude::L2Snapshots;
+
+    let result = L2Snapshots::delete_by_id(id)
+        .exec(state.db.as_ref())
+        .await
+        .map_err(ApiError::DatabaseError)?;
+
+    if result.rows_affected == 0 {
+        return Err(ApiError::NotFound(format!("快照 {} 不存在", id)));
+    }
+
+    Ok(axum::http::StatusCode::NO_CONTENT)
+}
+
