@@ -153,3 +153,54 @@ impl<'a> PipelineExecutor<'a> {
             use crate::entities::l2_snapshots;
             use crate::entities::prelude::L2Snapshots;
 
+            let l2_record = L2Snapshots::find()
+                .filter(l2_snapshots::Column::TrackingId.eq(tracking.id))
+                .filter(l2_snapshots::Column::SnapshotType.eq("l2"))
+                .order_by_desc(l2_snapshots::Column::CreatedAt)
+                .one(self.db)
+                .await?;
+
+            if let Some(snapshot) = l2_record {
+                // 反序列化快照以获取文件数量
+                let snapshot_data: crate::snapshot::types::RepositorySnapshot =
+                    serde_json::from_value(snapshot.payload.clone())
+                        .context("解析 L2 快照 payload 失败")?;
+
+                info!(
+                    tracking_id = tracking.id,
+                    snapshot_id = snapshot.id,
+                    files_count = snapshot_data.files.len(),
+                    created_at = %snapshot.created_at,
+                    "使用数据库中的历史 L2 快照"
+                );
+
+                return Ok(L2SnapshotResult {
+                    snapshot_id: Some(snapshot.id as i64),
+                    snapshot_path: None,
+                    files_count: snapshot_data.files.len(),
+                    has_new_data: true,
+                });
+            } else {
+                warn!(
+                    tracking_id = tracking.id,
+                    "数据库中也不存在 L2 快照，跳过快照生成"
+                );
+                return Ok(L2SnapshotResult {
+                    snapshot_id: None,
+                    snapshot_path: None,
+                    files_count: 0,
+                    has_new_data: false,
+                });
+            }
+        }
+
+        // 生成临时输出路径
+        let output_path = format!(
+            "/tmp/l2_snapshot_{}_{}.json",
+            tracking.id,
+            Utc::now().timestamp()
+        );
+
+        // 导出 L2 快照
+        let summary =
+            metadata_bridge::export_l2_snapshot(self.db, tracking.id, &l2_repo_path, &output_path)
