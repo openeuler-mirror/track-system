@@ -1369,3 +1369,55 @@ impl L2VsL1Comparator {
 
         // 识别 L1 修改的补丁（可能是 Bug 修复的更新）
         if !patch_diff.l2_modified.is_empty() {
+            recommendations.push(SyncRecommendation {
+                priority: SyncPriority::Medium,
+                recommendation_type: SyncType::BugFix,
+                description: format!(
+                    "L1 修改了 {} 个补丁文件，建议检查变更内容并决定是否同步",
+                    patch_diff.l2_modified.len()
+                ),
+                affected_files: patch_diff
+                    .l2_modified
+                    .iter()
+                    .map(|m| m.filename.clone())
+                    .collect(),
+                estimated_effort: EffortLevel::Medium,
+            });
+        }
+
+        Ok(recommendations)
+    }
+
+    /// 生成功能更新建议（Medium 优先级）
+    fn generate_feature_recommendations(
+        &self,
+        patch_diff: &PatchDiff,
+    ) -> Result<Vec<SyncRecommendation>> {
+        let mut recommendations = Vec::new();
+
+        // 识别 L1 新增的功能补丁
+        let feature_patches: Vec<_> = patch_diff
+            .l2_removed
+            .iter()
+            .filter(|p| {
+                let filename_lower = p.filename.to_lowercase();
+                (filename_lower.contains("feature")
+                    || filename_lower.contains("add-")
+                    || filename_lower.contains("enable-")
+                    || filename_lower.contains("support-")
+                    || filename_lower.contains("implement"))
+                    // 排除已处理的类型
+                    && !filename_lower.contains("cve-")
+                    && !filename_lower.contains("security")
+                    && !filename_lower.contains("fix")
+            })
+            .collect();
+
+        if !feature_patches.is_empty() {
+            recommendations.push(SyncRecommendation {
+                priority: SyncPriority::Medium,
+                recommendation_type: SyncType::NewFeature,
+                description: format!(
+                    "L1 新增了 {} 个功能补丁，建议评估这些新功能是否适用于 L2",
+                    feature_patches.len()
+                ),
