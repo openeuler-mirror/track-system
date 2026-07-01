@@ -82,3 +82,46 @@ impl GitLabClient {
 
         Ok(Self {
             client,
+            token: token_opt,
+            base_url: base_url.into(),
+        })
+    }
+
+    /// 创建实现了 Collector trait 的适配器
+    pub fn as_collector(self) -> impl Collector {
+        use crate::collectors::{adapters::GitClientCollectorAdapter, traits::Platform};
+        GitClientCollectorAdapter::new(self, Platform::GitLab)
+    }
+
+    /// URL 编码项目路径
+    fn encode_project_path(&self, owner: &str, repo: &str) -> String {
+        let path = format!("{}/{}", owner, repo);
+        urlencoding::encode(&path).to_string()
+    }
+
+    /// 发送 GET 请求
+    async fn get<T: serde::de::DeserializeOwned>(&self, url: &str) -> ApiResult<T> {
+        let mut retries = 0;
+
+        loop {
+            let mut request = self.client.get(url);
+
+            // GitLab 使用 PRIVATE-TOKEN 头或 access_token 参数
+            if let Some(token) = &self.token {
+                request = request.header("PRIVATE-TOKEN", token);
+            }
+
+            let response = request.send().await?;
+            let status = response.status();
+
+            if status.is_success() {
+                return response.json::<T>().await.map_err(ApiError::from);
+            }
+
+            let body = response.text().await.unwrap_or_default();
+            let message = if let Ok(json) = serde_json::from_str::<serde_json::Value>(&body) {
+                json.get("message")
+                    .and_then(|m| m.as_str())
+                    .unwrap_or(body.as_str())
+                    .to_string()
+            } else {
