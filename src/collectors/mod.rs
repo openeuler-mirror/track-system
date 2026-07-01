@@ -14,3 +14,19 @@ pub mod error;
 pub mod gitea;
 pub mod gitee;
 pub mod github;
+pub mod gitlab;
+pub mod local;
+pub mod traits;
+
+pub use adapters::GitClientCollectorAdapter;
+pub use error::{ApiError, ApiResult};
+pub use gitea::GiteaClient;
+pub use gitee::GiteeClient;
+pub use github::GitHubClient;
+pub use gitlab::GitLabClient;
+pub use local::LocalClient;
+pub use traits::{
+    Branch, CollectConfig, CollectResult, Collector, Commit, CommitMetadata, CommitStats,
+    CommitsParams, FileContent, GitClient, Issue, IssueClient, IssueParams, IssueState,
+    PaginationParams, PatchFile, Platform, Repository, SnapshotData, SourceFile,
+};
