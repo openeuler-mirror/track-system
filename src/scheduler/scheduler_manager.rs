@@ -217,3 +217,47 @@ impl SchedulerManager {
     /// # 参数
     /// * `wake_up` - 是否唤醒调度器
     /// * `tracking_id` - 可选的 tracking_id，如果指定则只处理该任务，否则处理所有待处理任务
+    pub async fn execute_round_wake_up(
+        &self,
+        wake_up: bool,
+        tracking_id: Option<i32>,
+    ) -> Result<Vec<SyncJobResult>> {
+        let sync_manager = SyncManager::new(&self.db);
+
+        // 获取待处理的任务（按优先级排序）
+        let pending_tasks = sync_manager
+            .get_pending_sync_tasks_with_tracking_id(wake_up, tracking_id)
+            .await
+            .context("获取待处理任务失败")?;
+
+        info!(pending_count = pending_tasks.len(), "发现待处理任务");
+
+        // 更新状态
+        {
+            let mut status = self.status.write().await;
+            status.pending_jobs = pending_tasks.len();
+        }
+
+        let mut results = Vec::new();
+        let executor = PipelineExecutor::new(&self.db, self.client.clone());
+
+        // 限制并发数量
+        let limit = self.config.max_concurrent_jobs.min(pending_tasks.len());
+
+        for tracking in pending_tasks.into_iter().take(limit) {
+            let tracking_id = tracking.id;
+
+            // 创建 sync_job
+            let job = match sync_manager.queue_sync_job(tracking_id, 0).await {
+                Ok(job) => job,
+                Err(err) => {
+                    error!(
+                        tracking_id = tracking_id,
+                        error = %err,
+                        "创建 sync_job 失败"
+                    );
+                    continue;
+                }
+            };
+
+            // 执行流水线
