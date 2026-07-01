@@ -217,3 +217,39 @@ mod tests {
         assert!(config.allowed_methods.contains(&Method::GET));
         assert!(config.allowed_methods.contains(&Method::POST));
     }
+
+    #[test]
+    fn test_cors_config_with_headers() {
+        let config = CorsConfig::new().with_headers(vec![
+            "Content-Type".to_string(),
+            "Authorization".to_string(),
+        ]);
+
+        assert_eq!(config.allowed_headers.len(), 2);
+        assert!(config.allowed_headers.contains(&"Content-Type".to_string()));
+        assert!(config
+            .allowed_headers
+            .contains(&"Authorization".to_string()));
+    }
+
+    #[test]
+    fn test_create_permissive_cors_layer() {
+        let _layer = create_permissive_cors_layer();
+        // 只测试能否成功创建
+    }
+
+    #[test]
+    fn test_create_strict_cors_layer() {
+        let origins = vec![
+            "https://example.com".to_string(),
+            "https://app.example.com".to_string(),
+        ];
+        let _layer = create_strict_cors_layer(origins);
+        // 只测试能否成功创建
+    }
+
+    #[test]
+    #[serial]
+    fn test_cors_config_from_env() {
+        // 设置环境变量
+        std::env::set_var(
