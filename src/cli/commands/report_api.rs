@@ -401,3 +401,49 @@ mod tests {
         let temp_file = NamedTempFile::new().unwrap();
         let file_path = temp_file.path().to_str().unwrap().to_string();
 
+        let mock = server
+            .mock("GET", "/api/reports/789/export?format=csv")
+            .with_status(200)
+            .with_header("content-type", "text/csv")
+            .with_body("\"col1,col2\\nval1,val2\"")
+            .create_async()
+            .await;
+
+        let result = export_report(&client, 789, "csv".to_string(), Some(file_path.clone())).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        assert!(std::path::Path::new(&file_path).exists());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_show_report_with_different_status() {
+        let (mut server, client) = setup_test_server().await;
+
+        // Test pending status
+        let mock = server
+            .mock("GET", "/api/reports/111")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "data": {
+                        "id": 111,
+                        "tracking_id": 1,
+                        "report_type": "analysis",
+                        "package_name": "pkg",
+                        "status": "pending",
+                        "content": {},
+                        "created_at": "2024-01-01T00:00:00Z",
+                        "updated_at": "2024-01-01T00:00:00Z"
+                    }
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = show_report(&client, 111).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+}
