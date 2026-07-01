@@ -174,3 +174,47 @@ fn apply_help_i18n_command(
             .mut_arg("help", |a| a.help(help_short).long_help(help_long))
             .clone();
     }
+
+    if is_root {
+        cmd = cmd.disable_version_flag(true);
+        if !arg_ids.iter().any(|id| id == "version") {
+            cmd = cmd.arg(
+                clap::Arg::new("version")
+                    .short('V')
+                    .long("version")
+                    .action(clap::ArgAction::Version)
+                    .help(version_short)
+                    .long_help(version_short),
+            );
+        } else {
+            cmd = cmd
+                .mut_arg("version", |a| {
+                    a.help(version_short).long_help(version_short)
+                })
+                .clone();
+        }
+    }
+
+    let sub_names: Vec<String> = cmd
+        .get_subcommands()
+        .map(|s| s.get_name().to_string())
+        .collect();
+    for name in sub_names {
+        cmd = cmd
+            .mut_subcommand(name, |sub| {
+                apply_help_i18n_command(sub, root_key, locale, false)
+            })
+            .clone();
+    }
+
+    cmd
+}
+
+fn lookup(key: &str) -> Option<String> {
+    let v = t!(key);
+    if v.as_ref() == key {
+        None
+    } else {
+        Some(v.to_string())
+    }
+}
