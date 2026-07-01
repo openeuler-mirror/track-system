@@ -153,3 +153,55 @@ pub struct CommitsParams {
     pub since: Option<DateTime<Utc>>,
     pub until: Option<DateTime<Utc>>,
     pub page: u32,
+    pub per_page: u32,
+}
+
+impl CommitsParams {
+    pub fn new(branch: impl Into<String>) -> Self {
+        Self {
+            branch: branch.into(),
+            since: None,
+            until: None,
+            page: 1,
+            per_page: 30,
+        }
+    }
+
+    pub fn since(mut self, since: DateTime<Utc>) -> Self {
+        self.since = Some(since);
+        self
+    }
+
+    pub fn until(mut self, until: DateTime<Utc>) -> Self {
+        self.until = Some(until);
+        self
+    }
+
+    pub fn page(mut self, page: u32) -> Self {
+        self.page = page;
+        self
+    }
+
+    pub fn per_page(mut self, per_page: u32) -> Self {
+        self.per_page = per_page;
+        self
+    }
+}
+
+/// Git 平台客户端通用接口
+#[async_trait]
+pub trait GitClient: Send + Sync {
+    /// 获取仓库信息
+    async fn get_repository(&self, owner: &str, repo: &str) -> ApiResult<Repository>;
+
+    /// 获取分支列表
+    async fn get_branches(&self, owner: &str, repo: &str) -> ApiResult<Vec<Branch>>;
+
+    /// 获取指定分支的 commits
+    async fn get_commits(
+        &self,
+        owner: &str,
+        repo: &str,
+        params: CommitsParams,
+    ) -> ApiResult<Vec<Commit>>;
+
