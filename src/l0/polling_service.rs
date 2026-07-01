@@ -40,3 +40,45 @@ impl L0PollingResult {
             diff_commits: 0,
         }
     }
+}
+
+impl Default for L0PollingResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// L0仓库轮询服务
+pub struct L0PollingService<'a, C>
+where
+    C: Collector + Send + Sync,
+{
+    db: &'a DatabaseConnection,
+    collector: &'a C,
+}
+
+impl<'a, C> L0PollingService<'a, C>
+where
+    C: Collector + Send + Sync,
+{
+    pub fn new(db: &'a DatabaseConnection, collector: &'a C) -> Self {
+        Self { db, collector }
+    }
+
+    /// 轮询L0仓库
+    pub async fn poll_l0(
+        &self,
+        package_id: i32,
+        owner: &str,
+        repo: &str,
+        branch: &str,
+        platform: Platform,
+    ) -> Result<L0PollingResult> {
+        let mut result = L0PollingResult::new();
+
+        // 构建采集配置
+        let config = CollectConfig::new(platform, branch)
+            .with_remote(owner, repo)
+            .with_limit(100);
+
+        // 使用 Collector 采集 commits
