@@ -287,3 +287,37 @@ index 123456..789abc 100644
         let hash = PatchParser::calculate_hash(content);
         // echo -n "test content" | sha256sum
         assert_eq!(
+            hash,
+            "6ae8a75555209fd6c44157c0aed8016e763ff435a19cf186f76863140143ff72"
+        );
+    }
+
+    #[test]
+    fn test_extract_patch_number() {
+        assert_eq!(
+            PatchParser::extract_patch_number("0001-fix-bug.patch"),
+            Some(1)
+        );
+        assert_eq!(
+            PatchParser::extract_patch_number("0023-update.patch"),
+            Some(23)
+        );
+        assert_eq!(PatchParser::extract_patch_number("fix-bug.patch"), None);
+    }
+
+    #[test]
+    fn test_is_backport_patch() {
+        assert!(PatchParser::is_backport_patch(
+            "backport-CVE-2023-1234.patch",
+            ""
+        ));
+        assert!(PatchParser::is_backport_patch(
+            "CVE-2023-1234.patch",
+            "This is a backport from upstream."
+        ));
+        assert!(!PatchParser::is_backport_patch(
+            "fix-bug.patch",
+            "Just a fix."
+        ));
+    }
+}
