@@ -26,3 +26,31 @@ pub enum ApiError {
     #[error("API 限流: {0}")]
     RateLimitError(String),
 
+    /// 资源不存在错误（404）
+    #[error("资源不存在: {0}")]
+    NotFoundError(String),
+
+    /// 服务器错误（5xx）
+    #[error("服务器错误: {0}")]
+    ServerError(String),
+
+    /// JSON 解析错误
+    #[error("JSON 解析失败: {0}")]
+    JsonError(#[from] serde_json::Error),
+
+    /// Base64 解码错误
+    #[error("Base64 解码失败: {0}")]
+    Base64Error(String),
+
+    /// 配置错误
+    #[error("配置错误: {0}")]
+    InvalidConfig(String),
+
+    /// 超时错误
+    #[error("请求超时")]
+    TimeoutError,
+
+    /// 其他错误
+    #[error("未知错误: {0}")]
+    Unknown(String),
+}
