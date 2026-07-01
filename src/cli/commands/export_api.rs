@@ -28,3 +28,34 @@ pub async fn execute(api_client: &ApiClient, action: ExportAction) -> Result<()>
         ExportAction::Report {
             report_id,
             format,
+            output,
+        } => export_report(api_client, report_id, format, output).await,
+    }
+}
+
+/// 导出元数据
+async fn export_metadata(
+    api_client: &ApiClient,
+    format: String,
+    output: Option<String>,
+    package_id: Option<i32>,
+) -> Result<()> {
+    println!("{}", "正在导出元数据...".cyan());
+
+    let mut url = format!("/export/metadata?format={}", format);
+    if let Some(id) = package_id {
+        url.push_str(&format!("&package_id={}", id));
+    }
+
+    let content: String = api_client.get(&url).await?;
+
+    // 保存到文件或输出到控制台
+    if let Some(output_path) = output {
+        fs::write(&output_path, &content)?;
+        println!("{}", "✓ 元数据已导出".green());
+        println!("文件: {}", output_path);
+    } else {
+        println!("{}", content);
+    }
+
+    Ok(())
