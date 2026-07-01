@@ -45,3 +45,50 @@ pub struct SyncManager<'a> {
 
 impl<'a> SyncManager<'a> {
     /// 创建新的同步管理器
+    pub fn new(db: &'a DatabaseConnection) -> Self {
+        Self { db }
+    }
+
+    /// 手动入队同步作业；如果已有待处理或运行中的作业则复用
+    pub async fn queue_sync_job(
+        &self,
+        tracking_id: i32,
+        priority: i32,
+    ) -> anyhow::Result<sync_jobs::Model> {
+        if let Some(existing) = self.find_active_sync_job(tracking_id).await? {
+            return Ok(existing);
+        }
+
+        let tracking = Tracking::find_by_id(tracking_id)
+            .one(self.db)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Tracking {} not found", tracking_id))?;
+        if matches!(tracking.tracking_status.as_str(), "paused" | "archived") {
+            return Err(anyhow::anyhow!(
+                "Tracking {} is {}, cannot queue sync job",
+                tracking_id,
+                tracking.tracking_status
+            ));
+        }
+
+        let now = Utc::now();
+        let job = sync_jobs::ActiveModel {
+            tracking_id: Set(tracking_id),
+            job_kind: Set(SYNC_JOB_KIND.to_string()),
+            scheduled_at: Set(now),
+            started_at: Set(None),
+            finished_at: Set(None),
+            status: Set(STATUS_PENDING.to_string()),
+            error: Set(None),
+            attempt_count: Set(0),
+            priority: Set(priority),
+            created_at: Set(now),
+            updated_at: Set(now),
+            ..Default::default()
+        };
+
+        let inserted = job.insert(self.db).await?;
+        Telemetry::sync_job_queued(tracking_id, inserted.id, priority);
+        Ok(inserted)
+    }
+
