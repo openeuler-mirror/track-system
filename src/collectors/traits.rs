@@ -101,3 +101,55 @@ pub enum IssueState {
 impl IssueState {
     pub fn as_query_value(&self) -> &'static str {
         match self {
+            IssueState::Open => "open",
+            IssueState::Closed => "closed",
+            IssueState::All => "all",
+        }
+    }
+
+    pub fn parse_str(value: &str) -> Self {
+        match value {
+            "open" => IssueState::Open,
+            "closed" => IssueState::Closed,
+            _ => IssueState::All,
+        }
+    }
+}
+
+impl fmt::Display for IssueState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.as_query_value())
+    }
+}
+
+/// Issue 信息
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Issue {
+    pub number: i64,
+    pub title: String,
+    pub state: IssueState,
+    pub author: String,
+    pub api_url: String,
+    pub labels: Vec<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub closed_at: Option<DateTime<Utc>>,
+    pub raw_payload: Value,
+}
+
+/// Issue 事件
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IssueEvent {
+    pub event_type: String,
+    pub actor: Option<String>,
+    pub occurred_at: DateTime<Utc>,
+    pub raw_payload: Value,
+}
+
+/// Commits 查询参数
+#[derive(Debug, Clone)]
+pub struct CommitsParams {
+    pub branch: String,
+    pub since: Option<DateTime<Utc>>,
+    pub until: Option<DateTime<Utc>>,
+    pub page: u32,
