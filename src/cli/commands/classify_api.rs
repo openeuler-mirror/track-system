@@ -236,3 +236,42 @@ mod tests {
             .with_header("content-type", "application/json")
             .with_body(
                 serde_json::json!({
+                    "processed": 5,
+                    "success": 5,
+                    "failed": 0
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let action = ClassifyAction::Process { limit: 5 };
+        let result = execute(&client, action).await;
+        if let Err(e) = &result {
+            eprintln!("Test error: {:?}", e);
+        }
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_execute_process_tracking_action() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("POST", "/api/classify/tracking/456")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "processed": 15,
+                    "success": 14,
+                    "failed": 1
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let action = ClassifyAction::ProcessTracking {
+            tracking_id: 456,
