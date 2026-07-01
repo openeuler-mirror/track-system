@@ -116,3 +116,43 @@ pub async fn compare_l1_vs_l0(
         task_id,
         status: CompareStatus::Pending,
         created_at: chrono::Utc::now(),
+    };
+
+    Ok(Json(ApiResponse::created(response)))
+}
+
+/// POST /api/compare/l2-vs-l1
+///
+/// 创建 L2 vs L1 对比任务
+pub async fn compare_l2_vs_l1(
+    State(_state): State<AppState>,
+    Json(request): Json<CompareL2VsL1Request>,
+) -> ApiResult<Json<ApiResponse<CompareTaskResponse>>> {
+    // 验证请求
+    if request.tracking_id <= 0 {
+        return Err(ApiError::BadRequest("Invalid tracking_id".to_string()));
+    }
+
+    // TODO: 实现 L2 vs L1 对比逻辑
+    // 1. 验证 tracking_id 存在
+    // 2. 获取 L1 和 L2 快照
+    // 3. 创建异步对比任务
+    // 4. 返回任务 ID
+
+    let task_id = uuid::Uuid::new_v4().to_string();
+    let response = CompareTaskResponse {
+        task_id,
+        status: CompareStatus::Pending,
+        created_at: chrono::Utc::now(),
+    };
+
+    Ok(Json(ApiResponse::created(response)))
+}
+
+/// GET /api/compare/tasks/:id
+///
+/// 查询对比任务状态
+pub async fn get_compare_status(
+    State(_state): State<AppState>,
+    Path(task_id): Path<String>,
+) -> ApiResult<Json<ApiResponse<CompareStatusResponse>>> {
