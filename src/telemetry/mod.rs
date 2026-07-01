@@ -70,3 +70,40 @@ impl Telemetry {
             ),
         }
     }
+
+    pub fn l0_poll_summary(package_id: i32, inserted: usize, skipped: usize) {
+        info!(
+            target = "l0",
+            package_id, inserted, skipped, "l0 poll finished"
+        );
+    }
+
+    pub fn backport_candidates_created(package_id: i32, created: usize, skipped: usize) {
+        info!(
+            target = "backport",
+            package_id, created, skipped, "backport advisor summary"
+        );
+    }
+
+    pub fn snapshot_export_completed(
+        tracking_id: Option<i32>,
+        path: &str,
+        exported_at: DateTime<Utc>,
+    ) {
+        info!(target = "snapshot", tracking_id, %exported_at, path, "snapshot export completed");
+    }
+
+    pub fn pipeline_stage_completed(tracking_id: i32, stage_name: &str, success: bool) {
+        if success {
+            info!(
+                target = "pipeline",
+                tracking_id, stage_name, "pipeline stage completed successfully"
+            );
+        } else {
+            warn!(
+                target = "pipeline",
+                tracking_id, stage_name, "pipeline stage failed"
+            );
+        }
+    }
+}
