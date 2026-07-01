@@ -48,3 +48,54 @@ use crate::{
 pub struct SnapshotSummary {
     pub tracking_id: i32,
     pub checksum: String,
+    pub file_count: usize,
+    pub spec_version: Option<String>,
+    pub commit_count: usize,
+    pub issue_count: usize,
+}
+
+pub async fn export_l2_snapshot<P: AsRef<Path>, Q: AsRef<Path>>(
+    db: &DatabaseConnection,
+    tracking_id: i32,
+    repo_path: P,
+    output_path: Q,
+) -> Result<SnapshotSummary> {
+    let tracking = TrackingEntity::find_by_id(tracking_id)
+        .one(db)
+        .await?
+        .context("tracking configuration not found")?;
+
+    let repo_path_buf = repo_path.as_ref().to_path_buf();
+    let snapshot =
+        build_repository_snapshot(db, &tracking, SnapshotOrigin::L2, Some(&repo_path_buf)).await?;
+    persist_snapshot(db, &snapshot, output_path.as_ref()).await
+}
+
+pub async fn export_l1_snapshot<Q: AsRef<Path>>(
+    db: &DatabaseConnection,
+    tracking_id: i32,
+    repo_path: Option<PathBuf>,
+    output_path: Q,
+) -> Result<SnapshotSummary> {
+    let tracking = TrackingEntity::find_by_id(tracking_id)
+        .one(db)
+        .await?
+        .context("tracking configuration not found")?;
+
+    let repo_path_ref = repo_path.as_deref();
+    let snapshot =
+        build_repository_snapshot(db, &tracking, SnapshotOrigin::L1, repo_path_ref).await?;
+    persist_snapshot(db, &snapshot, output_path.as_ref()).await
+}
+
+pub async fn import_snapshot<P: AsRef<Path>>(
+    db: &DatabaseConnection,
+    tracking_id: i32,
+    input_path: P,
+) -> Result<SnapshotSummary> {
+    let tracking = TrackingEntity::find_by_id(tracking_id)
+        .one(db)
+        .await?
+        .context("tracking configuration not found")?;
+
+    let json = fs::read_to_string(input_path.as_ref())?;
