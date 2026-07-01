@@ -130,3 +130,43 @@ mod tests {
     async fn test_export_metadata_with_package_id() {
         let (mut server, client) = setup_test_server().await;
 
+        let mock = server
+            .mock("GET", "/api/export/metadata?format=yaml&package_id=123")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body("\"name: test\\nversion: 1.0\"")
+            .create_async()
+            .await;
+
+        let result = export_metadata(&client, "yaml".to_string(), None, Some(123)).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_export_metadata_to_file() {
+        let (mut server, client) = setup_test_server().await;
+        let temp_file = NamedTempFile::new().unwrap();
+        let file_path = temp_file.path().to_str().unwrap().to_string();
+
+        let mock = server
+            .mock("GET", "/api/export/metadata?format=json")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body("\"{\\\"test\\\": \\\"data\\\"}\"")
+            .create_async()
+            .await;
+
+        let result =
+            export_metadata(&client, "json".to_string(), Some(file_path.clone()), None).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+
+        let content = fs::read_to_string(&file_path).unwrap();
+        assert_eq!(content, "{\"test\": \"data\"}");
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_export_report_to_console() {
+        let (mut server, client) = setup_test_server().await;
+
