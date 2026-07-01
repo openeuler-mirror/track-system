@@ -630,3 +630,56 @@ impl L2VsL1Comparator {
         // 检查性能优化标记
         let perf_keywords = [
             "# Performance:",
+            "# Optimization:",
+            "# Optimize",
+            "-O2",
+            "-O3",
+            "-march=",
+        ];
+
+        for keyword in &perf_keywords {
+            if spec_content.contains(keyword) {
+                customizations.push(Customization {
+                    customization_type: CustomizationType::PerformanceOptimization,
+                    description: format!("spec 文件包含性能优化标记: {}", keyword),
+                    affected_files: vec!["*.spec".to_string()],
+                });
+                break; // 只添加一次性能优化
+            }
+        }
+
+        // 检查安全加固标记
+        let security_keywords = [
+            "# Security:",
+            "# Hardening:",
+            "-fstack-protector",
+            "-D_FORTIFY_SOURCE",
+            "--enable-security",
+        ];
+
+        for keyword in &security_keywords {
+            if spec_content.contains(keyword) {
+                customizations.push(Customization {
+                    customization_type: CustomizationType::SecurityHardening,
+                    description: format!("spec 文件包含安全加固标记: {}", keyword),
+                    affected_files: vec!["*.spec".to_string()],
+                });
+                break; // 只添加一次安全加固
+            }
+        }
+
+        Ok(customizations)
+    }
+
+    /// 分析 patch 文件中的定制内容
+    fn analyze_patch_customizations(patches: &[PatchFile]) -> Result<Vec<Customization>> {
+        let mut customizations = Vec::new();
+
+        for patch in patches {
+            let filename_lower = patch.filename.to_lowercase();
+
+            // 1. 检查定制功能补丁
+            if filename_lower.contains("custom")
+                || filename_lower.contains("enterprise")
+                || filename_lower.contains("internal")
+                || filename_lower.contains("proprietary")
