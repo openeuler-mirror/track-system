@@ -2107,3 +2107,55 @@ Test package
     #[test]
     fn test_sync_priority_ordering() {
         assert!(SyncPriority::Critical < SyncPriority::High);
+        assert!(SyncPriority::High < SyncPriority::Medium);
+        assert!(SyncPriority::Medium < SyncPriority::Low);
+    }
+
+    #[test]
+    fn test_sync_type_equality() {
+        assert_eq!(SyncType::SecurityPatch, SyncType::SecurityPatch);
+        assert_ne!(SyncType::SecurityPatch, SyncType::BugFix);
+    }
+
+    #[test]
+    fn test_effort_level_equality() {
+        assert_eq!(EffortLevel::Low, EffortLevel::Low);
+        assert_ne!(EffortLevel::Low, EffortLevel::High);
+    }
+
+    #[test]
+    fn test_conflict_type_equality() {
+        assert_eq!(ConflictType::PatchConflict, ConflictType::PatchConflict);
+        assert_ne!(ConflictType::PatchConflict, ConflictType::VersionConflict);
+    }
+
+    #[test]
+    fn test_extract_cve_number_valid() {
+        assert_eq!(
+            L2VsL1Comparator::extract_cve_number("fix-CVE-2023-12345.patch"),
+            Some("CVE-2023-12345".to_string())
+        );
+
+        assert_eq!(
+            L2VsL1Comparator::extract_cve_number("CVE-2024-9999-security.patch"),
+            Some("CVE-2024-9999".to_string())
+        );
+
+        assert_eq!(
+            L2VsL1Comparator::extract_cve_number("cve-2022-1234.patch"),
+            Some("CVE-2022-1234".to_string())
+        );
+    }
+
+    #[test]
+    fn test_extract_cve_number_invalid() {
+        assert_eq!(L2VsL1Comparator::extract_cve_number("bugfix.patch"), None);
+        assert_eq!(L2VsL1Comparator::extract_cve_number("CVE-.patch"), None);
+        assert_eq!(L2VsL1Comparator::extract_cve_number("test.patch"), None);
+    }
+
+    #[test]
+    fn test_extract_release_from_spec() {
+        let spec_content = r#"
+Name: mypackage
+Version: 1.0.0
