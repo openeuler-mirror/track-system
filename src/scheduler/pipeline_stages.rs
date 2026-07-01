@@ -2013,3 +2013,54 @@ Summary: Test package
         };
         use chrono::{TimeZone, Utc};
         use httpmock::prelude::*;
+        use sea_orm::{DatabaseBackend, MockDatabase};
+
+        let server = MockServer::start();
+        let risk_create_url = format!("{}/risk/create", server.base_url());
+        let _risk_url_guard = EnvVarGuard::set("RISK_CREATE_URL", &risk_create_url);
+        let _risk_enabled_guard = EnvVarGuard::set("RISK_CREATE_ENABLED", "true");
+        let _risk_timeout_guard = EnvVarGuard::set("RISK_HTTP_TIMEOUT_SECS", "2");
+
+        let fixed_time = Utc.timestamp_opt(1_700_000_000, 0).unwrap();
+
+        let expected_body = serde_json::json!({
+            "description": "Fix bug\nhttp://example.com/commit/sha-001",
+            "level": 2,
+            "reporter": "track-system",
+            "type": "Bugfix",
+            "software": "pkg",
+            "version": "1.0",
+            "release": "1",
+            "platform": "noarch",
+            "disclosure_time": fixed_time.to_rfc3339(),
+            "source": "owner",
+            "package_id": 0,
+            "inner_secret": "Ctyun@123"
+        });
+
+        let mock = server.mock(|when, then| {
+            when.method(POST)
+                .path("/risk/create")
+                .json_body(expected_body);
+            then.status(200).json_body(serde_json::json!({"ok": true}));
+        });
+
+        let tracking_model = tracking::Model {
+            id: 2,
+            package_id: 3,
+            distro_id: 1,
+            l1_branch: "main".to_string(),
+            l1_repo_owner: "owner".to_string(),
+            l1_repo_name: "repo".to_string(),
+            l2_branch: "local".to_string(),
+            l2_repo_path: "/path".to_string(),
+            tracking_status: "idle".to_string(),
+            last_sync_time: Some(Utc::now()),
+            last_l1_commit_sha: None,
+            last_l2_commit_sha: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            last_error: None,
+        };
+
+        let package_model = packages::Model {
