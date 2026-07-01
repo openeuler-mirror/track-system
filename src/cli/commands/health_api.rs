@@ -195,3 +195,41 @@ mod tests {
                         "active_jobs": 3,
                         "pending_jobs": 10
                     },
+                    "api": {
+                        "status": "available",
+                        "version": "1.0.0"
+                    },
+                    "timestamp": "2024-01-01T00:00:00Z"
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = check_all_health(&client).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_check_component_health() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/health?component=database")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "status": "healthy",
+                    "details": {
+                        "connection_pool": "active",
+                        "connections": 10
+                    }
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = check_component_health(&client, "database").await;
