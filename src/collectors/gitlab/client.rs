@@ -368,3 +368,43 @@ mod tests {
             "file_path": "file.txt",
             "commit_id": "sha",
             "size": 100,
+            "content": "SGVsbG8gV29ybGQ=",
+            "encoding": "base64",
+            "blob_id": "blob_id",
+            "content_sha256": "sha256",
+            "ref_name": "main" // Missing field
+        });
+
+        let _mock = server.mock(|when, then| {
+            when.method(GET)
+                .path("/projects/owner%2Ftest-repo/repository/files/file.txt")
+                .query_param("ref", "main")
+                .header("PRIVATE-TOKEN", "token");
+            then.status(200).json_body(file_response);
+        });
+
+        let result = client
+            .get_file_content("owner", "test-repo", "file.txt", "main")
+            .await;
+        // mock.assert();
+        assert!(result.is_ok(), "Result error: {:?}", result.err());
+        let file = result.unwrap();
+        assert_eq!(file.name, "file.txt");
+    }
+
+    #[tokio::test]
+    async fn test_retry_mechanism() {
+        let server = MockServer::start();
+        let client = GitLabClient::with_base_url(server.base_url(), "token").unwrap();
+
+        let mock = server.mock(|when, then| {
+            when.method(GET).path("/projects/owner%2Ftest-repo");
+            then.status(500).body("Internal Server Error");
+        });
+
+        let result = client.get_repository("owner", "test-repo").await;
+
+        assert!(result.is_err());
+        mock.assert_calls(4); // 1 initial + 3 retries
+    }
+}
