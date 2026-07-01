@@ -76,3 +76,42 @@ pub struct GitLabCommit {
     pub title: Option<String>,
     pub message: String,
     pub author_name: String,
+    pub author_email: String,
+    pub authored_date: DateTime<Utc>,
+    pub committer_name: String,
+    pub committer_email: String,
+    pub committed_date: DateTime<Utc>,
+    pub web_url: String,
+    #[serde(default)]
+    pub stats: Option<GitLabCommitStats>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GitLabCommitStats {
+    pub additions: u32,
+    pub deletions: u32,
+    pub total: u32,
+}
+
+impl From<GitLabCommit> for Commit {
+    fn from(commit: GitLabCommit) -> Self {
+        let title = commit
+            .title
+            .as_ref()
+            .map(|t| t.to_string())
+            .unwrap_or_else(|| {
+                commit
+                    .message
+                    .lines()
+                    .next()
+                    .unwrap_or("")
+                    .trim()
+                    .to_string()
+            });
+
+        Self {
+            sha: commit.id,
+            title,
+            message: commit.message,
+            author_name: commit.author_name,
+            author_email: commit.author_email,
