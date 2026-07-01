@@ -429,3 +429,46 @@ mod tests {
         let (mut server, client) = setup_test_server().await;
 
         let mock = server
+            .mock("GET", "/api/status/scheduler")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "data": {
+                        "running": true,
+                        "active_jobs": 2,
+                        "pending_jobs": 3
+                    }
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = execute(&client, StatusAction::Scheduler).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_execute_rate_limit_action() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/status/rate-limit")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "api_remaining": 100
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = execute(&client, StatusAction::RateLimit).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+}
