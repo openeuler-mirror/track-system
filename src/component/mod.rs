@@ -42,3 +42,47 @@ pub struct ComponentCommit {
 }
 
 /// 从 Gitee 获取指定组件的 spec 信息
+pub async fn fetch_component_spec<C: GitClient + ?Sized>(
+    client: &C,
+    owner: &str,
+    repo: &str,
+    branch: &str,
+    spec_path: &str,
+) -> Result<ComponentSpec> {
+    let file = client
+        .get_file_content(owner, repo, spec_path, branch)
+        .await
+        .map_err(|err| anyhow!("failed to fetch spec file: {}", err))?;
+
+    let content = decode_file_content(&file)?;
+    let spec = parse_spec(&content);
+
+    Ok(ComponentSpec {
+        name: repo.to_string(),
+        version: spec.version,
+        release: spec.release,
+    })
+}
+
+/// 获取仓库 commit 列表
+pub async fn fetch_component_commits<C: GitClient + ?Sized>(
+    client: &C,
+    owner: &str,
+    repo: &str,
+    branch: &str,
+    page: u32,
+    per_page: u32,
+) -> Result<Vec<ComponentCommit>> {
+    let params = CommitsParams::new(branch.to_string())
+        .page(page)
+        .per_page(per_page);
+
+    let commits = client
+        .get_commits(owner, repo, params)
+        .await
+        .map_err(|err| anyhow!("failed to fetch commits: {}", err))?;
+
+    Ok(commits.into_iter().map(from_commit).collect())
+}
+
+fn from_commit(commit: Commit) -> ComponentCommit {
