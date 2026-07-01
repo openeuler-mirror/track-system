@@ -260,3 +260,39 @@ mod tests {
         let response = SchedulerStatusResponse {
             running: true,
             active_jobs: 5,
+            pending_jobs: 10,
+            total_jobs_executed: 100,
+            last_execution: Some("2024-01-01T00:00:00Z".to_string()),
+        };
+        let json = serde_json::to_string(&response).unwrap();
+        assert!(json.contains("\"running\":true"));
+        assert!(json.contains("\"active_jobs\":5"));
+    }
+
+    #[test]
+    fn test_execute_round_request_deserialization() {
+        let json = r#"{"max_jobs": 10}"#;
+        let request: ExecuteRoundRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(request.max_jobs, Some(10));
+    }
+
+    #[tokio::test]
+    async fn test_wake_scheduler_no_scheduler() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+        let state = AppState::without_external_clients(db);
+        let body = serde_json::json!({"tracking_id": 1});
+
+        let result = wake_scheduler_handler(State(state), Json(body)).await;
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), StatusCode::SERVICE_UNAVAILABLE);
+    }
+
+    #[test]
+    fn test_wake_scheduler_response_serialization() {
+        let response = WakeSchedulerResponse {
+            message: "Scheduler woken up".to_string(),
+        };
+        let json = serde_json::to_string(&response).unwrap();
+        assert!(json.contains("\"message\":\"Scheduler woken up\""));
+    }
+}
