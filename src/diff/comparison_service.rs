@@ -140,3 +140,51 @@ impl<'a> ComparisonService<'a> {
         diff: &super::git_client::CommitDiff,
         method: &str,
     ) -> Result<Value> {
+        let l1_commits: Vec<_> = diff
+            .l1_ahead
+            .iter()
+            .map(|c| {
+                json!({
+                    "sha": &c.sha,
+                    "message": &c.message,
+                    "author": &c.author,
+                    "committed_at": c.committed_at.to_rfc3339(),
+                    "files_changed": c.files_changed,
+                })
+            })
+            .collect();
+
+        let l2_commits: Vec<_> = diff
+            .l2_ahead
+            .iter()
+            .map(|c| {
+                json!({
+                    "sha": &c.sha,
+                    "message": &c.message,
+                    "author": &c.author,
+                    "committed_at": c.committed_at.to_rfc3339(),
+                    "files_changed": c.files_changed,
+                })
+            })
+            .collect();
+
+        Ok(json!({
+            "tracking_id": tracking.id,
+            "method": method,
+            "l1_repo": format!("{}/{}", tracking.l1_repo_owner, tracking.l1_repo_name),
+            "l1_branch": &tracking.l1_branch,
+            "l2_branch": &tracking.l2_branch,
+            "commits_ahead": {
+                "count": diff.l1_ahead.len(),
+                "commits": l1_commits,
+            },
+            "commits_behind": {
+                "count": diff.l2_ahead.len(),
+                "commits": l2_commits,
+            },
+            "summary": {
+                "l1_ahead": diff.l1_ahead.len(),
+                "l2_ahead": diff.l2_ahead.len(),
+                "needs_backport": !diff.l1_ahead.is_empty(),
+                "needs_forward_port": !diff.l2_ahead.is_empty(),
+            },
