@@ -41,3 +41,46 @@ pub struct ClientConfig {
 fn default_timeout() -> u64 {
     30
 }
+
+fn default_verify_ssl() -> bool {
+    true
+}
+
+impl Default for ClientConfig {
+    fn default() -> Self {
+        Self {
+            server_url: "http://localhost:3000".to_string(),
+            auth_token: None,
+            timeout: default_timeout(),
+            verify_ssl: default_verify_ssl(),
+        }
+    }
+}
+
+impl ClientConfig {
+    /// 获取配置文件路径
+    pub fn config_path() -> ApiResult<PathBuf> {
+        // 优先查找用户主目录下的配置
+        let home = dirs::home_dir();
+        if let Some(home_dir) = home {
+            let user_config = home_dir.join(".track-cli").join("config.toml");
+            if user_config.exists() {
+                return Ok(user_config);
+            }
+        }
+
+        // 其次查找系统级配置
+        let system_config = PathBuf::from("/etc/track-system/track-cli.toml");
+        if system_config.exists() {
+            return Ok(system_config);
+        }
+
+        // 如果都不存在，返回用户主目录下的路径（用于新建）
+        dirs::home_dir()
+            .map(|h| h.join(".track-cli").join("config.toml"))
+            .ok_or_else(|| ApiError::ConfigError("无法获取用户主目录".to_string()))
+    }
+
+    /// 从配置文件加载
+    pub fn load() -> ApiResult<Self> {
+        let config_path = Self::config_path()?;
