@@ -231,3 +231,50 @@ impl Formatter for TableFormatter {
                             if let serde_json::Value::Object(obj) = v {
                                 Some(
                                     headers
+                                        .iter()
+                                        .map(|h| {
+                                            obj.get(*h)
+                                                .map(format_json_value)
+                                                .unwrap_or_else(|| "".to_string())
+                                        })
+                                        .collect(),
+                                )
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
+
+                    self.render_simple(&headers, &rows)
+                } else {
+                    Ok("Invalid data format".to_string())
+                }
+            }
+            serde_json::Value::Object(obj) => {
+                // 单个对象，渲染为键值对表格
+                let headers = vec!["Key", "Value"];
+                let rows: Vec<Vec<String>> = obj
+                    .iter()
+                    .map(|(k, v)| vec![k.clone(), format_json_value(v)])
+                    .collect();
+
+                self.render_simple(&headers, &rows)
+            }
+            _ => Ok(format!("{}", json_value)),
+        }
+    }
+}
+
+/// 格式化 JSON 值为字符串
+fn format_json_value(value: &serde_json::Value) -> String {
+    match value {
+        serde_json::Value::Null => "null".to_string(),
+        serde_json::Value::Bool(b) => b.to_string(),
+        serde_json::Value::Number(n) => n.to_string(),
+        serde_json::Value::String(s) => s.clone(),
+        serde_json::Value::Array(_) | serde_json::Value::Object(_) => {
+            serde_json::to_string(value).unwrap_or_else(|_| "{}".to_string())
+        }
+    }
+}
+
