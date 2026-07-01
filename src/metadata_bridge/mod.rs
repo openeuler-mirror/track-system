@@ -1217,3 +1217,54 @@ Patch1: fix.patch
         assert!(result
             .unwrap_err()
             .to_string()
+            .contains("解析 L2 快照 payload 失败"));
+    }
+
+    #[tokio::test]
+    async fn test_collect_l2_commits_parses_cve_list() {
+        use crate::entities::l2_commit_records;
+
+        let model = l2_commit_records::Model {
+            id: 1,
+            tracking_id: 1,
+            commit_sha: "sha".to_string(),
+            commit_message: "m".to_string(),
+            author_name: "a".to_string(),
+            author_email: "e".to_string(),
+            committed_at: Utc::now(),
+            change_type: None,
+            primary_change_type: None,
+            cve_list: Some(json!(["CVE-2025-1"])),
+            spec_changed: false,
+            patch_stats: None,
+            classification_status: "pending".to_string(),
+            classification_notes: None,
+            sync_status: "not_synced".to_string(),
+            synced_to_l2_commit: None,
+            synced_at: None,
+            api_url: "u".to_string(),
+            fetched_at: Utc::now(),
+            files_changed_count: 0,
+            additions: 0,
+            deletions: 0,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            spec_version: None,
+            spec_release: None,
+        };
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<l2_commit_records::Model, _, _>(vec![vec![model]])
+            .into_connection();
+        let commits = collect_l2_commits(&db, 1).await.unwrap();
+        assert_eq!(commits.len(), 1);
+        assert_eq!(commits[0].cve_list, vec!["CVE-2025-1".to_string()]);
+    }
+
+    #[tokio::test]
+    async fn test_persist_l2_commits_inserts_and_handles_empty_cve() {
+        use crate::entities::l2_commit_records;
+
+        let commit = CommitEntry {
+            sha: "sha".to_string(),
+            title: "t".to_string(),
