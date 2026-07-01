@@ -60,3 +60,35 @@ pub struct ComponentCommitParams {
     pub owner: Option<String>,
     #[serde(default)]
     pub branch: Option<String>,
+    #[serde(default = "default_page")]
+    pub page: u32,
+    #[serde(default = "default_per_page")]
+    pub per_page: u32,
+    #[serde(default)]
+    pub platform: Option<String>,
+}
+
+fn default_page() -> u32 {
+    1
+}
+
+fn default_per_page() -> u32 {
+    20
+}
+
+/// 组件 commit 响应
+#[derive(Debug, Serialize)]
+pub struct ComponentCommitDto {
+    pub sha: String,
+    pub message: String,
+    pub author_name: String,
+    pub author_email: String,
+    pub authored_at: DateTime<Utc>,
+    pub url: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub additions: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub deletions: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub total: Option<u32>,
+}
