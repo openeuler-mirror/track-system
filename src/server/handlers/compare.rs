@@ -237,3 +237,44 @@ mod tests {
         assert_eq!(task_response.status, CompareStatus::Pending);
     }
 
+    #[tokio::test]
+    async fn test_compare_l1_vs_l0_invalid_tracking_id() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+        let state = AppState::without_external_clients(db);
+
+        let request = CompareL1VsL0Request {
+            tracking_id: 0,
+            l0_snapshot_id: None,
+            l1_snapshot_id: None,
+        };
+
+        let result = compare_l1_vs_l0(State(state), Json(request)).await;
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(matches!(err, ApiError::BadRequest(_)));
+    }
+
+    #[tokio::test]
+    async fn test_compare_l2_vs_l1_valid_request() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+        let state = AppState::without_external_clients(db);
+
+        let request = CompareL2VsL1Request {
+            tracking_id: 2,
+            l1_snapshot_id: Some("snapshot-789".to_string()),
+            l2_snapshot_id: Some("snapshot-101".to_string()),
+        };
+
+        let result = compare_l2_vs_l1(State(state), Json(request)).await;
+        assert!(result.is_ok());
+
+        let response = result.unwrap();
+        assert_eq!(response.0.code, 201);
+        assert!(response.0.data.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_compare_l2_vs_l1_invalid_tracking_id() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+        let state = AppState::without_external_clients(db);
+
