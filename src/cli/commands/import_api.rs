@@ -432,3 +432,51 @@ fn parse_snapshot_or_convert(
                 authored_at,
                 url,
                 stats,
+                primary_change_type,
+                cve_list,
+            }
+        })
+        .collect();
+
+    // 将通用 issue JSON 转换为 IssueEntry
+    let issues: Vec<IssueEntry> = issues_arr
+        .into_iter()
+        .map(|i| {
+            let number = i
+                .get("number")
+                .and_then(|v| {
+                    v.as_i64()
+                        .map(|n| n.to_string())
+                        .or_else(|| v.as_str().map(|s| s.to_string()))
+                })
+                .unwrap_or_default();
+            let title = i
+                .get("title")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let state = i
+                .get("state")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let author = i
+                .get("author")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let labels = i
+                .get("labels")
+                .and_then(|v| v.as_array())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|e| e.as_str().map(|s| s.to_string()))
+                        .collect::<Vec<String>>()
+                })
+                .unwrap_or_default();
+            let updated_at = i
+                .get("updated_at")
+                .and_then(|v| v.as_str())
+                .or_else(|| i.get("date").and_then(|v| v.as_str()))
+                .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
+                .map(|dt| dt.with_timezone(&Utc))
