@@ -46,3 +46,52 @@ pub struct ImportResult {
     /// 导入的发行版数量
     pub imported_distros: usize,
     /// 导入的跟踪配置数量
+    pub imported_trackings: usize,
+    /// 导入的 commit 数量
+    pub imported_commits: usize,
+    /// 错误信息
+    pub error: Option<String>,
+}
+
+/// 元数据导入器
+pub struct MetadataImporter<'a> {
+    db: &'a DatabaseConnection,
+}
+
+impl<'a> MetadataImporter<'a> {
+    /// 创建新的导入器
+    pub fn new(db: &'a DatabaseConnection) -> Self {
+        Self { db }
+    }
+
+    /// 导入元数据
+    pub async fn import<P: AsRef<Path>>(
+        &self,
+        path: P,
+        options: &ImportOptions,
+    ) -> Result<ImportResult, DbErr> {
+        // 读取文件
+        let content = std::fs::read_to_string(path.as_ref())
+            .map_err(|e| DbErr::Custom(format!("File read error: {}", e)))?;
+
+        // 解析 JSON
+        let metadata: ExportedMetadata = serde_json::from_str(&content)
+            .map_err(|e| DbErr::Custom(format!("JSON parse error: {}", e)))?;
+
+        // 导入数据
+        let mut result = ImportResult::default();
+
+        // 导入软件包
+        for pkg_json in &metadata.packages {
+            match self.import_package(pkg_json, options).await? {
+                PackageImportResult::Imported => result.imported_packages += 1,
+                PackageImportResult::Updated => result.updated_packages += 1,
+                PackageImportResult::Skipped => result.skipped_packages += 1,
+            }
+        }
+
+        // 导入发行版
+        for distro_json in &metadata.distros {
+            if self.import_distro(distro_json, options).await? {
+                result.imported_distros += 1;
+            }
