@@ -499,3 +499,48 @@ mod tests {
 
         let query = ExportFormatQuery {
             format: Some(ExportFormat::Json),
+        };
+
+        // Test with invalid ID (0)
+        let result = export_report(State(state.clone()), Path(0), Query(query.clone())).await;
+        assert!(result.is_err());
+        if let Err(ApiError::BadRequest(msg)) = result {
+            assert!(msg.contains("Invalid report ID"));
+        }
+
+        // Test with invalid ID (negative)
+        let result = export_report(State(state), Path(-5), Query(query)).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_get_report_not_found() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<crate::entities::tracking_reports::Model, _, _>([[]])
+            .into_connection();
+        let state = AppState::without_external_clients(db);
+
+        let result = get_report(State(state), Path(999)).await;
+        assert!(result.is_err());
+        if let Err(ApiError::NotFound(msg)) = result {
+            assert!(msg.contains("Report 999 not found"));
+        }
+    }
+
+    #[tokio::test]
+    async fn test_export_report_not_found() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<crate::entities::tracking_reports::Model, _, _>([[]])
+            .into_connection();
+        let state = AppState::without_external_clients(db);
+        let query = ExportFormatQuery {
+            format: Some(ExportFormat::Json),
+        };
+
+        let result = export_report(State(state), Path(999), Query(query)).await;
+        assert!(result.is_err());
+        if let Err(ApiError::NotFound(msg)) = result {
+            assert!(msg.contains("Report 999 not found"));
+        }
+    }
+}
