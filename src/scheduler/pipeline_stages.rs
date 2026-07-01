@@ -773,3 +773,54 @@ impl<'a> PipelineExecutor<'a> {
                                                     Some(_) => 1,
                                                     None => 1,
                                                 };
+
+                                            let version = if base_version.is_empty() {
+                                                commit
+                                                    .spec_version
+                                                    .clone()
+                                                    .unwrap_or_else(|| "unknown".to_string())
+                                            } else {
+                                                base_version.clone()
+                                            };
+
+                                            let release = if base_release.is_empty() {
+                                                commit
+                                                    .spec_release
+                                                    .clone()
+                                                    .unwrap_or_else(|| "unknown".to_string())
+                                            } else {
+                                                base_release.clone()
+                                            };
+
+                                            let req = RiskCreateReq {
+                                                description: format!(
+                                                    "{}\n{}",
+                                                    commit.commit_message, commit.api_url
+                                                ),
+                                                level: risk_level,
+                                                reporter: "track-system".to_string(),
+                                                r#type: commit
+                                                    .primary_change_type
+                                                    .clone()
+                                                    .unwrap_or_else(|| "Unknown".to_string()),
+                                                software: package_name.clone(),
+                                                version,
+                                                release,
+                                                platform: "noarch".to_string(),
+                                                disclosure_time: Some(
+                                                    commit.committed_at.to_rfc3339(),
+                                                ),
+                                                source: Some(tracking.l1_repo_owner.clone()),
+                                                package_id: 0,
+                                                inner_secret: "Ctyun@123".to_string(),
+                                            };
+                                            info!(
+                                                tracking_id = tracking.id,
+                                                commit_sha = %commit.commit_sha,
+                                                req = ?req,
+                                                "调用 risk/create 请求"
+                                            );
+
+                                            match risk_client
+                                                .post(&risk_create_url)
+                                                .header("Content-Type", "application/json")
