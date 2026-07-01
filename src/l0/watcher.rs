@@ -106,3 +106,40 @@ where
                 authored_at: Set(commit.date),
                 metadata: Set(Some(metadata)),
                 created_at: Set(Utc::now()),
+                updated_at: Set(Utc::now()),
+                ..Default::default()
+            };
+
+            active.insert(self.db).await?;
+            summary.commits_inserted += 1;
+        }
+
+        Telemetry::l0_poll_summary(
+            package.id,
+            summary.commits_inserted,
+            summary.commits_skipped,
+        );
+        Ok(summary)
+    }
+}
+
+fn parse_github_repo(url: &str) -> Result<(String, String)> {
+    let trimmed = url.trim().trim_end_matches('/').trim_end_matches(".git");
+
+    let path = if let Some(idx) = trimmed.find("github.com/") {
+        &trimmed[idx + "github.com/".len()..]
+    } else {
+        trimmed
+    };
+
+    let mut segments = path.split('/').filter(|segment| !segment.is_empty());
+    let owner = segments
+        .next()
+        .ok_or_else(|| anyhow!("invalid repository url: {}", url))?;
+    let repo = segments
+        .next()
+        .ok_or_else(|| anyhow!("invalid repository url: {}", url))?;
+
+    Ok((owner.to_string(), repo.to_string()))
+}
+
