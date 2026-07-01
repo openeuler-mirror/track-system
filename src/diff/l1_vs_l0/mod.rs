@@ -302,3 +302,54 @@ impl L1VsL0Comparator {
                     })
                 } else {
                     None
+                }
+            })
+            .collect();
+
+        // 按版本号排序（从旧到新）
+        upgradable.sort_by(|a, b| {
+            let va = VersionParser::parse(&a.version).unwrap_or_else(|_| Version::new(0, 0, 0));
+            let vb = VersionParser::parse(&b.version).unwrap_or_else(|_| Version::new(0, 0, 0));
+            va.cmp(&vb)
+        });
+
+        Ok(upgradable)
+    }
+
+    /// 分析补丁状态
+    ///
+    /// 通过以下策略判断补丁是否已合并到上游：
+    /// 1. 检查补丁是否标记为 backport（文件名或内容包含 backport/upstream/cherry-pick）
+    /// 2. 如果是 backport，提取上游 commit SHA，检查是否在 changelog 中
+    /// 3. 对于非 backport 补丁，通过描述关键词匹配 changelog 条目
+    /// 4. 检查补丁修复的问题是否在可升级版本的 changelog 中提及
+    fn analyze_patches(
+        &self,
+        patches: &[PatchInfo],
+        changelogs: &HashMap<String, Vec<ChangelogEntry>>,
+        upgradable_versions: &[UpgradableVersion],
+    ) -> Result<PatchAnalysis> {
+        let mut merged_in_upstream = Vec::new();
+        let mut still_needed = Vec::new();
+
+        for patch in patches {
+            // 解析补丁内容（如果有内容哈希，说明已经解析过）
+            let is_merged = if let Some(content_hash) = &patch.content_hash {
+                // 使用内容哈希判断（简化版本：假设有哈希就是已解析）
+                self.is_patch_merged_in_upstream(
+                    patch,
+                    content_hash,
+                    changelogs,
+                    upgradable_versions,
+                )?
+            } else {
+                // 没有内容哈希，保守判断为仍需保留
+                false
+            };
+
+            if is_merged {
+                merged_in_upstream.push(patch.clone());
+            } else {
+                still_needed.push(patch.clone());
+            }
+        }
