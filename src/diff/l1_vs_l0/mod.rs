@@ -454,3 +454,54 @@ impl L1VsL0Comparator {
     /// 2. 检查 changelog 条目的类型是否为 security
     /// 3. 检查 changelog 条目的描述是否包含 CVE 相关关键词
     fn analyze_cve_patches(
+        &self,
+        cve_patches: &[CveInfo],
+        changelogs: &HashMap<String, Vec<ChangelogEntry>>,
+    ) -> Result<CveAnalysis> {
+        let mut fixed_in_upstream = Vec::new();
+        let mut not_fixed_in_upstream = Vec::new();
+
+        for cve in cve_patches {
+            let is_fixed = self.is_cve_fixed_in_upstream(&cve.cve_id, changelogs)?;
+
+            if is_fixed {
+                fixed_in_upstream.push(cve.clone());
+            } else {
+                not_fixed_in_upstream.push(cve.clone());
+            }
+        }
+
+        Ok(CveAnalysis {
+            total_cves: cve_patches.len(),
+            fixed_in_upstream,
+            not_fixed_in_upstream,
+        })
+    }
+
+    /// 判断 CVE 是否已在上游修复
+    ///
+    /// 策略：
+    /// 1. 直接匹配：检查 changelog 条目中是否包含 CVE 编号
+    /// 2. 模糊匹配：检查 security 类型的 changelog 条目
+    fn is_cve_fixed_in_upstream(
+        &self,
+        cve_id: &str,
+        changelogs: &HashMap<String, Vec<ChangelogEntry>>,
+    ) -> Result<bool> {
+        let cve_id_lower = cve_id.to_lowercase();
+
+        // 遍历所有版本的 changelog
+        for changelog_entries in changelogs.values() {
+            for entry in changelog_entries {
+                // 策略 1: 直接匹配 CVE 编号
+                let entry_desc_lower = entry.description.to_lowercase();
+                if entry_desc_lower.contains(&cve_id_lower) {
+                    return Ok(true);
+                }
+
+                // 策略 2: 检查 security 类型的条目
+                // 如果是 security 类型，且描述中包含相关关键词，可能是相关修复
+                if entry.entry_type.to_lowercase() == "security" {
+                    // 提取 CVE 年份和编号（例如 CVE-2023-1234 -> 2023, 1234）
+                    if let Some((year, number)) = Self::parse_cve_id(cve_id) {
+                        // 检查 changelog 中是否提及相同年份的 CVE
