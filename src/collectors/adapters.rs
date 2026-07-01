@@ -360,3 +360,47 @@ mod tests {
                     encoding: "base64".to_string(),
                     download_url: "https://example.com/test.spec".to_string(),
                 })
+            });
+
+        let adapter = GitClientCollectorAdapter::new(mock_client, Platform::GitHub);
+        let config = CollectConfig {
+            owner: Some("owner".to_string()),
+            repo: Some("repo".to_string()),
+            branch: "main".to_string(),
+            since: None,
+            until: None,
+            limit: None,
+            level: Some("l2".to_string()),
+            platform: Platform::GitHub,
+            repo_path: None,
+            api_url: None,
+            token: None,
+        };
+
+        let result = adapter.collect(&config).await;
+        assert!(result.is_ok());
+        let res = result.unwrap();
+        assert_eq!(res.level, "l2");
+        assert_eq!(res.commits.len(), 1);
+        assert!(res.spec.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_collect_l0_success() {
+        let mut mock_client = MockGitClient::new();
+
+        // Mock get_commits
+        mock_client
+            .expect_get_commits()
+            .times(1)
+            .returning(|_, _, _| Ok(vec![]));
+
+        // Mock get_file_content should NOT be called for l0
+        mock_client.expect_get_file_content().times(0);
+
+        let adapter = GitClientCollectorAdapter::new(mock_client, Platform::GitHub);
+        let config = CollectConfig {
+            owner: Some("owner".to_string()),
+            repo: Some("repo".to_string()),
+            branch: "main".to_string(),
+            since: None,
