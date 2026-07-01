@@ -196,3 +196,53 @@ pub struct BackportSuggestionResult {
 #[allow(dead_code)]
 pub struct PipelineExecutor<'a> {
     pub(super) db: &'a DatabaseConnection,
+    pub(super) client: Option<Arc<dyn SyncApiClient>>,
+    sync_manager: SyncManager<'a>,
+    state_manager: Option<Arc<super::pipeline_state::PipelineStateManager>>,
+}
+
+impl<'a> PipelineExecutor<'a> {
+    /// 创建新的流水线执行器
+    pub fn new(db: &'a DatabaseConnection, client: Option<Arc<dyn SyncApiClient>>) -> Self {
+        Self {
+            db,
+            client,
+            sync_manager: SyncManager::new(db),
+            state_manager: None,
+        }
+    }
+
+    /// 创建带状态管理的流水线执行器
+    pub fn with_state_manager(
+        db: &'a DatabaseConnection,
+        client: Option<Arc<dyn SyncApiClient>>,
+        state_manager: Arc<super::pipeline_state::PipelineStateManager>,
+    ) -> Self {
+        Self {
+            db,
+            client,
+            sync_manager: SyncManager::new(db),
+            state_manager: Some(state_manager),
+        }
+    }
+
+    /// 执行完整的同步流水线
+    pub async fn execute_sync_job(&self, job_id: i64) -> Result<SyncJobResult> {
+        let started_at = Utc::now();
+        info!(job_id = job_id, "开始执行同步流水线");
+
+        // 获取 sync_job 信息
+        let job = self.get_sync_job(job_id).await?;
+        let tracking_id = job.tracking_id;
+
+        // 创建流水线状态
+        if let Some(state_mgr) = &self.state_manager {
+            state_mgr.create_state(job_id, tracking_id)?;
+            state_mgr.update_job_status(job_id, "running").await?;
+        }
+
+        // 获取 tracking 配置
+        let tracking = self
+            .sync_manager
+            .get_tracking(tracking_id)
+            .await
