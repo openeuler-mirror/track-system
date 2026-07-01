@@ -85,3 +85,46 @@ pub async fn execute(api_client: &ApiClient, action: CompareAction) -> Result<()
         CompareAction::Report { format, output } => {
             generate_report(api_client, format, output).await
         }
+    }
+}
+
+/// 执行 L1 vs L0 对比
+pub async fn compare_l1_vs_l0(
+    api_client: &ApiClient,
+    tracking_id: i32,
+    l0_snapshot_id: Option<String>,
+    l1_snapshot_id: Option<String>,
+) -> Result<()> {
+    println!("正在创建 L1 vs L0 对比任务...");
+    println!("  跟踪配置 ID: {}", tracking_id);
+
+    let request = CompareL1VsL0Request {
+        tracking_id,
+        l0_snapshot_id,
+        l1_snapshot_id,
+    };
+
+    match api_client
+        .post::<_, ApiResponse<CompareTaskResponse>>("/compare/l1-vs-l0", &request)
+        .await
+    {
+        Ok(response) => {
+            let task = response.data;
+            println!();
+            println!("{} 对比任务已创建", "✓".green().bold());
+            println!("  任务 ID: {}", task.task_id.cyan());
+            println!("  状态: {:?}", task.status);
+            println!("  创建时间: {}", format_datetime_local(&task.created_at));
+            println!();
+            println!("使用以下命令查询任务状态:");
+            println!("  track-cli compare status {}", task.task_id);
+            Ok(())
+        }
+        Err(e) => {
+            println!("{} 创建对比任务失败: {}", "✗".red().bold(), e);
+            Err(e.into())
+        }
+    }
+}
+
+/// 执行 L2 vs L1 对比
