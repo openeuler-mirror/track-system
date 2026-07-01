@@ -113,3 +113,41 @@ async fn batch_sync(api_client: &ApiClient, ids: Vec<i32>) -> Result<()> {
 
     let mut success_count = 0;
     let mut failed_count = 0;
+
+    for tracking_id in ids {
+        print!("提交 tracking {}... ", tracking_id);
+
+        match api_client
+            .post::<_, serde_json::Value>(
+                &format!("/sync/{}/queue", tracking_id),
+                &serde_json::json!({}),
+            )
+            .await
+        {
+            Ok(_) => {
+                println!("{}", "✓".green());
+                success_count += 1;
+            }
+            Err(e) => {
+                println!("{}: {}", "✗".red(), e);
+                failed_count += 1;
+            }
+        }
+    }
+
+    println!();
+    println!("完成: {} 成功, {} 失败", success_count, failed_count);
+
+    Ok(())
+}
+
+/// 唤醒调度器，立即触发调度
+async fn wake_scheduler(api_client: &ApiClient, tracking_id: Option<i32>) -> Result<()> {
+    println!("{}", "正在唤醒调度器...".cyan());
+
+    let body = if let Some(id) = tracking_id {
+        serde_json::json!({ "tracking_id": id })
+    } else {
+        serde_json::json!({})
+    };
+
