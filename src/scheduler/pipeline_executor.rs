@@ -97,3 +97,53 @@ impl StageResult {
             finished_at,
             details,
         }
+    }
+
+    pub fn failure(stage: PipelineStage, message: String, started_at: DateTime<Utc>) -> Self {
+        let finished_at = Utc::now();
+        let duration = (finished_at - started_at)
+            .to_std()
+            .unwrap_or(Duration::from_secs(0));
+
+        Self {
+            stage,
+            success: false,
+            message,
+            duration,
+            started_at,
+            finished_at,
+            details: serde_json::json!({}),
+        }
+    }
+}
+
+/// 同步任务执行结果
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SyncJobResult {
+    pub job_id: i64,
+    pub tracking_id: i32,
+    pub success: bool,
+    pub message: String,
+    pub stage_results: HashMap<PipelineStage, StageResult>,
+    pub started_at: DateTime<Utc>,
+    pub finished_at: DateTime<Utc>,
+    pub total_duration: Duration,
+}
+
+/// 任务进度
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct JobProgress {
+    pub job_id: i64,
+    pub tracking_id: i32,
+    pub current_stage: Option<PipelineStage>,
+    pub completed_stages: Vec<PipelineStage>,
+    pub progress_percent: f32,
+    pub status: String,
+}
+
+/// L1 获取结果
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct L1IngestionResult {
+    pub commits_synced: usize,
+    pub issues_synced: usize,
+    pub has_new_data: bool,
