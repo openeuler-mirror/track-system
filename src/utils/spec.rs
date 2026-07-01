@@ -295,3 +295,52 @@ impl SpecParser {
             .cloned()
             .collect()
     }
+}
+
+/// spec 文件对比结果
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SpecComparison {
+    /// 版本是否变化
+    pub version_changed: bool,
+    /// 版本差异（旧版本，新版本）
+    pub version_diff: Option<(String, String)>,
+    /// 新增的 BuildRequires
+    pub build_requires_added: Vec<String>,
+    /// 删除的 BuildRequires
+    pub build_requires_removed: Vec<String>,
+    /// 新增的 Requires
+    pub requires_added: Vec<String>,
+    /// 删除的 Requires
+    pub requires_removed: Vec<String>,
+    /// 新增的 configure 选项
+    pub configure_options_added: Vec<String>,
+    /// 删除的 configure 选项
+    pub configure_options_removed: Vec<String>,
+    /// Source 是否变化
+    pub sources_changed: bool,
+    /// Patch 是否变化
+    pub patches_changed: bool,
+}
+
+impl SpecComparison {
+    /// 生成差异摘要
+    pub fn summary(&self) -> String {
+        let mut parts = Vec::new();
+
+        if self.version_changed {
+            if let Some((old_ver, new_ver)) = &self.version_diff {
+                parts.push(format!("版本从 {} 变更为 {}", old_ver, new_ver));
+            }
+        }
+
+        if !self.build_requires_added.is_empty() {
+            parts.push(format!(
+                "新增 {} 个 BuildRequires",
+                self.build_requires_added.len()
+            ));
+        }
+
+        if !self.build_requires_removed.is_empty() {
+            parts.push(format!(
+                "删除 {} 个 BuildRequires",
+                self.build_requires_removed.len()
