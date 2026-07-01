@@ -404,3 +404,46 @@ mod tests {
             repo: Some("repo".to_string()),
             branch: "main".to_string(),
             since: None,
+            until: None,
+            limit: None,
+            level: Some("l0".to_string()),
+            platform: Platform::GitHub,
+            repo_path: None,
+            api_url: None,
+            token: None,
+        };
+
+        let result = adapter.collect(&config).await;
+        assert!(result.is_ok());
+        let res = result.unwrap();
+        assert_eq!(res.level, "l0");
+        assert!(res.spec.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_collect_config_validation_error() {
+        let mock_client = MockGitClient::new();
+        let adapter = GitClientCollectorAdapter::new(mock_client, Platform::GitHub);
+        let config = CollectConfig {
+            owner: None, // Missing owner
+            repo: Some("repo".to_string()),
+            branch: "main".to_string(),
+            since: None,
+            until: None,
+            limit: None,
+            level: None,
+            platform: Platform::GitHub,
+            repo_path: None,
+            api_url: None,
+            token: None,
+        };
+
+        let result = adapter.collect(&config).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_collect_spec_success() {
+        let mut mock_client = MockGitClient::new();
+        let content = "Name: test\nVersion: 1.2.3\nRelease: 1\n";
+        let encoded = BASE64_STANDARD.encode(content);
