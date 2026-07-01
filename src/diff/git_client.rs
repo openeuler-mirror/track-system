@@ -180,3 +180,49 @@ impl GitRepositoryClient {
             .iter()
             .filter(|c| !l1_shas.contains(c.sha.as_str()))
             .cloned()
+            .collect();
+
+        CommitDiff { l1_ahead, l2_ahead }
+    }
+
+    /// 私有辅助方法：获取和检出分支
+    fn fetch_and_checkout(repo: &Repository, branch: &str) -> Result<()> {
+        // 如果是远程仓库，先 fetch
+        if let Ok(mut remote) = repo.find_remote("origin") {
+            remote
+                .fetch(&[branch], None, None)
+                .context("Fetch 分支失败")?;
+        }
+
+        // 检出分支
+        let obj = repo
+            .revparse_single(&format!("refs/heads/{}", branch))
+            .or_else(|_| repo.revparse_single(&format!("remotes/origin/{}", branch)))
+            .context(format!("找不到分支: {}", branch))?;
+
+        repo.set_head_detached(obj.id()).context("检出分支失败")?;
+
+        Ok(())
+    }
+
+    /// 私有辅助方法：计算 commit 中变动的文件数
+    fn count_files_changed(repo: &Repository, commit: &git2::Commit) -> Result<usize> {
+        if commit.parent_count() == 0 {
+            // 首个 commit，直接计算树中的文件数
+            let tree = commit.tree().context("获取树失败")?;
+            Ok(tree.len())
+        } else {
+            // 对比与父 commit 的差异
+            let parent = commit.parent(0).context("获取父 commit 失败")?;
+            let parent_tree = parent.tree().context("获取父树失败")?;
+            let commit_tree = commit.tree().context("获取 commit 树失败")?;
+
+            let diff = repo
+                .diff_tree_to_tree(Some(&parent_tree), Some(&commit_tree), None)
+                .context("生成 diff 失败")?;
+
+            Ok(diff.deltas().len())
+        }
+    }
+}
+
