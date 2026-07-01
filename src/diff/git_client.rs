@@ -315,3 +315,48 @@ mod tests {
         let oid1 = create_commit(&repo, "First commit", None);
         let oid2 = create_commit(&repo, "Second commit", Some(oid1));
 
+        let client = GitRepositoryClient::new(temp_dir.path()).unwrap();
+        let commits = client.get_commits("master").unwrap();
+
+        assert_eq!(commits.len(), 2);
+        // git2 revwalk with TIME | REVERSE usually yields oldest first if timestamps same,
+        // but here we rely on topological order or verify existence.
+        // Actually implementation uses Sort::TIME | Sort::REVERSE which means REVERSE(TIME) i.e. oldest first?
+        // Let's check implementation:
+        // revwalk.set_sorting(Sort::TIME | Sort::REVERSE)
+        // libgit2 doc: TIME sorts by time (newest first). REVERSE reverses the order.
+        // So it should be oldest first.
+
+        // However, in our test, timestamps might be identical.
+        // Let's just check content.
+        let shas: Vec<String> = commits.iter().map(|c| c.sha.clone()).collect();
+        assert!(shas.contains(&oid1.to_string()));
+        assert!(shas.contains(&oid2.to_string()));
+    }
+
+    #[test]
+    fn test_compute_diff_no_diff() {
+        let commit1 = GitCommit {
+            sha: "abc123".to_string(),
+            message: "test".to_string(),
+            author: "test".to_string(),
+            author_email: "test@example.com".to_string(),
+            committed_at: Utc::now(),
+            files_changed: 1,
+        };
+
+        let l1 = vec![commit1.clone()];
+        let l2 = vec![commit1];
+
+        let diff = GitRepositoryClient::compute_diff(&l1, &l2);
+        assert_eq!(diff.l1_ahead.len(), 0);
+        assert_eq!(diff.l2_ahead.len(), 0);
+    }
+
+    #[test]
+    fn test_compute_diff_l1_ahead() {
+        let commit1 = GitCommit {
+            sha: "abc123".to_string(),
+            message: "first".to_string(),
+            author: "test".to_string(),
+            author_email: "test@example.com".to_string(),
