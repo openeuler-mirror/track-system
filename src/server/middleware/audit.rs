@@ -124,3 +124,46 @@ fn extract_resource_info(path: &str) -> (String, Option<String>) {
         }
     } else {
         None
+    };
+
+    (resource_type, resource_id)
+}
+
+/// 记录审计日志到数据库
+#[allow(clippy::too_many_arguments)]
+async fn log_audit(
+    db: &DatabaseConnection,
+    user_id: Option<String>,
+    action: audit_logs::AuditAction,
+    resource_type: String,
+    resource_id: Option<String>,
+    method: String,
+    path: String,
+    ip_address: String,
+    user_agent: Option<String>,
+    response_status: i32,
+    duration: i32,
+) -> Result<(), sea_orm::DbErr> {
+    let audit_log = audit_logs::ActiveModel {
+        user_id: Set(user_id),
+        action: Set(action.to_string()),
+        resource_type: Set(resource_type),
+        resource_id: Set(resource_id),
+        method: Set(method),
+        path: Set(path),
+        ip_address: Set(Some(ip_address)),
+        user_agent: Set(user_agent),
+        request_body: Set(None), // 可选择性记录请求体
+        response_status: Set(response_status),
+        response_body: Set(None), // 可选择性记录响应体
+        duration: Set(Some(duration)),
+        error_message: Set(None),
+        created_at: Set(Utc::now()),
+        ..Default::default()
+    };
+
+    audit_log.insert(db).await?;
+
+    Ok(())
+}
+
