@@ -516,3 +516,55 @@ pub struct CollectResult {
     /// 分支名称
     pub branch: String,
     /// 采集时间
+    pub collected_at: DateTime<Utc>,
+    /// Commits 列表
+    pub commits: Vec<CommitMetadata>,
+    /// 快照数据（L1/L2 使用）
+    pub snapshot: Option<SnapshotData>,
+    /// 文件列表（L2 使用）
+    pub files: Vec<FileInfo>,
+    /// Spec 文件信息（L2 使用）
+    pub spec: Option<SpecInfo>,
+    /// Issues 列表（L2 使用）
+    pub issues: Vec<IssueMetadata>,
+}
+
+/// 统一的采集器接口
+#[async_trait]
+pub trait Collector: Send + Sync {
+    /// 采集元数据
+    async fn collect(&self, config: &CollectConfig) -> ApiResult<CollectResult>;
+
+    /// 获取采集器名称
+    fn name(&self) -> &str;
+
+    /// 检查配置是否有效
+    fn validate_config(&self, config: &CollectConfig) -> ApiResult<()> {
+        // 默认实现：检查基本配置
+        match config.platform {
+            Platform::Local => {
+                if config.repo_path.is_none() {
+                    return Err(super::error::ApiError::InvalidConfig(
+                        "Local platform requires repo_path".to_string(),
+                    ));
+                }
+            }
+            _ => {
+                if config.owner.is_none() || config.repo.is_none() {
+                    return Err(super::error::ApiError::InvalidConfig(
+                        "Remote platform requires owner and repo".to_string(),
+                    ));
+                }
+            }
+        }
+
+        if config.branch.is_empty() {
+            return Err(super::error::ApiError::InvalidConfig(
+                "Branch name is required".to_string(),
+            ));
+        }
+
+        Ok(())
+    }
+}
+
