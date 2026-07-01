@@ -343,3 +343,46 @@ mod tests {
         mock.assert_async().await;
     }
 
+    #[tokio::test]
+    async fn test_show_rate_limit() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/status/rate-limit")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "github_api": {
+                        "remaining": 4800,
+                        "limit": 5000,
+                        "reset_at": "2024-01-01T12:00:00Z"
+                    },
+                    "gitee_api": {
+                        "remaining": 950,
+                        "limit": 1000,
+                        "reset_at": "2024-01-01T12:00:00Z"
+                    }
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = show_rate_limit(&client).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_show_rate_limit_failure() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/status/rate-limit")
+            .with_status(404)
+            .create_async()
+            .await;
+
+        let result = show_rate_limit(&client).await;
+        assert!(result.is_err(), "Expected failure but got success");
