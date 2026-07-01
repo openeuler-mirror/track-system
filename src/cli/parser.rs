@@ -259,3 +259,56 @@ pub enum WorkflowAction {
     Validate {
         /// 工作流文件路径
         workflow_file: String,
+    },
+
+    /// 模拟运行工作流（不实际执行）
+    #[command(about = "Dry-run a workflow")]
+    DryRun {
+        /// 工作流文件路径
+        workflow_file: String,
+
+        /// 额外的变量
+        #[arg(long)]
+        var: Vec<String>,
+    },
+}
+
+// ============== L0 Commands ==============
+
+#[derive(Subcommand, Debug)]
+pub enum L0Action {
+    /// 轮询L0仓库
+    #[command(about = "Poll L0 repository")]
+    Poll {
+        /// Package ID (可选，不指定则轮询所有)
+        package_id: Option<i32>,
+    },
+
+    /// 检测L0与L1的差异
+    #[command(about = "Detect differences between L0 and L1")]
+    DetectDiff {
+        /// Package ID
+        package_id: i32,
+    },
+}
+
+// ============== Compare Commands ==============
+
+#[derive(Subcommand, Debug)]
+pub enum CompareAction {
+    /// 对比单个tracking的L1和L2
+    #[command(about = "Compare L1 and L2 for a tracking")]
+    Tracking {
+        /// Tracking ID
+        tracking_id: i32,
+    },
+
+    /// 生成对比报告
+    #[command(about = "Generate comparison report")]
+    Report {
+        /// 输出格式 (json, csv, html)
+        #[arg(long, default_value = "json")]
+        format: String,
+
+        /// 输出文件路径
+        #[arg(long)]
