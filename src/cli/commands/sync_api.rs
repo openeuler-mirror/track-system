@@ -151,3 +151,42 @@ async fn wake_scheduler(api_client: &ApiClient, tracking_id: Option<i32>) -> Res
         serde_json::json!({})
     };
 
+    let result: serde_json::Value = api_client.post("/scheduler/wake", &body).await?;
+
+    println!("{}", "✓ 调度器已唤醒".green());
+
+    if let Some(message) = result["message"].as_str() {
+        println!("{}", message);
+    }
+
+    Ok(())
+}
+
+/// 显示同步状态
+async fn show_sync_status(api_client: &ApiClient) -> Result<()> {
+    println!("{}", "正在获取同步状态...".cyan());
+
+    // 获取调度器状态
+    let status: serde_json::Value = api_client.get("/status").await?;
+
+    println!("\n{}", "=== 系统状态 ===".bold());
+    println!("数据库: {}", status["database"]["status"]);
+    println!("调度器: {}", status["scheduler"]["status"]);
+
+    if let Some(jobs) = status["scheduler"]["active_jobs"].as_array() {
+        println!("\n{}", "=== 活动任务 ===".bold());
+        if jobs.is_empty() {
+            println!("无活动任务");
+        } else {
+            for job in jobs {
+                println!(
+                    "- 任务 {}: {} ({})",
+                    job["id"], job["tracking_id"], job["status"]
+                );
+            }
+        }
+    }
+
+    Ok(())
+}
+
