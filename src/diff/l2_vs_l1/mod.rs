@@ -1896,3 +1896,56 @@ impl L2VsL1Comparator {
             stats: crate::snapshot::types::ChangeStats {
                 additions: model.additions,
                 deletions: model.deletions,
+                files_changed: model.files_changed_count,
+            },
+            primary_change_type: model.primary_change_type.clone(),
+            cve_list: model
+                .cve_list
+                .as_ref()
+                .and_then(|v| serde_json::from_value::<Vec<String>>(v.clone()).ok())
+                .unwrap_or_default(),
+        }
+    }
+
+    /// 在 commits 列表中查找匹配 version-release 的基线 commit
+    ///
+    /// 返回：(基线 commit, commit 在列表中的索引)
+    ///
+    /// 查找策略：
+    /// 1. 优先查找 commit message 中同时包含 version 和 release 的 commit
+    /// 2. 如果没找到，查找只包含 version 的 commit
+    /// 3. 如果还没找到，返回 None
+    fn find_base_commit(
+        commits: &[CommitEntry],
+        version: &str,
+        release: Option<&str>,
+    ) -> (Option<CommitEntry>, Option<usize>) {
+        // 构建搜索模式
+        let version_patterns = [
+            format!("Version: {}", version),
+            format!("version {}", version),
+            format!("v{}", version),
+            version.to_string(),
+        ];
+
+        let release_patterns = release.map(|r| {
+            vec![
+                format!("Release: {}", r),
+                format!("release {}", r),
+                format!("-{}", r),
+            ]
+        });
+
+        // 策略 1: 查找同时匹配 version 和 release 的 commit
+        if let Some(ref rel_patterns) = release_patterns {
+            for (idx, commit) in commits.iter().enumerate() {
+                let message_lower = commit.message.to_lowercase();
+                let title_lower = commit.title.to_lowercase();
+
+                let has_version = version_patterns.iter().any(|pattern| {
+                    message_lower.contains(&pattern.to_lowercase())
+                        || title_lower.contains(&pattern.to_lowercase())
+                });
+
+                let has_release = rel_patterns.iter().any(|pattern| {
+                    message_lower.contains(&pattern.to_lowercase())
