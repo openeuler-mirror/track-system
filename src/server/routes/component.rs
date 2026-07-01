@@ -13,3 +13,19 @@ use axum::{
     routing::{get, post},
     Router,
 };
+
+use crate::server::{handlers, state::AppState};
+
+pub fn component_routes() -> Router<AppState> {
+    Router::new()
+        .route("/components", get(handlers::component::list_components))
+        .route("/components/:name", get(handlers::component::get_component))
+        .route(
+            "/components/query",
+            post(handlers::component::query_components),
+        )
+        .route(
+            "/components/:name/commits",
+            get(handlers::component::list_component_commits),
+        )
+}
