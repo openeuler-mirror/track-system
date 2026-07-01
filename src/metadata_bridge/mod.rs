@@ -1421,3 +1421,54 @@ Patch1: fix.patch
             }]
         });
 
+        let snapshot_model = l2_snapshots::Model {
+            id: 10,
+            tracking_id: 1,
+            snapshot_type: "l2".to_string(),
+            checksum: "c".to_string(),
+            payload,
+            created_at: now,
+        };
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![snapshot_model]])
+            .into_connection();
+
+        let tracking_model = make_tracking_model(1);
+        let snapshot = build_repository_snapshot(&db, &tracking_model, SnapshotOrigin::L2, None)
+            .await
+            .unwrap();
+
+        assert_eq!(snapshot.tracking_id, 1);
+        assert_eq!(snapshot.origin, SnapshotOrigin::L2);
+        assert!(snapshot.spec.is_some());
+        assert_eq!(snapshot.files.len(), 1);
+        assert_eq!(snapshot.issues.len(), 1);
+        assert_eq!(snapshot.issues[0].number, "1");
+    }
+
+    #[test]
+    fn test_collect_files_from_repo_walks_and_skips_git_dir() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let root = temp_dir.path();
+
+        std::fs::create_dir_all(root.join(".git")).unwrap();
+        std::fs::write(root.join(".git").join("config"), b"ignored").unwrap();
+
+        std::fs::create_dir_all(root.join("src")).unwrap();
+        std::fs::write(root.join("a.txt"), b"hello").unwrap();
+        std::fs::write(root.join("src").join("b.bin"), [0xffu8, 0xfeu8, 0xfdu8]).unwrap();
+
+        let files = collect_files(SnapshotOrigin::L2, None, Some(root)).unwrap();
+        let paths: Vec<String> = files.iter().map(|f| f.path.clone()).collect();
+
+        assert!(paths.iter().any(|p| p == "a.txt"));
+        assert!(paths.iter().any(|p| p == "src/b.bin"));
+        assert!(!paths.iter().any(|p| p.contains(".git")));
+
+        let a = files.iter().find(|f| f.path == "a.txt").unwrap();
+        assert!(!a.is_binary);
+        let b = files.iter().find(|f| f.path == "src/b.bin").unwrap();
+        assert!(b.is_binary);
+    }
+
