@@ -2212,3 +2212,56 @@ Summary: Test package
 
     #[test]
     fn test_create_l1_snapshot_no_version_in_spec() {
+        use crate::snapshot::types::SnapshotOrigin;
+        use crate::snapshot::types::SpecEntry;
+        use base64::Engine;
+
+        let spec_content = "Name: testpkg\nRelease: 1\nSummary: Test\n";
+        let spec_base64 = base64::engine::general_purpose::STANDARD.encode(spec_content);
+
+        let snapshot = RepositorySnapshot {
+            tracking_id: 1,
+            origin: SnapshotOrigin::L1,
+            spec: Some(SpecEntry {
+                path: "testpkg.spec".to_string(),
+                version: None,
+                release: Some("1".to_string()),
+                sha256: "spec_hash".to_string(),
+                content_base64: spec_base64,
+            }),
+            files: vec![],
+            commits: vec![],
+            generated_at: Utc::now(),
+            issues: vec![],
+        };
+
+        let result = L2VsL1Comparator::create_l1_snapshot("testpkg".to_string(), &snapshot);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("无法从 spec 文件提取版本号"));
+    }
+
+    #[test]
+    fn test_create_l1_snapshot_invalid_base64() {
+        use crate::snapshot::types::SnapshotOrigin;
+        use crate::snapshot::types::SpecEntry;
+
+        let snapshot = RepositorySnapshot {
+            tracking_id: 1,
+            origin: SnapshotOrigin::L1,
+            spec: Some(SpecEntry {
+                path: "testpkg.spec".to_string(),
+                version: Some("1.0.0".to_string()),
+                release: Some("1".to_string()),
+                sha256: "spec_hash".to_string(),
+                content_base64: "%%%not_base64%%%".to_string(),
+            }),
+            files: vec![],
+            commits: vec![],
+            generated_at: Utc::now(),
+            issues: vec![],
+        };
+
+        let result = L2VsL1Comparator::create_l1_snapshot("testpkg".to_string(), &snapshot);
