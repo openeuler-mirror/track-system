@@ -47,3 +47,53 @@ impl PipelineStage {
             Self::DiffComparison => "差异对比",
             Self::Classification => "变更分类",
             Self::ReportGeneration => "报告生成",
+            Self::BackportSuggestion => "回合建议",
+        }
+    }
+
+    /// 获取所有阶段（按执行顺序）
+    pub fn all_stages() -> Vec<Self> {
+        vec![
+            Self::L1Ingestion,
+            Self::L2Snapshot,
+            Self::DiffComparison,
+            Self::Classification,
+            Self::ReportGeneration,
+            Self::BackportSuggestion,
+        ]
+    }
+}
+
+/// 阶段执行结果
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StageResult {
+    pub stage: PipelineStage,
+    pub success: bool,
+    pub message: String,
+    pub duration: Duration,
+    pub started_at: DateTime<Utc>,
+    pub finished_at: DateTime<Utc>,
+    pub details: serde_json::Value,
+}
+
+impl StageResult {
+    pub fn success(
+        stage: PipelineStage,
+        message: String,
+        started_at: DateTime<Utc>,
+        details: serde_json::Value,
+    ) -> Self {
+        let finished_at = Utc::now();
+        let duration = (finished_at - started_at)
+            .to_std()
+            .unwrap_or(Duration::from_secs(0));
+
+        Self {
+            stage,
+            success: true,
+            message,
+            duration,
+            started_at,
+            finished_at,
+            details,
+        }
