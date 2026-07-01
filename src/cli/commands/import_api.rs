@@ -823,3 +823,52 @@ mod tests {
                     "code": 200,
                     "message": "success",
                     "data": null
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = import_single_file(&client, &temp_file.path().to_path_buf(), 1).await;
+        assert!(result.is_err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_import_single_file_api_error() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mut temp_file = NamedTempFile::new().unwrap();
+        temp_file
+            .write_all(create_test_snapshot_json().as_bytes())
+            .unwrap();
+        temp_file.flush().unwrap();
+
+        let mock = server
+            .mock("POST", "/api/metadata/l1")
+            .with_status(500)
+            .with_header("content-type", "text/plain")
+            .with_body("server error")
+            .create_async()
+            .await;
+
+        let result = import_single_file(&client, &temp_file.path().to_path_buf(), 1).await;
+        assert!(result.is_err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_import_single_file_not_exists() {
+        let (_server, client) = setup_test_server().await;
+        let non_existent = PathBuf::from("/nonexistent/file.json");
+        let result = import_single_file(&client, &non_existent, 1).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_resolve_tracking_id_from_package() {
+        let (mut server, client) = setup_test_server().await;
+
+        // Mock packages endpoint
+        let packages_mock_1 = server
+            .mock("GET", "/api/packages")
