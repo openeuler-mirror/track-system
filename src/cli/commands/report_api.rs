@@ -87,3 +87,47 @@ pub async fn list_reports(
     }
 
     match api_client
+        .get::<ApiResponse<PaginatedResponse<ReportSummary>>>(&format!("/reports{}", query))
+        .await
+    {
+        Ok(response) => {
+            let data = response.data;
+
+            if data.items.is_empty() {
+                println!("{}", "没有找到报告".yellow());
+                return Ok(());
+            }
+
+            println!();
+            println!("{}", "报告列表:".bold());
+            println!(
+                "{:<8} {:<15} {:<20} {:<30} {:<12} {:<20}",
+                "ID", "跟踪ID", "类型", "软件包", "状态", "创建时间"
+            );
+            println!("{}", "-".repeat(105));
+
+            for report in data.items {
+                let status_str = match report.status.as_str() {
+                    "completed" => "已完成".green(),
+                    "pending" => "等待中".yellow(),
+                    "failed" => "失败".red(),
+                    _ => report.status.as_str().into(),
+                };
+
+                println!(
+                    "{:<8} {:<15} {:<20} {:<30} {} {:<20}",
+                    report.id,
+                    report.tracking_id,
+                    report.report_type,
+                    report.package_name,
+                    status_str,
+                    format_datetime_local(&report.created_at)
+                );
+            }
+
+            println!();
+            println!(
+                "第 {}/{} 页，共 {} 条记录",
+                data.page, data.total_pages, data.total
+            );
+
