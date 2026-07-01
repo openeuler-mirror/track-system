@@ -127,3 +127,47 @@ impl ClientConfig {
             config.server_url = url;
         }
 
+        if let Ok(token) = std::env::var("TRACK_AUTH_TOKEN") {
+            config.auth_token = Some(token);
+        }
+
+        if let Ok(timeout) = std::env::var("TRACK_TIMEOUT") {
+            if let Ok(t) = timeout.parse::<u64>() {
+                config.timeout = t;
+            }
+        }
+
+        Ok(config)
+    }
+
+    /// 设置服务器地址
+    pub fn set_server_url(&mut self, url: String) {
+        self.server_url = url;
+    }
+
+    /// 设置认证 token
+    pub fn set_auth_token(&mut self, token: Option<String>) {
+        self.auth_token = token;
+    }
+
+    /// 获取完整的 API 基础 URL
+    pub fn api_base_url(&self) -> String {
+        format!("{}/api", self.server_url.trim_end_matches('/'))
+    }
+
+    /// 验证配置是否有效
+    pub fn validate(&self) -> ApiResult<()> {
+        // 验证服务器 URL 格式
+        if self.server_url.is_empty() {
+            return Err(ApiError::ConfigError("服务器地址不能为空".to_string()));
+        }
+
+        // 验证超时时间
+        if self.timeout == 0 {
+            return Err(ApiError::ConfigError("超时时间必须大于 0".to_string()));
+        }
+
+        Ok(())
+    }
+}
+
