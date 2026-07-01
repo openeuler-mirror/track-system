@@ -1040,3 +1040,51 @@ mod tests {
         changelogs.insert(
             "1.23.0".to_string(),
             vec![ChangelogEntry {
+                entry_type: "security".to_string(),
+                description: "Fix CVE-2023-1234".to_string(),
+                commit_sha: Some("abc123".to_string()),
+            }],
+        );
+
+        // 执行 CVE 分析
+        let analysis = comparator
+            .analyze_cve_patches(&cve_patches, &changelogs)
+            .unwrap();
+
+        // 验证结果
+        assert_eq!(analysis.total_cves, 2);
+        assert_eq!(analysis.fixed_in_upstream.len(), 1);
+        assert_eq!(analysis.not_fixed_in_upstream.len(), 1);
+        assert_eq!(analysis.fixed_in_upstream[0].cve_id, "CVE-2023-1234");
+        assert_eq!(analysis.not_fixed_in_upstream[0].cve_id, "CVE-2023-9999");
+    }
+
+    #[test]
+    fn test_parse_cve_id() {
+        assert_eq!(
+            L1VsL0Comparator::parse_cve_id("CVE-2023-1234"),
+            Some(("2023".to_string(), "1234".to_string()))
+        );
+        assert_eq!(
+            L1VsL0Comparator::parse_cve_id("CVE-2024-56789"),
+            Some(("2024".to_string(), "56789".to_string()))
+        );
+        assert_eq!(L1VsL0Comparator::parse_cve_id("invalid"), None);
+    }
+
+    #[test]
+    fn test_extract_cve_numbers() {
+        // 注意：extract_cve_numbers 期望小写文本
+        let text = "fix cve-2023-1234 and cve-2023-5678";
+        let numbers = L1VsL0Comparator::extract_cve_numbers(text);
+        assert!(numbers.is_some());
+        let numbers = numbers.unwrap();
+        assert_eq!(numbers.len(), 2);
+        assert!(numbers.contains(&"1234".to_string()));
+        assert!(numbers.contains(&"5678".to_string()));
+
+        let text = "no cve here";
+        let numbers = L1VsL0Comparator::extract_cve_numbers(text);
+        assert!(numbers.is_none());
+    }
+}
