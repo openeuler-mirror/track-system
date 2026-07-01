@@ -202,3 +202,47 @@ mod tests {
 
         let db = MockDatabase::new(DatabaseBackend::Postgres)
             .append_query_results([mock_packages])
+            .into_connection();
+
+        let state = AppState::without_external_clients(db);
+        let result = list_packages(State(state)).await;
+
+        assert!(result.is_ok());
+        let response = result.unwrap();
+        assert_eq!(response.0.len(), 2);
+        assert_eq!(response.0[0].name, "glibc");
+        assert_eq!(response.0[1].name, "gcc");
+    }
+
+    #[tokio::test]
+    async fn test_create_package() {
+        let mock_package = create_mock_package(1, "new-package");
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results([[mock_package.clone()]])
+            .into_connection();
+
+        let state = AppState::without_external_clients(db);
+        let request = CreatePackageRequest {
+            name: "new-package".to_string(),
+            level: 1,
+            sync_interval_hours: 24,
+            l0_repo_url: Some("https://github.com/example/repo".to_string()),
+            description: Some("Test package".to_string()),
+        };
+
+        let result = create_package(State(state), Json(request)).await;
+        assert!(result.is_ok());
+
+        let (status, response) = result.unwrap();
+        assert_eq!(status, StatusCode::CREATED);
+        assert_eq!(response.0.name, "new-package");
+    }
+
+    #[tokio::test]
+    async fn test_create_package_invalid_sync_interval() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+
+        let state = AppState::without_external_clients(db);
+        let request = CreatePackageRequest {
+            name: "new-package".to_string(),
