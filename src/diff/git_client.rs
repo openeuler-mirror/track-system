@@ -270,3 +270,48 @@ mod tests {
             sha: "sha1".to_string(),
             message: "m1".to_string(),
             author: "a".to_string(),
+            author_email: "e".to_string(),
+            committed_at: now,
+            files_changed: 1,
+        };
+        let c2 = GitCommit {
+            sha: "sha2".to_string(),
+            message: "m2".to_string(),
+            author: "a".to_string(),
+            author_email: "e".to_string(),
+            committed_at: now,
+            files_changed: 1,
+        };
+        let c3 = GitCommit {
+            sha: "sha3".to_string(),
+            message: "m3".to_string(),
+            author: "a".to_string(),
+            author_email: "e".to_string(),
+            committed_at: now,
+            files_changed: 1,
+        };
+
+        // L1: [c1, c2], L2: [c1] => L1 ahead [c2], L2 ahead []
+        let diff =
+            GitRepositoryClient::compute_diff(&[c1.clone(), c2.clone()], std::slice::from_ref(&c1));
+        assert_eq!(diff.l1_ahead.len(), 1);
+        assert_eq!(diff.l1_ahead[0].sha, "sha2");
+        assert_eq!(diff.l2_ahead.len(), 0);
+
+        // L1: [c1], L2: [c1, c3] => L1 ahead [], L2 ahead [c3]
+        let diff =
+            GitRepositoryClient::compute_diff(std::slice::from_ref(&c1), &[c1.clone(), c3.clone()]);
+        assert_eq!(diff.l1_ahead.len(), 0);
+        assert_eq!(diff.l2_ahead.len(), 1);
+        assert_eq!(diff.l2_ahead[0].sha, "sha3");
+    }
+
+    #[test]
+    fn test_get_commits() {
+        let temp_dir = TempDir::new().unwrap();
+        let repo = Repository::init(temp_dir.path()).unwrap();
+
+        // Create commits
+        let oid1 = create_commit(&repo, "First commit", None);
+        let oid2 = create_commit(&repo, "Second commit", Some(oid1));
+
