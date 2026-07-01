@@ -2738,3 +2738,56 @@ Summary: Test package
             classification_notes: None,
             sync_status: "idle".to_string(),
             synced_to_l2_commit: None,
+            synced_at: None,
+            api_url: "http://example".to_string(),
+            fetched_at: now,
+            files_changed_count: 0,
+            additions: 0,
+            deletions: 0,
+            created_at: now,
+            updated_at: now,
+            spec_version: Some("1.0.0".to_string()),
+            spec_release: None,
+        };
+
+        let (commit, idx) =
+            L2VsL1Comparator::find_base_commit_from_records(&[model], "1.0.0", Some("9"));
+        assert!(commit.is_some());
+        assert_eq!(idx, Some(0));
+    }
+
+    #[test]
+    fn test_find_base_commit_from_records_none() {
+        use crate::entities::l1_commit_records;
+        use chrono::Utc;
+
+        let now = Utc::now();
+        let model = l1_commit_records::Model {
+            id: 1,
+            tracking_id: 1,
+            commit_sha: "sha1".to_string(),
+            commit_message: "msg".to_string(),
+            author_name: "a".to_string(),
+            author_email: "a@a".to_string(),
+            committed_at: now,
+            change_type: None,
+            primary_change_type: None,
+            cve_list: None,
+            spec_changed: true,
+            patch_stats: None,
+            classification_status: "done".to_string(),
+            classification_notes: None,
+            sync_status: "idle".to_string(),
+            synced_to_l2_commit: None,
+            synced_at: None,
+            api_url: "http://example".to_string(),
+            fetched_at: now,
+            files_changed_count: 0,
+            additions: 0,
+            deletions: 0,
+            created_at: now,
+            updated_at: now,
+            spec_version: None,
+            spec_release: None,
+        };
+
