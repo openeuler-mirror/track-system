@@ -82,3 +82,45 @@ where
             .with_limit(100);
 
         // 使用 Collector 采集 commits
+        let collect_result = self
+            .collector
+            .collect(&config)
+            .await
+            .context("采集L0 commits失败")?;
+
+        let commits = collect_result.commits;
+        let total_checked = commits.len();
+
+        info!(
+            package_id = package_id,
+            commits_count = total_checked,
+            "采集到 {} 个 commits",
+            total_checked
+        );
+
+        let mut total_new = 0;
+
+        for commit in &commits {
+            // 检查该commit是否已存在
+            let existing = l0_commits::Entity::find()
+                .filter(l0_commits::Column::PackageId.eq(package_id))
+                .filter(l0_commits::Column::CommitSha.eq(&commit.sha))
+                .one(self.db)
+                .await?;
+
+            if existing.is_none() {
+                // 新的commit，记录到数据库
+                let now = Utc::now();
+                let l0_commit = l0_commits::ActiveModel {
+                    package_id: Set(package_id),
+                    repo: Set(format!("{}/{}", owner, repo)),
+                    commit_sha: Set(commit.sha.clone()),
+                    summary: Set(commit.message.clone()),
+                    authored_at: Set(commit.date),
+                    metadata: Set(Some(serde_json::json!({
+                        "author_name": commit.author,
+                        "author_email": commit.email,
+                        "files_changed": commit.files_changed,
+                    }))),
+                    created_at: Set(now),
+                    updated_at: Set(now),
