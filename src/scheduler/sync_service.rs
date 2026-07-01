@@ -573,3 +573,48 @@ impl SyncResult {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_openeuler_ci_bot_by_name() {
+        assert!(is_openeuler_ci_bot("openeuler-ci-bot", "user@example.com"));
+        assert!(is_openeuler_ci_bot("OpenEuler-CI-Bot", "user@example.com"));
+        assert!(is_openeuler_ci_bot("OPENEULER-CI-BOT", "user@example.com"));
+    }
+
+    #[test]
+    fn test_is_openeuler_ci_bot_by_email() {
+        assert!(is_openeuler_ci_bot("User", "openeuler-ci-bot@example.com"));
+        assert!(is_openeuler_ci_bot("User", "ci-bot@example.com"));
+        assert!(is_openeuler_ci_bot("User", "CI-BOT@example.com"));
+    }
+
+    #[test]
+    fn test_is_openeuler_ci_bot_false() {
+        assert!(!is_openeuler_ci_bot("John Doe", "john@example.com"));
+        assert!(!is_openeuler_ci_bot("Developer", "dev@company.com"));
+    }
+
+    #[test]
+    fn test_sync_status_enum() {
+        let success = SyncStatus::Success;
+        let skipped = SyncStatus::Skipped;
+        let failed = SyncStatus::Failed;
+
+        assert_ne!(success, skipped);
+        assert_ne!(success, failed);
+        assert_ne!(skipped, failed);
+    }
+
+    #[test]
+    fn test_sync_result_success() {
+        let result = SyncResult::success(10, 5);
+
+        assert_eq!(result.status, SyncStatus::Success);
+        assert_eq!(result.commits_synced, 10);
+        assert_eq!(result.issues_synced, 5);
+        assert_eq!(result.message, "同步成功");
+        assert!(result.is_success());
+        assert!(!result.is_skipped());
