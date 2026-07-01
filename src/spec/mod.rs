@@ -151,3 +151,35 @@ Release: 1
     }
 
     #[test]
+    fn test_nested_macros() {
+        let content = r#"
+%define major 1
+%define ver %{major}.20
+Version: %{ver}.1
+Release: 1
+"#;
+        let spec = SpecFile::parse(content);
+        assert_eq!(spec.version, "1.20.1");
+    }
+
+    #[test]
+    fn test_conditional_macros() {
+        let content = r#"
+Version: 1.20.1
+Release: 1%{?dist}
+"#;
+        let spec = SpecFile::parse(content);
+        assert_eq!(spec.release, "1");
+    }
+
+    #[test]
+    fn test_global_definition() {
+        let content = r#"
+%global pkg_version 1.2.3
+Version: %{pkg_version}
+Release: 1
+"#;
+        let spec = SpecFile::parse(content);
+        assert_eq!(spec.version, "1.2.3");
+    }
+}
