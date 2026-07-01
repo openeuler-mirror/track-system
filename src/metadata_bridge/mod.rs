@@ -150,3 +150,53 @@ async fn build_repository_snapshot(
         // 如果没有找到快照数据，回退到从数据库读取 commits
         info!(
             tracking_id = tracking.id,
+            "未找到 L2 快照数据，回退到从数据库读取 commits"
+        );
+    }
+
+    let mut snapshot = RepositorySnapshot::new(tracking.id, origin.clone());
+    snapshot.spec = collect_spec(origin.clone(), tracking, repo_path).await?;
+    snapshot.files = collect_files(origin.clone(), snapshot.spec.as_ref(), repo_path)?;
+    snapshot.commits = match (origin.clone(), repo_path) {
+        (SnapshotOrigin::L2, Some(path)) => {
+            // 从 repo 收集 L2 commits 并持久化到数据库
+            let result = collect_commits_from_repo(path)?;
+            info!(
+                tracking_id = tracking.id,
+                commit_count = result.commits.len(),
+                spec_version = ?result.spec_version,
+                spec_release = ?result.spec_release,
+                "从仓库收集到 commits 和 spec 信息"
+            );
+            persist_l2_commits(
+                db,
+                tracking.id,
+                &result.commits,
+                result.spec_version.as_deref(),
+                result.spec_release.as_deref(),
+            )
+            .await?;
+            // 再从数据库读取以保持一致性
+            collect_l2_commits(db, tracking.id).await?
+        }
+        (SnapshotOrigin::L2, None) => {
+            // 无 repo 路径时，从数据库读取 L2 commits
+            collect_l2_commits(db, tracking.id).await?
+        }
+        _ => collect_commits(db, tracking.id).await?,
+    };
+    snapshot.issues = collect_issues(db, tracking.id).await?;
+
+    Ok(snapshot)
+}
+fn collect_files(
+    _origin: SnapshotOrigin,
+    spec_entry: Option<&SpecEntry>,
+    repo_path: Option<&Path>,
+) -> Result<Vec<FileEntry>> {
+    let mut entries: Vec<FileEntry> = Vec::new();
+
+    // 1) 如果提供了本地仓库路径，按原逻辑遍历文件系统
+    if let Some(root) = repo_path {
+        for entry in WalkDir::new(root)
+            .into_iter()
