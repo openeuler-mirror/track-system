@@ -821,3 +821,54 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_queue_sync_job_insert() {
+        use crate::entities::{sync_jobs, tracking};
+        use chrono::Utc;
+        use sea_orm::{DatabaseBackend, MockDatabase};
+        use std::env;
+
+        env::remove_var("DEFAULT_PLATFORM");
+        let job_inserted = sync_jobs::Model {
+            id: 2,
+            tracking_id: 7,
+            job_kind: "sync".to_string(),
+            scheduled_at: Utc::now(),
+            started_at: None,
+            finished_at: None,
+            status: "pending".to_string(),
+            error: None,
+            attempt_count: 0,
+            priority: 0,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let tracking_model = tracking::Model {
+            id: 7,
+            package_id: 1,
+            distro_id: 1,
+            l1_branch: "main".to_string(),
+            l1_repo_owner: "owner".to_string(),
+            l1_repo_name: "repo".to_string(),
+            l2_branch: "local".to_string(),
+            l2_repo_path: "/tmp".to_string(),
+            tracking_status: "idle".to_string(),
+            last_sync_time: None,
+            last_l1_commit_sha: None,
+            last_l2_commit_sha: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            last_error: None,
+        };
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<sync_jobs::Model, _, _>(vec![vec![]])
+            .append_query_results::<tracking::Model, _, _>(vec![vec![tracking_model.clone()]])
+            .append_query_results::<sync_jobs::Model, _, _>(vec![vec![job_inserted.clone()]])
+            .into_connection();
+        let manager = SyncManager::new(&db);
+        let job = manager.queue_sync_job(7, 0).await.unwrap();
+        assert_eq!(job.id, 2);
+        assert_eq!(job.tracking_id, 7);
+    }
+}
