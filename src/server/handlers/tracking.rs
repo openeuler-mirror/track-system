@@ -312,3 +312,50 @@ pub async fn delete_tracking(
     Ok(Json(ApiResponse::<()>::no_content()))
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::entities::{packages, tracking};
+    use axum::extract::{Path, State};
+    use sea_orm::{DatabaseBackend, MockDatabase};
+
+    fn create_mock_tracking(id: i32, package_id: i32) -> tracking::Model {
+        tracking::Model {
+            id,
+            package_id,
+            distro_id: 1,
+            l1_repo_owner: "openeuler".to_string(),
+            l1_repo_name: "glibc".to_string(),
+            l1_branch: "main".to_string(),
+            l2_branch: "CTyunOS-2.0".to_string(),
+            l2_repo_path: "/opt/repo/glibc".to_string(),
+            tracking_status: "active".to_string(),
+            last_sync_time: None,
+            last_l1_commit_sha: None,
+            last_l2_commit_sha: None,
+            created_at: chrono::Utc::now(),
+            last_error: None,
+            updated_at: chrono::Utc::now(),
+        }
+    }
+
+    fn create_mock_package(id: i32) -> packages::Model {
+        packages::Model {
+            id,
+            name: "glibc".to_string(),
+            level: 1,
+            sync_interval_hours: 24,
+            l0_repo_url: Some("https://github.com/bminor/glibc".to_string()),
+            description: Some("GNU C Library".to_string()),
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        }
+    }
+
+    #[test]
+    fn test_tracking_list_query_defaults() {
+        let query = TrackingListQuery {
+            page: None,
+            page_size: None,
+            package_id: None,
+            distro_id: None,
