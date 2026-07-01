@@ -354,3 +354,49 @@ mod tests {
         assert_eq!(commits.len(), 1);
         assert_eq!(commits[0].sha, "sha");
     }
+
+    #[tokio::test]
+    async fn test_get_file_content() {
+        let server = MockServer::start();
+        let client = GiteeClient::for_testing("token", server.base_url()).unwrap();
+
+        let file_response = json!({
+            "name": "file.txt",
+            "path": "file.txt",
+            "sha": "sha",
+            "size": 100,
+            "content": "SGVsbG8gV29ybGQ=",
+            "encoding": "base64",
+            "download_url": "url"
+        });
+
+        let mock = server.mock(|when, then| {
+            when.method(GET)
+                .path("/repos/owner/test-repo/contents/file.txt")
+                .query_param("ref", "main")
+                .query_param("access_token", "token");
+            then.status(200).json_body(file_response);
+        });
+
+        let result = client
+            .get_file_content("owner", "test-repo", "file.txt", "main")
+            .await;
+        mock.assert();
+        assert!(result.is_ok());
+        let file = result.unwrap();
+        assert_eq!(file.name, "file.txt");
+    }
+
+    #[tokio::test]
+    async fn test_get_issues() {
+        let server = MockServer::start();
+        let client = GiteeClient::for_testing("token", server.base_url()).unwrap();
+
+        let issues_response = json!([
+            {
+                "id": 1,
+                "number": 1,
+                "title": "title",
+                "state": "open",
+                "body": "body",
+                "user": {
