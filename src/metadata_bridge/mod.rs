@@ -505,3 +505,54 @@ async fn persist_snapshot<P: AsRef<Path>>(
         ..Default::default()
     }
     .insert(db)
+    .await?;
+
+    info!(
+        snapshot_id = model.id,
+        tracking_id = snapshot.tracking_id,
+        checksum = checksum,
+        file_count = snapshot.files.len(),
+        origin = ?snapshot.origin,
+        "snapshot stored"
+    );
+
+    Ok(SnapshotSummary {
+        tracking_id: snapshot.tracking_id,
+        checksum,
+        file_count: snapshot.files.len(),
+        spec_version: snapshot.spec.as_ref().and_then(|s| s.version.clone()),
+        commit_count: snapshot.commits.len(),
+        issue_count: snapshot.issues.len(),
+    })
+}
+
+fn extract_spec_version(content: &str) -> Option<String> {
+    let re = Regex::new(r"(?m)^\s*Version\s*:\s*([\w\.\-]+)").ok()?;
+    re.captures(content)
+        .and_then(|caps| caps.get(1))
+        .map(|m| m.as_str().to_string())
+}
+
+fn extract_spec_release(content: &str) -> Option<String> {
+    let re = Regex::new(r"(?m)^\s*Release\s*:\s*([^\r\n]+)").ok()?;
+    re.captures(content)
+        .and_then(|caps| caps.get(1))
+        .map(|m| {
+            let raw = m.as_str().trim();
+            // 去掉常见的可选宏与尾随右括号
+            let cleaned = raw
+                .replace("%{?dist}", "")
+                .replace("%{?scl:", "")
+                .replace("%{!?scl:", "")
+                .replace("%{?scl_prefix}", "")
+                .replace('}', "")
+                .trim()
+                .to_string();
+            cleaned
+        })
+        .filter(|s| !s.is_empty())
+}
+
+fn sha256_hex(data: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(data);
