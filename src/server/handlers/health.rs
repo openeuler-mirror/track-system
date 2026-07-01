@@ -86,3 +86,21 @@ mod tests {
         let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
 
         // MockDatabase automatically responds ok to ping unless configured otherwise?
+        // Actually ping() might not send a query in sea-orm-mock or sends a simple SELECT 1
+        // Let's assume default behavior is success for empty mock db
+
+        let status = check_database(&db).await;
+        assert_eq!(status.status, "healthy");
+    }
+
+    #[tokio::test]
+    async fn test_status_check_healthy() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+        let state = AppState::without_external_clients(db);
+
+        let response = status_check(State(state)).await;
+
+        assert_eq!(response.0.code, 200);
+        assert_eq!(response.0.data.unwrap().status, "healthy");
+    }
+}
