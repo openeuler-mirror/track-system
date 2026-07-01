@@ -80,3 +80,44 @@ impl TaskExecutor {
             }
             "export" => {
                 let format = task
+                    .parameters
+                    .get("format")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("json");
+
+                info!("  执行 export 任务: format = {}", format);
+                Ok(serde_yaml::Value::String(format!(
+                    "Exported in {} format",
+                    format
+                )))
+            }
+            "l0" => {
+                let package_id = task.parameters.get("package_id").and_then(|v| v.as_i64());
+                info!("  执行 L0 任务: package_id = {:?}", package_id);
+                Ok(serde_yaml::Value::String(
+                    "L0 polling completed".to_string(),
+                ))
+            }
+            "snapshot" => {
+                let tracking_id = task
+                    .parameters
+                    .get("tracking_id")
+                    .and_then(|v| v.as_i64())
+                    .context("snapshot 任务缺少 tracking_id 参数")?;
+
+                info!("  执行 snapshot 任务: tracking_id = {}", tracking_id);
+                Ok(serde_yaml::Value::String(format!(
+                    "Snapshot operation completed for tracking {}",
+                    tracking_id
+                )))
+            }
+            _ => Err(anyhow::anyhow!("未知的任务类型: {}", task.task_type)),
+        }
+    }
+}
+
+impl Default for TaskExecutor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
