@@ -39,3 +39,44 @@ pub fn diff_snapshots(l1: &RepositorySnapshot, l2: &RepositorySnapshot) -> Resul
 
     let file_diff = diff_files(&l1.files, &l2.files);
     let spec_diff = diff_spec(l1.spec.as_ref(), l2.spec.as_ref());
+    let summary = SummaryDiff {
+        l1_commits: l1.commits.len(),
+        l2_commits: l2.commits.len(),
+        l1_issues: l1.issues.len(),
+        l2_issues: l2.issues.len(),
+    };
+
+    Ok(DiffReport {
+        tracking_id: l1.tracking_id,
+        generated_at: l1.generated_at,
+        file_diff,
+        spec_diff,
+        summary,
+    })
+}
+
+fn diff_files(l1_files: &[FileEntry], l2_files: &[FileEntry]) -> Vec<FileDiff> {
+    use std::collections::HashMap;
+
+    let mut map_l2 = HashMap::new();
+    for file in l2_files {
+        map_l2.insert(&file.path, file);
+    }
+
+    let mut diffs = Vec::new();
+    for file in l1_files {
+        if let Some(other) = map_l2.remove(&file.path) {
+            if file.sha256 != other.sha256 {
+                diffs.push(FileDiff::Modified {
+                    path: file.path.clone(),
+                    l1_sha: file.sha256.clone(),
+                    l2_sha: other.sha256.clone(),
+                });
+            }
+        } else {
+            diffs.push(FileDiff::Added {
+                path: file.path.clone(),
+                sha: file.sha256.clone(),
+            });
+        }
+    }
