@@ -14,3 +14,19 @@ use axum::{
     Router,
 };
 
+use crate::server::{handlers::sync, state::AppState};
+
+pub fn sync_routes() -> Router<AppState> {
+    Router::new()
+        .route(
+            "/sync/:tracking_id/queue",
+            post(sync::queue_sync_job_handler),
+        )
+        .route(
+            "/sync/:tracking_id/trigger",
+            post(sync::trigger_manual_sync_handler),
+        )
+        .route("/scheduler/status", get(sync::get_scheduler_status_handler))
+        .route("/scheduler/execute", post(sync::execute_round_handler))
+        .route("/scheduler/wake", post(sync::wake_scheduler_handler))
+}
