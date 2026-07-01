@@ -274,3 +274,50 @@ pub async fn export_report(
         }
         ExportFormat::Yaml => {
             format!(
+                "# Report Export\nid: {}\ntracking_id: {}\nreport_type: {}\npackage_name: {}\nstatus: {}\ngenerated_at: {}\ncreated_at: {}\nupdated_at: {}\n",
+                report_model.id,
+                report_model.tracking_id,
+                report_model.source,
+                package_name,
+                report_model.status,
+                report_model.generated_at,
+                report_model.created_at,
+                report_model.updated_at
+            )
+        }
+        ExportFormat::Markdown => {
+            format!(
+                "# Report {}\n\n## Basic Information\n\n- **Package**: {}\n- **Type**: {}\n- **Status**: {}\n- **Tracking ID**: {}\n- **Generated At**: {}\n\n## Diff Summary\n\n```json\n{}\n```\n",
+                report_model.id,
+                package_name,
+                report_model.source,
+                report_model.status,
+                report_model.tracking_id,
+                report_model.generated_at,
+                serde_json::to_string_pretty(&report_model.diff_summary).unwrap_or_default()
+            )
+        }
+        ExportFormat::Html => {
+            format!(
+                "<!DOCTYPE html>\n<html>\n<head>\n    <title>Report {}</title>\n    <style>body {{ font-family: Arial, sans-serif; margin: 20px; }}</style>\n</head>\n<body>\n    <h1>Report {}</h1>\n    <h2>Basic Information</h2>\n    <ul>\n        <li><strong>Package:</strong> {}</li>\n        <li><strong>Type:</strong> {}</li>\n        <li><strong>Status:</strong> {}</li>\n        <li><strong>Tracking ID:</strong> {}</li>\n        <li><strong>Generated At:</strong> {}</li>\n    </ul>\n    <h2>Diff Summary</h2>\n    <pre>{}</pre>\n</body>\n</html>",
+                report_model.id,
+                report_model.id,
+                package_name,
+                report_model.source,
+                report_model.status,
+                report_model.tracking_id,
+                report_model.generated_at,
+                serde_json::to_string_pretty(&report_model.diff_summary).unwrap_or_default()
+            )
+        }
+    };
+
+    Ok(content)
+}
+
+/// 导出格式查询参数
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExportFormatQuery {
+    pub format: Option<ExportFormat>,
+}
+
