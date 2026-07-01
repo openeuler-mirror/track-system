@@ -378,3 +378,47 @@ mod tests {
         let db = MockDatabase::new(DatabaseBackend::Postgres)
             .append_exec_results([MockExecResult {
                 last_insert_id: 0,
+                rows_affected: 0,
+            }])
+            .into_connection();
+
+        let state = AppState::without_external_clients(db);
+        let result = delete_package(State(state), Path(999)).await;
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(matches!(err, ApiError::NotFound(_)));
+    }
+
+    #[tokio::test]
+    async fn test_get_package_with_tracking_found() {
+        let mock_package = create_mock_package(1, "glibc");
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results([[mock_package.clone()]])
+            .append_query_results::<crate::entities::tracking::Model, _, _>([vec![]])
+            .into_connection();
+
+        let state = AppState::without_external_clients(db);
+        let result = get_package_with_tracking(State(state), Path(1)).await;
+
+        assert!(result.is_ok());
+        let response = result.unwrap();
+        assert_eq!(response.0.package.name, "glibc");
+        assert_eq!(response.0.tracking.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_get_package_with_tracking_not_found() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<packages::Model, _, _>([[]])
+            .into_connection();
+
+        let state = AppState::without_external_clients(db);
+        let result = get_package_with_tracking(State(state), Path(999)).await;
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(matches!(err, ApiError::NotFound(_)));
+    }
+}
