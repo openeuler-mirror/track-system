@@ -655,3 +655,42 @@ mod tests {
         assert!(result.is_ok());
         let res = result.unwrap();
         assert_eq!(res.level, "l0");
+        assert_eq!(res.commits.len(), 1);
+    }
+
+    #[test]
+    fn test_local_client_name() {
+        let temp_dir = setup_test_repo();
+        let client = LocalClient::new(temp_dir.path()).unwrap();
+        assert_eq!(client.name(), "LocalCollector");
+    }
+
+    #[tokio::test]
+    async fn test_collect_snapshot() {
+        let temp_dir = setup_test_repo();
+        // Add a spec file
+        let spec_path = temp_dir.path().join("test.spec");
+        fs::write(&spec_path, "Name: test\nVersion: 1.0\nRelease: 1\n").unwrap();
+
+        // Commit spec file
+        let repo = Repository::open(temp_dir.path()).unwrap();
+        let mut index = repo.index().unwrap();
+        index.add_path(Path::new("test.spec")).unwrap();
+        index.write().unwrap();
+        let tree_id = index.write_tree().unwrap();
+        let tree = repo.find_tree(tree_id).unwrap();
+        let parent = repo.head().unwrap().peel_to_commit().unwrap();
+        let sig = git2::Signature::now("Test User", "test@example.com").unwrap();
+        repo.commit(Some("HEAD"), &sig, &sig, "Add spec", &tree, &[&parent])
+            .unwrap();
+
+        let client = LocalClient::new(temp_dir.path()).unwrap();
+        let repo_ref = client.open_repo().unwrap();
+        let result = client.collect_snapshot(&repo_ref, "master");
+
+        assert!(result.is_ok());
+        let snapshot = result.unwrap();
+        assert!(snapshot.spec_path.is_some());
+        assert_eq!(snapshot.spec_version, Some("1.0".to_string()));
+    }
+}
