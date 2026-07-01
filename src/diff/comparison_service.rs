@@ -93,3 +93,50 @@ impl<'a> ComparisonService<'a> {
     pub async fn compare_l1_l2_git(
         &self,
         tracking: &tracking::Model,
+        l2_repo_path: impl AsRef<Path>,
+    ) -> Result<ComparisonReport> {
+        let l2_path = l2_repo_path.as_ref();
+
+        debug!(
+            tracking_id = tracking.id,
+            l2_path = ?l2_path,
+            "开始 L1/L2 Git 对比"
+        );
+
+        // 在线程池中执行 Git 操作（避免阻塞异步任务）
+        let l1_branch = tracking.l1_branch.clone();
+        let l2_branch = tracking.l2_branch.clone();
+        let l2_path = l2_path.to_path_buf();
+
+        let git_client = task::spawn_blocking(move || GitRepositoryClient::new(&l2_path)).await??;
+
+        // 对比分支
+        let diff =
+            task::spawn_blocking(move || git_client.compare_branches(&l1_branch, &l2_branch))
+                .await??;
+
+        let report = ComparisonReport {
+            tracking_id: tracking.id,
+            commits_behind: diff.l2_ahead.len(),
+            commits_ahead: diff.l1_ahead.len(),
+            diff_summary: self.build_detailed_diff(tracking, &diff, "git_comparison")?,
+            source: "git_diff".to_string(),
+        };
+
+        info!(
+            tracking_id = tracking.id,
+            commits_ahead = diff.l1_ahead.len(),
+            commits_behind = diff.l2_ahead.len(),
+            "L1/L2 Git 对比完成"
+        );
+
+        Ok(report)
+    }
+
+    /// 构建详细的差异信息
+    fn build_detailed_diff(
+        &self,
+        tracking: &tracking::Model,
+        diff: &super::git_client::CommitDiff,
+        method: &str,
+    ) -> Result<Value> {
