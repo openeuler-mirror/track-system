@@ -74,3 +74,41 @@ pub async fn queue_sync_job_handler(
 }
 
 /// 手动触发同步
+pub async fn trigger_manual_sync_handler(
+    Path(tracking_id): Path<i32>,
+    State(state): State<AppState>,
+) -> Result<Json<TriggerSyncResponse>, StatusCode> {
+    // 检查是否有调度器管理器
+    let scheduler_manager = state
+        .scheduler_manager
+        .as_ref()
+        .ok_or(StatusCode::SERVICE_UNAVAILABLE)?;
+
+    // 手动触发同步
+    let scheduler = scheduler_manager.read().await;
+    match scheduler.trigger_manual_sync(tracking_id).await {
+        Ok(job_id) => Ok(Json(TriggerSyncResponse {
+            job_id,
+            tracking_id,
+            message: "同步任务已创建并开始执行".to_string(),
+        })),
+        Err(err) => {
+            tracing::error!(
+                tracking_id = tracking_id,
+                error = %err,
+                "手动触发同步失败"
+            );
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
+/// 获取调度器状态
+pub async fn get_scheduler_status_handler(
+    State(state): State<AppState>,
+) -> Result<Json<SchedulerStatusResponse>, StatusCode> {
+    // 检查是否有调度器管理器
+    let scheduler_manager = state
+        .scheduler_manager
+        .as_ref()
+        .ok_or(StatusCode::SERVICE_UNAVAILABLE)?;
