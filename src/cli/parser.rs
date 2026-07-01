@@ -838,3 +838,31 @@ mod tests {
 
         for hidden in [
             "health", "status", "distro", "config", "compare", "l0", "workflow", "classify",
+        ] {
+            assert!(
+                !root_commands.contains(&hidden.to_string()),
+                "root help should hide command '{hidden}', got: {root_commands:?}"
+            );
+        }
+
+        for visible in [
+            "sync", "snapshot", "import", "package", "tracking", "report",
+        ] {
+            assert!(
+                root_commands.contains(&visible.to_string()),
+                "root help should include command '{visible}', got: {root_commands:?}"
+            );
+        }
+
+        assert!(
+            !help.contains("Print help"),
+            "help should be localized, got: {help}"
+        );
+        assert!(
+            !help.contains("Print version"),
+            "version should be localized, got: {help}"
+        );
+
+        i18n::init_i18n(Some("en-US"));
+    }
+}
