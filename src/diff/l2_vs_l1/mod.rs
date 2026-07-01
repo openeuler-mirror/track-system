@@ -2528,3 +2528,55 @@ Summary: Test package
         assert!(recs.iter().all(|r| r.priority == SyncPriority::Low));
         assert!(recs
             .iter()
+            .any(|r| r.recommendation_type == SyncType::NewFeature));
+        assert!(recs
+            .iter()
+            .any(|r| r.recommendation_type == SyncType::ConfigUpdate));
+    }
+
+    #[test]
+    fn test_generate_customization_recommendations_priority_changes_with_security() {
+        let comparator = L2VsL1Comparator::new();
+        let mut by_type: HashMap<String, Vec<Customization>> = HashMap::new();
+        by_type.insert(
+            "SecurityHardening".to_string(),
+            vec![Customization {
+                customization_type: CustomizationType::SecurityHardening,
+                description: "sec".to_string(),
+                affected_files: vec![],
+            }],
+        );
+        let analysis = CustomizationAnalysis {
+            total_customizations: 1,
+            by_type,
+            summary: "s".to_string(),
+        };
+        let recs = comparator
+            .generate_customization_recommendations(&analysis)
+            .unwrap();
+        assert_eq!(recs.len(), 1);
+        assert_eq!(recs[0].priority, SyncPriority::High);
+        assert!(recs[0].description.contains("必须保留"));
+    }
+
+    #[test]
+    fn test_generate_dependency_recommendations_requires_changes() {
+        let comparator = L2VsL1Comparator::new();
+        let spec_diff = SpecDiff {
+            version_diff: None,
+            content_identical: false,
+            diff_summary: "x".to_string(),
+            key_changes: vec![],
+            detailed_comparison: Some(SpecComparison {
+                version_changed: false,
+                version_diff: None,
+                build_requires_added: vec![],
+                build_requires_removed: vec![],
+                requires_added: vec!["zlib".to_string()],
+                requires_removed: vec!["glibc".to_string()],
+                configure_options_added: vec![],
+                configure_options_removed: vec![],
+                sources_changed: false,
+                patches_changed: false,
+            }),
+            build_requires_added: vec![],
