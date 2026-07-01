@@ -124,3 +124,45 @@ where
                     }))),
                     created_at: Set(now),
                     updated_at: Set(now),
+                    ..Default::default()
+                };
+
+                l0_commit.insert(self.db).await?;
+                total_new += 1;
+                debug!("发现新L0 commit: {}", commit.sha);
+            }
+        }
+
+        result.new_commits = total_new;
+        result.diff_commits = total_checked;
+
+        info!(
+            l0_repo = format!("{}/{}", owner, repo),
+            branch = branch,
+            new_commits = result.new_commits,
+            checked_commits = result.diff_commits,
+            "L0轮询完成"
+        );
+
+        Ok(result)
+    }
+
+    /// 检测L0与L1之间的差异
+    ///
+    /// TODO: 此方法需要重构以使用 Collector trait
+    /// 当前实现仍使用 GitClient，因为需要比较两个不同的仓库
+    #[deprecated(note = "需要重构以使用 Collector trait")]
+    pub async fn detect_diff(
+        &self,
+        _package_id: i32,
+        _l0_owner: &str,
+        _l0_repo: &str,
+        _l1_owner: &str,
+        _l1_repo: &str,
+        _branch: &str,
+    ) -> Result<L0PollingResult> {
+        // TODO: 重构此方法以使用 Collector
+        // 可能需要接受两个 Collector 参数，或者使用工厂模式创建 Collector
+        unimplemented!("此方法需要重构以使用 Collector trait")
+    }
+}
