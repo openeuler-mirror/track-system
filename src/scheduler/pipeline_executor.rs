@@ -346,3 +346,52 @@ impl<'a> PipelineExecutor<'a> {
 
             // 优化：如果 L2 快照为空，直接生成报告
             if *stage == PipelineStage::L2Snapshot {
+                if let Some(details) = result.details.as_object() {
+                    if let Some(has_new_data) = details.get("has_new_data") {
+                        if !has_new_data.as_bool().unwrap_or(true) {
+                            info!(job_id = job_id, "L2 快照为空，跳转到报告生成阶段");
+                            skip_to_report_generation = true;
+                            continue;
+                        }
+                    }
+                }
+            }
+
+            if skip_to_report_generation && *stage == PipelineStage::ReportGeneration {
+                break;
+            }
+        }
+
+        let finished_at = Utc::now();
+        let total_duration = (finished_at - started_at)
+            .to_std()
+            .unwrap_or(Duration::from_secs(0));
+
+        let success = last_error.is_none() && !cancelled;
+        let message = if cancelled {
+            "流水线已被取消".to_string()
+        } else {
+            last_error.unwrap_or_else(|| "流水线执行成功".to_string())
+        };
+
+        // 更新最终状态
+        if let Some(state_mgr) = &self.state_manager {
+            let final_status = if cancelled {
+                "cancelled"
+            } else if success {
+                "completed"
+            } else {
+                "failed"
+            };
+            state_mgr.update_job_status(job_id, final_status).await?;
+            // 清理状态（可选，保留一段时间用于查询）
+            // state_mgr.cleanup_state(job_id);
+        }
+
+        let result = SyncJobResult {
+            job_id,
+            tracking_id,
+            success,
+            message: message.clone(),
+            stage_results,
+            started_at,
