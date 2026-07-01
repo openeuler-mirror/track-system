@@ -296,3 +296,53 @@ impl<'a> PipelineExecutor<'a> {
                     Telemetry::pipeline_stage_completed(tracking_id, stage.name(), true);
                     result
                 }
+                Err(err) => {
+                    error!(
+                        job_id = job_id,
+                        stage = ?stage,
+                        error = %err,
+                        "阶段执行失败"
+                    );
+                    Telemetry::pipeline_stage_completed(tracking_id, stage.name(), false);
+
+                    let error_msg = format!("阶段 {} 失败: {}", stage.name(), err);
+                    last_error = Some(error_msg.clone());
+
+                    StageResult::failure(*stage, error_msg, stage_started_at)
+                }
+            };
+
+            stage_results.insert(*stage, result.clone());
+
+            // 完成阶段
+            if result.success {
+                if let Some(state_mgr) = &self.state_manager {
+                    state_mgr.complete_stage(job_id, *stage)?;
+                }
+            }
+
+            // 如果阶段失败，停止后续阶段
+            if !result.success {
+                warn!(
+                    job_id = job_id,
+                    stage = ?stage,
+                    "阶段失败，停止后续阶段执行"
+                );
+                break;
+            }
+
+            // 优化：如果 L1 获取没有新数据，直接生成报告
+            if *stage == PipelineStage::L1Ingestion {
+                if let Some(details) = result.details.as_object() {
+                    if let Some(has_new_data) = details.get("has_new_data") {
+                        if !has_new_data.as_bool().unwrap_or(true) {
+                            info!(job_id = job_id, "L1 没有新数据，跳转到报告生成阶段");
+                            skip_to_report_generation = true;
+                            continue;
+                        }
+                    }
+                }
+            }
+
+            // 优化：如果 L2 快照为空，直接生成报告
+            if *stage == PipelineStage::L2Snapshot {
