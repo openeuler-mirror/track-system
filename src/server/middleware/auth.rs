@@ -43,3 +43,48 @@ impl Claims {
     /// 创建新的 Claims
     pub fn new(user_id: String, username: String, role: String, expiry_hours: i64) -> Self {
         let now = Utc::now();
+        let exp = now + Duration::hours(expiry_hours);
+
+        Self {
+            sub: user_id,
+            username,
+            role,
+            exp: exp.timestamp(),
+            iat: now.timestamp(),
+        }
+    }
+
+    /// 检查 token 是否过期
+    pub fn is_expired(&self) -> bool {
+        let now = Utc::now().timestamp();
+        self.exp < now
+    }
+}
+
+/// JWT 认证配置
+#[derive(Clone)]
+pub struct AuthConfig {
+    /// JWT 密钥
+    pub secret: String,
+    /// Token 过期时间（小时）
+    pub expiry_hours: i64,
+}
+
+impl Default for AuthConfig {
+    fn default() -> Self {
+        Self {
+            secret: "default-secret-key-change-in-production".to_string(),
+            expiry_hours: 24,
+        }
+    }
+}
+
+impl AuthConfig {
+    /// 创建新的认证配置
+    pub fn new(secret: String, expiry_hours: i64) -> Self {
+        Self {
+            secret,
+            expiry_hours,
+        }
+    }
+
