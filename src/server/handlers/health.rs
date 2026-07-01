@@ -68,3 +68,21 @@ async fn check_database(db: &DatabaseConnection) -> ComponentStatus {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::server::state::AppState;
+    use sea_orm::{DatabaseBackend, MockDatabase};
+
+    #[tokio::test]
+    async fn test_health_check() {
+        let response = health_check().await;
+        assert_eq!(response.0.code, 200);
+        assert_eq!(response.0.data, Some("OK".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_check_database_healthy() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+
+        // MockDatabase automatically responds ok to ping unless configured otherwise?
