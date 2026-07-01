@@ -157,3 +157,42 @@ mod tests {
             )
             .create_async()
             .await;
+
+        let result = process_classification(&client, 10).await;
+        if let Err(e) = &result {
+            eprintln!("Test error: {:?}", e);
+        }
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_process_tracking_classification() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("POST", "/api/classify/tracking/123")
+            .match_body(mockito::Matcher::Json(serde_json::json!({
+                "limit": 20
+            })))
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "processed": 20,
+                    "success": 18,
+                    "failed": 2
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = process_tracking_classification(&client, 123, 20).await;
+        if let Err(e) = &result {
+            eprintln!("Test error: {:?}", e);
+        }
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
