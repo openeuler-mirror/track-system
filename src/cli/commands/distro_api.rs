@@ -332,3 +332,47 @@ mod tests {
                 serde_json::json!({
                     "id": 456,
                     "name": "CentOS",
+                    "version": "7",
+                    "description": "CentOS 7",
+                    "created_at": "2024-01-01T00:00:00Z",
+                    "updated_at": "2024-01-01T00:00:00Z"
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = show_distro(&client, "CentOS".to_string()).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_remove_distro_with_confirm() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("DELETE", "/api/distros/by-name/OldDistro")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(serde_json::json!({}).to_string())
+            .create_async()
+            .await;
+
+        let result = remove_distro(&client, "OldDistro".to_string(), true).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_execute_add_action() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("POST", "/api/distros")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "id": 10,
+                    "name": "openSUSE",
