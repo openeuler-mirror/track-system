@@ -78,3 +78,43 @@ pub async fn get_package(
         .ok_or_else(|| ApiError::NotFound(format!("Package with id {} not found", id)))?;
 
     Ok(Json(package.into()))
+}
+
+/// 获取软件包及其跟踪配置
+pub async fn get_package_with_tracking(
+    State(state): State<AppState>,
+    Path(id): Path<i32>,
+) -> ApiResult<Json<PackageWithTrackingResponse>> {
+    let package = Packages::find_by_id(id)
+        .one(state.db.as_ref())
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("Package with id {} not found", id)))?;
+
+    let tracking_list = package
+        .find_related(Tracking)
+        .all(state.db.as_ref())
+        .await?;
+
+    let tracking_responses: Vec<TrackingResponse> =
+        tracking_list.into_iter().map(Into::into).collect();
+
+    Ok(Json(PackageWithTrackingResponse {
+        package: package.into(),
+        tracking: tracking_responses,
+    }))
+}
+
+/// 更新软件包
+pub async fn update_package(
+    State(state): State<AppState>,
+    Path(id): Path<i32>,
+    Json(req): Json<UpdatePackageRequest>,
+) -> ApiResult<Json<PackageResponse>> {
+    let package = Packages::find_by_id(id)
+        .one(state.db.as_ref())
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("Package with id {} not found", id)))?;
+
+    let mut package: packages::ActiveModel = package.into();
+
+    if let Some(level) = req.level {
