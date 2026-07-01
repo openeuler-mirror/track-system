@@ -193,3 +193,26 @@ mod tests {
 
         let config2 = ClientConfig {
             server_url: "http://localhost:8080/".to_string(),
+            ..Default::default()
+        };
+        assert_eq!(config2.api_base_url(), "http://localhost:8080/api");
+    }
+
+    #[test]
+    fn test_validate() {
+        let config = ClientConfig::default();
+        assert!(config.validate().is_ok());
+
+        let invalid_config = ClientConfig {
+            server_url: "".to_string(),
+            ..Default::default()
+        };
+        assert!(invalid_config.validate().is_err());
+
+        let invalid_timeout = ClientConfig {
+            timeout: 0,
+            ..Default::default()
+        };
+        assert!(invalid_timeout.validate().is_err());
+    }
+}
