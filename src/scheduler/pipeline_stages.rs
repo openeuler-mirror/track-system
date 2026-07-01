@@ -256,3 +256,55 @@ impl<'a> PipelineExecutor<'a> {
             has_spec_changes = has_spec_changes,
             l1_vs_l0_completed = l1_vs_l0_result.is_some(),
             l2_vs_l1_completed = l2_vs_l1_result.is_some(),
+            "差异对比完成"
+        );
+
+        Ok(DiffComparisonResult {
+            report_id: Some(report_id),
+            files_changed,
+            has_spec_changes,
+        })
+    }
+
+    /// 执行 L2 vs L1 对比
+    async fn compare_l2_vs_l1(
+        &self,
+        tracking: &tracking::Model,
+    ) -> Result<Option<diff::l2_vs_l1::L2VsL1Report>> {
+        use crate::entities::l2_snapshots;
+        use crate::entities::prelude::{L2Snapshots, Packages};
+        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
+
+        info!(tracking_id = tracking.id, "执行 L2 vs L1 对比");
+
+        // 获取软件包名称
+        let package = Packages::find_by_id(tracking.package_id)
+            .one(self.db)
+            .await?
+            .context("未找到关联的软件包记录")?;
+        let package_name = package.name.clone();
+
+        // 查询最新的 L1/L2 快照
+        let l1_record = L2Snapshots::find()
+            .filter(l2_snapshots::Column::TrackingId.eq(tracking.id))
+            .filter(l2_snapshots::Column::SnapshotType.eq("l1"))
+            .order_by_desc(l2_snapshots::Column::CreatedAt)
+            .one(self.db)
+            .await?;
+
+        let l2_record = L2Snapshots::find()
+            .filter(l2_snapshots::Column::TrackingId.eq(tracking.id))
+            .filter(l2_snapshots::Column::SnapshotType.eq("l2"))
+            .order_by_desc(l2_snapshots::Column::CreatedAt)
+            .one(self.db)
+            .await?;
+
+        if l1_record.is_none() || l2_record.is_none() {
+            warn!(
+                tracking_id = tracking.id,
+                has_l1 = l1_record.is_some(),
+                has_l2 = l2_record.is_some(),
+                "缺少 L1/L2 快照，跳过内容对比"
+            );
+            return Ok(None);
+        }
