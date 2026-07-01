@@ -54,3 +54,31 @@ pub enum ApiError {
     #[error("未知错误: {0}")]
     Unknown(String),
 }
+
+/// API 结果类型别名
+pub type ApiResult<T> = Result<T, ApiError>;
+
+impl ApiError {
+    /// 从 HTTP 状态码创建错误
+    pub fn from_status(status: u16, message: String) -> Self {
+        match status {
+            401 | 403 => Self::AuthenticationError(message),
+            404 => Self::NotFoundError(message),
+            429 => Self::RateLimitError(message),
+            500..=599 => Self::ServerError(message),
+            _ => Self::Unknown(message),
+        }
+    }
+
+    /// 判断是否为可重试的错误
+    pub fn is_retryable(&self) -> bool {
+        matches!(
+            self,
+            Self::TimeoutError
+                | Self::ServerError(_)
+                | Self::RateLimitError(_)
+                | Self::HttpError(_)
+        )
+    }
+}
+
