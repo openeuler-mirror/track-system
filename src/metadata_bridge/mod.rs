@@ -200,3 +200,54 @@ fn collect_files(
     if let Some(root) = repo_path {
         for entry in WalkDir::new(root)
             .into_iter()
+            .filter_entry(|e| e.file_name() != ".git")
+        {
+            let entry = entry?;
+            if !entry.file_type().is_file() {
+                continue;
+            }
+            let rel_path = entry
+                .path()
+                .strip_prefix(root)
+                .unwrap_or(entry.path())
+                .to_string_lossy()
+                .replace('\\', "/");
+
+            let content = fs::read(entry.path())?;
+            let sha = sha256_hex(&content);
+            let size = content.len() as u64;
+            let is_binary = std::str::from_utf8(&content).is_err();
+
+            entries.push(FileEntry {
+                path: rel_path,
+                size,
+                sha256: sha,
+                is_binary,
+            });
+        }
+        entries.sort_by(|a, b| a.path.cmp(&b.path));
+        return Ok(entries);
+    }
+
+    // 2) 当没有本地仓库可遍历、且存在 spec 时，基于 spec 提取补丁与源文件
+    if let Some(spec) = spec_entry {
+        // 解码 spec 内容
+        let decoded = BASE64_STANDARD
+            .decode(spec.content_base64.replace('\n', "").as_bytes())
+            .map_err(|e| anyhow::anyhow!("Base64 解码 spec 内容失败: {}", e))?;
+        let spec_text = String::from_utf8(decoded)
+            .map_err(|e| anyhow::anyhow!("spec 内容不是有效的 UTF-8: {}", e))?;
+
+        // 解析 spec，提取 patches 与 sources
+        let parsed = SpecParser::parse(&spec_text)?;
+
+        // 生成 FileEntry：补丁文件
+        for p in parsed.patches.iter() {
+            // 使用规范化的相对路径（仅作为占位），确保后续提取识别 .patch/.diff
+            let path = p.trim().to_string();
+            if path.is_empty() {
+                continue;
+            }
+            // 内容哈希无法获取，采用路径字符串的哈希作为占位，避免空值
+            let sha = sha256_hex(path.as_bytes());
+            entries.push(FileEntry {
