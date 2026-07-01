@@ -140,3 +140,41 @@ impl GitClient for GiteaClient {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::collectors::traits::CommitsParams;
+    use httpmock::prelude::*;
+    use serde_json::json;
+
+    #[tokio::test]
+    async fn test_gitea_client_new() {
+        let client = GiteaClient::new("token", "http://localhost").unwrap();
+        assert_eq!(client.token, "token");
+        assert_eq!(client.base_url, "http://localhost");
+    }
+
+    #[tokio::test]
+    async fn test_gitea_client_as_collector() {
+        let client = GiteaClient::new("token", "http://localhost").unwrap();
+        let _collector = client.as_collector();
+    }
+
+    #[tokio::test]
+    async fn test_get_repository() {
+        let server = MockServer::start();
+        let client = GiteaClient::new("token", server.base_url()).unwrap();
+
+        let repo_response = json!({
+            "id": 1,
+            "name": "test-repo",
+            "full_name": "owner/test-repo",
+            "html_url": "http://localhost/owner/test-repo",
+            "description": "test repo",
+            "private": false,
+            "created_at": "2023-01-01T00:00:00Z",
+            "updated_at": "2023-01-01T00:00:00Z",
+            "default_branch": "main",
+            "clone_url": "http://localhost/owner/test-repo.git",
+            "owner": {
+                "id": 1,
