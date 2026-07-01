@@ -47,3 +47,52 @@ impl Version {
         }
     }
 
+    /// 带预发布标识创建版本
+    pub fn with_pre_release(
+        major: u32,
+        minor: u32,
+        patch: u32,
+        pre_release: impl Into<String>,
+    ) -> Self {
+        let pre = pre_release.into();
+        Self {
+            major,
+            minor,
+            patch,
+            pre_release: Some(pre.clone()),
+            build: None,
+            raw: format!("{}.{}.{}-{}", major, minor, patch, pre),
+        }
+    }
+
+    /// 是否为稳定版本（无预发布标识）
+    pub fn is_stable(&self) -> bool {
+        self.pre_release.is_none()
+    }
+
+    /// 是否为预发布版本
+    pub fn is_pre_release(&self) -> bool {
+        self.pre_release.is_some()
+    }
+
+    /// 获取版本距离（相对于另一个版本）
+    /// 返回值：正数表示当前版本更新，负数表示当前版本更旧
+    pub fn distance_from(&self, other: &Version) -> i32 {
+        // 简化的距离计算：主要基于主版本号和次版本号
+        let major_diff = (self.major as i32) - (other.major as i32);
+        let minor_diff = (self.minor as i32) - (other.minor as i32);
+        let patch_diff = (self.patch as i32) - (other.patch as i32);
+
+        // 主版本号差异权重最高 (10000)，次版本号权重 (100)，补丁版本权重 (1)
+        major_diff * 10000 + minor_diff * 100 + patch_diff
+    }
+
+    /// 是否比另一个版本新
+    pub fn is_newer_than(&self, other: &Version) -> bool {
+        self > other
+    }
+
+    /// 是否比另一个版本旧
+    pub fn is_older_than(&self, other: &Version) -> bool {
+        self < other
+    }
