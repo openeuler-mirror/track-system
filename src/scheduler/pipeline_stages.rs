@@ -1806,3 +1806,55 @@ Summary: Test package
 
         let pending_commit = L1Model {
             id: 1,
+            tracking_id: tracking_model.id,
+            commit_sha: "sha1".to_string(),
+            commit_message: "Fix CVE-2024-0001".to_string(),
+            author_name: "dev".to_string(),
+            author_email: "dev@example.com".to_string(),
+            committed_at: Utc::now(),
+            created_at: Utc::now(),
+            change_type: None,
+            primary_change_type: None,
+            cve_list: None,
+            spec_changed: false,
+            patch_stats: None,
+            classification_status: "pending".to_string(),
+            classification_notes: None,
+            sync_status: "pending".to_string(),
+            synced_to_l2_commit: None,
+            synced_at: None,
+            api_url: "http://example.com/commit/sha1".to_string(),
+            fetched_at: Utc::now(),
+            files_changed_count: 1,
+            additions: 10,
+            deletions: 2,
+            updated_at: Utc::now(),
+            spec_version: None,
+            spec_release: None,
+        };
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<L1Model, _, _>(vec![vec![pending_commit.clone()]])
+            .append_query_results::<L1Model, _, _>(vec![vec![pending_commit.clone()]])
+            .append_exec_results(vec![MockExecResult {
+                last_insert_id: 1,
+                rows_affected: 1,
+            }])
+            .into_connection();
+
+        let executor = PipelineExecutor::new(&db, None);
+        let prev = std::collections::HashMap::new();
+
+        let classification = ChangeClassification {
+            primary_type: ChangeType::CVE,
+            cve_numbers: vec!["CVE-2024-0001".to_string()],
+            ..Default::default()
+        };
+
+        let mut active_commit: L1ActiveModel = pending_commit.into();
+        active_commit.primary_change_type =
+            Set(Some(classification.primary_type.as_str().to_string()));
+        active_commit.cve_list = Set(Some(
+            serde_json::to_value(&classification.cve_numbers).unwrap(),
+        ));
+        active_commit.spec_changed = Set(classification.has_spec_change);
