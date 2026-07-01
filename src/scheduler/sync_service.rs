@@ -381,3 +381,51 @@ impl<'a> SyncService<'a> {
 
                 saved_count += 1;
             }
+
+            info!(saved = saved_count, "保存了 {} 个新 commits", saved_count);
+            Ok(saved_count)
+        } else {
+            info!("暂不支持同步 {} 平台的 commits", platform);
+            Ok(0)
+        }
+    }
+
+    /// 从 Collector 同步 issues
+    async fn sync_issues_from_collector(
+        &self,
+        tracking_id: i32,
+        _collector: &dyn Collector,
+        _tracking: &tracking::Model,
+    ) -> Result<usize> {
+        // 尝试将 Collector 转换为 IssueClient
+        // 注意：这里需要 Collector 同时实现 IssueClient trait
+        // 由于 Rust 的 trait object 限制，我们需要通过其他方式处理
+        // 暂时保留原有的 IssueClient 逻辑
+
+        // TODO: 重构 IssueClient 集成到 Collector 中
+        warn!(
+            tracking_id = tracking_id,
+            "Issues 同步暂时跳过,需要重构 IssueClient 集成"
+        );
+
+        // 使用旧的 sync_issues 方法
+        // 这里需要创建对应的客户端
+        Ok(0)
+    }
+
+    /// 同步 issues
+    #[allow(unused)]
+    async fn sync_issues<C>(
+        &self,
+        client: &C,
+        tracking_id: i32,
+        owner: &str,
+        repo: &str,
+    ) -> Result<usize>
+    where
+        C: IssueClient + Send + Sync + ?Sized,
+    {
+        info!("同步 issues");
+        use crate::entities::{issues, prelude::*};
+        use sea_orm::Set;
+
