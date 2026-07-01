@@ -391,3 +391,53 @@ mod tests {
         let (mut server, client) = setup_test_server().await;
 
         let mock1 = server
+            .mock("POST", "/api/sync/1/queue")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "job_id": 10,
+                    "status": "queued"
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let mock2 = server
+            .mock("POST", "/api/sync/2/queue")
+            .with_status(500)
+            .create_async()
+            .await;
+
+        let result = batch_sync(&client, vec![1, 2]).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock1.assert_async().await;
+        mock2.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_show_sync_status() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/status")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "database": {
+                        "status": "connected"
+                    },
+                    "scheduler": {
+                        "status": "running",
+                        "active_jobs": []
+                    }
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = show_sync_status(&client).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
