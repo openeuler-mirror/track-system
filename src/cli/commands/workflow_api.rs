@@ -368,3 +368,51 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_dry_run_workflow() {
+        let (mut server, client) = setup_test_server().await;
+        let workflow_file = create_temp_workflow_file("workflow: test");
+
+        let mock = server
+            .mock("POST", "/api/workflow/dry-run")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "steps": [
+                        {
+                            "name": "Step 1: Initialize",
+                            "action": "init"
+                        },
+                        {
+                            "name": "Step 2: Process",
+                            "action": "process"
+                        }
+                    ]
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = dry_run_workflow(
+            &client,
+            workflow_file.path().to_str().unwrap().to_string(),
+            vec![],
+        )
+        .await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_dry_run_workflow_with_vars() {
+        let (mut server, client) = setup_test_server().await;
+        let workflow_file = create_temp_workflow_file("workflow: test");
+
+        let mock = server
+            .mock("POST", "/api/workflow/dry-run")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "steps": [
