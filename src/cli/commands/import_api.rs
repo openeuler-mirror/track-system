@@ -1068,3 +1068,52 @@ mod tests {
                 {"path": "a.patch", "sha256": "x", "size": 1, "is_binary": false}
             ],
             "spec": null,
+            "commits": [],
+            "issues": []
+        })
+        .to_string();
+
+        let mut file1 = NamedTempFile::new().unwrap();
+        file1.write_all(file1_json.as_bytes()).unwrap();
+        file1.flush().unwrap();
+
+        let file2_json = serde_json::json!({
+            "repo": "missing",
+            "commits": []
+        })
+        .to_string();
+
+        let mut file2 = NamedTempFile::new().unwrap();
+        file2.write_all(file2_json.as_bytes()).unwrap();
+        file2.flush().unwrap();
+
+        let packages_mock = server
+            .mock("GET", "/api/packages")
+            .expect(2)
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!([
+                    {
+                        "id": 10,
+                        "name": "test-package",
+                        "level": 1,
+                        "sync_interval_hours": 24,
+                        "l0_repo_url": "https://github.com/test/test",
+                        "description": "Test package",
+                        "created_at": "2024-01-01T00:00:00Z",
+                        "updated_at": "2024-01-01T00:00:00Z"
+                    }
+                ])
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let tracking_mock = server
+            .mock("GET", "/api/tracking?page=1&page_size=100&package_id=10")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "code": 200,
