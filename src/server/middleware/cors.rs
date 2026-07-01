@@ -182,3 +182,38 @@ pub fn create_cors_layer_from_env() -> CorsLayer {
     CorsConfig::from_env().build()
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serial_test::serial;
+
+    #[test]
+    fn test_default_cors_config() {
+        let config = CorsConfig::default();
+
+        assert_eq!(config.allowed_origins, vec!["*"]);
+        assert_eq!(config.allowed_methods.len(), 6);
+        assert!(config.allow_credentials);
+        assert_eq!(config.max_age, 3600);
+    }
+
+    #[test]
+    fn test_cors_config_builder() {
+        let config = CorsConfig::new()
+            .with_origins(vec!["https://example.com".to_string()])
+            .with_credentials(false)
+            .with_max_age(7200);
+
+        assert_eq!(config.allowed_origins, vec!["https://example.com"]);
+        assert!(!config.allow_credentials);
+        assert_eq!(config.max_age, 7200);
+    }
+
+    #[test]
+    fn test_cors_config_with_methods() {
+        let config = CorsConfig::new().with_methods(vec![Method::GET, Method::POST]);
+
+        assert_eq!(config.allowed_methods.len(), 2);
+        assert!(config.allowed_methods.contains(&Method::GET));
+        assert!(config.allowed_methods.contains(&Method::POST));
+    }
