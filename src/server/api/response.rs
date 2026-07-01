@@ -46,3 +46,52 @@ impl<T: Serialize> ApiResponse<T> {
             code: 200,
             message: message.into(),
             data: Some(data),
+        }
+    }
+
+    /// 创建创建成功响应（201）
+    pub fn created(data: T) -> Self {
+        Self {
+            code: 201,
+            message: "Created".to_string(),
+            data: Some(data),
+        }
+    }
+
+    /// 创建无内容响应（204）
+    pub fn no_content() -> ApiResponse<()> {
+        ApiResponse {
+            code: 204,
+            message: "No Content".to_string(),
+            data: None,
+        }
+    }
+}
+
+impl<T: Serialize> IntoResponse for ApiResponse<T> {
+    fn into_response(self) -> Response {
+        let status = StatusCode::from_u16(self.code).unwrap_or(StatusCode::OK);
+        (status, Json(self)).into_response()
+    }
+}
+
+/// 分页响应结构
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PaginatedResponse<T> {
+    /// 数据列表
+    pub items: Vec<T>,
+    /// 总数
+    pub total: u64,
+    /// 当前页码（从 1 开始）
+    pub page: u64,
+    /// 每页大小
+    pub page_size: u64,
+    /// 总页数
+    pub total_pages: u64,
+}
+
+impl<T> PaginatedResponse<T> {
+    /// 创建分页响应
+    pub fn new(items: Vec<T>, total: u64, page: u64, page_size: u64) -> Self {
+        let total_pages = if page_size > 0 {
+            total.div_ceil(page_size)
