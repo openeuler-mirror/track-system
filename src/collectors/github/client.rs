@@ -320,3 +320,49 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_file_content() {
+        let server = MockServer::start();
+        let client = GitHubClient::for_testing("token", server.base_url()).unwrap();
+
+        let file_response = json!({
+            "name": "file.txt",
+            "path": "file.txt",
+            "sha": "sha",
+            "size": 100,
+            "content": "SGVsbG8gV29ybGQ=",
+            "encoding": "base64",
+            "download_url": "url"
+        });
+
+        let mock = server.mock(|when, then| {
+            when.method(GET)
+                .path("/repos/owner/test-repo/contents/file.txt")
+                .query_param("ref", "main")
+                .header("Authorization", "Bearer token");
+            then.status(200).json_body(file_response);
+        });
+
+        let result = client
+            .get_file_content("owner", "test-repo", "file.txt", "main")
+            .await;
+        mock.assert();
+        assert!(result.is_ok());
+        let file = result.unwrap();
+        assert_eq!(file.name, "file.txt");
+    }
+
+    #[tokio::test]
+    async fn test_retry_mechanism() {
+        let server = MockServer::start();
+        let client = GitHubClient::for_testing("token", server.base_url()).unwrap();
+
+        let mock = server.mock(|when, then| {
+            when.method(GET).path("/repos/owner/test-repo");
+            then.status(500).body("Internal Server Error");
+        });
+
+        let result = client.get_repository("owner", "test-repo").await;
+
+        assert!(result.is_err());
+        mock.assert_calls(4); // 1 initial + 3 retries
+    }
+}
