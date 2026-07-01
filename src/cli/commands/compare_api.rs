@@ -172,3 +172,46 @@ pub async fn get_compare_status(api_client: &ApiClient, task_id: String) -> Resu
     println!("  任务 ID: {}", task_id.cyan());
     println!();
 
+    match api_client
+        .get::<ApiResponse<CompareStatusResponse>>(&format!("/compare/tasks/{}", task_id))
+        .await
+    {
+        Ok(response) => {
+            let status = response.data;
+
+            println!("{}", "任务状态:".bold());
+            println!("  任务 ID: {}", status.task_id.cyan());
+
+            let status_str = match status.status {
+                CompareStatus::Pending => "等待中".yellow(),
+                CompareStatus::Running => "运行中".blue(),
+                CompareStatus::Completed => "已完成".green(),
+                CompareStatus::Failed => "失败".red(),
+                CompareStatus::Cancelled => "已取消".yellow(),
+            };
+            println!("  状态: {}", status_str);
+            println!("  进度: {}%", status.progress);
+
+            if let Some(msg) = status.message {
+                println!("  消息: {}", msg);
+            }
+
+            println!("  创建时间: {}", format_datetime_local(&status.created_at));
+            println!("  更新时间: {}", format_datetime_local(&status.updated_at));
+
+            if let Some(completed_at) = status.completed_at {
+                println!("  完成时间: {}", format_datetime_local(&completed_at));
+            }
+
+            if let Some(report_id) = status.report_id {
+                println!();
+                println!("  报告 ID: {}", report_id.to_string().cyan());
+                println!("  查看报告: track-cli report show {}", report_id);
+            }
+
+            Ok(())
+        }
+        Err(e) => {
+            println!("{} 查询任务状态失败: {}", "✗".red().bold(), e);
+            Err(e.into())
+        }
