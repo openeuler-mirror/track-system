@@ -31,3 +31,36 @@ pub struct Model {
     #[sea_orm(column_type = "JsonBinary", nullable)]
     pub cve_list: Option<JsonValue>,
     pub spec_changed: bool,
+    #[sea_orm(column_type = "JsonBinary", nullable)]
+    pub patch_stats: Option<JsonValue>,
+    pub classification_status: String,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub classification_notes: Option<String>,
+    pub sync_status: String,
+    pub synced_to_l2_commit: Option<String>,
+    pub synced_at: Option<DateTimeUtc>,
+    #[sea_orm(column_type = "Text")]
+    pub api_url: String,
+    pub fetched_at: DateTimeUtc,
+    pub files_changed_count: i32,
+    pub additions: i32,
+    pub deletions: i32,
+    pub created_at: DateTimeUtc,
+    pub updated_at: DateTimeUtc,
+    // 新增：spec 版本与 release 字段
+    #[sea_orm(nullable)]
+    pub spec_version: Option<String>,
+    #[sea_orm(nullable)]
+    pub spec_release: Option<String>,
+}
+
+#[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+pub enum Relation {
+    #[sea_orm(has_many = "super::commit_files::Entity")]
+    CommitFiles,
+    #[sea_orm(has_many = "super::spec_changes::Entity")]
+    SpecChanges,
+    #[sea_orm(has_many = "super::spec_snapshots::Entity")]
+    SpecSnapshots,
+    #[sea_orm(
+        belongs_to = "super::tracking::Entity",
