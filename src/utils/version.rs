@@ -320,3 +320,30 @@ mod tests {
 
     #[test]
     fn test_version_comparison() {
+        let v1 = Version::new(1, 0, 0);
+        let v2 = Version::new(1, 1, 0);
+        let v3 = Version::new(2, 0, 0);
+        let _v4 = Version::with_pre_release(2, 0, 0, "rc.1");
+
+        assert!(v1 < v2);
+        assert!(v2 < v3);
+        assert!(v1 < v3);
+
+        // Note: This implementation of Version comparison might depend on raw string if Ord is derived
+        // Let's check distance_from logic which is manually implemented
+        assert!(v2.is_newer_than(&v1));
+        assert!(v1.is_older_than(&v2));
+    }
+
+    #[test]
+    fn test_version_distance() {
+        let v1 = Version::new(1, 0, 0);
+        let v2 = Version::new(1, 1, 0);
+        let v3 = Version::new(2, 0, 0);
+
+        // 1.1.0 - 1.0.0 = 100 (minor diff * 100)
+        assert_eq!(v2.distance_from(&v1), 100);
+        // 2.0.0 - 1.0.0 = 10000 (major diff * 10000)
+        assert_eq!(v3.distance_from(&v1), 10000);
+    }
+}
