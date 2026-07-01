@@ -88,3 +88,48 @@ impl AuthConfig {
         }
     }
 
+    /// 从环境变量加载配置
+    pub fn from_env() -> Self {
+        let secret = std::env::var("JWT_SECRET")
+            .unwrap_or_else(|_| "default-secret-key-change-in-production".to_string());
+        let expiry_hours = std::env::var("JWT_EXPIRY_HOURS")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(24);
+
+        Self {
+            secret,
+            expiry_hours,
+        }
+    }
+}
+
+/// JWT Token 生成器
+pub struct JwtTokenGenerator {
+    config: AuthConfig,
+}
+
+impl JwtTokenGenerator {
+    /// 创建新的 Token 生成器
+    pub fn new(config: AuthConfig) -> Self {
+        Self { config }
+    }
+
+    /// 生成 JWT Token
+    pub fn generate_token(
+        &self,
+        user_id: String,
+        username: String,
+        role: String,
+    ) -> Result<String, jsonwebtoken::errors::Error> {
+        let claims = Claims::new(user_id, username, role, self.config.expiry_hours);
+
+        encode(
+            &Header::default(),
+            &claims,
+            &EncodingKey::from_secret(self.config.secret.as_bytes()),
+        )
+    }
+
+    /// 验证 JWT Token
+    pub fn verify_token(&self, token: &str) -> Result<Claims, jsonwebtoken::errors::Error> {
