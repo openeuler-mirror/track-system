@@ -670,3 +670,53 @@ mod tests {
             name: "test-pkg".to_string(),
             level: 1,
             sync_interval_hours: 24,
+            l0_repo_url: None,
+            description: None,
+            created_at: base,
+            updated_at: Utc::now(),
+        };
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results(vec![vec![tracking_model]])
+            .append_query_results(vec![vec![package_model]])
+            .into_connection();
+
+        let manager = SyncManager::new(&db);
+        let next_sync = manager.calculate_next_sync_time(1).await.unwrap();
+
+        assert_eq!(next_sync, base + Duration::hours(24));
+    }
+
+    #[tokio::test]
+    async fn test_calculate_next_sync_time_first_run_is_import_time() {
+        use crate::entities::{packages, tracking};
+        use sea_orm::{DatabaseBackend, MockDatabase};
+
+        let base = Utc::now() - Duration::hours(100);
+        let tracking_model = tracking::Model {
+            id: 1,
+            package_id: 1,
+            distro_id: 1,
+            l1_branch: "main".to_string(),
+            l1_repo_owner: "owner".to_string(),
+            l1_repo_name: "repo".to_string(),
+            l2_branch: "local".to_string(),
+            l2_repo_path: "/path".to_string(),
+            tracking_status: "idle".to_string(),
+            last_sync_time: None,
+            last_l1_commit_sha: None,
+            last_l2_commit_sha: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            last_error: None,
+        };
+
+        let package_model = packages::Model {
+            id: 1,
+            name: "test-pkg".to_string(),
+            level: 1,
+            sync_interval_hours: 24,
+            l0_repo_url: None,
+            description: None,
+            created_at: base,
+            updated_at: Utc::now(),
