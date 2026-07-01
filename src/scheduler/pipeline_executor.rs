@@ -545,3 +545,52 @@ impl<'a> PipelineExecutor<'a> {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sea_orm::{DatabaseBackend, MockDatabase};
+
+    #[test]
+    fn test_pipeline_stage_name() {
+        assert_eq!(PipelineStage::L1Ingestion.name(), "L1 元数据获取");
+        assert_eq!(PipelineStage::L2Snapshot.name(), "L2 快照生成");
+        assert_eq!(PipelineStage::DiffComparison.name(), "差异对比");
+        assert_eq!(PipelineStage::Classification.name(), "变更分类");
+        assert_eq!(PipelineStage::ReportGeneration.name(), "报告生成");
+        assert_eq!(PipelineStage::BackportSuggestion.name(), "回合建议");
+    }
+
+    #[test]
+    fn test_pipeline_stage_all_stages() {
+        let stages = PipelineStage::all_stages();
+        assert_eq!(stages.len(), 6);
+        assert_eq!(stages[0], PipelineStage::L1Ingestion);
+        assert_eq!(stages[1], PipelineStage::L2Snapshot);
+        assert_eq!(stages[2], PipelineStage::DiffComparison);
+        assert_eq!(stages[3], PipelineStage::Classification);
+        assert_eq!(stages[4], PipelineStage::ReportGeneration);
+        assert_eq!(stages[5], PipelineStage::BackportSuggestion);
+    }
+
+    #[test]
+    fn test_stage_result_success() {
+        let started_at = Utc::now();
+        let details = serde_json::json!({"test": "data"});
+
+        let result = StageResult::success(
+            PipelineStage::L1Ingestion,
+            "成功消息".to_string(),
+            started_at,
+            details.clone(),
+        );
+
+        assert_eq!(result.stage, PipelineStage::L1Ingestion);
+        assert!(result.success);
+        assert_eq!(result.message, "成功消息");
+        assert_eq!(result.details, details);
+        assert!(result.finished_at >= started_at);
+    }
+
+    #[test]
+    fn test_stage_result_failure() {
+        let started_at = Utc::now();
