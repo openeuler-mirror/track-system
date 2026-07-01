@@ -140,3 +140,50 @@ impl<'a> SyncExecutor<'a> {
         }
 
         Ok(outcome)
+    }
+
+    /// 实际执行同步操作
+    async fn do_sync(&self, tracking: &tracking::Model) -> Result<SyncResult> {
+        info!(tracking_id = tracking.id, "开始执行真实同步");
+
+        let sync_service = SyncService::new(self.db);
+        // 使用新的 Collector 接口进行同步
+        // 注意：即使有注入的客户端，我们也使用 sync_tracking，
+        // 因为它会根据 tracking 配置自动选择合适的 Collector
+        let result = sync_service.sync_tracking(tracking.id).await;
+
+        let sync_result = result.context("SyncService 同步失败")?;
+
+        info!(
+            tracking_id = tracking.id,
+            commits_synced = sync_result.commits_synced,
+            issues_synced = sync_result.issues_synced,
+            status = ?sync_result.status,
+            message = %sync_result.message,
+            "同步执行完成"
+        );
+
+        Ok(sync_result)
+    }
+
+    /// 执行所有待处理的同步任务（默认限流）
+    pub async fn execute_pending_tasks(&self) -> Result<SyncExecutionStats> {
+        self.execute_pending_tasks_with_limit(DEFAULT_MAX_TASKS)
+            .await
+    }
+
+    /// 执行待处理同步任务，最多处理 `max_tasks` 个
+    pub async fn execute_pending_tasks_with_limit(
+        &self,
+        max_tasks: usize,
+    ) -> Result<SyncExecutionStats> {
+        let pending_tasks = self
+            .sync_manager
+            .get_pending_sync_tasks_ordered(false)
+            .await
+            .context("获取待处理任务失败")?;
+
+        let mut stats = SyncExecutionStats {
+            discovered: pending_tasks.len(),
+            ..Default::default()
+        };
