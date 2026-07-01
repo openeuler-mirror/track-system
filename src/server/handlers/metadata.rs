@@ -408,3 +408,54 @@ pub async fn delete_l1_metadata(
 /// 列出 L2 元数据快照
 pub async fn list_l2_metadata(
     State(_state): State<AppState>,
+    Query(query): Query<MetadataListQuery>,
+) -> ApiResult<Json<ApiResponse<Vec<MetadataSummary>>>> {
+    let _tracking_id = query.tracking_id;
+    Ok(Json(ApiResponse::success(vec![])))
+}
+
+/// GET /api/metadata/l2/:id
+///
+/// 获取 L2 元数据详情
+pub async fn get_l2_metadata(
+    State(_state): State<AppState>,
+    Path(id): Path<String>,
+) -> ApiResult<Json<ApiResponse<MetadataDetail>>> {
+    let detail = MetadataDetail {
+        id: id.clone(),
+        tracking_id: 1,
+        level: "l2".to_string(),
+        file_count: 0,
+        imported_at: chrono::Utc::now(),
+    };
+    Ok(Json(ApiResponse::success(detail)))
+}
+
+pub async fn delete_l2_metadata(
+    State(_state): State<AppState>,
+    Path(id): Path<String>,
+) -> ApiResult<axum::http::StatusCode> {
+    tracing::info!(snapshot_id = %id, "删除 L2 元数据");
+    Ok(axum::http::StatusCode::NO_CONTENT)
+}
+
+/// 元数据列表查询参数
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MetadataListQuery {
+    /// 按跟踪配置 ID 过滤
+    pub tracking_id: Option<i32>,
+}
+
+/// 元数据摘要
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MetadataSummary {
+    /// 快照 ID
+    pub id: String,
+    /// 跟踪配置 ID
+    pub tracking_id: i32,
+    /// 层级（l0, l1, l2）
+    pub level: String,
+    /// 文件数量
+    pub file_count: usize,
+    /// 导入时间
+    pub imported_at: chrono::DateTime<chrono::Utc>,
