@@ -42,3 +42,47 @@ async fn create_snapshot(
         format!("正在创建 tracking {} 的快照...", tracking_id).cyan()
     );
 
+    let mut payload = serde_json::json!({
+        "tracking_id": tracking_id
+    });
+
+    if let Some(t) = tag {
+        payload["tag"] = serde_json::Value::String(t);
+    }
+
+    let result: serde_json::Value = api_client.post("/snapshot/create", &payload).await?;
+
+    println!("{}", "✓ 快照已创建".green());
+    println!("快照 ID: {}", result["snapshot_id"]);
+    let created_at = result["created_at"].as_str().unwrap_or("-");
+    let created_at = chrono::DateTime::parse_from_rfc3339(created_at)
+        .map(|dt| dt.with_timezone(&chrono::Utc))
+        .ok()
+        .map(|dt| format_datetime_local(&dt))
+        .unwrap_or_else(|| created_at.to_string());
+    println!("创建时间: {}", created_at);
+    if let Some(tag_value) = result["tag"].as_str() {
+        println!("标签: {}", tag_value);
+    }
+
+    Ok(())
+}
+
+/// 恢复 L2 快照
+async fn restore_snapshot(api_client: &ApiClient, snapshot_id: i64, force: bool) -> Result<()> {
+    println!("{}", format!("正在恢复快照 {}...", snapshot_id).cyan());
+
+    if !force {
+        println!("{}", "警告: 此操作将覆盖现有数据".yellow());
+        print!("是否继续? (y/N): ");
+        use std::io::{self, Write};
+        io::stdout().flush()?;
+
+        let mut input = String::new();
+        io::stdin().read_line(&mut input)?;
+
+        if !input.trim().eq_ignore_ascii_case("y") {
+            println!("已取消");
+            return Ok(());
+        }
+    }
