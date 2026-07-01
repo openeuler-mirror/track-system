@@ -261,3 +261,47 @@ impl SchedulerManager {
             };
 
             // 执行流水线
+            match executor.execute_sync_job(job.id).await {
+                Ok(result) => {
+                    info!(
+                        job_id = job.id,
+                        tracking_id = tracking_id,
+                        success = result.success,
+                        "同步任务完成"
+                    );
+
+                    // 更新 sync_manager 状态
+                    if result.success {
+                        let _ = sync_manager.complete_sync_task(tracking_id, true).await;
+                    } else {
+                        let _ = sync_manager.complete_sync_task(tracking_id, false).await;
+                    }
+
+                    results.push(result);
+                }
+                Err(err) => {
+                    error!(
+                        job_id = job.id,
+                        tracking_id = tracking_id,
+                        error = %err,
+                        "同步任务失败"
+                    );
+
+                    let _ = sync_manager.complete_sync_task(tracking_id, false).await;
+                }
+            }
+        }
+
+        // 更新状态
+        {
+            let mut status = self.status.write().await;
+            status.total_jobs_executed += results.len();
+            status.last_execution = Some(Utc::now());
+        }
+
+        info!(executed = results.len(), "调度轮次完成");
+
+        Ok(results)
+    }
+}
+
