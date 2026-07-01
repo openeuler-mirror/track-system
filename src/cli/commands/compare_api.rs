@@ -437,3 +437,48 @@ mod tests {
                 })
                 .to_string(),
             )
+            .create_async()
+            .await;
+
+        let result = compare_l1_vs_l0(
+            &client,
+            5,
+            Some("snap-l0-1".to_string()),
+            Some("snap-l1-1".to_string()),
+        )
+        .await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_compare_status_pending() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/compare/tasks/task-pending")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "data": {
+                        "task_id": "task-pending",
+                        "status": "pending",
+                        "progress": 0,
+                        "message": null,
+                        "created_at": "2024-01-01T00:00:00Z",
+                        "updated_at": "2024-01-01T00:00:00Z",
+                        "completed_at": null,
+                        "report_id": null
+                    }
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = get_compare_status(&client, "task-pending".to_string()).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+}
