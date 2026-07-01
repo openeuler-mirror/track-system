@@ -705,3 +705,51 @@ mod tests {
             current_version: "1.22.0".to_string(),
             patches: vec![],
             cve_patches: vec![],
+        };
+
+        // 执行对比
+        let report = comparator.compare(&l0_info, &l1_info).await.unwrap();
+
+        // 验证结果
+        assert_eq!(report.package_name, "nginx");
+        assert_eq!(report.current_version, "1.22.0");
+        assert_eq!(report.latest_stable, "1.24.0");
+        assert!(report.version_behind > 0);
+        assert!(!report.recommendations.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_find_upgradable_versions() {
+        let comparator = L1VsL0Comparator::new();
+
+        let all_versions = vec![
+            VersionTag {
+                version: "1.20.0".to_string(),
+                date: Utc::now(),
+                changelog: "Old version".to_string(),
+                is_stable: true,
+            },
+            VersionTag {
+                version: "1.22.0".to_string(),
+                date: Utc::now(),
+                changelog: "Bug fixes".to_string(),
+                is_stable: true,
+            },
+            VersionTag {
+                version: "1.23.0".to_string(),
+                date: Utc::now(),
+                changelog: "Security update with CVE fixes".to_string(),
+                is_stable: true,
+            },
+            VersionTag {
+                version: "1.24.0-beta".to_string(),
+                date: Utc::now(),
+                changelog: "Beta release".to_string(),
+                is_stable: false,
+            },
+        ];
+
+        let upgradable = comparator
+            .find_upgradable_versions("1.20.0", &all_versions)
+            .unwrap();
+
