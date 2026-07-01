@@ -145,3 +145,52 @@ async fn add_tracking(
     status: String,
 ) -> Result<()> {
     println!("正在添加跟踪配置...");
+
+    let package_id = resolve_package_id(api_client, &package).await?;
+    let distro_id = parse_distro_id(&distro)?;
+    let (l1_owner, l1_name) = parse_owner_repo(&l1_repo)?;
+
+    let request = CreateTrackingRequest {
+        package_id,
+        distro_id,
+        l1_repo_owner: l1_owner,
+        l1_repo_name: l1_name,
+        l1_branch,
+        l2_branch,
+        l2_repo_path,
+        tracking_status: Some(status),
+    };
+
+    match api_client
+        .post::<_, ApiResponse<TrackingDto>>("/tracking", &request)
+        .await
+    {
+        Ok(response) => {
+            println!("{} 跟踪配置添加成功", "✓".green().bold());
+            println!("  ID: {}", response.data.id);
+            println!(
+                "  L1 仓库: {}/{} ({})",
+                response.data.l1_repo_owner, response.data.l1_repo_name, response.data.l1_branch
+            );
+            println!(
+                "  L2 路径: {} ({})",
+                response.data.l2_repo_path, response.data.l2_branch
+            );
+            println!("  状态: {}", response.data.tracking_status);
+            Ok(())
+        }
+        Err(e) => {
+            println!("{} 添加跟踪配置失败: {}", "✗".red().bold(), e);
+            Err(e.into())
+        }
+    }
+}
+
+/// 列出跟踪配置
+async fn list_tracking(
+    api_client: &ApiClient,
+    limit: u64,
+    package: Option<String>,
+    status: Option<String>,
+) -> Result<()> {
+    println!("正在获取跟踪配置列表...");
