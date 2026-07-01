@@ -140,3 +140,50 @@ impl<'a> SyncManager<'a> {
 
         Ok(next_sync)
     }
+
+    /// 获取需要同步的任务列表
+    pub async fn get_pending_sync_tasks(&self) -> anyhow::Result<Vec<tracking::Model>> {
+        self.get_pending_sync_tasks_with_limit(None).await
+    }
+
+    /// 获取需要同步的任务列表（带限制）
+    pub async fn get_pending_sync_tasks_with_limit(
+        &self,
+        limit: Option<usize>,
+    ) -> anyhow::Result<Vec<tracking::Model>> {
+        let now = Utc::now();
+
+        // 查询所有跟踪配置及其关联的软件包
+        let mut query = Tracking::find()
+            .find_also_related(Packages)
+            .filter(tracking::Column::TrackingStatus.ne("syncing"))
+            .filter(tracking::Column::TrackingStatus.ne("paused"))
+            .filter(tracking::Column::TrackingStatus.ne("archived"));
+
+        if let Some(limit) = limit {
+            query = query.limit(limit as u64);
+        }
+
+        let results = query.all(self.db).await?;
+
+        // 过滤出需要同步的任务
+        let mut pending_tasks = Vec::new();
+        for (track, package_opt) in results {
+            if let Some(package) = package_opt {
+                // 检查是否需要同步
+                if should_sync(&track, &package, now) {
+                    pending_tasks.push(track);
+                }
+            }
+        }
+
+        Ok(pending_tasks)
+    }
+
+    pub async fn get_pending_sync_tasks_with_tracking_id(
+        &self,
+        wake_up: bool,
+        tracking_id: Option<i32>,
+    ) -> anyhow::Result<Vec<tracking::Model>> {
+        let now = Utc::now();
+
