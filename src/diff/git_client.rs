@@ -226,3 +226,47 @@ impl GitRepositoryClient {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use git2::{Oid, Repository, Signature};
+    use tempfile::TempDir;
+
+    fn create_commit(repo: &Repository, message: &str, parent: Option<Oid>) -> Oid {
+        let signature = Signature::now("Test User", "test@example.com").unwrap();
+        let tree_id = {
+            let mut index = repo.index().unwrap();
+            index.write_tree().unwrap()
+        };
+        let tree = repo.find_tree(tree_id).unwrap();
+        let parents = if let Some(p) = parent {
+            vec![repo.find_commit(p).unwrap()]
+        } else {
+            vec![]
+        };
+        let parents_refs: Vec<&git2::Commit> = parents.iter().collect();
+
+        repo.commit(
+            Some("HEAD"),
+            &signature,
+            &signature,
+            message,
+            &tree,
+            &parents_refs,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn test_new_invalid_path() {
+        let result = GitRepositoryClient::new("/invalid/path");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_compute_diff() {
+        let now = Utc::now();
+        let c1 = GitCommit {
+            sha: "sha1".to_string(),
+            message: "m1".to_string(),
+            author: "a".to_string(),
