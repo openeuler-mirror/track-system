@@ -81,3 +81,44 @@ pub struct GiteaCommit {
 pub struct GiteaCommitMetadata {
     #[serde(default)]
     pub title: Option<String>,
+    pub message: String,
+    pub author: GiteaCommitAuthor,
+    pub committer: Option<GiteaCommitAuthor>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GiteaCommitAuthor {
+    pub name: Option<String>,
+    pub email: Option<String>,
+    pub date: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GiteaCommitStats {
+    pub additions: u32,
+    pub deletions: u32,
+    pub total: u32,
+}
+
+impl From<GiteaCommit> for Commit {
+    fn from(commit: GiteaCommit) -> Self {
+        let author = &commit.commit.author;
+        let committer = commit.commit.committer.as_ref().unwrap_or(author);
+        let title = commit
+            .commit
+            .title
+            .as_ref()
+            .map(|t| t.to_string())
+            .unwrap_or_else(|| {
+                commit
+                    .commit
+                    .message
+                    .lines()
+                    .next()
+                    .unwrap_or("")
+                    .trim()
+                    .to_string()
+            });
+
+        Commit {
+            sha: commit.sha,
