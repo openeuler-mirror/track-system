@@ -183,3 +183,50 @@ impl<T: GitClient> GitClientCollectorAdapter<T> {
                         error!(
                             owner = %owner,
                             repo = %repo,
+                            branch = %branch,
+                            spec_path = %spec_path,
+                            error = %err,
+                            "Base64 解码 spec 内容失败"
+                        );
+                        return None;
+                    }
+                };
+
+                let sha = sha256_hex(&bytes);
+                let content_str = String::from_utf8(bytes.clone()).ok().unwrap_or_default();
+                let version = extract_spec_version(&content_str).unwrap_or_default();
+                let release = extract_spec_release(&content_str).unwrap_or_default();
+
+                info!(
+                    owner = %owner,
+                    repo = %repo,
+                    spec_path = %spec_path,
+                    version = %version,
+                    release = %release,
+                    "成功获取 spec 文件"
+                );
+
+                Some(SpecInfo {
+                    path: spec_path,
+                    sha256: sha,
+                    version,
+                    release,
+                    content_base64: normalized,
+                })
+            }
+            Err(err) => {
+                // 记录错误但不中断流程（spec 可能不存在）
+                error!(
+                    owner = %owner,
+                    repo = %repo,
+                    branch = %branch,
+                    spec_path = %spec_path,
+                    error = %err,
+                    "获取 spec 文件失败"
+                );
+                None
+            }
+        }
+    }
+}
+
