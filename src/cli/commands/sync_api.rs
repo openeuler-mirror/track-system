@@ -240,3 +240,53 @@ mod tests {
             .with_status(200)
             .with_header("content-type", "application/json")
             .with_body(
+                serde_json::json!({
+                    "data": [
+                        {
+                            "id": 10,
+                            "package_name": "pkg1"
+                        },
+                        {
+                            "id": 20,
+                            "package_name": "pkg2"
+                        }
+                    ]
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let mock_sync1 = server
+            .mock("POST", "/api/sync/10/queue")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "job_id": 100,
+                    "status": "queued"
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let mock_sync2 = server
+            .mock("POST", "/api/sync/20/queue")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "job_id": 200,
+                    "status": "queued"
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = run_all_sync(&client).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock_list.assert_async().await;
+        mock_sync1.assert_async().await;
+        mock_sync2.assert_async().await;
