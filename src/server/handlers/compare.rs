@@ -156,3 +156,43 @@ pub async fn get_compare_status(
     State(_state): State<AppState>,
     Path(task_id): Path<String>,
 ) -> ApiResult<Json<ApiResponse<CompareStatusResponse>>> {
+    // TODO: 实现任务状态查询逻辑
+    // 1. 从任务队列或数据库查询任务状态
+    // 2. 返回任务详情
+
+    // 临时实现：返回模拟数据
+    let response = CompareStatusResponse {
+        task_id: task_id.clone(),
+        status: CompareStatus::Completed,
+        progress: 100,
+        message: Some("Comparison completed successfully".to_string()),
+        created_at: chrono::Utc::now(),
+        updated_at: chrono::Utc::now(),
+        completed_at: Some(chrono::Utc::now()),
+        report_id: Some(1),
+    };
+
+    Ok(Json(ApiResponse::success(response)))
+}
+
+/// DELETE /api/compare/tasks/:id
+///
+/// 取消对比任务
+///
+/// 符合 RESTful 规范：使用 DELETE 方法取消/删除任务
+pub async fn cancel_compare_task(
+    State(_state): State<AppState>,
+    Path(task_id): Path<String>,
+) -> ApiResult<axum::http::StatusCode> {
+    // TODO: 实现任务取消逻辑
+    // 1. 查找任务
+    // 2. 如果任务正在运行，发送取消信号
+    // 3. 更新任务状态为 Cancelled
+    // 4. 返回 204 No Content
+
+    tracing::info!(task_id = %task_id, "取消对比任务");
+
+    // 临时实现：直接返回成功
+    Ok(axum::http::StatusCode::NO_CONTENT)
+}
+
