@@ -37,3 +37,42 @@ async fn add_distro(
     version: String,
     description: Option<String>,
 ) -> Result<()> {
+    println!(
+        "{}",
+        format!("正在添加发行版 {}:{}...", name, version).cyan()
+    );
+
+    let mut payload = serde_json::json!({
+        "name": name,
+        "version": version
+    });
+
+    if let Some(desc) = description {
+        payload["description"] = serde_json::Value::String(desc);
+    }
+
+    let result: serde_json::Value = api_client.post("/distros", &payload).await?;
+
+    println!("{}", "✓ 发行版已添加".green());
+    println!("ID: {}", result["id"]);
+    println!("名称: {}", result["name"]);
+    println!("版本: {}", result["version"]);
+
+    Ok(())
+}
+
+/// 列出所有发行版
+async fn list_distros(api_client: &ApiClient) -> Result<()> {
+    println!("{}", "正在获取发行版列表...".cyan());
+
+    let result: serde_json::Value = api_client.get("/distros").await?;
+    let distros = result["data"]
+        .as_array()
+        .ok_or_else(|| anyhow::anyhow!("无效的响应格式"))?;
+
+    if distros.is_empty() {
+        println!("{}", "没有发行版".yellow());
+        return Ok(());
+    }
+
+    println!("\n{}", "=== 发行版列表 ===".bold());
