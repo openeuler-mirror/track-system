@@ -90,3 +90,50 @@ fn sha256_hex(data: &[u8]) -> String {
     let mut hasher = Sha256::new();
     hasher.update(data);
     let digest = hasher.finalize();
+    format!("{:x}", digest)
+}
+
+#[async_trait]
+impl<T: GitClient> Collector for GitClientCollectorAdapter<T> {
+    async fn collect(&self, config: &CollectConfig) -> ApiResult<CollectResult> {
+        // 验证配置
+        self.validate_config(config)?;
+
+        let owner = config.owner.as_ref().unwrap();
+        let repo = config.repo.as_ref().unwrap();
+
+        // 构建 CommitsParams
+        let mut params = CommitsParams::new(&config.branch);
+        if let Some(since) = config.since {
+            params = params.since(since);
+        }
+        if let Some(until) = config.until {
+            params = params.until(until);
+        }
+        if let Some(limit) = config.limit {
+            params = params.per_page(limit);
+        }
+
+        // 获取 commits
+        let commits = self.client.get_commits(owner, repo, params).await?;
+
+        // 转换为 CommitMetadata
+        let commit_metadata: Vec<CommitMetadata> = commits.into_iter().map(|c| c.into()).collect();
+
+        // 确定采集层级
+        let level = config.level.as_deref().unwrap_or("l0");
+
+        // 采集 spec 文件（仅针对 L2）
+        let spec = if level == "l2" {
+            self.collect_spec(owner, repo, &config.branch).await
+        } else {
+            None
+        };
+
+        Ok(CollectResult {
+            level: level.to_string(),
+            platform: self.platform.as_str().to_string(),
+            owner: Some(owner.clone()),
+            repo: repo.clone(),
+            branch: config.branch.clone(),
+            collected_at: Utc::now(),
