@@ -154,3 +154,47 @@ async fn remove_distro(api_client: &ApiClient, name: String, confirm: bool) -> R
     Ok(())
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cli::client::ClientConfig;
+    use mockito::Server;
+
+    async fn setup_test_server() -> (mockito::ServerGuard, ApiClient) {
+        let server = Server::new_async().await;
+        let config = ClientConfig {
+            server_url: server.url(),
+            auth_token: Some("test_token".to_string()),
+            timeout: 30,
+            verify_ssl: true,
+        };
+        let client = ApiClient::new(config).unwrap();
+        (server, client)
+    }
+
+    #[tokio::test]
+    async fn test_add_distro_without_description() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("POST", "/api/distros")
+            .match_body(mockito::Matcher::Json(serde_json::json!({
+                "name": "Ubuntu",
+                "version": "22.04"
+            })))
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "id": 1,
+                    "name": "Ubuntu",
+                    "version": "22.04"
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = add_distro(&client, "Ubuntu".to_string(), "22.04".to_string(), None).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
