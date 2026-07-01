@@ -184,3 +184,50 @@ impl TableFormatter {
             if idx < rows.len() - 1 {
                 let row_separator = col_widths
                     .iter()
+                    .map(|w| "─".repeat(w + 2))
+                    .collect::<Vec<_>>()
+                    .join("┼");
+                output.push_str(&format!("├{}┤\n", row_separator));
+            }
+        }
+
+        // 渲染底部边框
+        let bottom_border = col_widths
+            .iter()
+            .map(|w| "─".repeat(w + 2))
+            .collect::<Vec<_>>()
+            .join("┴");
+        output.push_str(&format!("└{}┘\n", bottom_border));
+
+        Ok(output)
+    }
+}
+
+impl Default for TableFormatter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Formatter for TableFormatter {
+    fn format<T: Serialize>(&self, data: &T) -> anyhow::Result<String> {
+        // 将数据序列化为 JSON，然后转换为表格
+        let json_value = serde_json::to_value(data)?;
+
+        match json_value {
+            serde_json::Value::Array(arr) => {
+                if arr.is_empty() {
+                    return Ok("No data".to_string());
+                }
+
+                // 提取表头（从第一个对象的键）
+                if let Some(serde_json::Value::Object(first)) = arr.first() {
+                    let headers: Vec<&str> = first.keys().map(|k| k.as_str()).collect();
+
+                    // 提取数据行
+                    let rows: Vec<Vec<String>> = arr
+                        .iter()
+                        .filter_map(|v| {
+                            if let serde_json::Value::Object(obj) = v {
+                                Some(
+                                    headers
