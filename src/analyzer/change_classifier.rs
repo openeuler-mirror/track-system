@@ -120,3 +120,35 @@ impl<'a> ChangeClassifier<'a> {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::entities::l1_commit_records;
+    use sea_orm::MockDatabase;
+
+    #[test]
+    fn test_extract_cve_numbers() {
+        let text = "Fix CVE-2024-1234 and CVE-2024-5678";
+        let cves = ChangeClassifier::extract_cve_numbers(text);
+        assert_eq!(cves.len(), 2);
+        assert!(cves.contains(&"CVE-2024-1234".to_string()));
+        assert!(cves.contains(&"CVE-2024-5678".to_string()));
+    }
+
+    #[test]
+    fn test_classify_by_message() {
+        // CVE
+        assert_eq!(
+            ChangeClassifier::classify_by_message(
+                "Fix CVE-2024-0001",
+                &["CVE-2024-0001".to_string()]
+            ),
+            ChangeType::CVE
+        );
+        assert_eq!(
+            ChangeClassifier::classify_by_message("Fix security vulnerability", &[]),
+            ChangeType::CVE
+        );
+
+        // Backport
+        assert_eq!(
