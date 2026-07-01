@@ -211,3 +211,46 @@ fn print_package_detail(pkg: &PackageDto) {
     println!("{}", "软件包详情:".bold());
     println!("  ID: {}", pkg.id);
     println!("  名称: {}", pkg.name.cyan());
+    println!("  等级: {}", pkg.level);
+    println!("  同步间隔: {} 小时", pkg.sync_interval_hours);
+    if let Some(url) = pkg.l0_repo_url.clone() {
+        println!("  L0 仓库: {}", url);
+    }
+    if let Some(desc) = pkg.description.clone() {
+        println!("  描述: {}", desc);
+    }
+    println!("  创建时间: {}", format_datetime_local(&pkg.created_at));
+    println!("  更新时间: {}", format_datetime_local(&pkg.updated_at));
+}
+
+/// 更新软件包
+async fn update_package(
+    api_client: &ApiClient,
+    name: String,
+    sync_interval: Option<String>,
+    level: Option<i32>,
+    description: Option<String>,
+) -> Result<()> {
+    println!("正在更新软件包: {}", name.cyan());
+
+    let pkg_opt = find_package_by_name(api_client, &name).await?;
+    let pkg = match pkg_opt {
+        Some(p) => p,
+        None => {
+            println!("{} 未找到软件包: {}", "✗".red().bold(), name);
+            return Ok(());
+        }
+    };
+
+    let request = UpdatePackageRequest {
+        level,
+        sync_interval_hours: match sync_interval {
+            Some(s) => Some(parse_sync_interval_hours(&s)?),
+            None => None,
+        },
+        l0_repo_url: None,
+        description,
+    };
+
+    match api_client
+        .put::<_, PackageDto>(&format!("/packages/{}", pkg.id), &request)
