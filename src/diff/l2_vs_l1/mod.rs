@@ -261,3 +261,56 @@ pub struct SourceModification {
     pub l1_hash: String,
     /// L2 的哈希
     pub l2_hash: String,
+}
+
+/// 定制内容分析
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CustomizationAnalysis {
+    /// 总定制数
+    pub total_customizations: usize,
+    /// 按类型分组的定制
+    pub by_type: HashMap<String, Vec<Customization>>,
+    /// 定制摘要
+    pub summary: String,
+}
+
+/// 同步建议
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SyncRecommendation {
+    /// 优先级
+    pub priority: SyncPriority,
+    /// 建议类型
+    pub recommendation_type: SyncType,
+    /// 描述
+    pub description: String,
+    /// 影响的文件
+    pub affected_files: Vec<String>,
+    /// 预计工作量
+    pub estimated_effort: EffortLevel,
+}
+
+/// 同步优先级
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+pub enum SyncPriority {
+    /// 紧急（安全问题）
+    Critical,
+    /// 高（重要功能）
+    High,
+    /// 中（一般更新）
+    Medium,
+    /// 低（可选更新）
+    Low,
+}
+
+/// 同步类型
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum SyncType {
+    /// 版本升级
+    VersionUpgrade,
+    /// 安全补丁
+    SecurityPatch,
+    /// Bug 修复
+    BugFix,
+    /// 新功能
+    NewFeature,
+    /// 配置更新
