@@ -657,3 +657,54 @@ fn collect_commits_from_repo(repo_path: &Path) -> Result<RepoCollectionResult> {
                 let cols: Vec<&str> = line.split_whitespace().collect();
                 if cols.len() >= 3 {
                     let add = cols[0].parse::<i32>().ok();
+                    let del = cols[1].parse::<i32>().ok();
+                    if let (Some(a), Some(d)) = (add, del) {
+                        adds += a;
+                        dels += d;
+                        files += 1;
+                    }
+                }
+                current = Some((entry, adds, dels, files));
+            }
+        }
+    }
+
+    // 收尾最后一个提交
+    if let Some((mut entry, adds, dels, files)) = current.take() {
+        entry.stats = ChangeStats {
+            additions: adds,
+            deletions: dels,
+            files_changed: files,
+        };
+        commits.push(entry);
+    }
+
+    // 以时间降序排列
+    commits.sort_by(|a, b| b.authored_at.cmp(&a.authored_at));
+
+    Ok(RepoCollectionResult {
+        commits,
+        spec_version,
+        spec_release,
+    })
+}
+
+/// 从仓库路径中解析 spec 文件，提取 version 和 release
+fn parse_spec_from_repo(repo_path: &Path) -> Result<(Option<String>, Option<String>)> {
+    // 遍历仓库目录查找 .spec 文件
+    for entry in WalkDir::new(repo_path)
+        .into_iter()
+        .filter_entry(|e| e.file_name() != ".git")
+    {
+        let entry = entry?;
+        if !entry.file_type().is_file() {
+            continue;
+        }
+
+        // 检查是否为 .spec 文件
+        if entry
+            .path()
+            .extension()
+            .map(|ext| ext == "spec")
+            .unwrap_or(false)
+        {
