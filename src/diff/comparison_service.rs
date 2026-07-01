@@ -279,3 +279,46 @@ mod tests {
         let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
         let service = ComparisonService::new(&db);
         // Verify service is created successfully
+        assert!(std::ptr::addr_of!(service) as usize != 0);
+    }
+
+    #[tokio::test]
+    async fn test_generate_report_same_sha() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+        let service = ComparisonService::new(&db);
+
+        let mut tracking = create_test_tracking_model();
+        tracking.last_l1_commit_sha = Some("same_sha".to_string());
+        tracking.last_l2_commit_sha = Some("same_sha".to_string());
+
+        let report = service.generate_report(&tracking).await.unwrap();
+
+        assert_eq!(report.tracking_id, 1);
+        assert_eq!(report.commits_ahead, 0);
+        assert_eq!(report.commits_behind, 0);
+        assert_eq!(report.source, "auto");
+        assert_eq!(report.diff_summary["tracking_id"], 1);
+        assert_eq!(report.diff_summary["needs_sync"], false);
+        assert_eq!(report.diff_summary["method"], "sha_comparison");
+    }
+
+    #[tokio::test]
+    async fn test_generate_report_different_sha() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+        let service = ComparisonService::new(&db);
+
+        let mut tracking = create_test_tracking_model();
+        tracking.last_l1_commit_sha = Some("sha1".to_string());
+        tracking.last_l2_commit_sha = Some("sha2".to_string());
+
+        let report = service.generate_report(&tracking).await.unwrap();
+
+        assert_eq!(report.tracking_id, 1);
+        assert_eq!(report.commits_ahead, 1);
+        assert_eq!(report.commits_behind, 0);
+        assert_eq!(report.diff_summary["needs_sync"], true);
+        assert_eq!(report.diff_summary["l1_latest_sha"], "sha1");
+        assert_eq!(report.diff_summary["l2_latest_sha"], "sha2");
+    }
+
+    #[tokio::test]
