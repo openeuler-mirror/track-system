@@ -215,3 +215,47 @@ pub async fn get_compare_status(api_client: &ApiClient, task_id: String) -> Resu
             println!("{} 查询任务状态失败: {}", "✗".red().bold(), e);
             Err(e.into())
         }
+    }
+}
+
+/// 取消对比任务
+pub async fn cancel_compare_task(api_client: &ApiClient, task_id: String) -> Result<()> {
+    println!("正在取消对比任务...");
+    println!("  任务 ID: {}", task_id.cyan());
+
+    match api_client
+        .delete_no_content(&format!("/compare/tasks/{}", task_id))
+        .await
+    {
+        Ok(_) => {
+            println!();
+            println!("{} 任务已取消", "✓".green().bold());
+            println!("  任务 ID: {}", task_id.cyan());
+            Ok(())
+        }
+        Err(e) => {
+            println!("{} 取消任务失败: {}", "✗".red().bold(), e);
+            Err(e.into())
+        }
+    }
+}
+
+/// 生成对比报告
+async fn generate_report(
+    _api_client: &ApiClient,
+    format: String,
+    output: Option<String>,
+) -> Result<()> {
+    println!("正在生成对比报告...");
+    println!("  格式: {}", format);
+    if let Some(path) = output {
+        println!("  输出: {}", path);
+    }
+
+    // TODO: 实现报告生成逻辑
+    println!();
+    println!("{}", "注: 此功能待实现".yellow());
+
+    Ok(())
+}
+
