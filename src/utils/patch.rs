@@ -253,3 +253,37 @@ Subject: [PATCH] Fix CVE-2023-1234 and CVE-2023-5678
 This patch fixes multiple security issues.
 References:
 - https://nvd.nist.gov/vuln/detail/CVE-2023-1234
+- https://nvd.nist.gov/vuln/detail/CVE-2023-5678
+"#;
+        let cves = PatchParser::extract_cve_from_content(content);
+        assert_eq!(cves.len(), 2);
+        assert!(cves.contains(&"CVE-2023-1234".to_string()));
+        assert!(cves.contains(&"CVE-2023-5678".to_string()));
+    }
+
+    #[test]
+    fn test_extract_description() {
+        let content = r#"
+Subject: [PATCH] Fix buffer overflow
+
+This patch fixes a buffer overflow vulnerability in the parser.
+It ensures that input length is checked before processing.
+
+diff --git a/parser.c b/parser.c
+index 123456..789abc 100644
+--- a/parser.c
++++ b/parser.c
+"#;
+        let description = PatchParser::extract_description(content);
+        assert!(description.is_some());
+        let desc = description.unwrap();
+        assert!(desc.contains("Fix buffer overflow"));
+        assert!(desc.contains("This patch fixes a buffer overflow"));
+    }
+
+    #[test]
+    fn test_calculate_hash() {
+        let content = "test content";
+        let hash = PatchParser::calculate_hash(content);
+        // echo -n "test content" | sha256sum
+        assert_eq!(
