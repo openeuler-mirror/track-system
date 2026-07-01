@@ -141,3 +141,51 @@ impl<'a> SyncService<'a> {
                 let token = token.ok_or_else(|| anyhow::anyhow!("Gitee 需要 token"))?;
                 let client = GiteeClient::new(token)?;
                 let collector = client.as_collector();
+                Ok(Box::new(collector))
+            }
+            Platform::Gitea => {
+                let token = token.ok_or_else(|| anyhow::anyhow!("Gitea 需要 token"))?;
+                // Gitea 需要 API URL，从环境变量获取
+                let api_url = std::env::var("GITEA_API_URL")
+                    .unwrap_or_else(|_| "https://gitea.com".to_string());
+                let client = GiteaClient::new(token, api_url)?;
+                let collector = client.as_collector();
+                Ok(Box::new(collector))
+            }
+            Platform::GitLab => {
+                // TODO: 实现 GitLab Collector
+                Err(anyhow::anyhow!("GitLab Collector 尚未实现"))
+            }
+            Platform::Local => {
+                // TODO: 实现 Local Collector
+                Err(anyhow::anyhow!("Local Collector 尚未实现"))
+            }
+        }
+    }
+
+    /// 使用 Collector 同步指定 tracking
+    pub async fn sync_tracking_with_collector(
+        &self,
+        tracking_id: i32,
+        collector: &dyn Collector,
+    ) -> Result<SyncResult> {
+        info!(
+            tracking_id = tracking_id,
+            collector = collector.name(),
+            "使用 Collector 同步数据"
+        );
+
+        // 1. 查询 tracking 配置
+        let tracking_entity = Tracking::find_by_id(tracking_id)
+            .one(self.db)
+            .await
+            .context("查询 tracking 失败")?
+            .ok_or_else(|| anyhow::anyhow!("Tracking {} 不存在", tracking_id))?;
+
+        // 2. 构建采集配置
+        let platform = self.infer_platform(&tracking_entity)?;
+
+        info!(
+            tracking_id = tracking_id,
+            platform = %platform,
+            l1_branch = %tracking_entity.l1_branch,
