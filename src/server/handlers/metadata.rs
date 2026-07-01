@@ -459,3 +459,55 @@ pub struct MetadataSummary {
     pub file_count: usize,
     /// 导入时间
     pub imported_at: chrono::DateTime<chrono::Utc>,
+}
+
+/// 元数据详情
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MetadataDetail {
+    /// 快照 ID
+    pub id: String,
+    /// 跟踪配置 ID
+    pub tracking_id: i32,
+    /// 层级（l0, l1, l2）
+    pub level: String,
+    /// 文件数量
+    pub file_count: usize,
+    /// 导入时间
+    pub imported_at: chrono::DateTime<chrono::Utc>,
+}
+
+/// 验证导入请求
+fn validate_import_request(tracking_id: i32, snapshot: &RepositorySnapshot) -> ApiResult<()> {
+    // 验证 tracking_id
+    if tracking_id <= 0 {
+        return Err(ApiError::BadRequest("Invalid tracking_id".to_string()));
+    }
+
+    // 验证 tracking_id 匹配
+    if snapshot.tracking_id != tracking_id {
+        return Err(ApiError::BadRequest(format!(
+            "Snapshot tracking_id ({}) does not match request tracking_id ({})",
+            snapshot.tracking_id, tracking_id
+        )));
+    }
+
+    Ok(())
+}
+
+/// 导入 L0 commit 到数据库
+async fn import_l0_commit(
+    db: &sea_orm::DatabaseConnection,
+    package_id: i32,
+    commit: &crate::snapshot::types::CommitEntry,
+) -> anyhow::Result<bool> {
+    use crate::entities::{l0_commits, prelude::*};
+    use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
+
+    // 检查是否已存在
+    let existing = L0Commits::find()
+        .filter(l0_commits::Column::PackageId.eq(package_id))
+        .filter(l0_commits::Column::CommitSha.eq(&commit.sha))
+        .one(db)
+        .await?;
+
+    if existing.is_some() {
