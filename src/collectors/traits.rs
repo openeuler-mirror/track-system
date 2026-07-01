@@ -360,3 +360,55 @@ impl CollectConfig {
             until: None,
             level: None,
         }
+    }
+
+    /// 设置远端仓库信息
+    pub fn with_remote(mut self, owner: impl Into<String>, repo: impl Into<String>) -> Self {
+        self.owner = Some(owner.into());
+        self.repo = Some(repo.into());
+        self
+    }
+
+    /// 设置本地仓库路径
+    pub fn with_local_path(mut self, path: impl Into<PathBuf>) -> Self {
+        self.repo_path = Some(path.into());
+        self
+    }
+
+    /// 设置 API 地址
+    pub fn with_api_url(mut self, url: impl Into<String>) -> Self {
+        self.api_url = Some(url.into());
+        self
+    }
+
+    /// 设置认证 token
+    pub fn with_token(mut self, token: impl Into<String>) -> Self {
+        self.token = Some(token.into());
+        self
+    }
+
+    /// 设置采集数量限制
+    pub fn with_limit(mut self, limit: u32) -> Self {
+        self.limit = Some(limit);
+        self
+    }
+
+    /// 设置起始时间
+    pub fn with_since(mut self, since: DateTime<Utc>) -> Self {
+        self.since = Some(since);
+        self
+    }
+
+    /// 设置结束时间
+    pub fn with_until(mut self, until: DateTime<Utc>) -> Self {
+        self.until = Some(until);
+        self
+    }
+
+    /// 设置采集层级
+    pub fn with_level(mut self, level: impl Into<String>) -> Self {
+        self.level = Some(level.into());
+        self
+    }
+}
+
