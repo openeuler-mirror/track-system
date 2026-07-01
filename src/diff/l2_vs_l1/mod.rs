@@ -2633,3 +2633,56 @@ Summary: Test package
             configure_options_removed: vec![],
         };
         let patch_diff = PatchDiff {
+            l1_total: 1,
+            l2_total: 1,
+            l2_added: vec![],
+            l2_removed: vec![],
+            l2_modified: vec![PatchModification {
+                filename: "p.patch".to_string(),
+                l1_hash: "a".to_string(),
+                l2_hash: "b".to_string(),
+            }],
+            identical: vec![],
+        };
+        let source_diff = SourceDiff {
+            l1_total: 1,
+            l2_total: 1,
+            l2_added: vec![],
+            l2_removed: vec![],
+            l2_modified: vec![SourceModification {
+                filename: "x.conf".to_string(),
+                l1_hash: "a".to_string(),
+                l2_hash: "b".to_string(),
+            }],
+        };
+        let conflicts = comparator
+            .detect_conflicts(&spec_diff, &patch_diff, &source_diff)
+            .unwrap();
+        assert_eq!(conflicts.len(), 4);
+        assert!(conflicts
+            .iter()
+            .any(|c| c.conflict_type == ConflictType::VersionConflict));
+        assert!(conflicts
+            .iter()
+            .any(|c| c.conflict_type == ConflictType::PatchConflict));
+        assert!(conflicts
+            .iter()
+            .any(|c| c.conflict_type == ConflictType::FileModificationConflict));
+        assert!(conflicts
+            .iter()
+            .any(|c| c.conflict_type == ConflictType::ConfigurationConflict));
+    }
+
+    #[test]
+    fn test_find_base_commit_from_records_exact_match() {
+        use crate::entities::l1_commit_records;
+        use chrono::Utc;
+
+        let now = Utc::now();
+        let model = l1_commit_records::Model {
+            id: 1,
+            tracking_id: 1,
+            commit_sha: "sha1".to_string(),
+            commit_message: "Version: 1.0.0\nRelease: 1\n".to_string(),
+            author_name: "a".to_string(),
+            author_email: "a@a".to_string(),
