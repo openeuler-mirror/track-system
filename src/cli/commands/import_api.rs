@@ -384,3 +384,51 @@ fn parse_snapshot_or_convert(
                 .map(|s| s.to_string())
                 .unwrap_or_else(|| message.lines().next().unwrap_or("").to_string());
             let author = c
+                .get("author")
+                .and_then(|v| v.as_str())
+                .or_else(|| c.get("author_name").and_then(|v| v.as_str()))
+                .unwrap_or("")
+                .to_string();
+            let authored_at = c
+                .get("authored_at")
+                .and_then(|v| v.as_str())
+                .or_else(|| c.get("author_date").and_then(|v| v.as_str()))
+                .or_else(|| c.get("date").and_then(|v| v.as_str()))
+                .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
+                .map(|dt| dt.with_timezone(&Utc))
+                .unwrap_or_else(Utc::now);
+            let url = c.get("url").and_then(|v| v.as_str()).map(|s| s.to_string());
+            let additions = c.get("additions").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
+            let deletions = c.get("deletions").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
+            let files_changed = c
+                .get("files_changed")
+                .and_then(|v| v.as_i64())
+                .or_else(|| c.get("files_changed_count").and_then(|v| v.as_i64()))
+                .unwrap_or(0) as i32;
+            let stats = ChangeStats {
+                additions,
+                deletions,
+                files_changed,
+            };
+            let primary_change_type = c
+                .get("primary_change_type")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+            let cve_list = c
+                .get("cve_list")
+                .and_then(|v| v.as_array())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|e| e.as_str().map(|s| s.to_string()))
+                        .collect::<Vec<String>>()
+                })
+                .unwrap_or_default();
+
+            CommitEntry {
+                sha,
+                title,
+                message,
+                author,
+                authored_at,
+                url,
+                stats,
