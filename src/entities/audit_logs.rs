@@ -34,3 +34,39 @@ pub struct Model {
     /// 客户端 IP 地址
     pub ip_address: Option<String>,
     /// User-Agent
+    #[sea_orm(column_type = "Text", nullable)]
+    pub user_agent: Option<String>,
+    /// 请求体 (JSON)
+    #[sea_orm(column_type = "JsonBinary", nullable)]
+    pub request_body: Option<JsonValue>,
+    /// 响应状态码
+    pub response_status: i32,
+    /// 响应体 (JSON, 可选)
+    #[sea_orm(column_type = "JsonBinary", nullable)]
+    pub response_body: Option<JsonValue>,
+    /// 请求处理时长 (毫秒)
+    pub duration: Option<i32>,
+    /// 错误信息 (如果有)
+    #[sea_orm(column_type = "Text", nullable)]
+    pub error_message: Option<String>,
+    /// 创建时间
+    pub created_at: DateTimeUtc,
+}
+
+#[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+pub enum Relation {}
+
+impl ActiveModelBehavior for ActiveModel {}
+
+/// 审计日志操作类型
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AuditAction {
+    Create,
+    Read,
+    Update,
+    Delete,
+    Execute,
+    Login,
+    Logout,
+}
+
