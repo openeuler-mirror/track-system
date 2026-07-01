@@ -40,3 +40,46 @@ fn parse_sync_interval_hours(input: &str) -> Result<i32> {
     let max_hours = 24 * 365;
     if !(min_hours..=max_hours).contains(&hours) {
         bail!("无效的 sync-interval：{input}，范围需在 {min_hours}..={max_hours} 小时");
+    }
+
+    Ok(hours)
+}
+
+/// 辅助：按名称查找软件包（客户端侧过滤）
+async fn find_package_by_name(
+    api_client: &ApiClient,
+    name: &str,
+) -> anyhow::Result<Option<PackageDto>> {
+    match api_client.get::<Vec<PackageDto>>("/packages").await {
+        Ok(list) => Ok(list.into_iter().find(|p| p.name == name)),
+        Err(e) => Err(e.into()),
+    }
+}
+
+/// 执行软件包管理命令
+pub async fn execute(api_client: &ApiClient, action: PackageAction) -> Result<()> {
+    match action {
+        PackageAction::Add {
+            name,
+            level,
+            sync_interval,
+            l0_repo,
+            description,
+        } => add_package(api_client, name, level, sync_interval, l0_repo, description).await,
+        PackageAction::List { limit } => list_packages(api_client, limit).await,
+        PackageAction::Show { name_or_id } => show_package(api_client, name_or_id).await,
+        PackageAction::Update {
+            name,
+            sync_interval,
+            level,
+            description,
+        } => update_package(api_client, name, sync_interval, level, description).await,
+        PackageAction::Remove { name, confirm } => remove_package(api_client, name, confirm).await,
+    }
+}
+
+/// 添加软件包
+async fn add_package(
+    api_client: &ApiClient,
+    name: String,
+    level: i32,
