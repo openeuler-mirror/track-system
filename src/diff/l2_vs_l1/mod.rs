@@ -1052,3 +1052,56 @@ impl L2VsL1Comparator {
 
     /// 分析定制内容影响
     ///
+    /// 对定制内容进行分类统计，并生成详细的摘要报告
+    fn analyze_customization_impact(
+        &self,
+        customizations: &[Customization],
+    ) -> Result<CustomizationAnalysis> {
+        let mut by_type: HashMap<String, Vec<Customization>> = HashMap::new();
+
+        // 按类型分组
+        for custom in customizations {
+            let type_name = format!("{:?}", custom.customization_type);
+            by_type.entry(type_name).or_default().push(custom.clone());
+        }
+
+        // 生成详细摘要
+        let summary = if customizations.is_empty() {
+            "未检测到定制内容".to_string()
+        } else {
+            let mut summary_parts = Vec::new();
+
+            // 总体统计
+            summary_parts.push(format!(
+                "检测到 {} 项定制内容，包括 {} 种类型",
+                customizations.len(),
+                by_type.len()
+            ));
+
+            // 按类型详细说明
+            let type_order = [
+                ("SecurityHardening", "安全加固"),
+                ("VersionChange", "版本变更"),
+                ("FeatureModification", "功能修改"),
+                ("ConfigurationChange", "配置修改"),
+                ("PerformanceOptimization", "性能优化"),
+                ("Other", "其他"),
+            ];
+
+            for (type_key, type_name_cn) in &type_order {
+                if let Some(items) = by_type.get(*type_key) {
+                    summary_parts.push(format!("- {}: {} 项", type_name_cn, items.len()));
+                }
+            }
+
+            // 重点关注项
+            let mut highlights = Vec::new();
+
+            // 安全加固最重要
+            if let Some(security_items) = by_type.get("SecurityHardening") {
+                if !security_items.is_empty() {
+                    highlights.push(format!(
+                        "包含 {} 项安全加固，需要在同步时特别注意保留",
+                        security_items.len()
+                    ));
+                }
