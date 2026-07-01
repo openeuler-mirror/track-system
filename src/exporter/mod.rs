@@ -196,3 +196,53 @@ impl<'a> MetadataExporter<'a> {
                     "updated_at": p.updated_at,
                 })
             })
+            .collect();
+
+        // 查询发行版
+        let mut distros_query = distros::Entity::find();
+        if options.incremental {
+            if let Some(since) = options.since {
+                distros_query = distros_query.filter(distros::Column::UpdatedAt.gt(since));
+            }
+        }
+        let distros_data = distros_query.all(self.db).await?;
+        let distros_json: Vec<serde_json::Value> = distros_data
+            .iter()
+            .map(|d| {
+                serde_json::json!({
+                    "id": d.id,
+                    "name": d.name,
+                    "version": d.version,
+                    "platform": d.platform,
+                    "base_url": d.base_url,
+                    "created_at": d.created_at,
+                    "updated_at": d.updated_at,
+                })
+            })
+            .collect();
+
+        // 查询跟踪配置
+        let mut trackings_query = tracking::Entity::find();
+        if options.incremental {
+            if let Some(since) = options.since {
+                trackings_query = trackings_query.filter(tracking::Column::UpdatedAt.gt(since));
+            }
+        }
+        let trackings_data = trackings_query.all(self.db).await?;
+        let trackings_json: Vec<serde_json::Value> = trackings_data
+            .iter()
+            .map(|t| {
+                serde_json::json!({
+                    "id": t.id,
+                    "package_id": t.package_id,
+                    "distro_id": t.distro_id,
+                    "l1_branch": t.l1_branch,
+                    "l1_repo_owner": t.l1_repo_owner,
+                    "l1_repo_name": t.l1_repo_name,
+                    "l2_branch": t.l2_branch,
+                    "l2_repo_path": t.l2_repo_path,
+                    "tracking_status": t.tracking_status,
+                    "created_at": t.created_at,
+                    "updated_at": t.updated_at,
+                })
+            })
