@@ -308,3 +308,55 @@ impl Platform {
             "local" => Some(Platform::Local),
             _ => None,
         }
+    }
+}
+
+impl fmt::Display for Platform {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
+/// 采集器配置
+#[derive(Debug, Clone)]
+pub struct CollectConfig {
+    /// 平台类型
+    pub platform: Platform,
+    /// 仓库所有者（远端平台需要）
+    pub owner: Option<String>,
+    /// 仓库名称（远端平台需要）
+    pub repo: Option<String>,
+    /// 本地仓库路径（local 平台需要）
+    pub repo_path: Option<PathBuf>,
+    /// 分支名称
+    pub branch: String,
+    /// API 地址（自建平台需要，如 Gitea）
+    pub api_url: Option<String>,
+    /// 认证 token
+    pub token: Option<String>,
+    /// 采集数量限制
+    pub limit: Option<u32>,
+    /// 起始时间（可选）
+    pub since: Option<DateTime<Utc>>,
+    /// 结束时间（可选）
+    pub until: Option<DateTime<Utc>>,
+    /// 采集层级（l0/l1/l2）
+    pub level: Option<String>,
+}
+
+impl CollectConfig {
+    /// 创建新的配置
+    pub fn new(platform: Platform, branch: impl Into<String>) -> Self {
+        Self {
+            platform,
+            owner: None,
+            repo: None,
+            repo_path: None,
+            branch: branch.into(),
+            api_url: None,
+            token: None,
+            limit: None,
+            since: None,
+            until: None,
+            level: None,
+        }
