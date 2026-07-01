@@ -35,3 +35,40 @@ pub struct Model {
     pub patch_stats: Option<JsonValue>,
     pub classification_status: String,
     #[sea_orm(column_type = "Text", nullable)]
+    pub classification_notes: Option<String>,
+    pub sync_status: String,
+    pub synced_to_l2_commit: Option<String>,
+    pub synced_at: Option<DateTimeUtc>,
+    #[sea_orm(column_type = "Text")]
+    pub api_url: String,
+    pub fetched_at: DateTimeUtc,
+    pub files_changed_count: i32,
+    pub additions: i32,
+    pub deletions: i32,
+    pub created_at: DateTimeUtc,
+    pub updated_at: DateTimeUtc,
+    #[sea_orm(nullable)]
+    pub spec_version: Option<String>,
+    #[sea_orm(nullable)]
+    pub spec_release: Option<String>,
+}
+
+#[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+pub enum Relation {
+    #[sea_orm(
+        belongs_to = "super::tracking::Entity",
+        from = "Column::TrackingId",
+        to = "super::tracking::Column::Id",
+        on_update = "NoAction",
+        on_delete = "Cascade"
+    )]
+    Tracking,
+}
+
+impl Related<super::tracking::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Tracking.def()
+    }
+}
+
+impl ActiveModelBehavior for ActiveModel {}
