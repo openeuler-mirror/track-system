@@ -2159,3 +2159,56 @@ Test package
         let spec_content = r#"
 Name: mypackage
 Version: 1.0.0
+Release: 1%{?dist}
+Summary: Test package
+"#;
+
+        let release = L2VsL1Comparator::extract_release_from_spec(spec_content);
+        assert_eq!(release, Some("1".to_string()));
+    }
+
+    #[test]
+    fn test_extract_release_from_spec_no_release() {
+        let spec_content = r#"
+Name: mypackage
+Version: 1.0.0
+Summary: Test package
+"#;
+
+        let release = L2VsL1Comparator::extract_release_from_spec(spec_content);
+        assert_eq!(release, None);
+    }
+
+    #[test]
+    fn test_extract_release_from_spec_with_dist() {
+        let spec_content = "Release: 2.el8%{?dist}\n";
+        let release = L2VsL1Comparator::extract_release_from_spec(spec_content);
+        assert_eq!(release, Some("2.el8".to_string()));
+    }
+
+    #[test]
+    fn test_create_l1_snapshot() {
+        let snapshot = create_test_snapshot();
+        let result = L2VsL1Comparator::create_l1_snapshot("testpkg".to_string(), &snapshot);
+
+        assert!(result.is_ok());
+        let l1_snap = result.unwrap();
+        assert_eq!(l1_snap.package_name, "testpkg");
+        assert_eq!(l1_snap.version, "1.0.0");
+        assert_eq!(l1_snap.patches.len(), 1);
+        assert_eq!(l1_snap.source_files.len(), 1);
+    }
+
+    #[test]
+    fn test_create_l1_snapshot_no_spec() {
+        let mut snapshot = create_test_snapshot();
+        snapshot.spec = None;
+
+        let result = L2VsL1Comparator::create_l1_snapshot("testpkg".to_string(), &snapshot);
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("缺少 spec 文件"));
+    }
+
+    #[test]
+    fn test_create_l1_snapshot_no_version_in_spec() {
