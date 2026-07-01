@@ -364,3 +364,55 @@ pub enum ExportAction {
     /// 导出元数据
     #[command(about = "Export metadata")]
     Metadata {
+        /// 导出格式 (json, csv, sql)
+        #[arg(long, default_value = "json")]
+        format: String,
+
+        /// 输出文件路径
+        #[arg(long)]
+        output: Option<String>,
+
+        /// Package ID过滤（可选）
+        #[arg(long)]
+        package_id: Option<i32>,
+    },
+
+    /// 导出报告
+    #[command(about = "Export report")]
+    Report {
+        /// Report ID
+        report_id: i32,
+
+        /// 导出格式 (json, pdf, html)
+        #[arg(long, default_value = "json")]
+        format: String,
+
+        /// 输出文件路径
+        #[arg(long)]
+        output: Option<String>,
+    },
+}
+
+// ============== Import Commands ==============
+
+#[derive(Subcommand, Debug)]
+pub enum ImportAction {
+    /// 导入元数据（通过 API）
+    #[command(about = "Import metadata via API")]
+    Metadata {
+        /// JSON 文件路径
+        #[arg(long)]
+        file: String,
+
+        /// 目标 tracking ID
+        #[arg(long)]
+        tracking_id: i32,
+    },
+
+    /// 批量导入多个 JSON 文件(通过 API)
+    #[command(about = "Batch import multiple JSON files via API")]
+    Batch {
+        /// JSON 文件路径列表(逗号分隔)
+        #[arg(long, value_delimiter = ',')]
+        files: Vec<String>,
+
