@@ -783,3 +783,30 @@ pub enum ReportAction {
     },
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::i18n;
+    use clap::{CommandFactory, Parser};
+    use serial_test::serial;
+
+    fn root_commands_from_help(help: &str) -> Vec<String> {
+        let mut commands = Vec::new();
+        let mut in_commands_section = false;
+
+        for line in help.lines() {
+            let trimmed = line.trim_end();
+
+            if trimmed == "Commands:" || trimmed == "命令:" {
+                in_commands_section = true;
+                continue;
+            }
+
+            if in_commands_section {
+                if trimmed.is_empty() {
+                    break;
+                }
+
+                let s = trimmed.trim_start();
+                if s.is_empty() || s.starts_with('-') {
+                    continue;
