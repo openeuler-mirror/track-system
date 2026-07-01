@@ -334,3 +334,47 @@ mod tests {
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(matches!(err, ApiError::BadRequest(_)));
+    }
+
+    #[tokio::test]
+    async fn test_update_package_not_found() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<packages::Model, _, _>([[]])
+            .into_connection();
+
+        let state = AppState::without_external_clients(db);
+        let request = UpdatePackageRequest {
+            level: None,
+            sync_interval_hours: Some(48),
+            l0_repo_url: None,
+            description: None,
+        };
+
+        let result = update_package(State(state), Path(999), Json(request)).await;
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(matches!(err, ApiError::NotFound(_)));
+    }
+
+    #[tokio::test]
+    async fn test_delete_package_success() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_exec_results([MockExecResult {
+                last_insert_id: 1,
+                rows_affected: 1,
+            }])
+            .into_connection();
+
+        let state = AppState::without_external_clients(db);
+        let result = delete_package(State(state), Path(1)).await;
+
+        assert!(result.is_ok());
+        let status = result.unwrap();
+        assert_eq!(status, StatusCode::NO_CONTENT);
+    }
+
+    #[tokio::test]
+    async fn test_delete_package_not_found() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_exec_results([MockExecResult {
+                last_insert_id: 0,
