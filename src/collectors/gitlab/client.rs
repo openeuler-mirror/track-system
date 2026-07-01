@@ -210,3 +210,42 @@ impl GitClient for GitLabClient {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::collectors::traits::CommitsParams;
+    use httpmock::prelude::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_encode_project_path() {
+        let client = GitLabClient::new("test-token").unwrap();
+        let encoded = client.encode_project_path("gitlab-org", "gitlab");
+        assert_eq!(encoded, "gitlab-org%2Fgitlab");
+    }
+
+    #[test]
+    fn test_client_creation() {
+        let client = GitLabClient::new("test-token");
+        assert!(client.is_ok());
+
+        let client = client.unwrap();
+        assert_eq!(client.base_url, GITLAB_API_BASE);
+        assert!(client.token.is_some());
+    }
+
+    #[test]
+    fn test_custom_base_url() {
+        let client = GitLabClient::with_base_url("https://gitlab.example.com/api/v4", "test-token");
+        assert!(client.is_ok());
+
+        let client = client.unwrap();
+        assert_eq!(client.base_url, "https://gitlab.example.com/api/v4");
+    }
+
+    #[tokio::test]
+    async fn test_gitlab_client_as_collector() {
+        let client = GitLabClient::new("token").unwrap();
+        let _collector = client.as_collector();
+    }
+
