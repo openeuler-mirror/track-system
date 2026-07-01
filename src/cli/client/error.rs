@@ -74,3 +74,41 @@ pub struct ErrorResponse {
 
 impl From<reqwest::Error> for ApiError {
     fn from(err: reqwest::Error) -> Self {
+        if err.is_timeout() {
+            ApiError::Timeout
+        } else if err.is_connect() {
+            ApiError::NetworkError(err.to_string())
+        } else if let Some(status) = err.status() {
+            ApiError::ServerError {
+                status: status.as_u16(),
+                message: err.to_string(),
+            }
+        } else {
+            ApiError::RequestError(err.to_string())
+        }
+    }
+}
+
+impl From<serde_json::Error> for ApiError {
+    fn from(err: serde_json::Error) -> Self {
+        ApiError::JsonError(err.to_string())
+    }
+}
+
+impl From<std::io::Error> for ApiError {
+    fn from(err: std::io::Error) -> Self {
+        ApiError::ConfigError(err.to_string())
+    }
+}
+
+impl From<toml::de::Error> for ApiError {
+    fn from(err: toml::de::Error) -> Self {
+        ApiError::ConfigError(err.to_string())
+    }
+}
+
+impl From<toml::ser::Error> for ApiError {
+    fn from(err: toml::ser::Error) -> Self {
+        ApiError::ConfigError(err.to_string())
+    }
+}
