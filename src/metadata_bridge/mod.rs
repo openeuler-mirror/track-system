@@ -606,3 +606,54 @@ fn collect_commits_from_repo(repo_path: &Path) -> Result<RepoCollectionResult> {
 
     for line in stdout.lines() {
         if line.contains(delim) {
+            // 遇到新的提交头，先收尾上一个提交
+            if let Some((mut entry, adds, dels, files)) = current.take() {
+                entry.stats = ChangeStats {
+                    additions: adds,
+                    deletions: dels,
+                    files_changed: files,
+                };
+                commits.push(entry);
+            }
+
+            // 解析当前提交头
+            let parts: Vec<&str> = line.split(delim).collect();
+            if parts.len() < 5 {
+                // 头部格式不符合预期，跳过
+                continue;
+            }
+
+            let sha = parts[0].to_string();
+            let author = parts[1].to_string();
+            let _email = parts[2];
+            let authored_at_str = parts[3];
+            let title = parts[4].to_string();
+            let authored_at = chrono::DateTime::parse_from_rfc3339(authored_at_str)
+                .map(|dt| dt.with_timezone(&Utc))
+                .unwrap_or_else(|_| Utc::now());
+
+            // 从标题提取 CVE
+            let mut cve_list: Vec<String> = Vec::new();
+            for m in cve_re.find_iter(&title) {
+                cve_list.push(m.as_str().to_string());
+            }
+
+            let entry = CommitEntry {
+                sha,
+                title: title.clone(),
+                message: title, // 暂以标题作为消息摘要
+                author,
+                authored_at,
+                url: None,
+                stats: ChangeStats::default(),
+                primary_change_type: None,
+                cve_list,
+            };
+
+            current = Some((entry, 0, 0, 0));
+        } else {
+            // 解析 numstat 行：<additions> <deletions> <path>
+            if let Some((entry, mut adds, mut dels, mut files)) = current.take() {
+                let cols: Vec<&str> = line.split_whitespace().collect();
+                if cols.len() >= 3 {
+                    let add = cols[0].parse::<i32>().ok();
