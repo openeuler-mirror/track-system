@@ -192,3 +192,35 @@ mod tests {
         assert!(rec.contains("Fix critical bug"));
     }
 
+    #[tokio::test]
+    async fn test_generate_for_package_not_found() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results(vec![Vec::<packages::Model>::new()])
+            .into_connection();
+
+        let advisor = BackportAdvisor::new(&db);
+        let result = advisor.generate_for_package(999).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_generate_for_package_no_tracking() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results(vec![vec![packages::Model {
+                id: 1,
+                name: "pkg".to_string(),
+                level: 0,
+                sync_interval_hours: 24,
+                l0_repo_url: None,
+                description: None,
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
+            }]]) // package found
+            .append_query_results(vec![Vec::<tracking::Model>::new()]) // no tracking
+            .into_connection();
+
+        let advisor = BackportAdvisor::new(&db);
+        let summary = advisor.generate_for_package(1).await.unwrap();
+        assert_eq!(summary.candidates_created, 0);
+    }
+}
