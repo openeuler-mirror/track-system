@@ -130,3 +130,47 @@ fn apply_help_i18n_command(
     template.push_str(&format!("{commands_title}:\n{{subcommands}}\n\n"));
 
     let options_title =
+        lookup(&format!("{help_key}.options")).unwrap_or_else(|| "Options".to_string());
+    template.push_str(&format!("{options_title}:\n{{options}}\n"));
+
+    cmd = cmd.help_template(template).disable_help_subcommand(true);
+
+    let is_zh = locale.to_ascii_lowercase().starts_with("zh");
+    let help_short = if is_zh {
+        "显示帮助信息"
+    } else {
+        "Print help"
+    };
+    let help_long = if is_zh {
+        "显示帮助信息（使用 '-h' 查看摘要）"
+    } else {
+        "Print help (see a summary with '-h')"
+    };
+    let version_short = if is_zh {
+        "显示版本信息"
+    } else {
+        "Print version"
+    };
+
+    cmd = cmd.disable_help_flag(true);
+
+    let arg_ids: Vec<String> = cmd
+        .get_arguments()
+        .map(|a| a.get_id().to_string())
+        .collect();
+
+    if !arg_ids.iter().any(|id| id == "help") {
+        cmd = cmd.arg(
+            clap::Arg::new("help")
+                .short('h')
+                .long("help")
+                .action(clap::ArgAction::Help)
+                .global(true)
+                .help(help_short)
+                .long_help(help_long),
+        );
+    } else {
+        cmd = cmd
+            .mut_arg("help", |a| a.help(help_short).long_help(help_long))
+            .clone();
+    }
