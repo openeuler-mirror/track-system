@@ -291,3 +291,16 @@ mod tests {
         let result = formatter.render_simple(&headers, &rows).unwrap();
         assert!(result.contains("Name"));
         assert!(result.contains("Alice"));
+    }
+
+    #[test]
+    fn test_render_bordered() {
+        let formatter = TableFormatter::new().with_color(false);
+        let headers = vec!["ID", "Name"];
+        let rows = vec![vec!["1", "Test"], vec!["2", "Demo"]];
+
+        let result = formatter.render_bordered(&headers, &rows).unwrap();
+        assert!(result.contains("┌"));
+        assert!(result.contains("└"));
+    }
+}
