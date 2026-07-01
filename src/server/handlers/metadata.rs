@@ -665,3 +665,52 @@ async fn trigger_comparison_task(state: &AppState, tracking_id: i32) -> anyhow::
     Ok(())
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::entities::{issues, l0_commits, l1_commit_records, sync_jobs};
+    use chrono::Utc;
+    use sea_orm::{DatabaseBackend, MockDatabase};
+    use std::sync::Once;
+
+    fn init_test_tracing() {
+        static INIT: Once = Once::new();
+        INIT.call_once(|| {
+            let filter =
+                tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+                    tracing_subscriber::EnvFilter::new("track_system=debug,sea_orm=info")
+                });
+
+            tracing_subscriber::fmt()
+                .with_env_filter(filter)
+                .with_test_writer()
+                .try_init()
+                .ok();
+        });
+    }
+
+    fn create_test_snapshot(tracking_id: i32) -> RepositorySnapshot {
+        RepositorySnapshot {
+            tracking_id,
+            origin: crate::snapshot::types::SnapshotOrigin::L1,
+            generated_at: Utc::now(),
+            spec: None,
+            files: vec![],
+            commits: vec![],
+            issues: vec![],
+        }
+    }
+
+    #[test]
+    fn test_validate_import_request_success() {
+        let snapshot = create_test_snapshot(1);
+        let result = validate_import_request(1, &snapshot);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_validate_import_request_invalid_tracking_id() {
+        let snapshot = create_test_snapshot(1);
+        let result = validate_import_request(0, &snapshot);
+        assert!(result.is_err());
+    }
