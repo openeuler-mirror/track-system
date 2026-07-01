@@ -198,3 +198,48 @@ mod tests {
         let result = add_distro(&client, "Ubuntu".to_string(), "22.04".to_string(), None).await;
         assert!(result.is_ok(), "Result failed: {:?}", result.err());
         mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_add_distro_with_description() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("POST", "/api/distros")
+            .match_body(mockito::Matcher::Json(serde_json::json!({
+                "name": "Debian",
+                "version": "12",
+                "description": "Debian 12 Bookworm"
+            })))
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "id": 2,
+                    "name": "Debian",
+                    "version": "12"
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = add_distro(
+            &client,
+            "Debian".to_string(),
+            "12".to_string(),
+            Some("Debian 12 Bookworm".to_string()),
+        )
+        .await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_list_distros() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/distros")
+            .with_status(200)
+            .with_header("content-type", "application/json")
