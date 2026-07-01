@@ -182,3 +182,49 @@ pub async fn get_report(
         return Err(ApiError::BadRequest("Invalid report ID".to_string()));
     }
 
+    // 从数据库查询报告
+    let report = TrackingReports::find_by_id(id as i32)
+        .find_also_related(Tracking)
+        .one(state.db.as_ref())
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("Report {} not found", id)))?;
+
+    let (report_model, tracking_opt) = report;
+
+    // 获取 package 名称
+    let package_name = if let Some(tracking_model) = tracking_opt {
+        Packages::find_by_id(tracking_model.package_id)
+            .one(state.db.as_ref())
+            .await?
+            .map(|p| p.name)
+            .unwrap_or_else(|| "unknown".to_string())
+    } else {
+        "unknown".to_string()
+    };
+
+    let report_detail = ReportDetail {
+        id: report_model.id as i64,
+        tracking_id: report_model.tracking_id,
+        report_type: report_model.source,
+        package_name,
+        status: report_model.status,
+        content: report_model.diff_summary,
+        created_at: report_model.created_at,
+        updated_at: report_model.updated_at,
+    };
+
+    Ok(Json(ApiResponse::success(report_detail)))
+}
+
+/// GET /api/reports/:id/export
+///
+/// 导出报告（支持多种格式）
+pub async fn export_report(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+    Query(format): Query<ExportFormatQuery>,
+) -> ApiResult<String> {
+    use crate::entities::prelude::*;
+    use sea_orm::*;
+
+    // 验证 ID
