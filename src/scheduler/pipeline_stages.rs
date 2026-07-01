@@ -1444,3 +1444,55 @@ Summary: Test package
             release: Some("1".to_string()),
             content_base64: spec_base64,
         };
+
+        let file_entry = FileEntry {
+            path: "file1".to_string(),
+            size: 10,
+            sha256: "abc123".to_string(),
+            is_binary: false,
+        };
+
+        let commit_entry = CommitEntry {
+            sha: "sha1".to_string(),
+            title: "Init".to_string(),
+            message: "Initial commit".to_string(),
+            author: "dev".to_string(),
+            authored_at: Utc::now(),
+            url: None,
+            stats: crate::snapshot::types::ChangeStats {
+                additions: 1,
+                deletions: 0,
+                files_changed: 1,
+            },
+            primary_change_type: None,
+            cve_list: vec![],
+        };
+
+        let l1_snapshot = RepositorySnapshot {
+            tracking_id: tracking_model.id,
+            generated_at: Utc::now(),
+            origin: SnapshotOrigin::L1,
+            files: vec![file_entry.clone()],
+            spec: Some(spec_entry.clone()),
+            commits: vec![commit_entry.clone()],
+            issues: vec![],
+        };
+
+        let l2_snapshot = RepositorySnapshot {
+            tracking_id: tracking_model.id,
+            generated_at: Utc::now(),
+            origin: SnapshotOrigin::L2,
+            files: vec![file_entry],
+            spec: Some(spec_entry),
+            commits: vec![commit_entry],
+            issues: vec![],
+        };
+
+        let l1_model = l2_snapshots::Model {
+            id: 1,
+            tracking_id: tracking_model.id,
+            snapshot_type: "l1".to_string(),
+            checksum: "c1".to_string(),
+            payload: serde_json::to_value(&l1_snapshot).unwrap(),
+            created_at: Utc::now(),
+        };
