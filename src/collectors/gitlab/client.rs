@@ -289,3 +289,42 @@ mod tests {
         let branch_response = json!([
             {
                 "name": "main",
+                "commit": {
+                    "id": "sha",
+                    "web_url": "url"
+                },
+                "protected": true
+            }
+        ]);
+
+        let mock = server.mock(|when, then| {
+            when.method(GET)
+                .path("/projects/owner%2Ftest-repo/repository/branches")
+                .header("PRIVATE-TOKEN", "token");
+            then.status(200).json_body(branch_response);
+        });
+
+        let result = client.get_branches("owner", "test-repo").await;
+        mock.assert();
+        assert!(result.is_ok());
+        let branches = result.unwrap();
+        assert_eq!(branches.len(), 1);
+        assert_eq!(branches[0].name, "main");
+    }
+
+    #[tokio::test]
+    async fn test_get_commits() {
+        let server = MockServer::start();
+        let client = GitLabClient::with_base_url(server.base_url(), "token").unwrap();
+
+        let commits_response = json!([
+            {
+                "id": "sha",
+                "short_id": "short_sha",
+                "message": "message",
+                "author_name": "author",
+                "author_email": "email",
+                "authored_date": "2023-01-01T00:00:00Z",
+                "committer_name": "committer",
+                "committer_email": "email",
+                "committed_date": "2023-01-01T00:00:00Z",
