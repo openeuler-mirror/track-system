@@ -79,3 +79,44 @@ impl<'a> ChangeClassifier<'a> {
         let message_lower = message.to_lowercase();
 
         // 1. 优先识别 CVE（如果提取到 CVE 编号）
+        if !cve_numbers.is_empty() {
+            return ChangeType::CVE;
+        }
+
+        // 2. 识别 CVE 关键词（即使没有完整的 CVE 编号）
+        if message_lower.contains("cve") || message_lower.contains("security") {
+            return ChangeType::CVE;
+        }
+
+        // 3. 识别 Backport
+        let backport_keywords = [
+            "backport",
+            "cherry-pick",
+            "cherry pick",
+            "port from",
+            "ported from",
+            "merge from",
+            "merged from",
+            "upstream",
+        ];
+        for keyword in &backport_keywords {
+            if message_lower.contains(keyword) {
+                return ChangeType::Backport;
+            }
+        }
+
+        // 4. 识别 Bugfix
+        let bugfix_keywords = [
+            "fix", "bug", "bugfix", "issue", "problem", "resolve", "patch", "correct",
+        ];
+        for keyword in &bugfix_keywords {
+            if message_lower.contains(keyword) {
+                return ChangeType::Bugfix;
+            }
+        }
+
+        // 5. 默认返回 Unknown
+        ChangeType::Unknown
+    }
+}
+
