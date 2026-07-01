@@ -545,3 +545,53 @@ mod tests {
         let result = remove_package(&client, "test-pkg".to_string(), false).await;
         assert!(result.is_ok());
     }
+
+    #[tokio::test]
+    async fn test_execute_add_action() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("POST", "/api/packages")
+            .match_body(mockito::Matcher::Json(serde_json::json!({
+                "name": "exec-pkg",
+                "level": 1,
+                "sync_interval_hours": 24,
+                "l0_repo_url": null,
+                "description": null
+            })))
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(create_test_package_dto(1, "exec-pkg").to_string())
+            .create_async()
+            .await;
+
+        let action = PackageAction::Add {
+            name: "exec-pkg".to_string(),
+            level: 1,
+            sync_interval: "24h".to_string(),
+            l0_repo: None,
+            description: None,
+        };
+        let result = execute(&client, action).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_execute_list_action() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/packages")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(serde_json::json!([]).to_string())
+            .create_async()
+            .await;
+
+        let action = PackageAction::List { limit: 10 };
+        let result = execute(&client, action).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+}
