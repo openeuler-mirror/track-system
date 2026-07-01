@@ -87,3 +87,48 @@ async fn list_workflows(api_client: &ApiClient) -> Result<()> {
     println!("\n{}", "=== 可用工作流 ===".bold());
     for workflow in workflows {
         let name = workflow["name"].as_str().unwrap_or("unknown");
+        let description = workflow["description"].as_str().unwrap_or("");
+        println!("- {}: {}", name.green(), description);
+    }
+
+    Ok(())
+}
+
+/// 验证工作流定义
+async fn validate_workflow(api_client: &ApiClient, workflow_file: String) -> Result<()> {
+    println!("{}", format!("正在验证工作流: {}...", workflow_file).cyan());
+
+    // 读取工作流文件
+    let workflow_content = fs::read_to_string(&workflow_file)?;
+
+    let result: serde_json::Value = api_client
+        .post(
+            "/workflow/validate",
+            &serde_json::json!({
+                "workflow": workflow_content
+            }),
+        )
+        .await?;
+
+    if result["valid"].as_bool().unwrap_or(false) {
+        println!("{}", "✓ 工作流定义有效".green());
+    } else {
+        println!("{}", "✗ 工作流定义无效".red());
+        if let Some(errors) = result["errors"].as_array() {
+            println!("\n错误:");
+            for error in errors {
+                println!("  - {}", error.as_str().unwrap_or("unknown error"));
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// 模拟运行工作流
+async fn dry_run_workflow(
+    api_client: &ApiClient,
+    workflow_file: String,
+    vars: Vec<String>,
+) -> Result<()> {
+    println!(
