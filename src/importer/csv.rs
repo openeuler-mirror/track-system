@@ -238,3 +238,38 @@ kernel,1,,https://git.kernel.org,Linux内核
 
         let nginx = packages.iter().find(|p| p.name == "nginx").unwrap();
         assert_eq!(nginx.level, 2);
+        assert_eq!(nginx.sync_interval_hours, 12);
+
+        let kernel = packages.iter().find(|p| p.name == "kernel").unwrap();
+        assert_eq!(kernel.level, 1);
+        assert_eq!(kernel.sync_interval_hours, 6); // 默认值
+    }
+
+    #[tokio::test]
+    async fn test_csv_update() {
+        let db = Database::connect("sqlite::memory:")
+            .await
+            .expect("Failed to connect");
+
+        use migration::{Migrator, MigratorTrait};
+        Migrator::up(&db, None)
+            .await
+            .expect("Failed to run migrations");
+
+        let importer = CsvImporter::new(&db);
+
+        // 第一次导入
+        let csv1 = r#"name,level,sync_interval_hours,l0_repo_url,description
+nginx,2,12,https://github.com/nginx/nginx,Web服务器
+"#;
+        let result1 = importer.import_from_string(csv1).await.unwrap();
+        assert_eq!(result1.stats.created, 1);
+
+        // 第二次导入（更新）
+        let csv2 = r#"name,level,sync_interval_hours,l0_repo_url,description
+nginx,1,6,https://github.com/nginx/nginx,高性能Web服务器
+"#;
+        let result2 = importer.import_from_string(csv2).await.unwrap();
+        assert_eq!(result2.stats.updated, 1);
+        assert_eq!(result2.stats.created, 0);
+
