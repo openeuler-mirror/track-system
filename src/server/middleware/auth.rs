@@ -344,3 +344,41 @@ mod tests {
 
         assert!(result.is_err());
     }
+
+    #[test]
+    fn test_extract_bearer_token() {
+        use axum::http::HeaderMap;
+
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            header::AUTHORIZATION,
+            "Bearer test-token-123".parse().unwrap(),
+        );
+
+        let token = extract_bearer_token(&headers);
+
+        assert_eq!(token, Some("test-token-123".to_string()));
+    }
+
+    #[test]
+    fn test_extract_bearer_token_missing() {
+        use axum::http::HeaderMap;
+
+        let headers = HeaderMap::new();
+        let token = extract_bearer_token(&headers);
+
+        assert_eq!(token, None);
+    }
+
+    #[test]
+    fn test_extract_bearer_token_invalid_format() {
+        use axum::http::HeaderMap;
+
+        let mut headers = HeaderMap::new();
+        headers.insert(header::AUTHORIZATION, "InvalidFormat".parse().unwrap());
+
+        let token = extract_bearer_token(&headers);
+
+        assert_eq!(token, None);
+    }
+}
