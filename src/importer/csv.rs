@@ -203,3 +203,38 @@ impl<'a> CsvImporter<'a> {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_csv_parsing() {
+        let csv_content = r#"name,level,sync_interval_hours,l0_repo_url,description
+nginx,2,12,https://github.com/nginx/nginx,Web服务器
+kernel,1,,https://git.kernel.org,Linux内核
+"#;
+
+        let db = Database::connect("sqlite::memory:")
+            .await
+            .expect("Failed to connect");
+
+        // 运行迁移
+        use migration::{Migrator, MigratorTrait};
+        Migrator::up(&db, None)
+            .await
+            .expect("Failed to run migrations");
+
+        let importer = CsvImporter::new(&db);
+        let result = importer.import_from_string(csv_content).await.unwrap();
+
+        assert!(result.success);
+        assert_eq!(result.stats.total, 2);
+        assert_eq!(result.stats.created, 2);
+        assert_eq!(result.stats.failed, 0);
+
+        // 验证导入的数据
+        let packages = Packages::find().all(&db).await.unwrap();
+        assert_eq!(packages.len(), 2);
+
+        let nginx = packages.iter().find(|p| p.name == "nginx").unwrap();
+        assert_eq!(nginx.level, 2);
