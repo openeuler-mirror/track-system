@@ -120,3 +120,34 @@ pub fn parse_spec(content: &str) -> SpecInfo {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_simple_spec() {
+        let content = r#"
+Name: nginx
+Version: 1.20.1
+Release: 1%{?dist}
+Summary: High performance web server
+"#;
+        let spec = SpecFile::parse(content);
+        assert_eq!(spec.version, "1.20.1");
+        assert_eq!(spec.release, "1");
+    }
+
+    #[test]
+    fn test_macro_expansion() {
+        let content = r#"
+%define major_ver 1
+%define minor_ver 20
+%define patch_ver 1
+Version: %{major_ver}.%{minor_ver}.%{patch_ver}
+Release: 1
+"#;
+        let spec = SpecFile::parse(content);
+        assert_eq!(spec.version, "1.20.1");
+    }
+
+    #[test]
