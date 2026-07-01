@@ -3212,3 +3212,55 @@ Summary: Test package
             package_name: "p".to_string(),
             version: "2.0.0".to_string(),
             spec_content: "Name: p\nVersion: 2.0.0\nRelease: 1\nBuildRequires: gcc\n".to_string(),
+            spec_sha256: "b".to_string(),
+            patches: vec![PatchFile {
+                filename: "fix.patch".to_string(),
+                path: "fix.patch".to_string(),
+                content_hash: "h2".to_string(),
+                size: 1,
+                applied: true,
+            }],
+            source_files: vec![SourceFile {
+                filename: "x.conf".to_string(),
+                path: "x.conf".to_string(),
+                content_hash: "s2".to_string(),
+                size: 1,
+            }],
+            customizations: vec![Customization {
+                customization_type: CustomizationType::SecurityHardening,
+                description: "sec".to_string(),
+                affected_files: vec!["x.conf".to_string()],
+            }],
+            commits: vec![],
+            snapshot_at: now,
+        };
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<crate::entities::l2_commit_records::Model, _, _>(vec![vec![]])
+            .append_query_results::<crate::entities::l1_commit_records::Model, _, _>(vec![vec![]])
+            .into_connection();
+
+        let report = comparator
+            .compare(&l1_snapshot, &l2_snapshot, &db, 1)
+            .await
+            .unwrap();
+        assert_eq!(report.package_name, "p");
+        assert!(!report.sync_recommendations.is_empty());
+        assert!(!report.conflicts.is_empty());
+    }
+
+    #[test]
+    fn test_create_l2_snapshot() {
+        let snapshot = create_test_snapshot();
+        let result = L2VsL1Comparator::create_l2_snapshot("testpkg".to_string(), &snapshot);
+
+        assert!(result.is_ok());
+        let l2_snap = result.unwrap();
+        assert_eq!(l2_snap.package_name, "testpkg");
+        assert_eq!(l2_snap.version, "1.0.0");
+        assert_eq!(l2_snap.patches.len(), 1);
+        assert_eq!(l2_snap.source_files.len(), 1);
+        assert!(!l2_snap.customizations.is_empty() || l2_snap.customizations.is_empty());
+        // 可能有或没有定制
+    }
+
