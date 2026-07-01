@@ -187,3 +187,51 @@ impl<'a> MetadataImporter<'a> {
         }
 
         // 导入 issues
+        for issue_info in &metadata.issues {
+            match self.import_issue(issue_info, tracking_id).await {
+                Ok(true) => issues_imported += 1,
+                Ok(false) => issues_skipped += 1,
+                Err(e) => {
+                    warn!("导入 issue #{} 失败: {}", issue_info.number, e);
+                    issues_skipped += 1;
+                }
+            }
+        }
+
+        info!(
+            "导入完成: commits={}/{}, issues={}/{}",
+            commits_imported,
+            commits_imported + commits_skipped,
+            issues_imported,
+            issues_imported + issues_skipped
+        );
+
+        Ok(ImportResult::success(
+            commits_imported,
+            commits_skipped,
+            issues_imported,
+            issues_skipped,
+        ))
+    }
+
+    /// 导入单个 commit
+    async fn import_commit(&self, commit_info: &CommitInfo, tracking_id: i32) -> Result<bool> {
+        use sea_orm::{ColumnTrait, QueryFilter};
+
+        // 检查是否已存在
+        let existing = L1CommitRecords::find()
+            .filter(l1_commit_records::Column::TrackingId.eq(tracking_id))
+            .filter(l1_commit_records::Column::CommitSha.eq(&commit_info.sha))
+            .one(self.db)
+            .await
+            .context("查询已有 commit 失败")?;
+
+        if existing.is_some() {
+            return Ok(false); // 已存在，跳过
+        }
+
+        // 插入新记录
+        let new_commit = l1_commit_records::ActiveModel {
+            tracking_id: Set(tracking_id),
+            commit_sha: Set(commit_info.sha.clone()),
+            commit_message: Set(commit_info.message.clone()),
