@@ -47,3 +47,53 @@ impl Default for ExportOptions {
     fn default() -> Self {
         Self {
             format: ExportFormat::Json,
+            include_commits: false,
+            incremental: false,
+            since: None,
+        }
+    }
+}
+
+/// 导出结果
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExportResult {
+    /// 是否成功
+    pub success: bool,
+    /// 导出的软件包数量
+    pub exported_packages: usize,
+    /// 导出的发行版数量
+    pub exported_distros: usize,
+    /// 导出的跟踪配置数量
+    pub exported_trackings: usize,
+    /// 导出的 commit 数量
+    pub exported_commits: usize,
+    /// 导出时间
+    pub export_time: DateTime<Utc>,
+    /// 文件校验和
+    pub checksum: Option<String>,
+    /// 错误信息
+    pub error: Option<String>,
+}
+
+impl Default for ExportResult {
+    fn default() -> Self {
+        Self {
+            success: false,
+            exported_packages: 0,
+            exported_distros: 0,
+            exported_trackings: 0,
+            exported_commits: 0,
+            export_time: Utc::now(),
+            checksum: None,
+            error: None,
+        }
+    }
+}
+
+/// 导出的元数据结构
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExportedMetadata {
+    /// 导出时间
+    pub export_time: DateTime<Utc>,
+    /// 软件包列表
+    pub packages: Vec<serde_json::Value>,
