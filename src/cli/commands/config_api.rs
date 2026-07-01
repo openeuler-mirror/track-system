@@ -39,3 +39,45 @@ async fn init_config(path: Option<String>) -> Result<()> {
         print!("是否覆盖? (y/N): ");
         use std::io::{self, Write};
         io::stdout().flush()?;
+
+        let mut input = String::new();
+        io::stdin().read_line(&mut input)?;
+
+        if !input.trim().eq_ignore_ascii_case("y") {
+            println!("已取消");
+            return Ok(());
+        }
+    }
+
+    // 创建默认配置
+    let default_config = ClientConfig {
+        server_url: "http://localhost:3000".to_string(),
+        auth_token: None,
+        timeout: 30,
+        verify_ssl: true,
+    };
+
+    // 确保目录存在
+    if let Some(parent) = config_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+
+    // 写入配置文件
+    let toml_content = toml::to_string_pretty(&default_config)?;
+    fs::write(&config_path, toml_content)?;
+
+    println!("{}", "✓ 配置文件已创建".green());
+    println!("路径: {}", config_path.display());
+    println!("\n默认配置:");
+    println!("  服务器地址: {}", default_config.server_url);
+    println!("  超时时间: {} 秒", default_config.timeout);
+    println!("\n请使用 'track-cli server config' 命令配置服务器连接");
+
+    Ok(())
+}
+
+/// 验证配置文件
+async fn validate_config(path: Option<String>) -> Result<()> {
+    let config_path = get_config_path(path)?;
+
+    if !config_path.exists() {
