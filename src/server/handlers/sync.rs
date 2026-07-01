@@ -36,3 +36,41 @@ pub struct SchedulerStatusResponse {
     pub active_jobs: usize,
     pub pending_jobs: usize,
     pub total_jobs_executed: usize,
+    pub last_execution: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ExecuteRoundRequest {
+    pub max_jobs: Option<usize>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ExecuteRoundResponse {
+    pub executed: usize,
+    pub succeeded: usize,
+    pub failed: usize,
+}
+
+#[derive(Debug, Serialize)]
+pub struct WakeSchedulerResponse {
+    pub message: String,
+}
+
+pub async fn queue_sync_job_handler(
+    Path(tracking_id): Path<i32>,
+    State(state): State<AppState>,
+) -> Result<Json<QueueSyncResponse>, StatusCode> {
+    let manager = state.scheduler();
+
+    manager
+        .queue_sync_job(tracking_id, 0)
+        .await
+        .map_err(|_| StatusCode::BAD_REQUEST)
+        .map(|job| {
+            Json(QueueSyncResponse {
+                queued_job_id: job.id,
+            })
+        })
+}
+
+/// 手动触发同步
