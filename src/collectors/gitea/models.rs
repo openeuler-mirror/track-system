@@ -122,3 +122,45 @@ impl From<GiteaCommit> for Commit {
 
         Commit {
             sha: commit.sha,
+            title,
+            message: commit.commit.message,
+            author_name: author.name.clone().unwrap_or_default(),
+            author_email: author.email.clone().unwrap_or_default(),
+            author_date: author.date,
+            committer_name: committer.name.clone().unwrap_or_default(),
+            committer_email: committer.email.clone().unwrap_or_default(),
+            committer_date: committer.date,
+            html_url: commit.html_url.unwrap_or_default(),
+            stats: commit.stats.map(|stats| CommitStats {
+                additions: stats.additions,
+                deletions: stats.deletions,
+                total: stats.total,
+            }),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GiteaFileContent {
+    pub name: String,
+    pub path: String,
+    pub sha: String,
+    pub size: u64,
+    pub encoding: String,
+    pub content: String,
+    pub html_url: Option<String>,
+}
+
+impl From<GiteaFileContent> for FileContent {
+    fn from(file: GiteaFileContent) -> Self {
+        FileContent {
+            name: file.name,
+            path: file.path,
+            sha: file.sha,
+            size: file.size,
+            content: file.content,
+            encoding: file.encoding,
+            download_url: file.html_url.unwrap_or_default(),
+        }
+    }
+}
