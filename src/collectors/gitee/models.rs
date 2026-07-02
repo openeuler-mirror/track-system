@@ -46,3 +46,52 @@ impl From<GiteeRepository> for Repository {
             updated_at: repo
                 .updated_at
                 .parse::<DateTime<Utc>>()
+                .unwrap_or_else(|_| Utc::now()),
+        }
+    }
+}
+
+/// Gitee 分支响应
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GiteeBranch {
+    pub name: String,
+    pub commit: GiteeCommitRef,
+    pub protected: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GiteeCommitRef {
+    pub sha: String,
+}
+
+impl From<GiteeBranch> for Branch {
+    fn from(branch: GiteeBranch) -> Self {
+        Self {
+            name: branch.name,
+            commit_sha: branch.commit.sha,
+            protected: branch.protected,
+        }
+    }
+}
+
+/// Gitee Commit 响应
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GiteeCommit {
+    pub sha: String,
+    pub commit: GiteeCommitDetail,
+    pub html_url: String,
+    #[serde(default)]
+    pub stats: Option<GiteeCommitStats>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GiteeCommitDetail {
+    #[serde(default)]
+    pub title: Option<String>,
+    pub message: String,
+    pub author: GiteeUser,
+    pub committer: GiteeUser,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GiteeUser {
