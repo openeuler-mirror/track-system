@@ -104,3 +104,39 @@ impl GitClient for GiteaClient {
         &self,
         owner: &str,
         repo: &str,
+        params: CommitsParams,
+    ) -> ApiResult<Vec<Commit>> {
+        info!(
+            "get_commits: base_url={}, token={}, owner={}, repo={}, params={:?}",
+            self.base_url, self.token, owner, repo, params
+        );
+        let mut path = format!(
+            "/repos/{}/{}/commits?sha={}&page={}&limit={}",
+            owner, repo, params.branch, params.page, params.per_page
+        );
+
+        if let Some(since) = params.since {
+            path.push_str(&format!("&since={}", since.to_rfc3339()));
+        }
+
+        if let Some(until) = params.until {
+            path.push_str(&format!("&until={}", until.to_rfc3339()));
+        }
+
+        let commits: Vec<GiteaCommit> = self.get(&path).await?;
+        Ok(commits.into_iter().map(Into::into).collect())
+    }
+
+    async fn get_file_content(
+        &self,
+        owner: &str,
+        repo: &str,
+        path: &str,
+        branch: &str,
+    ) -> ApiResult<FileContent> {
+        let api_path = format!("/repos/{}/{}/contents/{}?ref={}", owner, repo, path, branch);
+        let file: GiteaFileContent = self.get(&api_path).await?;
+        Ok(file.into())
+    }
+}
+
