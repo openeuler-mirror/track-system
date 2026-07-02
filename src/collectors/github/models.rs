@@ -113,3 +113,41 @@ impl From<GitHubCommitStats> for CommitStats {
 
 impl From<GitHubCommit> for Commit {
     fn from(commit: GitHubCommit) -> Self {
+        let default_author = GitHubCommitAuthor {
+            name: Some("unknown".to_string()),
+            email: Some("unknown".to_string()),
+            date: Utc::now(),
+        };
+
+        let author = commit.commit.author.unwrap_or(default_author);
+        let author_name = author.name.unwrap_or_else(|| "unknown".to_string());
+        let author_email = author.email.unwrap_or_else(|| "unknown".to_string());
+        let author_date = author.date;
+
+        let (committer_name, committer_email, committer_date) = match commit.commit.committer {
+            Some(committer) => (
+                committer.name.unwrap_or_else(|| "unknown".to_string()),
+                committer.email.unwrap_or_else(|| "unknown".to_string()),
+                committer.date,
+            ),
+            None => (author_name.clone(), author_email.clone(), author_date),
+        };
+
+        let title = commit
+            .commit
+            .title
+            .as_ref()
+            .map(|t| t.to_string())
+            .unwrap_or_else(|| {
+                commit
+                    .commit
+                    .message
+                    .lines()
+                    .next()
+                    .unwrap_or("")
+                    .trim()
+                    .to_string()
+            });
+
+        Commit {
+            sha: commit.sha,
