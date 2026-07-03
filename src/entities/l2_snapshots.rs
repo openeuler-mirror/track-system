@@ -21,3 +21,26 @@ pub struct Model {
     pub snapshot_type: String,
     pub checksum: String,
     #[sea_orm(column_type = "JsonBinary")]
+    pub payload: JsonValue,
+    pub created_at: DateTimeUtc,
+}
+
+#[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+pub enum Relation {
+    #[sea_orm(
+        belongs_to = "super::tracking::Entity",
+        from = "Column::TrackingId",
+        to = "super::tracking::Column::Id",
+        on_delete = "Cascade",
+        on_update = "NoAction"
+    )]
+    Tracking,
+}
+
+impl Related<super::tracking::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Tracking.def()
+    }
+}
+
+impl ActiveModelBehavior for ActiveModel {}
