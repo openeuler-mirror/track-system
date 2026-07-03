@@ -1210,3 +1210,56 @@ impl L2VsL1Comparator {
                 let filename_lower = p.filename.to_lowercase();
                 filename_lower.contains("cve-")
                     || filename_lower.contains("security")
+                    || filename_lower.contains("vulnerability")
+                    || filename_lower.contains("exploit")
+            })
+            .collect();
+
+        if !security_patches.is_empty() {
+            // 提取 CVE 编号
+            let cve_numbers: Vec<String> = security_patches
+                .iter()
+                .filter_map(|p| Self::extract_cve_number(&p.filename))
+                .collect();
+
+            let description = if !cve_numbers.is_empty() {
+                format!(
+                    "L1 新增了 {} 个安全补丁（包括 {}），强烈建议立即同步以修复安全漏洞",
+                    security_patches.len(),
+                    cve_numbers.join(", ")
+                )
+            } else {
+                format!(
+                    "L1 新增了 {} 个安全相关补丁，强烈建议立即同步",
+                    security_patches.len()
+                )
+            };
+
+            recommendations.push(SyncRecommendation {
+                priority: SyncPriority::Critical,
+                recommendation_type: SyncType::SecurityPatch,
+                description,
+                affected_files: security_patches
+                    .iter()
+                    .map(|p| p.filename.clone())
+                    .collect(),
+                estimated_effort: EffortLevel::High,
+            });
+        }
+
+        Ok(recommendations)
+    }
+
+    /// 提取 CVE 编号
+    ///
+    /// 从文件名中提取 CVE 编号，格式为 CVE-YYYY-NNNNN
+    fn extract_cve_number(filename: &str) -> Option<String> {
+        let filename_upper = filename.to_uppercase();
+        if let Some(start) = filename_upper.find("CVE-") {
+            // CVE 格式：CVE-YYYY-NNNNN（年份4位，编号至少4位）
+            let cve_part = &filename_upper[start..];
+
+            // 查找 CVE 编号的结束位置
+            // CVE 编号由 "CVE-" + 数字 + "-" + 数字组成
+            let mut end = 4; // 跳过 "CVE-"
+            let chars: Vec<char> = cve_part.chars().collect();
