@@ -30,3 +30,36 @@ pub struct SummaryDiff {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub enum FileDiff {
+    Added {
+        path: String,
+        sha: String,
+    },
+    Deleted {
+        path: String,
+        sha: String,
+    },
+    Modified {
+        path: String,
+        l1_sha: String,
+        l2_sha: String,
+    },
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub enum SpecDiff {
+    Added {
+        version: Option<String>,
+        sha: String,
+    },
+    Deleted {
+        version: Option<String>,
+        sha: String,
+    },
+    Modified {
+        l1_version: Option<String>,
+        l2_version: Option<String>,
+        l1_sha: String,
+        l2_sha: String,
+    },
+}
