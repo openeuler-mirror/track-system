@@ -505,3 +505,54 @@ impl L1VsL0Comparator {
                     // 提取 CVE 年份和编号（例如 CVE-2023-1234 -> 2023, 1234）
                     if let Some((year, number)) = Self::parse_cve_id(cve_id) {
                         // 检查 changelog 中是否提及相同年份的 CVE
+                        if entry_desc_lower.contains(&format!("cve-{}", year))
+                            || entry_desc_lower.contains(&format!("cve {}", year))
+                        {
+                            // 进一步检查编号是否接近（可能是批量修复）
+                            if let Some(mentioned_cves) =
+                                Self::extract_cve_numbers(&entry_desc_lower)
+                            {
+                                for mentioned_number in mentioned_cves {
+                                    // 如果编号差距在 100 以内，可能是相关修复
+                                    if let Ok(num) = number.parse::<i32>() {
+                                        if let Ok(mentioned_num) = mentioned_number.parse::<i32>() {
+                                            if (num - mentioned_num).abs() <= 100 {
+                                                // 这是一个启发式判断，可能需要人工确认
+                                                // 但为了保守起见，我们不在这里返回 true
+                                                // 只有精确匹配才返回 true
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 默认：未在上游修复
+        Ok(false)
+    }
+
+    /// 解析 CVE 编号
+    ///
+    /// 从 CVE-YYYY-NNNNN 格式中提取年份和编号
+    fn parse_cve_id(cve_id: &str) -> Option<(String, String)> {
+        let parts: Vec<&str> = cve_id.split('-').collect();
+        if parts.len() >= 3 && parts[0].to_lowercase() == "cve" {
+            Some((parts[1].to_string(), parts[2].to_string()))
+        } else {
+            None
+        }
+    }
+
+    /// 从文本中提取 CVE 编号
+    fn extract_cve_numbers(text: &str) -> Option<Vec<String>> {
+        let re = regex::Regex::new(r"cve-\d{4}-(\d{4,})").ok()?;
+        let numbers: Vec<String> = re
+            .captures_iter(text)
+            .filter_map(|cap| cap.get(1).map(|m| m.as_str().to_string()))
+            .collect();
+
+        if numbers.is_empty() {
