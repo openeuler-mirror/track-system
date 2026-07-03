@@ -947,3 +947,56 @@ impl L2VsL1Comparator {
         &self,
         l1_patches: &[PatchFile],
         l2_patches: &[PatchFile],
+    ) -> Result<PatchDiff> {
+        // 构建哈希映射
+        let l1_map: HashMap<String, &PatchFile> =
+            l1_patches.iter().map(|p| (p.filename.clone(), p)).collect();
+
+        let l2_map: HashMap<String, &PatchFile> =
+            l2_patches.iter().map(|p| (p.filename.clone(), p)).collect();
+
+        let mut l2_added = Vec::new();
+        let mut l2_removed = Vec::new();
+        let mut l2_modified = Vec::new();
+        let mut identical = Vec::new();
+
+        // 检查 L2 的 patch
+        for l2_patch in l2_patches {
+            if let Some(l1_patch) = l1_map.get(&l2_patch.filename) {
+                // 文件名相同，检查内容
+                if l1_patch.content_hash == l2_patch.content_hash {
+                    tracing::info!("patch {} 内容 identical", l2_patch.filename);
+                    identical.push(l2_patch.clone());
+                } else {
+                    tracing::info!("patch {} 内容不同", l2_patch.filename);
+                    l2_modified.push(PatchModification {
+                        filename: l2_patch.filename.clone(),
+                        l1_hash: l1_patch.content_hash.clone(),
+                        l2_hash: l2_patch.content_hash.clone(),
+                    });
+                }
+            } else {
+                // L2 新增的 patch 文件
+                tracing::info!("patch {} 新增", l2_patch.filename);
+                l2_added.push(l2_patch.clone());
+            }
+        }
+
+        // 检查 L1 有但 L2 没有的 patch 文件
+        for l1_patch in l1_patches {
+            if !l2_map.contains_key(&l1_patch.filename) {
+                tracing::info!("patch {} 已删除", l1_patch.filename);
+                l2_removed.push(l1_patch.clone());
+            }
+        }
+
+        Ok(PatchDiff {
+            l1_total: l1_patches.len(),
+            l2_total: l2_patches.len(),
+            l2_added,
+            l2_removed,
+            l2_modified,
+            identical,
+        })
+    }
+
