@@ -1738,3 +1738,56 @@ impl L2VsL1Comparator {
                 description: "spec 文件存在关键变更，可能导致构建冲突".to_string(),
                 files: vec!["*.spec".to_string()],
                 resolution_hint: "建议对比 spec 文件的具体变更，确保构建配置兼容".to_string(),
+            });
+        }
+
+        Ok(conflicts)
+    }
+
+    /// 对比 commit（通过数据库 version-release 匹配）
+    async fn compare_commit_db(
+        &self,
+        l1_snapshot: &L1Snapshot,
+        l2_snapshot: &L2Snapshot,
+        db: &DatabaseConnection,
+        tracking_id: i32,
+    ) -> Result<CommitDiff> {
+        use crate::entities::{l1_commit_records, l2_commit_records, prelude::*};
+
+        let l2_latest_commit = L2CommitRecords::find()
+            .filter(l2_commit_records::Column::TrackingId.eq(tracking_id))
+            .order_by_desc(l2_commit_records::Column::CommittedAt)
+            .one(db)
+            .await?;
+
+        let (l2_version, l2_release) = if let Some(commit) = &l2_latest_commit {
+            let version = commit
+                .spec_version
+                .clone()
+                .unwrap_or_else(|| l2_snapshot.version.clone());
+            let release = commit
+                .spec_release
+                .clone()
+                .or_else(|| Self::extract_release_from_spec(&l2_snapshot.spec_content));
+            (version, release)
+        } else {
+            let version = l2_snapshot.version.clone();
+            let release = Self::extract_release_from_spec(&l2_snapshot.spec_content);
+            (version, release)
+        };
+
+        // 查询 L1 commits（时间降序）
+        let l1_models = L1CommitRecords::find()
+            .filter(l1_commit_records::Column::TrackingId.eq(tracking_id))
+            .order_by_desc(l1_commit_records::Column::CommittedAt)
+            .all(db)
+            .await?;
+
+        // 转换为 CommitEntry，保持同序
+        let l1_commits: Vec<CommitEntry> =
+            l1_models.iter().map(Self::model_to_commit_entry).collect();
+
+        // 先基于数据库的 spec_version/spec_release 精确匹配
+        let (base_commit, base_index) = {
+            let (commit, index) =
+                Self::find_base_commit_from_records(&l1_models, &l2_version, l2_release.as_deref());
