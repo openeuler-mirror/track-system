@@ -80,3 +80,44 @@ fn diff_files(l1_files: &[FileEntry], l2_files: &[FileEntry]) -> Vec<FileDiff> {
             });
         }
     }
+
+    for remaining in map_l2.values() {
+        diffs.push(FileDiff::Deleted {
+            path: remaining.path.clone(),
+            sha: remaining.sha256.clone(),
+        });
+    }
+
+    diffs
+}
+
+fn diff_spec(l1_spec: Option<&SpecEntry>, l2_spec: Option<&SpecEntry>) -> Option<SpecDiff> {
+    match (l1_spec, l2_spec) {
+        (Some(lhs), Some(rhs)) => match (&lhs.version, &rhs.version) {
+            (Some(v1), Some(v2)) if v1 == v2 => None,
+            (Some(v1), Some(v2)) => Some(SpecDiff::Modified {
+                l1_version: Some(v1.clone()),
+                l2_version: Some(v2.clone()),
+                l1_sha: lhs.sha256.clone(),
+                l2_sha: rhs.sha256.clone(),
+            }),
+            _ if lhs.sha256 == rhs.sha256 => None,
+            _ => Some(SpecDiff::Modified {
+                l1_version: lhs.version.clone(),
+                l2_version: rhs.version.clone(),
+                l1_sha: lhs.sha256.clone(),
+                l2_sha: rhs.sha256.clone(),
+            }),
+        },
+        (Some(lhs), None) => Some(SpecDiff::Added {
+            version: lhs.version.clone(),
+            sha: lhs.sha256.clone(),
+        }),
+        (None, Some(rhs)) => Some(SpecDiff::Deleted {
+            version: rhs.version.clone(),
+            sha: rhs.sha256.clone(),
+        }),
+        (None, None) => None,
+    }
+}
+
