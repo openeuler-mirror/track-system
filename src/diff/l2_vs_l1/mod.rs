@@ -1791,3 +1791,55 @@ impl L2VsL1Comparator {
         let (base_commit, base_index) = {
             let (commit, index) =
                 Self::find_base_commit_from_records(&l1_models, &l2_version, l2_release.as_deref());
+            if commit.is_some() {
+                (commit, index)
+            } else {
+                Self::find_base_commit(&l1_commits, &l2_version, l2_release.as_deref())
+            }
+        };
+
+        let l1_commits_count = l1_snapshot.commits.len();
+        let l2_commits_count = l2_snapshot.commits.len();
+
+        let behind_commits = if let Some(idx) = base_index {
+            l1_commits[..idx].to_vec()
+        } else {
+            l1_commits.clone()
+        };
+
+        let base_version_release = base_commit
+            .as_ref()
+            .map(|_| (l2_version.clone(), l2_release.clone()));
+
+        Ok(CommitDiff {
+            l1_commits_count,
+            l2_commits_count,
+            behind_commits,
+            base_commit,
+            base_version_release,
+        })
+    }
+
+    /// 从 spec 文件内容中提取 Release 字段
+    fn extract_release_from_spec(spec_content: &str) -> Option<String> {
+        for line in spec_content.lines() {
+            let trimmed = line.trim();
+            if trimmed.starts_with("Release:") {
+                // 提取 Release 值，可能包含宏如 %{?dist}
+                let release_value = trimmed
+                    .strip_prefix("Release:")
+                    .map(|s| s.trim())
+                    .unwrap_or("");
+
+                // 移除常见的宏如 %{?dist}
+                let cleaned = release_value
+                    .replace("%{?dist}", "")
+                    .replace("%{dist}", "")
+                    .trim()
+                    .to_string();
+
+                if !cleaned.is_empty() {
+                    return Some(cleaned);
+                }
+            }
+        }
