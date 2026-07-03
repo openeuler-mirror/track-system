@@ -103,3 +103,56 @@ pub struct Customization {
     pub description: String,
     /// 影响的文件
     pub affected_files: Vec<String>,
+}
+
+/// 定制类型
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum CustomizationType {
+    /// 版本变更
+    VersionChange,
+    /// 功能修改
+    FeatureModification,
+    /// 配置修改
+    ConfigurationChange,
+    /// 安全加固
+    SecurityHardening,
+    /// 性能优化
+    PerformanceOptimization,
+    /// 其他
+    Other,
+}
+
+/// Commit 差异
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CommitDiff {
+    /// L1 中的总 commits 数
+    pub l1_commits_count: usize,
+    /// L2 中的总 commits 数
+    pub l2_commits_count: usize,
+    /// L2 落后于 L1 的 commits
+    pub behind_commits: Vec<CommitEntry>,
+    /// 作为基线的 commit（version-release 匹配的 commit）
+    pub base_commit: Option<CommitEntry>,
+    /// 基线 commit 的版本-发行信息
+    pub base_version_release: Option<(String, Option<String>)>,
+}
+
+/// L2 vs L1 对比报告
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct L2VsL1Report {
+    /// 报告 ID
+    pub id: Option<i64>,
+    /// 软件包名称
+    pub package_name: String,
+    /// spec 文件差异
+    pub spec_diff: SpecDiff,
+    /// patch 文件差异
+    pub patch_diff: PatchDiff,
+    /// 源文件差异
+    pub source_diff: SourceDiff,
+    /// 定制内容分析
+    pub customization_analysis: CustomizationAnalysis,
+    /// 同步建议
+    pub sync_recommendations: Vec<SyncRecommendation>,
+    /// 冲突列表
+    pub conflicts: Vec<MergeConflict>,
