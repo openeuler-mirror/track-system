@@ -404,3 +404,53 @@ impl L1VsL0Comparator {
                 .to_lowercase()
                 .chars()
                 .take(50)
+                .collect::<String>();
+
+            // 检查可升级版本的 changelog
+            for version in upgradable_versions {
+                if let Some(changelog_entries) = changelogs.get(&version.version) {
+                    for entry in changelog_entries {
+                        let entry_desc = entry.description.to_lowercase();
+
+                        // 如果 changelog 条目包含补丁的关键词，认为可能已合并
+                        if !patch_keywords.is_empty()
+                            && entry_desc.contains(&patch_keywords[..20.min(patch_keywords.len())])
+                        {
+                            return Ok(true);
+                        }
+                    }
+                }
+            }
+        }
+
+        // 策略 3: 检查 CVE 补丁
+        let cve_ids = PatchParser::extract_cve_from_filename(&patch.filename);
+        if !cve_ids.is_empty() {
+            // 检查这些 CVE 是否在上游的 changelog 中提及
+            for version in upgradable_versions {
+                if let Some(changelog_entries) = changelogs.get(&version.version) {
+                    for entry in changelog_entries {
+                        let entry_desc = entry.description.to_lowercase();
+
+                        // 检查是否提及相同的 CVE
+                        for cve_id in &cve_ids {
+                            if entry_desc.contains(&cve_id.to_lowercase()) {
+                                return Ok(true);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 默认：保守判断为仍需保留
+        Ok(false)
+    }
+
+    /// 分析 CVE 补丁
+    ///
+    /// 通过以下策略判断 CVE 是否已在上游修复：
+    /// 1. 检查 changelog 条目中是否直接提及 CVE 编号
+    /// 2. 检查 changelog 条目的类型是否为 security
+    /// 3. 检查 changelog 条目的描述是否包含 CVE 相关关键词
+    fn analyze_cve_patches(
