@@ -37,3 +37,42 @@ pub enum Relation {
         to = "super::packages::Column::Id",
         on_delete = "Cascade",
         on_update = "NoAction"
+    )]
+    Packages,
+    #[sea_orm(
+        belongs_to = "super::l0_commits::Entity",
+        from = "Column::L0CommitId",
+        to = "super::l0_commits::Column::Id",
+        on_delete = "Cascade",
+        on_update = "NoAction"
+    )]
+    L0Commits,
+    #[sea_orm(
+        belongs_to = "super::distros::Entity",
+        from = "Column::TargetDistroId",
+        to = "super::distros::Column::Id",
+        on_delete = "Cascade",
+        on_update = "NoAction"
+    )]
+    Distros,
+}
+
+impl Related<super::packages::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Packages.def()
+    }
+}
+
+impl Related<super::l0_commits::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::L0Commits.def()
+    }
+}
+
+impl Related<super::distros::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Distros.def()
+    }
+}
+
+impl ActiveModelBehavior for ActiveModel {}
