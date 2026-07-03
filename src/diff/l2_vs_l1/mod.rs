@@ -841,3 +841,56 @@ impl L2VsL1Comparator {
 
         // 执行详细对比
         let detailed_comparison = SpecParser::compare(&l1_spec, &l2_spec);
+
+        // 对比版本
+        let version_diff = if l1.version != l2.version {
+            let relationship = self.compare_version_relationship(&l1.version, &l2.version)?;
+            Some(VersionDiff {
+                l1_version: l1.version.clone(),
+                l2_version: l2.version.clone(),
+                relationship,
+            })
+        } else {
+            None
+        };
+
+        // 生成差异摘要
+        let diff_summary = if content_identical {
+            "spec 文件内容完全相同".to_string()
+        } else {
+            detailed_comparison.summary()
+        };
+
+        // 提取关键变更
+        let mut key_changes = Vec::new();
+
+        if detailed_comparison.version_changed {
+            if let Some((old_ver, new_ver)) = &detailed_comparison.version_diff {
+                key_changes.push(format!("版本从 {} 变更为 {}", old_ver, new_ver));
+            }
+        }
+
+        if !detailed_comparison.build_requires_added.is_empty() {
+            key_changes.push(format!(
+                "新增 BuildRequires: {}",
+                detailed_comparison.build_requires_added.join(", ")
+            ));
+        }
+
+        if !detailed_comparison.build_requires_removed.is_empty() {
+            key_changes.push(format!(
+                "删除 BuildRequires: {}",
+                detailed_comparison.build_requires_removed.join(", ")
+            ));
+        }
+
+        if !detailed_comparison.configure_options_added.is_empty() {
+            key_changes.push(format!(
+                "新增 configure 选项: {}",
+                detailed_comparison.configure_options_added.join(" ")
+            ));
+        }
+
+        if !detailed_comparison.configure_options_removed.is_empty() {
+            key_changes.push(format!(
+                "删除 configure 选项: {}",
