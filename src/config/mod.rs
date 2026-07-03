@@ -142,3 +142,51 @@ pub struct ServerConfig {
 pub struct LoggingConfig {
     pub level: String,
     pub format: String,
+    pub output: String,
+    pub file_path: Option<String>,
+}
+
+impl Config {
+    /// 从文件加载配置
+    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self> {
+        let content = fs::read_to_string(path.as_ref())
+            .with_context(|| format!("无法读取配置文件: {:?}", path.as_ref()))?;
+        
+        let config: Config = serde_yaml::from_str(&content)
+            .context("无法解析配置文件")?;
+        
+        config.validate()?;
+        
+        Ok(config)
+    }
+
+    /// 验证配置
+    pub fn validate(&self) -> Result<()> {
+        // 验证数据库配置
+        match self.database.db_type.as_str() {
+            "sqlite" => {
+                if self.database.sqlite.is_none() {
+                    anyhow::bail!("SQLite 配置缺失");
+                }
+            }
+            "postgresql" => {
+                if self.database.postgresql.is_none() {
+                    anyhow::bail!("PostgreSQL 配置缺失");
+                }
+            }
+            _ => anyhow::bail!("不支持的数据库类型: {}", self.database.db_type),
+        }
+
+        // 验证软件包配置
+        if self.packages.is_empty() {
+            anyhow::bail!("至少需要配置一个软件包");
+        }
+
+        // 验证发行版配置
+        if self.distros.is_empty() {
+            anyhow::bail!("至少需要配置一个发行版");
+        }
+
+        // 验证跟踪配置
+        for tracking in &self.trackings {
+            // 检查软件包是否存在
