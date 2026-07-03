@@ -1580,3 +1580,55 @@ impl L2VsL1Comparator {
                     customization_analysis.total_customizations,
                     if has_security {
                         "特别注意：包含安全加固定制，必须保留"
+                    } else {
+                        "建议在同步前备份定制内容"
+                    }
+                ),
+                affected_files: Vec::new(),
+                estimated_effort: EffortLevel::Low,
+            });
+        }
+
+        Ok(recommendations)
+    }
+
+    /// 生成依赖变更建议（Medium 优先级）
+    fn generate_dependency_recommendations(
+        &self,
+        spec_diff: &SpecDiff,
+    ) -> Result<Vec<SyncRecommendation>> {
+        let mut recommendations = Vec::new();
+
+        // 检查是否有详细的 spec 对比结果
+        if let Some(detailed) = &spec_diff.detailed_comparison {
+            // Requires 变更（运行时依赖）
+            if !detailed.requires_added.is_empty() || !detailed.requires_removed.is_empty() {
+                let mut description_parts = Vec::new();
+
+                if !detailed.requires_added.is_empty() {
+                    description_parts.push(format!(
+                        "新增运行时依赖: {}",
+                        detailed.requires_added.join(", ")
+                    ));
+                }
+
+                if !detailed.requires_removed.is_empty() {
+                    description_parts.push(format!(
+                        "删除运行时依赖: {}",
+                        detailed.requires_removed.join(", ")
+                    ));
+                }
+
+                recommendations.push(SyncRecommendation {
+                    priority: SyncPriority::Medium,
+                    recommendation_type: SyncType::ConfigUpdate,
+                    description: format!(
+                        "L1 的运行时依赖发生变更：{}。建议同步以确保运行时环境正确",
+                        description_parts.join("；")
+                    ),
+                    affected_files: vec!["*.spec".to_string()],
+                    estimated_effort: EffortLevel::Low,
+                });
+            }
+        }
+
