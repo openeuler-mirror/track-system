@@ -1632,3 +1632,56 @@ impl L2VsL1Comparator {
             }
         }
 
+        Ok(recommendations)
+    }
+
+    /// 去重同步建议
+    ///
+    /// 如果有相同类型和影响文件的建议，保留优先级最高的
+    fn deduplicate_recommendations(
+        recommendations: Vec<SyncRecommendation>,
+    ) -> Vec<SyncRecommendation> {
+        use std::collections::HashSet;
+
+        let mut seen = HashSet::new();
+        let mut result = Vec::new();
+
+        for rec in recommendations {
+            // 创建唯一键：类型 + 文件列表
+            let key = format!(
+                "{:?}:{}",
+                rec.recommendation_type,
+                rec.affected_files.join(",")
+            );
+
+            if !seen.contains(&key) {
+                seen.insert(key);
+                result.push(rec);
+            }
+        }
+
+        result
+    }
+
+    /// 检测冲突
+    fn detect_conflicts(
+        &self,
+        spec_diff: &SpecDiff,
+        patch_diff: &PatchDiff,
+        source_diff: &SourceDiff,
+    ) -> Result<Vec<MergeConflict>> {
+        let mut conflicts = Vec::new();
+
+        // 1. 版本冲突
+        if let Some(version_diff) = &spec_diff.version_diff {
+            if version_diff.relationship == VersionRelationship::L2Newer {
+                conflicts.push(MergeConflict {
+                    conflict_type: ConflictType::VersionConflict,
+                    description: format!(
+                        "L2 版本 ({}) 比 L1 版本 ({}) 更新，可能导致同步冲突",
+                        version_diff.l2_version, version_diff.l1_version
+                    ),
+                    files: vec!["*.spec".to_string()],
+                    resolution_hint: "建议先确认 L2 的版本变更原因，再决定是否回退或保持"
+                        .to_string(),
+                });
