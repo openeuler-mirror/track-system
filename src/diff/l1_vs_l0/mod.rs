@@ -353,3 +353,54 @@ impl L1VsL0Comparator {
                 still_needed.push(patch.clone());
             }
         }
+
+        // 计算升级后可移除的补丁数
+        let can_be_removed_after_upgrade = merged_in_upstream.len();
+
+        Ok(PatchAnalysis {
+            total_patches: patches.len(),
+            merged_in_upstream,
+            still_needed,
+            can_be_removed_after_upgrade,
+        })
+    }
+
+    /// 判断补丁是否已合并到上游
+    fn is_patch_merged_in_upstream(
+        &self,
+        patch: &PatchInfo,
+        _content_hash: &str,
+        changelogs: &HashMap<String, Vec<ChangelogEntry>>,
+        upgradable_versions: &[UpgradableVersion],
+    ) -> Result<bool> {
+        // 策略 1: 检查是否为 backport patch
+        if PatchParser::is_backport_patch(&patch.filename, &patch.description) {
+            // 如果是 backport，尝试提取上游 commit SHA
+            if let Some(upstream_commit) = PatchParser::extract_upstream_commit(&patch.description)
+            {
+                // 检查这个 commit 是否在任何 changelog 中
+                for changelog_entries in changelogs.values() {
+                    for entry in changelog_entries {
+                        if let Some(commit_sha) = &entry.commit_sha {
+                            // 支持短 SHA 匹配（前 7 位）
+                            if commit_sha
+                                .starts_with(&upstream_commit[..7.min(upstream_commit.len())])
+                                || upstream_commit
+                                    .starts_with(&commit_sha[..7.min(commit_sha.len())])
+                            {
+                                return Ok(true);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 策略 2: 通过描述关键词匹配
+        if !patch.description.is_empty() {
+            // 提取补丁描述的关键词（简化版本：使用前 50 个字符）
+            let patch_keywords = patch
+                .description
+                .to_lowercase()
+                .chars()
+                .take(50)
