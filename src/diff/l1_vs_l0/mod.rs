@@ -150,3 +150,54 @@ pub struct PatchAnalysis {
     /// 升级后可移除的补丁数
     pub can_be_removed_after_upgrade: usize,
 }
+
+/// CVE 分析结果
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CveAnalysis {
+    /// 总 CVE 数
+    pub total_cves: usize,
+    /// 已在上游修复的 CVE
+    pub fixed_in_upstream: Vec<CveInfo>,
+    /// 未在上游修复的 CVE
+    pub not_fixed_in_upstream: Vec<CveInfo>,
+}
+
+/// L1 vs L0 对比器
+pub struct L1VsL0Comparator;
+
+impl L1VsL0Comparator {
+    /// 创建新的对比器
+    pub fn new() -> Self {
+        Self
+    }
+
+    /// 执行版本对比
+    pub async fn compare(
+        &self,
+        l0_info: &L0VersionInfo,
+        l1_info: &L1VersionInfo,
+    ) -> Result<L1VsL0Report> {
+        // 1. 版本对比
+        let version_comparison = self.compare_versions(
+            &l1_info.current_version,
+            &l0_info.latest_stable,
+            &l0_info.latest_version,
+            &l0_info.all_versions,
+        )?;
+
+        // 2. 识别可升级版本
+        let upgradable_versions =
+            self.find_upgradable_versions(&l1_info.current_version, &l0_info.all_versions)?;
+
+        // 3. 分析补丁状态
+        let patch_analysis =
+            self.analyze_patches(&l1_info.patches, &l0_info.changelogs, &upgradable_versions)?;
+
+        // 4. CVE 分析
+        let cve_analysis = self.analyze_cve_patches(&l1_info.cve_patches, &l0_info.changelogs)?;
+
+        // 5. 生成升级建议
+        let recommendations = self.generate_recommendations(
+            &version_comparison,
+            &patch_analysis,
+            &cve_analysis,
