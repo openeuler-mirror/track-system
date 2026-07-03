@@ -1316,3 +1316,56 @@ impl L2VsL1Comparator {
                     recommendations.push(SyncRecommendation {
                         priority: SyncPriority::Low,
                         recommendation_type: SyncType::VersionUpgrade,
+                        description: format!(
+                            "L2 版本 ({}) 领先于 L1 版本 ({})，建议评估是否需要向 L1 贡献变更",
+                            version_diff.l2_version, version_diff.l1_version
+                        ),
+                        affected_files: vec!["*.spec".to_string()],
+                        estimated_effort: EffortLevel::Medium,
+                    });
+                }
+                _ => {}
+            }
+        }
+
+        Ok(recommendations)
+    }
+
+    /// 生成 Bug 修复补丁建议（Medium 优先级）
+    fn generate_bugfix_recommendations(
+        &self,
+        patch_diff: &PatchDiff,
+    ) -> Result<Vec<SyncRecommendation>> {
+        let mut recommendations = Vec::new();
+
+        // 识别 L1 新增的 Bug 修复补丁
+        let bugfix_patches: Vec<_> = patch_diff
+            .l2_removed
+            .iter()
+            .filter(|p| {
+                let filename_lower = p.filename.to_lowercase();
+                (filename_lower.contains("fix")
+                    || filename_lower.contains("bug")
+                    || filename_lower.contains("patch"))
+                    // 排除安全补丁（已在 Critical 中处理）
+                    && !filename_lower.contains("cve-")
+                    && !filename_lower.contains("security")
+                    && !filename_lower.contains("vulnerability")
+            })
+            .collect();
+
+        if !bugfix_patches.is_empty() {
+            recommendations.push(SyncRecommendation {
+                priority: SyncPriority::Medium,
+                recommendation_type: SyncType::BugFix,
+                description: format!(
+                    "L1 新增了 {} 个 Bug 修复补丁，建议评估并同步到 L2",
+                    bugfix_patches.len()
+                ),
+                affected_files: bugfix_patches.iter().map(|p| p.filename.clone()).collect(),
+                estimated_effort: EffortLevel::Medium,
+            });
+        }
+
+        // 识别 L1 修改的补丁（可能是 Bug 修复的更新）
+        if !patch_diff.l2_modified.is_empty() {
