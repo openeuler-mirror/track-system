@@ -156,3 +156,55 @@ pub struct L2VsL1Report {
     pub sync_recommendations: Vec<SyncRecommendation>,
     /// 冲突列表
     pub conflicts: Vec<MergeConflict>,
+    /// commit 差异
+    pub commit_diff: CommitDiff,
+    /// 生成时间
+    pub created_at: DateTime<Utc>,
+}
+
+/// spec 文件差异
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SpecDiff {
+    /// 版本差异
+    pub version_diff: Option<VersionDiff>,
+    /// 内容哈希是否相同
+    pub content_identical: bool,
+    /// 差异摘要
+    pub diff_summary: String,
+    /// 关键变更
+    pub key_changes: Vec<String>,
+    /// 详细的 spec 对比结果
+    pub detailed_comparison: Option<SpecComparison>,
+    /// 新增的 BuildRequires
+    pub build_requires_added: Vec<String>,
+    /// 删除的 BuildRequires
+    pub build_requires_removed: Vec<String>,
+    /// 新增的 configure 选项
+    pub configure_options_added: Vec<String>,
+    /// 删除的 configure 选项
+    pub configure_options_removed: Vec<String>,
+}
+
+/// 版本差异
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VersionDiff {
+    /// L1 版本
+    pub l1_version: String,
+    /// L2 版本
+    pub l2_version: String,
+    /// 版本关系
+    pub relationship: VersionRelationship,
+}
+
+/// 版本关系
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum VersionRelationship {
+    /// L2 版本更新
+    L2Newer,
+    /// L2 版本更旧
+    L2Older,
+    /// 版本相同
+    Same,
+    /// 无法比较
+    Incomparable,
+}
