@@ -190,3 +190,51 @@ impl Config {
         // 验证跟踪配置
         for tracking in &self.trackings {
             // 检查软件包是否存在
+            if !self.packages.iter().any(|p| p.name == tracking.package) {
+                anyhow::bail!("跟踪配置引用了不存在的软件包: {}", tracking.package);
+            }
+
+            // 检查发行版是否存在
+            if !self.distros.iter().any(|d| d.name == tracking.distro) {
+                anyhow::bail!("跟踪配置引用了不存在的发行版: {}", tracking.distro);
+            }
+
+            // 检查 L2 仓库路径
+            let l2_path = Path::new(&tracking.l2.repo_path);
+            if !l2_path.exists() {
+                eprintln!("警告: L2 仓库路径不存在: {}", tracking.l2.repo_path);
+            }
+        }
+
+        Ok(())
+    }
+
+    /// 获取数据库连接字符串
+    pub fn database_url(&self) -> String {
+        match self.database.db_type.as_str() {
+            "sqlite" => {
+                let sqlite = self.database.sqlite.as_ref().unwrap();
+                format!("sqlite://{}?mode=rwc", sqlite.path)
+            }
+            "postgresql" => {
+                let pg = self.database.postgresql.as_ref().unwrap();
+                format!(
+                    "postgresql://{}:{}@{}:{}/{}",
+                    pg.username, pg.password, pg.host, pg.port, pg.database
+                )
+            }
+            _ => panic!("不支持的数据库类型"),
+        }
+    }
+
+    /// 保存配置到文件
+    pub fn save_to_file<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+        let content = serde_yaml::to_string(self)
+            .context("无法序列化配置")?;
+        
+        fs::write(path.as_ref(), content)
+            .with_context(|| format!("无法写入配置文件: {:?}", path.as_ref()))?;
+        
+        Ok(())
+    }
+}
