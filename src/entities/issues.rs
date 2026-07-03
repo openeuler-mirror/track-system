@@ -29,3 +29,34 @@ pub struct Model {
     pub created_at: DateTimeUtc,
     pub updated_at: DateTimeUtc,
     pub closed_at: Option<DateTimeUtc>,
+    #[sea_orm(column_type = "JsonBinary", nullable)]
+    pub raw_payload: Option<JsonValue>,
+}
+
+#[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+pub enum Relation {
+    #[sea_orm(has_many = "super::issue_events::Entity")]
+    IssueEvents,
+    #[sea_orm(
+        belongs_to = "super::tracking::Entity",
+        from = "Column::TrackingId",
+        to = "super::tracking::Column::Id",
+        on_delete = "Cascade",
+        on_update = "NoAction"
+    )]
+    Tracking,
+}
+
+impl Related<super::issue_events::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::IssueEvents.def()
+    }
+}
+
+impl Related<super::tracking::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Tracking.def()
+    }
+}
+
+impl ActiveModelBehavior for ActiveModel {}
