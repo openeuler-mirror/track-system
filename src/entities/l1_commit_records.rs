@@ -64,3 +64,36 @@ pub enum Relation {
     SpecSnapshots,
     #[sea_orm(
         belongs_to = "super::tracking::Entity",
+        from = "Column::TrackingId",
+        to = "super::tracking::Column::Id",
+        on_update = "NoAction",
+        on_delete = "Cascade"
+    )]
+    Tracking,
+}
+
+impl Related<super::commit_files::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::CommitFiles.def()
+    }
+}
+
+impl Related<super::spec_changes::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::SpecChanges.def()
+    }
+}
+
+impl Related<super::spec_snapshots::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::SpecSnapshots.def()
+    }
+}
+
+impl Related<super::tracking::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Tracking.def()
+    }
+}
+
+impl ActiveModelBehavior for ActiveModel {}
