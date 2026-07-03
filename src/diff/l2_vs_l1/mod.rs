@@ -1158,3 +1158,55 @@ impl L2VsL1Comparator {
     ) -> Result<Vec<SyncRecommendation>> {
         let mut recommendations = Vec::new();
 
+        // 1. 安全补丁建议（最高优先级 - Critical）
+        recommendations.extend(self.generate_security_recommendations(patch_diff)?);
+
+        // 2. 版本升级建议（高优先级 - High）
+        recommendations.extend(self.generate_version_recommendations(spec_diff)?);
+
+        // 3. Bug 修复补丁建议（中优先级 - Medium）
+        recommendations.extend(self.generate_bugfix_recommendations(patch_diff)?);
+
+        // 4. 功能更新建议（中优先级 - Medium）
+        recommendations.extend(self.generate_feature_recommendations(patch_diff)?);
+
+        // 5. 配置变更建议（中优先级 - Medium）
+        recommendations.extend(self.generate_config_recommendations(spec_diff)?);
+
+        // 6. 源文件更新建议（低优先级 - Low）
+        recommendations.extend(self.generate_source_recommendations(source_diff)?);
+
+        // 7. 定制内容保留建议（低优先级 - Low）
+        recommendations
+            .extend(self.generate_customization_recommendations(customization_analysis)?);
+
+        // 8. 依赖变更建议（中优先级 - Medium）
+        recommendations.extend(self.generate_dependency_recommendations(spec_diff)?);
+
+        // 按优先级排序（Critical > High > Medium > Low）
+        recommendations.sort_by(|a, b| a.priority.cmp(&b.priority));
+
+        // 去重：如果有相同类型和文件的建议，保留优先级最高的
+        recommendations = Self::deduplicate_recommendations(recommendations);
+
+        // 去重后再次排序以确保顺序正确
+        recommendations.sort_by(|a, b| a.priority.cmp(&b.priority));
+
+        Ok(recommendations)
+    }
+
+    /// 生成安全补丁同步建议（Critical 优先级）
+    fn generate_security_recommendations(
+        &self,
+        patch_diff: &PatchDiff,
+    ) -> Result<Vec<SyncRecommendation>> {
+        let mut recommendations = Vec::new();
+
+        // 识别 L1 新增的安全补丁（L2 中不存在的）
+        let security_patches: Vec<_> = patch_diff
+            .l2_removed
+            .iter()
+            .filter(|p| {
+                let filename_lower = p.filename.to_lowercase();
+                filename_lower.contains("cve-")
+                    || filename_lower.contains("security")
