@@ -115,3 +115,43 @@ impl From<GitLabCommit> for Commit {
             message: commit.message,
             author_name: commit.author_name,
             author_email: commit.author_email,
+            author_date: commit.authored_date,
+            committer_name: commit.committer_name,
+            committer_email: commit.committer_email,
+            committer_date: commit.committed_date,
+            html_url: commit.web_url,
+            stats: commit.stats.map(|s| CommitStats {
+                additions: s.additions,
+                deletions: s.deletions,
+                total: s.total,
+            }),
+        }
+    }
+}
+
+/// GitLab 文件内容
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GitLabFileContent {
+    pub file_name: String,
+    pub file_path: String,
+    pub size: u64,
+    pub encoding: String,
+    pub content: String,
+    pub content_sha256: String,
+    pub ref_name: String,
+    pub blob_id: String,
+}
+
+impl From<GitLabFileContent> for FileContent {
+    fn from(file: GitLabFileContent) -> Self {
+        Self {
+            name: file.file_name,
+            path: file.file_path.clone(),
+            sha: file.blob_id,
+            size: file.size,
+            content: file.content,
+            encoding: file.encoding,
+            download_url: String::new(), // GitLab 不直接提供下载 URL
+        }
+    }
+}
