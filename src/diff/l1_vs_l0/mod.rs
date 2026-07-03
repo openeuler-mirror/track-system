@@ -48,3 +48,54 @@ pub struct VersionTag {
     pub is_stable: bool,
 }
 
+/// Changelog 条目
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChangelogEntry {
+    /// 类型（feature, bugfix, security, etc.）
+    pub entry_type: String,
+    /// 描述
+    pub description: String,
+    /// 相关的 commit SHA
+    pub commit_sha: Option<String>,
+}
+
+/// L1 版本信息（发行版）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct L1VersionInfo {
+    /// 软件包名称
+    pub package_name: String,
+    /// 当前版本（从 spec 文件提取）
+    pub current_version: String,
+    /// Patch 列表
+    pub patches: Vec<PatchInfo>,
+    /// CVE 补丁
+    pub cve_patches: Vec<CveInfo>,
+}
+
+/// Patch 信息
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PatchInfo {
+    /// 文件名
+    pub filename: String,
+    /// 描述
+    pub description: String,
+    /// 是否已应用
+    pub applied: bool,
+    /// 内容哈希
+    pub content_hash: Option<String>,
+}
+
+/// CVE 信息
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CveInfo {
+    /// CVE 编号
+    pub cve_id: String,
+    /// 补丁文件
+    pub patch_file: String,
+    /// 描述
+    pub description: String,
+    /// 严重程度
+    pub severity: Option<String>,
+}
+
+/// L1 vs L0 对比报告
