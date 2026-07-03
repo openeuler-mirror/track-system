@@ -556,3 +556,54 @@ impl L1VsL0Comparator {
             .collect();
 
         if numbers.is_empty() {
+            None
+        } else {
+            Some(numbers)
+        }
+    }
+
+    /// 生成升级建议
+    fn generate_recommendations(
+        &self,
+        version_comparison: &VersionComparison,
+        patch_analysis: &PatchAnalysis,
+        cve_analysis: &CveAnalysis,
+        upgradable_versions: &[UpgradableVersion],
+    ) -> Result<Vec<String>> {
+        let mut recommendations = Vec::new();
+
+        // 1. 版本落后建议
+        if version_comparison.is_outdated {
+            if version_comparison.behind_count == 0 {
+                recommendations.push("当前版本已是最新稳定版本".to_string());
+            } else if version_comparison.behind_count == 1 {
+                recommendations.push("当前版本落后 1 个版本，建议升级到最新稳定版本".to_string());
+            } else {
+                recommendations.push(format!(
+                    "当前版本落后 {} 个版本，强烈建议升级到最新稳定版本",
+                    version_comparison.behind_count
+                ));
+            }
+        }
+
+        // 2. 安全更新建议
+        let security_releases: Vec<_> = upgradable_versions
+            .iter()
+            .filter(|v| v.is_security_release)
+            .collect();
+
+        if !security_releases.is_empty() {
+            recommendations.push(format!(
+                "发现 {} 个安全更新版本，建议优先升级",
+                security_releases.len()
+            ));
+        }
+
+        // 3. CVE 修复建议
+        if !cve_analysis.fixed_in_upstream.is_empty() {
+            recommendations.push(format!(
+                "{} 个 CVE 已在上游修复，升级后可移除相关补丁",
+                cve_analysis.fixed_in_upstream.len()
+            ));
+        }
+
