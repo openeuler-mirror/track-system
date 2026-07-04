@@ -123,3 +123,45 @@ async fn show_config(section: Option<String>, format: String) -> Result<()> {
             "配置文件不存在: {}\n请先运行 'track-cli config init' 初始化配置",
             config_path.display()
         );
+    }
+
+    // 读取配置
+    let content = fs::read_to_string(&config_path)?;
+    let config: ClientConfig = toml::from_str(&content)?;
+
+    match format.as_str() {
+        "json" => show_config_json(&config, section)?,
+        "yaml" => show_config_yaml(&config, section)?,
+        "toml" => show_config_toml(&config, section)?,
+        _ => anyhow::bail!("不支持的格式: {}", format),
+    }
+
+    Ok(())
+}
+
+/// 以 JSON 格式显示配置
+fn show_config_json(config: &ClientConfig, section: Option<String>) -> Result<()> {
+    if let Some(sec) = section {
+        let value = match sec.as_str() {
+            "server" | "server_url" => serde_json::json!({ "server_url": config.server_url }),
+            "token" | "auth_token" => serde_json::json!({ "auth_token": config.auth_token }),
+            "timeout" => serde_json::json!({ "timeout": config.timeout }),
+            _ => anyhow::bail!("未知的配置部分: {}", sec),
+        };
+        println!("{}", serde_json::to_string_pretty(&value)?);
+    } else {
+        println!("{}", serde_json::to_string_pretty(&config)?);
+    }
+    Ok(())
+}
+
+/// 以 YAML 格式显示配置
+fn show_config_yaml(config: &ClientConfig, section: Option<String>) -> Result<()> {
+    if let Some(sec) = section {
+        let value = match sec.as_str() {
+            "server" | "server_url" => serde_yaml::to_string(&config.server_url)?,
+            "token" | "auth_token" => serde_yaml::to_string(&config.auth_token)?,
+            "timeout" => serde_yaml::to_string(&config.timeout)?,
+            _ => anyhow::bail!("未知的配置部分: {}", sec),
+        };
+        print!("{}", value);
