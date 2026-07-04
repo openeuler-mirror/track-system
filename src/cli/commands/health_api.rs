@@ -37,3 +37,43 @@ async fn check_all_health(api_client: &ApiClient) -> Result<()> {
     println!("{}", "正在检查系统健康状态...".cyan());
 
     let health: serde_json::Value = api_client.get("/health").await?;
+
+    println!("\n{}", "=== 系统健康状态 ===".bold());
+
+    // 整体状态
+    let overall_status = health["status"].as_str().unwrap_or("unknown");
+    let status_display = match overall_status {
+        "healthy" => "健康".green(),
+        "degraded" => "降级".yellow(),
+        "unhealthy" => "不健康".red(),
+        _ => "未知".white(),
+    };
+    println!("整体状态: {}", status_display);
+
+    // 数据库状态
+    if let Some(db) = health["database"].as_object() {
+        println!("\n{}", "数据库:".bold());
+        let db_status = db
+            .get("status")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown");
+        let db_display = match db_status {
+            "connected" => "已连接".green(),
+            "disconnected" => "未连接".red(),
+            _ => "未知".white(),
+        };
+        println!("  状态: {}", db_display);
+
+        if let Some(latency) = db.get("latency_ms").and_then(|v| v.as_f64()) {
+            println!("  延迟: {:.2} ms", latency);
+        }
+    }
+
+    // 调度器状态
+    if let Some(scheduler) = health["scheduler"].as_object() {
+        println!("\n{}", "调度器:".bold());
+        let sched_status = scheduler
+            .get("status")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown");
+        let sched_display = match sched_status {
