@@ -15,3 +15,21 @@
 
 pub mod cron_scheduler;
 pub mod pipeline_executor;
+pub mod pipeline_stages;
+pub mod pipeline_state;
+pub mod scheduler_manager;
+pub mod sync_executor;
+pub mod sync_manager;
+pub mod sync_service;
+
+pub use cron_scheduler::CronScheduler;
+pub use pipeline_executor::{
+    BackportSuggestionResult, ClassificationResult, DiffComparisonResult, JobProgress,
+    L1IngestionResult, L2SnapshotResult, PipelineExecutor, PipelineStage, ReportGenerationResult,
+    StageResult, SyncJobResult,
+};
+pub use pipeline_state::{PipelineState, PipelineStateManager};
+pub use scheduler_manager::{SchedulerConfig, SchedulerManager, SchedulerStatus};
+pub use sync_executor::{SyncApiClient, SyncExecutionStats, SyncExecutor};
+pub use sync_manager::SyncManager;
+pub use sync_service::{SyncResult, SyncService, SyncStatus};
