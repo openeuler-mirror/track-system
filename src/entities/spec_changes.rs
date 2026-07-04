@@ -36,3 +36,42 @@ pub struct Model {
     pub patches_added: i32,
     pub patches_removed: i32,
     pub patches_modified: i32,
+    pub changelog_entries_added: i32,
+    pub created_at: DateTimeUtc,
+}
+
+#[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+pub enum Relation {
+    #[sea_orm(
+        belongs_to = "super::l1_commit_records::Entity",
+        from = "Column::CommitRecordId",
+        to = "super::l1_commit_records::Column::Id",
+        on_update = "NoAction",
+        on_delete = "Cascade"
+    )]
+    CommitRecords,
+    #[sea_orm(
+        belongs_to = "super::spec_snapshots::Entity",
+        from = "Column::NewSnapshotId",
+        to = "super::spec_snapshots::Column::Id",
+        on_update = "NoAction",
+        on_delete = "Cascade"
+    )]
+    SpecSnapshots2,
+    #[sea_orm(
+        belongs_to = "super::spec_snapshots::Entity",
+        from = "Column::OldSnapshotId",
+        to = "super::spec_snapshots::Column::Id",
+        on_update = "NoAction",
+        on_delete = "SetNull"
+    )]
+    SpecSnapshots1,
+}
+
+impl Related<super::l1_commit_records::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::CommitRecords.def()
+    }
+}
+
+impl ActiveModelBehavior for ActiveModel {}
