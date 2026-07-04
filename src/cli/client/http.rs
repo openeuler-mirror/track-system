@@ -128,3 +128,47 @@ impl ApiClient {
     }
 
     /// GET 请求
+    pub async fn get<T: DeserializeOwned>(&self, path: &str) -> ApiResult<T> {
+        let response = self
+            .build_request(Method::GET, path)
+            .send()
+            .await
+            .map_err(ApiError::from)?;
+
+        Self::handle_response(response).await
+    }
+
+    /// POST 请求
+    pub async fn post<B: Serialize, T: DeserializeOwned>(
+        &self,
+        path: &str,
+        body: &B,
+    ) -> ApiResult<T> {
+        let response = self
+            .build_request(Method::POST, path)
+            .json(body)
+            .send()
+            .await
+            .map_err(ApiError::from)?;
+
+        Self::handle_response(response).await
+    }
+
+    /// PUT 请求
+    pub async fn put<B: Serialize, T: DeserializeOwned>(
+        &self,
+        path: &str,
+        body: &B,
+    ) -> ApiResult<T> {
+        let response = self
+            .build_request(Method::PUT, path)
+            .json(body)
+            .send()
+            .await
+            .map_err(ApiError::from)?;
+
+        Self::handle_response(response).await
+    }
+
+    /// DELETE 请求
+    pub async fn delete<T: DeserializeOwned>(&self, path: &str) -> ApiResult<T> {
