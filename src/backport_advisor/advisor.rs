@@ -119,3 +119,44 @@ impl<'a> BackportAdvisor<'a> {
 
         Telemetry::backport_candidates_created(
             package_id,
+            summary.candidates_created,
+            summary.candidates_skipped,
+        );
+        Ok(summary)
+    }
+}
+
+fn extract_version(summary: &str) -> Option<String> {
+    let regex = Regex::new(r"(\d+\.\d+(?:\.\d+)?)").expect("version regex");
+    regex
+        .captures(summary)
+        .and_then(|caps| caps.get(1))
+        .map(|m| m.as_str().to_string())
+}
+
+fn build_patch_path(package: &str, sha: &str) -> String {
+    let short_sha: String = sha.chars().take(8).collect();
+    format!("patches/{}-{}.patch", package, short_sha)
+}
+
+fn build_recommendation(
+    package_name: &str,
+    distros: &HashMap<i32, String>,
+    distro_id: i32,
+    summary: &str,
+    version: &str,
+) -> String {
+    let target = distros
+        .get(&distro_id)
+        .cloned()
+        .unwrap_or_else(|| format!("distro-{}", distro_id));
+
+    format!(
+        "建议将 {package} 上游版本 {version} 的提交回合至 {target}。摘要: {summary}",
+        package = package_name,
+        version = version,
+        target = target,
+        summary = summary
+    )
+}
+
