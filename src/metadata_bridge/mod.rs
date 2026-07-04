@@ -759,3 +759,53 @@ async fn load_l2_snapshot_from_db(
         snapshot_id = snapshot_record.id,
         "从数据库加载 L2 快照数据"
     );
+
+    // 解析 payload JSON
+    let collect_result: CollectResult =
+        serde_json::from_value(snapshot_record.payload).context("解析 L2 快照 payload 失败")?;
+
+    // 转换 commits 并持久化到 l2_commit_records
+    let commit_entries: Vec<CommitEntry> = collect_result
+        .commits
+        .iter()
+        .map(|c| CommitEntry {
+            sha: c.sha.clone(),
+            title: c.title.clone(),
+            message: c.message.clone(),
+            author: c.author.clone(),
+            authored_at: c.date,
+            url: None, // CollectResult 中没有 URL 字段
+            stats: ChangeStats {
+                additions: 0,
+                deletions: 0,
+                files_changed: 0,
+            },
+            primary_change_type: None,
+            cve_list: Vec::new(),
+        })
+        .collect();
+
+    // 提取 spec 信息用于持久化
+    let spec_version = collect_result.spec.as_ref().map(|s| s.version.as_str());
+    let spec_release = collect_result.spec.as_ref().map(|s| s.release.as_str());
+
+    // 持久化 commits 到数据库
+    if !commit_entries.is_empty() {
+        persist_l2_commits(db, tracking_id, &commit_entries, spec_version, spec_release).await?;
+        info!(
+            tracking_id = tracking_id,
+            commit_count = commit_entries.len(),
+            "已将 L2 快照中的 commits 持久化到数据库"
+        );
+    }
+
+    // 转换 spec 信息
+    let spec_entry = collect_result.spec.map(|s| SpecEntry {
+        path: s.path,
+        version: Some(s.version),
+        release: Some(s.release),
+        sha256: s.sha256,
+        content_base64: s.content_base64,
+    });
+
+    // 转换 files 信息
