@@ -58,3 +58,33 @@ impl From<sea_orm::DbErr> for ApiError {
                 }
             }
         }
+        Self::DatabaseError(err)
+    }
+}
+
+impl IntoResponse for ApiError {
+    fn into_response(self) -> Response {
+        use crate::server::api::ErrorResponse;
+
+        let error_response = match self {
+            Self::DatabaseError(e) => {
+                tracing::error!("Database error: {:?}", e);
+                ErrorResponse::internal_error("Database error occurred")
+            }
+            Self::NotFound(msg) => ErrorResponse::not_found(msg),
+            Self::BadRequest(msg) => ErrorResponse::bad_request(msg),
+            Self::Unauthorized(msg) => ErrorResponse::unauthorized(msg),
+            Self::Forbidden(msg) => ErrorResponse::forbidden(msg),
+            Self::InternalError(msg) => {
+                tracing::error!("Internal error: {}", msg);
+                ErrorResponse::internal_error(msg)
+            }
+            Self::Conflict(msg) => ErrorResponse::conflict(msg),
+        };
+
+        error_response.into_response()
+    }
+}
+
+/// API 结果类型
+pub type ApiResult<T> = Result<T, ApiError>;
