@@ -302,3 +302,54 @@ async fn collect_spec(
             repo_path = %root.display(),
             "开始收集本地仓库 spec 文件"
         );
+        for entry in WalkDir::new(root)
+            .into_iter()
+            .filter_entry(|e| e.file_name() != ".git")
+        {
+            let entry = entry?;
+            if !entry.file_type().is_file() {
+                continue;
+            }
+            if entry
+                .path()
+                .extension()
+                .map(|ext| ext == "spec")
+                .unwrap_or(false)
+            {
+                let content = fs::read(entry.path())?;
+                let sha = sha256_hex(&content);
+                let version = std::str::from_utf8(&content)
+                    .ok()
+                    .and_then(extract_spec_version);
+                let release = std::str::from_utf8(&content)
+                    .ok()
+                    .and_then(extract_spec_release);
+                return Ok(Some(SpecEntry {
+                    path: entry
+                        .path()
+                        .strip_prefix(root)
+                        .unwrap_or(entry.path())
+                        .to_string_lossy()
+                        .replace('\\', "/"),
+                    sha256: sha,
+                    version,
+                    release,
+                    content_base64: BASE64_STANDARD.encode(content),
+                }));
+            }
+        }
+        return Ok(None);
+    }
+
+    // 2) 对于 L1 仓库，使用 Gitee API 获取 spec 内容
+    if origin == SnapshotOrigin::L1 {
+        info!(
+            tracking_id = tracking.id,
+            l1_repo_owner = %tracking.l1_repo_owner,
+            l1_repo_name = %tracking.l1_repo_name,
+            l1_branch = %tracking.l1_branch,
+            "开始从 Gitee 获取 L1 spec 文件"
+        );
+        let owner = tracking.l1_repo_owner.as_str();
+        let repo = tracking.l1_repo_name.as_str();
+        let branch = tracking.l1_branch.as_str();
