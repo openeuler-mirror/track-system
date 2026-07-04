@@ -809,3 +809,54 @@ async fn load_l2_snapshot_from_db(
     });
 
     // 转换 files 信息
+    let file_entries: Vec<FileEntry> = collect_result
+        .files
+        .iter()
+        .map(|f| FileEntry {
+            path: f.path.clone(),
+            size: f.size,
+            sha256: f.sha256.clone(),
+            is_binary: f.is_binary,
+        })
+        .collect();
+
+    // 转换 issues 信息
+    let issue_entries: Vec<IssueEntry> = collect_result
+        .issues
+        .iter()
+        .map(|i| IssueEntry {
+            number: i.number.to_string(),
+            title: i.title.clone(),
+            state: i.state.clone(),
+            author: i.author.clone(),
+            updated_at: i.updated_at,
+            labels: i.labels.clone(),
+        })
+        .collect();
+
+    // 构建 RepositorySnapshot
+    let mut snapshot = RepositorySnapshot::new(tracking_id, SnapshotOrigin::L2);
+    snapshot.spec = spec_entry;
+    snapshot.files = file_entries;
+    snapshot.commits = commit_entries;
+    snapshot.issues = issue_entries;
+
+    Ok(Some(snapshot))
+}
+async fn collect_l2_commits(db: &DatabaseConnection, tracking_id: i32) -> Result<Vec<CommitEntry>> {
+    let models = L2CommitRecords::find()
+        .filter(crate::entities::l2_commit_records::Column::TrackingId.eq(tracking_id))
+        .order_by_desc(crate::entities::l2_commit_records::Column::CommittedAt)
+        .all(db)
+        .await?;
+
+    let entries = models
+        .into_iter()
+        .map(|model| {
+            let cve_list: Vec<String> = model
+                .cve_list
+                .and_then(|value| serde_json::from_value::<Vec<String>>(value).ok())
+                .unwrap_or_default();
+
+            CommitEntry {
+                sha: model.commit_sha,
