@@ -28,3 +28,33 @@ pub enum ApiError {
     /// 内部服务器错误
     InternalError(String),
     /// 冲突（如唯一性约束违反）
+    Conflict(String),
+}
+
+impl fmt::Display for ApiError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::DatabaseError(e) => write!(f, "Database error: {}", e),
+            Self::NotFound(msg) => write!(f, "Not found: {}", msg),
+            Self::BadRequest(msg) => write!(f, "Bad request: {}", msg),
+            Self::Unauthorized(msg) => write!(f, "Unauthorized: {}", msg),
+            Self::Forbidden(msg) => write!(f, "Forbidden: {}", msg),
+            Self::InternalError(msg) => write!(f, "Internal error: {}", msg),
+            Self::Conflict(msg) => write!(f, "Conflict: {}", msg),
+        }
+    }
+}
+
+impl std::error::Error for ApiError {}
+
+impl From<sea_orm::DbErr> for ApiError {
+    fn from(err: sea_orm::DbErr) -> Self {
+        // 检查是否是唯一性约束冲突
+        if let sea_orm::DbErr::Exec(sea_orm::RuntimeErr::SqlxError(sqlx_err)) = &err {
+            if let Some(db_err) = sqlx_err.as_database_error() {
+                // SQLite 唯一性约束错误码
+                if db_err.message().contains("UNIQUE constraint failed") {
+                    return Self::Conflict("Resource already exists".to_string());
+                }
+            }
+        }
