@@ -11,3 +11,17 @@
 
 //! 导入模块
 //!
+//! 支持：
+//! - CSV 文件批量导入软件包配置
+//! - JSON/SQL 元数据导入（用于内外网同步）
+//! - track-collector JSON 导入
+
+pub mod csv;
+pub mod metadata;
+pub mod metadata_importer;
+
+pub use csv::{CsvImporter, ImportResult, ImportStats};
+pub use metadata::{ImportOptions, ImportResult as MetadataImportResult, MetadataImporter};
+pub use metadata_importer::{
+    CollectedMetadata, ImportResult as CollectorImportResult, MetadataImporter as CollectorImporter,
+};
