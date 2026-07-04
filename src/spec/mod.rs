@@ -38,3 +38,44 @@ impl SpecFile {
         for raw_line in content.lines() {
             let line = raw_line.trim();
 
+            if let Some(caps) = macro_define_re.captures(line) {
+                let name = caps.get(1).unwrap().as_str();
+                let value = caps.get(2).unwrap().as_str().trim();
+                spec.macros
+                    .insert(name.to_string(), spec.expand_macros(value, &macro_usage_re));
+                continue;
+            }
+
+            if let Some(caps) = version_re.captures(line) {
+                let raw = caps.get(1).unwrap().as_str().trim();
+                let expanded = spec.expand_macros(raw, &macro_usage_re);
+                spec.version = SpecFile::format_version(&expanded);
+                continue;
+            }
+
+            if let Some(caps) = release_re.captures(line) {
+                let raw = caps.get(1).unwrap().as_str().trim();
+                let expanded = spec.expand_macros(raw, &macro_usage_re);
+                spec.release = SpecFile::format_version(&expanded);
+            }
+        }
+
+        spec
+    }
+
+    fn expand_macros(&self, value: &str, macro_usage_re: &Regex) -> String {
+        let mut expanded = value.to_string();
+        let mut iterations = 0;
+        const MAX_ITERATIONS: usize = 10;
+
+        while macro_usage_re.is_match(&expanded) && iterations < MAX_ITERATIONS {
+            let replaced = macro_usage_re
+                .replace_all(&expanded, |caps: &regex::Captures| {
+                    let optional = caps.get(1).is_some_and(|m| !m.as_str().is_empty());
+                    let name = caps.get(2).unwrap().as_str();
+                    match self.macros.get(name) {
+                        Some(value) => value.clone(),
+                        None if optional => String::new(),
+                        None => format!("%{{{}}}", name),
+                    }
+                })
