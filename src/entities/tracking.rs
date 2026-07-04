@@ -35,3 +35,40 @@ pub struct Model {
     #[sea_orm(column_type = "Text", nullable)]
     pub last_error: Option<String>,
 }
+
+#[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+pub enum Relation {
+    #[sea_orm(has_many = "super::l1_commit_records::Entity")]
+    CommitRecords,
+    #[sea_orm(has_many = "super::issues::Entity")]
+    Issues,
+    #[sea_orm(has_many = "super::tracking_reports::Entity")]
+    TrackingReports,
+    #[sea_orm(has_many = "super::sync_jobs::Entity")]
+    SyncJobs,
+    #[sea_orm(has_many = "super::l2_snapshots::Entity")]
+    L2Snapshots,
+    #[sea_orm(
+        belongs_to = "super::distros::Entity",
+        from = "Column::DistroId",
+        to = "super::distros::Column::Id",
+        on_update = "NoAction",
+        on_delete = "Cascade"
+    )]
+    Distros,
+    #[sea_orm(
+        belongs_to = "super::packages::Entity",
+        from = "Column::PackageId",
+        to = "super::packages::Column::Id",
+        on_update = "NoAction",
+        on_delete = "Cascade"
+    )]
+    Packages,
+}
+
+impl Related<super::l1_commit_records::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::CommitRecords.def()
+    }
+}
+
