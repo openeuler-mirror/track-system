@@ -85,3 +85,46 @@ impl ApiClient {
             // 错误响应
             let error_text = response
                 .text()
+                .await
+                .unwrap_or_else(|_| "未知错误".to_string());
+
+            // 尝试解析为标准错误格式
+            if let Ok(error_response) = serde_json::from_str::<ErrorResponse>(&error_text) {
+                Self::map_error_response(status, error_response)
+            } else {
+                Self::map_status_error(status, error_text)
+            }
+        }
+    }
+
+    /// 映射错误响应
+    fn map_error_response<T>(status: StatusCode, error: ErrorResponse) -> ApiResult<T> {
+        match status {
+            StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN => {
+                Err(ApiError::AuthenticationError(error.message))
+            }
+            StatusCode::NOT_FOUND => Err(ApiError::NotFound(error.message)),
+            StatusCode::BAD_REQUEST => Err(ApiError::BadRequest(error.message)),
+            _ => Err(ApiError::ServerError {
+                status: status.as_u16(),
+                message: error.message,
+            }),
+        }
+    }
+
+    /// 映射状态码错误
+    fn map_status_error<T>(status: StatusCode, message: String) -> ApiResult<T> {
+        match status {
+            StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN => {
+                Err(ApiError::AuthenticationError(message))
+            }
+            StatusCode::NOT_FOUND => Err(ApiError::NotFound(message)),
+            StatusCode::BAD_REQUEST => Err(ApiError::BadRequest(message)),
+            _ => Err(ApiError::ServerError {
+                status: status.as_u16(),
+                message,
+            }),
+        }
+    }
+
+    /// GET 请求
