@@ -911,3 +911,54 @@ async fn persist_l2_commits(
             committed_at: Set(commit.authored_at),
             change_type: Set(None),
             primary_change_type: Set(commit.primary_change_type.clone()),
+            cve_list: Set(cve_json),
+            spec_changed: Set(false),
+            patch_stats: Set(None),
+            classification_status: Set("pending".to_string()),
+            classification_notes: Set(None),
+            sync_status: Set("not_synced".to_string()),
+            synced_to_l2_commit: Set(None),
+            synced_at: Set(None),
+            api_url: Set(commit.url.clone().unwrap_or_default()),
+            fetched_at: Set(Utc::now()),
+            files_changed_count: Set(commit.stats.files_changed),
+            additions: Set(commit.stats.additions),
+            deletions: Set(commit.stats.deletions),
+            spec_version: Set(spec_version.map(|s| s.to_string())),
+            spec_release: Set(spec_release.map(|s| s.to_string())),
+            created_at: Set(Utc::now()),
+            updated_at: Set(Utc::now()),
+            ..Default::default()
+        };
+
+        // 使用 upsert 避免重复插入
+        let _ = L2CommitRecords::insert(model)
+            .on_conflict(
+                OnConflict::columns([
+                    l2_commit_records::Column::TrackingId,
+                    l2_commit_records::Column::CommitSha,
+                ])
+                .update_columns([
+                    l2_commit_records::Column::CommitMessage,
+                    l2_commit_records::Column::AuthorName,
+                    l2_commit_records::Column::CommittedAt,
+                    l2_commit_records::Column::FilesChangedCount,
+                    l2_commit_records::Column::Additions,
+                    l2_commit_records::Column::Deletions,
+                    l2_commit_records::Column::UpdatedAt,
+                ])
+                .to_owned(),
+            )
+            .exec(db)
+            .await?;
+    }
+
+    info!(
+        tracking_id = tracking_id,
+        commit_count = commits.len(),
+        "L2 commits 已持久化到数据库"
+    );
+
+    Ok(())
+}
+
