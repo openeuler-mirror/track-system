@@ -84,3 +84,46 @@ impl ClientConfig {
     /// 从配置文件加载
     pub fn load() -> ApiResult<Self> {
         let config_path = Self::config_path()?;
+
+        if !config_path.exists() {
+            // 配置文件不存在，返回默认配置
+            return Ok(Self::default());
+        }
+
+        let content = fs::read_to_string(&config_path)
+            .map_err(|e| ApiError::ConfigError(format!("读取配置文件失败: {}", e)))?;
+
+        let config: ClientConfig = toml::from_str(&content)
+            .map_err(|e| ApiError::ConfigError(format!("解析配置文件失败: {}", e)))?;
+
+        Ok(config)
+    }
+
+    /// 保存配置到文件
+    pub fn save(&self) -> ApiResult<()> {
+        let config_path = Self::config_path()?;
+
+        // 确保配置目录存在
+        if let Some(parent) = config_path.parent() {
+            fs::create_dir_all(parent)
+                .map_err(|e| ApiError::ConfigError(format!("创建配置目录失败: {}", e)))?;
+        }
+
+        let content = toml::to_string_pretty(self)
+            .map_err(|e| ApiError::ConfigError(format!("序列化配置失败: {}", e)))?;
+
+        fs::write(&config_path, content)
+            .map_err(|e| ApiError::ConfigError(format!("写入配置文件失败: {}", e)))?;
+
+        Ok(())
+    }
+
+    /// 从环境变量加载配置（优先级高于配置文件）
+    pub fn from_env() -> ApiResult<Self> {
+        let mut config = Self::load()?;
+
+        // 环境变量覆盖配置文件
+        if let Ok(url) = std::env::var("TRACK_SERVER_URL") {
+            config.server_url = url;
+        }
+
