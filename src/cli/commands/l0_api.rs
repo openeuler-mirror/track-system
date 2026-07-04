@@ -56,3 +56,33 @@ async fn poll_l0(api_client: &ApiClient, package_id: Option<i32>) -> Result<()> 
 
 /// 检测 L0 与 L1 的差异
 async fn detect_diff(api_client: &ApiClient, package_id: i32) -> Result<()> {
+    println!(
+        "{}",
+        format!("正在检测 package {} 的 L0/L1 差异...", package_id).cyan()
+    );
+
+    let result: serde_json::Value = api_client
+        .post(&format!("/l0/diff/{}", package_id), &serde_json::json!({}))
+        .await?;
+
+    println!("{}", "✓ 差异检测完成".green());
+    println!("\n{}", "=== 版本信息 ===".bold());
+    println!("L0 最新版本: {}", result["l0_version"]);
+    println!("L1 当前版本: {}", result["l1_version"]);
+
+    if let Some(diff) = result["diff"].as_object() {
+        println!("\n{}", "=== 差异统计 ===".bold());
+        println!("新增 commits: {}", diff["new_commits"]);
+        println!("新增 tags: {}", diff["new_tags"]);
+        println!("版本落后: {}", diff["version_behind"]);
+
+        if let Some(upgrade_available) = diff["upgrade_available"].as_bool() {
+            if upgrade_available {
+                println!("\n{}", "有可用的升级版本".yellow());
+            }
+        }
+    }
+
+    Ok(())
+}
+
