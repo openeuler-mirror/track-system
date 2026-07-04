@@ -335,3 +335,52 @@ fn parse_snapshot_or_convert(
         let content_base64 = v
             .get("content_base64")
             .and_then(|p| p.as_str())
+            .unwrap_or("")
+            .to_string();
+        let sha256 = v
+            .get("sha256")
+            .and_then(|p| p.as_str())
+            .unwrap_or("")
+            .to_string();
+
+        if !path.is_empty() && !content_base64.is_empty() {
+            Some(SpecEntry {
+                path,
+                version,
+                release,
+                content_base64,
+                sha256,
+            })
+        } else {
+            None
+        }
+    });
+
+    // files 列表（可选）
+    let files_arr = root
+        .get("files")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+
+    // 将通用 commit JSON 转换为 CommitEntry
+    let commits: Vec<CommitEntry> = commits_arr
+        .into_iter()
+        .map(|c| {
+            // 字段兼容映射
+            let sha = c
+                .get("sha")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let message = c
+                .get("message")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let title = c
+                .get("title")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| message.lines().next().unwrap_or("").to_string());
+            let author = c
