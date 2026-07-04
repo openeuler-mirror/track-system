@@ -78,3 +78,43 @@ async fn process_tracking_classification(
         )
         .await?;
 
+    println!("{}", "✓ 分类任务已完成".green());
+    println!("处理数量: {}", result["processed"]);
+    println!("成功: {}", result["success"]);
+    println!("失败: {}", result["failed"]);
+
+    Ok(())
+}
+
+/// 以守护进程方式运行分类任务队列
+async fn run_classification_daemon(
+    api_client: &ApiClient,
+    interval: u64,
+    batch_size: usize,
+) -> Result<()> {
+    println!(
+        "{}",
+        format!(
+            "启动分类守护进程 (间隔: {}秒, 批大小: {})...",
+            interval, batch_size
+        )
+        .cyan()
+    );
+
+    let result: serde_json::Value = api_client
+        .post(
+            "/classify/daemon/start",
+            &serde_json::json!({
+                "interval": interval,
+                "batch_size": batch_size
+            }),
+        )
+        .await?;
+
+    println!("{}", "✓ 守护进程已启动".green());
+    println!("守护进程 ID: {}", result["daemon_id"]);
+    println!("状态: {}", result["status"]);
+
+    Ok(())
+}
+
