@@ -142,3 +142,52 @@ async fn resolve_tracking_id_from_package(
                 "ℹ".cyan(),
                 package_name,
                 trackings.len(),
+                tracking.id,
+                tracking.tracking_status
+            );
+        }
+        Ok(tracking.id)
+    } else {
+        Err(anyhow!("未找到可用的 tracking 配置"))
+    }
+}
+
+/// 导入单个文件
+async fn import_single_file(
+    api_client: &ApiClient,
+    file: &PathBuf,
+    tracking_id: i32,
+) -> Result<()> {
+    println!("正在导入文件: {}", file.display().to_string().cyan());
+
+    // 检查文件是否存在
+    if !file.exists() {
+        println!("{} 文件不存在: {}", "✗".red().bold(), file.display());
+        anyhow::bail!("文件不存在");
+    }
+
+    // 读取并解析/转换快照文件
+    let content = fs::read_to_string(file)?;
+    let snapshot = parse_snapshot_or_convert(&content, tracking_id)?;
+
+    // 确定导入端点（根据快照来源）
+    let endpoint = match snapshot.origin {
+        SnapshotOrigin::L1 => "/metadata/l1",
+        SnapshotOrigin::L2 => "/metadata/l2",
+        SnapshotOrigin::Unknown => {
+            // 默认使用 L1
+            println!("{}", "警告: 快照来源未知，默认使用 L1 端点".yellow());
+            "/metadata/l1"
+        }
+    };
+
+    println!("  快照来源: {:?}", snapshot.origin);
+    println!("  文件数量: {}", snapshot.files.len());
+    println!("  提交数量: {}", snapshot.commits.len());
+    println!("  问题数量: {}", snapshot.issues.len());
+    println!();
+
+    // 构建请求
+    let request = ImportRequest {
+        tracking_id,
+        snapshot,
