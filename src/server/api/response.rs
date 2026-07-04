@@ -193,3 +193,52 @@ pub struct HealthResponse {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HealthComponents {
     /// 数据库状态
+    pub database: ComponentStatus,
+    /// 调度器状态
+    pub scheduler: ComponentStatus,
+}
+
+/// 组件状态
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ComponentStatus {
+    /// 状态：healthy, unhealthy, unknown
+    pub status: String,
+    /// 详细信息
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+}
+
+impl ComponentStatus {
+    /// 创建健康状态
+    pub fn healthy() -> Self {
+        Self {
+            status: "healthy".to_string(),
+            message: None,
+        }
+    }
+
+    /// 创建健康状态（带消息）
+    pub fn healthy_with_message(message: impl Into<String>) -> Self {
+        Self {
+            status: "healthy".to_string(),
+            message: Some(message.into()),
+        }
+    }
+
+    /// 创建不健康状态
+    pub fn unhealthy(message: impl Into<String>) -> Self {
+        Self {
+            status: "unhealthy".to_string(),
+            message: Some(message.into()),
+        }
+    }
+
+    /// 创建未知状态
+    pub fn unknown(message: impl Into<String>) -> Self {
+        Self {
+            status: "unknown".to_string(),
+            message: Some(message.into()),
+        }
+    }
+}
+
