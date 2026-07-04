@@ -21,3 +21,26 @@ pub struct BackportCandidateDto {
     pub l0_commit_id: i64,
     pub target_distro_id: i32,
     pub spec_base_version: String,
+    pub recommendation: String,
+    pub status: String,
+    pub patch_artifact: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+impl From<backport_candidates::Model> for BackportCandidateDto {
+    fn from(model: backport_candidates::Model) -> Self {
+        Self {
+            id: model.id,
+            package_id: model.package_id,
+            l0_commit_id: model.l0_commit_id,
+            target_distro_id: model.target_distro_id,
+            spec_base_version: model.spec_base_version,
+            recommendation: model.recommendation,
+            status: model.status,
+            patch_artifact: model.patch_artifact,
+            created_at: model.created_at,
+            updated_at: model.updated_at,
+        }
+    }
+}
