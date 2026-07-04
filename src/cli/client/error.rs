@@ -36,3 +36,41 @@ pub enum ApiError {
     AuthenticationError(String),
 
     /// 资源未找到
+    #[error("资源未找到: {0}")]
+    NotFound(String),
+
+    /// 请求参数错误
+    #[error("请求参数错误: {0}")]
+    BadRequest(String),
+
+    /// JSON 序列化/反序列化错误
+    #[error("JSON 处理错误: {0}")]
+    JsonError(String),
+
+    /// 配置错误
+    #[error("配置错误: {0}")]
+    ConfigError(String),
+
+    /// 超时错误
+    #[error("请求超时")]
+    Timeout,
+
+    /// 其他错误
+    #[error("未知错误: {0}")]
+    Other(String),
+}
+
+/// API 响应结果类型
+pub type ApiResult<T> = Result<T, ApiError>;
+
+/// 标准 API 错误响应格式
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ErrorResponse {
+    pub error: String,
+    pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub details: Option<serde_json::Value>,
+}
+
+impl From<reqwest::Error> for ApiError {
+    fn from(err: reqwest::Error) -> Self {
