@@ -860,3 +860,54 @@ async fn collect_l2_commits(db: &DatabaseConnection, tracking_id: i32) -> Result
 
             CommitEntry {
                 sha: model.commit_sha,
+                title: model
+                    .commit_message
+                    .lines()
+                    .next()
+                    .unwrap_or("")
+                    .to_string(),
+                message: model.commit_message,
+                author: model.author_name,
+                authored_at: model.committed_at,
+                url: Some(model.api_url),
+                stats: crate::snapshot::types::ChangeStats {
+                    additions: model.additions,
+                    deletions: model.deletions,
+                    files_changed: model.files_changed_count,
+                },
+                primary_change_type: model.primary_change_type,
+                cve_list,
+            }
+        })
+        .collect();
+
+    Ok(entries)
+}
+
+// 持久化 L2 commits 到数据库
+async fn persist_l2_commits(
+    db: &DatabaseConnection,
+    tracking_id: i32,
+    commits: &[CommitEntry],
+    spec_version: Option<&str>,
+    spec_release: Option<&str>,
+) -> Result<()> {
+    use crate::entities::l2_commit_records;
+    use sea_orm::sea_query::OnConflict;
+
+    for commit in commits {
+        let cve_json = if commit.cve_list.is_empty() {
+            None
+        } else {
+            Some(serde_json::to_value(&commit.cve_list)?)
+        };
+
+        let model = l2_commit_records::ActiveModel {
+            tracking_id: Set(tracking_id),
+            commit_sha: Set(commit.sha.clone()),
+            commit_message: Set(commit.message.clone()),
+            author_name: Set(commit.author.clone()),
+            author_email: Set(String::new()), // 从 repo 收集时没有 email
+            committed_at: Set(commit.authored_at),
+            change_type: Set(None),
+            primary_change_type: Set(commit.primary_change_type.clone()),
