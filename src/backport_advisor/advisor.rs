@@ -79,3 +79,43 @@ impl<'a> BackportAdvisor<'a> {
             for track in &trackings {
                 let exists = BackportCandidates::find()
                     .filter(backport_candidates::Column::PackageId.eq(package_id))
+                    .filter(backport_candidates::Column::L0CommitId.eq(commit.id))
+                    .filter(backport_candidates::Column::TargetDistroId.eq(track.distro_id))
+                    .one(self.db)
+                    .await?;
+
+                if exists.is_some() {
+                    summary.candidates_skipped += 1;
+                    continue;
+                }
+
+                let recommendation = build_recommendation(
+                    &package.name,
+                    &distro_map,
+                    track.distro_id,
+                    &commit.summary,
+                    &version,
+                );
+
+                let artifact = Some(build_patch_path(&package.name, &commit.commit_sha));
+
+                let candidate = backport_candidates::ActiveModel {
+                    package_id: Set(package_id),
+                    l0_commit_id: Set(commit.id),
+                    target_distro_id: Set(track.distro_id),
+                    spec_base_version: Set(version.clone()),
+                    recommendation: Set(recommendation),
+                    status: Set("pending".to_string()),
+                    patch_artifact: Set(artifact),
+                    created_at: Set(Utc::now()),
+                    updated_at: Set(Utc::now()),
+                    ..Default::default()
+                };
+
+                candidate.insert(self.db).await?;
+                summary.candidates_created += 1;
+            }
+        }
+
+        Telemetry::backport_candidates_created(
+            package_id,
