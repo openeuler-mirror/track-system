@@ -172,3 +172,47 @@ impl ApiClient {
 
     /// DELETE 请求
     pub async fn delete<T: DeserializeOwned>(&self, path: &str) -> ApiResult<T> {
+        let response = self
+            .build_request(Method::DELETE, path)
+            .send()
+            .await
+            .map_err(ApiError::from)?;
+
+        Self::handle_response(response).await
+    }
+
+    /// DELETE 请求（无响应体）
+    pub async fn delete_no_content(&self, path: &str) -> ApiResult<()> {
+        let response = self
+            .build_request(Method::DELETE, path)
+            .send()
+            .await
+            .map_err(ApiError::from)?;
+
+        let status = response.status();
+        if status.is_success() {
+            Ok(())
+        } else {
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "未知错误".to_string());
+            Self::map_status_error(status, error_text)
+        }
+    }
+
+    /// 健康检查
+    pub async fn health_check(&self) -> ApiResult<serde_json::Value> {
+        self.get("/health").await
+    }
+
+    /// 测试连接
+    pub async fn ping(&self) -> ApiResult<bool> {
+        match self.health_check().await {
+            Ok(_) => Ok(true),
+            Err(ApiError::NetworkError(_)) => Ok(false),
+            Err(e) => Err(e),
+        }
+    }
+}
+
