@@ -27,3 +27,32 @@ pub async fn execute(api_client: &ApiClient, action: L0Action) -> Result<()> {
 /// 轮询 L0 仓库
 async fn poll_l0(api_client: &ApiClient, package_id: Option<i32>) -> Result<()> {
     if let Some(id) = package_id {
+        println!("{}", format!("正在轮询 package {}...", id).cyan());
+
+        let result: serde_json::Value = api_client
+            .post(&format!("/l0/poll/{}", id), &serde_json::json!({}))
+            .await?;
+
+        println!("{}", "✓ 轮询完成".green());
+        println!("新 commits: {}", result["new_commits"]);
+        println!("新 tags: {}", result["new_tags"]);
+        println!("新 releases: {}", result["new_releases"]);
+    } else {
+        println!("{}", "正在轮询所有 packages...".cyan());
+
+        let result: serde_json::Value = api_client
+            .post("/l0/poll/all", &serde_json::json!({}))
+            .await?;
+
+        println!("{}", "✓ 轮询完成".green());
+        println!("处理的 packages: {}", result["processed"]);
+        println!("总新 commits: {}", result["total_new_commits"]);
+        println!("总新 tags: {}", result["total_new_tags"]);
+        println!("总新 releases: {}", result["total_new_releases"]);
+    }
+
+    Ok(())
+}
+
+/// 检测 L0 与 L1 的差异
+async fn detect_diff(api_client: &ApiClient, package_id: i32) -> Result<()> {
