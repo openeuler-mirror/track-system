@@ -295,3 +295,53 @@ impl<'a> MetadataExporter<'a> {
             export_time,
             packages: packages.clone(),
             distros: distros.clone(),
+            trackings: trackings.clone(),
+            commits: commits.clone(),
+        };
+
+        // 序列化为 JSON
+        let json_string = serde_json::to_string_pretty(&metadata)
+            .map_err(|e| DbErr::Custom(format!("JSON serialization error: {}", e)))?;
+
+        // 写入文件
+        std::fs::write(path, &json_string)
+            .map_err(|e| DbErr::Custom(format!("File write error: {}", e)))?;
+
+        // 计算校验和
+        let checksum = Some(format!("{:x}", md5::compute(&json_string)));
+
+        Ok(ExportResult {
+            success: true,
+            exported_packages: packages.len(),
+            exported_distros: distros.len(),
+            exported_trackings: trackings.len(),
+            exported_commits: commits.as_ref().map(|c| c.len()).unwrap_or(0),
+            export_time,
+            checksum,
+            error: None,
+        })
+    }
+
+    /// 导出为 SQL 格式
+    async fn export_sql(
+        &self,
+        path: &Path,
+        export_time: DateTime<Utc>,
+        packages: Vec<serde_json::Value>,
+        distros: Vec<serde_json::Value>,
+        trackings: Vec<serde_json::Value>,
+        commits: Option<Vec<serde_json::Value>>,
+    ) -> Result<ExportResult, DbErr> {
+        let mut sql_statements = Vec::new();
+
+        // 生成 packages 的 INSERT 语句
+        for pkg in &packages {
+            let id = pkg["id"].as_i64().unwrap_or(0);
+            let name = pkg["name"].as_str().unwrap_or("");
+            let level = pkg["level"].as_i64().unwrap_or(0);
+            let sync_interval = pkg["sync_interval_hours"].as_i64().unwrap_or(12);
+
+            sql_statements.push(format!(
+                "INSERT INTO packages (id, name, level, sync_interval_hours) VALUES ({}, '{}', {}, {});",
+                id, name, level, sync_interval
+            ));
