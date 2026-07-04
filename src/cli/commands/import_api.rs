@@ -46,3 +46,51 @@ struct ApiResponse<T> {
     message: String,
     data: Option<T>,
 }
+
+/// 导入请求
+#[derive(Debug, Serialize, Deserialize)]
+struct ImportRequest {
+    tracking_id: i32,
+    snapshot: RepositorySnapshot,
+}
+
+/// 列表响应
+#[derive(Debug, Serialize, Deserialize)]
+struct ListResponse<T> {
+    items: Vec<T>,
+    total: usize,
+}
+
+/// 执行导入命令
+pub async fn execute(api_client: &ApiClient, action: ImportAction) -> Result<()> {
+    match action {
+        ImportAction::Metadata { file, tracking_id } => {
+            let path = PathBuf::from(file);
+            import_single_file(api_client, &path, tracking_id).await
+        }
+        ImportAction::Batch {
+            files,
+            tracking_id: _tracking_id,
+        } => {
+            let paths: Vec<PathBuf> = files.into_iter().map(PathBuf::from).collect();
+            import_batch_files(api_client, paths).await
+        }
+    }
+}
+
+/// 从 JSON 内容中提取 repo 字段（package name）
+fn extract_repo_from_json(content: &str) -> Result<String> {
+    let root: Value =
+        serde_json::from_str(content).map_err(|e| anyhow!("解析 JSON 失败: {}", e))?;
+
+    // 尝试从通用采集格式提取 repo 字段
+    if let Some(repo) = root.get("repo").and_then(|v| v.as_str()) {
+        return Ok(repo.to_string());
+    }
+
+    // 如果是标准 RepositorySnapshot 格式，没有 repo 字段，需要提供 tracking_id
+    Err(anyhow!(
+        "JSON 文件中未找到 'repo' 字段，请使用 --tracking-id 参数明确指定"
+    ))
+}
+
