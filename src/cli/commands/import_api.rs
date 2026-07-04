@@ -480,3 +480,52 @@ fn parse_snapshot_or_convert(
                 .or_else(|| i.get("date").and_then(|v| v.as_str()))
                 .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
                 .map(|dt| dt.with_timezone(&Utc))
+                .unwrap_or_else(Utc::now);
+
+            IssueEntry {
+                number,
+                title,
+                state,
+                author,
+                labels,
+                updated_at,
+            }
+        })
+        .collect();
+
+    // 将通用 file JSON 转换为 FileEntry
+    let files: Vec<FileEntry> = files_arr
+        .into_iter()
+        .filter_map(|f| {
+            let path = f.get("path").and_then(|v| v.as_str())?.to_string();
+            let sha256 = f
+                .get("sha256")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let size = f.get("size").and_then(|v| v.as_u64()).unwrap_or(0);
+            let is_binary = f
+                .get("is_binary")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+
+            Some(FileEntry {
+                path,
+                sha256,
+                size,
+                is_binary,
+            })
+        })
+        .collect();
+
+    Ok(RepositorySnapshot {
+        tracking_id,
+        generated_at,
+        origin,
+        files,
+        spec: spec_entry,
+        commits,
+        issues,
+    })
+}
+
