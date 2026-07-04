@@ -53,3 +53,31 @@ pub fn create_app(db: Arc<DatabaseConnection>) -> Router {
 
 /// 使用自定义 AppState 创建 Axum 应用
 pub fn create_app_with_state(state: AppState) -> Router {
+    Router::new()
+        // API 路由
+        .nest(
+            "/api",
+            health_routes()
+                .merge(metadata_routes())
+                .merge(compare_routes())
+                .merge(reports_routes())
+                .merge(package_routes())
+                .merge(tracking_routes())
+                .merge(sync_routes())
+                .merge(backport_routes())
+                .merge(component_routes())
+                .merge(crate::server::routes::snapshot_routes()),
+        )
+        .with_state(state)
+}
+
+/// 启动服务器
+pub async fn serve(app: Router, addr: SocketAddr) -> anyhow::Result<()> {
+    let listener = tokio::net::TcpListener::bind(addr).await?;
+
+    tracing::info!("Server listening on {}", addr);
+
+    axum::serve(listener, app).await?;
+
+    Ok(())
+}
