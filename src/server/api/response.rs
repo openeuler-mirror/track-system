@@ -95,3 +95,52 @@ impl<T> PaginatedResponse<T> {
     pub fn new(items: Vec<T>, total: u64, page: u64, page_size: u64) -> Self {
         let total_pages = if page_size > 0 {
             total.div_ceil(page_size)
+        } else {
+            0
+        };
+
+        Self {
+            items,
+            total,
+            page,
+            page_size,
+            total_pages,
+        }
+    }
+}
+
+/// 错误响应结构
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ErrorResponse {
+    /// 错误码
+    pub code: u16,
+    /// 错误消息
+    pub message: String,
+    /// 错误详情（可选）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub details: Option<String>,
+}
+
+impl ErrorResponse {
+    /// 创建错误响应
+    pub fn new(code: u16, message: impl Into<String>) -> Self {
+        Self {
+            code,
+            message: message.into(),
+            details: None,
+        }
+    }
+
+    /// 创建带详情的错误响应
+    pub fn with_details(code: u16, message: impl Into<String>, details: impl Into<String>) -> Self {
+        Self {
+            code,
+            message: message.into(),
+            details: Some(details.into()),
+        }
+    }
+
+    /// 400 Bad Request
+    pub fn bad_request(message: impl Into<String>) -> Self {
+        Self::new(400, message)
+    }
