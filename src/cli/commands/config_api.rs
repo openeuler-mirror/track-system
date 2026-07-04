@@ -165,3 +165,45 @@ fn show_config_yaml(config: &ClientConfig, section: Option<String>) -> Result<()
             _ => anyhow::bail!("未知的配置部分: {}", sec),
         };
         print!("{}", value);
+    } else {
+        print!("{}", serde_yaml::to_string(&config)?);
+    }
+    Ok(())
+}
+
+/// 以 TOML 格式显示配置
+fn show_config_toml(config: &ClientConfig, section: Option<String>) -> Result<()> {
+    if let Some(sec) = section {
+        match sec.as_str() {
+            "server" | "server_url" => println!("server_url = \"{}\"", config.server_url),
+            "token" | "auth_token" => {
+                if let Some(token) = &config.auth_token {
+                    println!("auth_token = \"{}\"", token);
+                } else {
+                    println!("# auth_token = \"\"");
+                }
+            }
+            "timeout" => println!("timeout = {}", config.timeout),
+            _ => anyhow::bail!("未知的配置部分: {}", sec),
+        }
+    } else {
+        print!("{}", toml::to_string_pretty(&config)?);
+    }
+    Ok(())
+}
+
+/// 获取配置文件路径
+fn get_config_path(path: Option<String>) -> Result<PathBuf> {
+    if let Some(p) = path {
+        Ok(PathBuf::from(p))
+    } else {
+        get_default_config_path()
+    }
+}
+
+/// 获取默认配置文件路径
+fn get_default_config_path() -> Result<PathBuf> {
+    let home = dirs::home_dir().ok_or_else(|| anyhow::anyhow!("无法获取用户主目录"))?;
+    Ok(home.join(".track-cli").join("config.toml"))
+}
+
