@@ -454,3 +454,54 @@ async fn collect_issues(db: &DatabaseConnection, tracking_id: i32) -> Result<Vec
         .order_by_desc(crate::entities::issues::Column::UpdatedAt)
         .all(db)
         .await?;
+
+    let entries = models
+        .into_iter()
+        .map(|model| {
+            let labels = model
+                .labels
+                .and_then(|value| {
+                    serde_json::from_value::<Vec<String>>(value.clone())
+                        .or_else(|_| serde_json::from_value::<String>(value).map(|s| vec![s]))
+                        .ok()
+                })
+                .unwrap_or_default();
+
+            IssueEntry {
+                number: model.issue_number,
+                title: model.title,
+                state: model.state,
+                author: model.author,
+                labels,
+                updated_at: model.updated_at,
+            }
+        })
+        .collect();
+
+    Ok(entries)
+}
+
+async fn persist_snapshot<P: AsRef<Path>>(
+    db: &DatabaseConnection,
+    snapshot: &RepositorySnapshot,
+    output_path: P,
+) -> Result<SnapshotSummary> {
+    let json = serde_json::to_string_pretty(snapshot)?;
+    fs::write(output_path.as_ref(), &json)?;
+
+    let checksum = sha256_hex(json.as_bytes());
+    let payload_value: JsonValue = serde_json::from_str(&json)?;
+
+    let model = l2_snapshots::ActiveModel {
+        tracking_id: Set(snapshot.tracking_id),
+        snapshot_type: Set(match snapshot.origin {
+            SnapshotOrigin::L1 => "l1".to_string(),
+            SnapshotOrigin::L2 => "l2".to_string(),
+            SnapshotOrigin::Unknown => "unknown".to_string(),
+        }),
+        checksum: Set(checksum.clone()),
+        payload: Set(payload_value),
+        created_at: Set(Utc::now()),
+        ..Default::default()
+    }
+    .insert(db)
