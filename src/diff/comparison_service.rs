@@ -45,3 +45,51 @@ pub struct ComparisonReport {
 pub struct ComparisonService<'a> {
     db: &'a DatabaseConnection,
 }
+
+impl<'a> ComparisonService<'a> {
+    pub fn new(db: &'a DatabaseConnection) -> Self {
+        Self { db }
+    }
+
+    /// 生成对比报告（快速版，基于 SHA）
+    pub async fn generate_report(&self, tracking: &tracking::Model) -> Result<ComparisonReport> {
+        let mut report = ComparisonReport {
+            tracking_id: tracking.id,
+            commits_behind: 0,
+            commits_ahead: 0,
+            diff_summary: json!({}),
+            source: "auto".to_string(),
+        };
+
+        // 基于tracking配置计算差异
+        if let (Some(l1_sha), Some(l2_sha)) =
+            (&tracking.last_l1_commit_sha, &tracking.last_l2_commit_sha)
+        {
+            // 如果L1和L2的commit不同，说明有差异
+            if l1_sha != l2_sha {
+                report.commits_ahead = 1;
+            }
+        } else if tracking.last_l1_commit_sha.is_some() && tracking.last_l2_commit_sha.is_none() {
+            // L1有新commit但L2没有同步
+            report.commits_ahead = 1;
+        }
+
+        // 构建详细的diff摘要
+        report.diff_summary = json!({
+            "tracking_id": tracking.id,
+            "l1_latest_sha": tracking.last_l1_commit_sha.as_deref().unwrap_or("unknown"),
+            "l2_latest_sha": tracking.last_l2_commit_sha.as_deref().unwrap_or("unknown"),
+            "commits_ahead": report.commits_ahead,
+            "commits_behind": report.commits_behind,
+            "needs_sync": report.commits_ahead > 0,
+            "generated_at": Utc::now().to_rfc3339(),
+            "method": "sha_comparison",
+        });
+
+        Ok(report)
+    }
+
+    /// 对比 L1 和 L2 仓库的 commits（完整版，基于实际 Git 历史）
+    pub async fn compare_l1_l2_git(
+        &self,
+        tracking: &tracking::Model,
