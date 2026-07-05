@@ -145,3 +145,52 @@ impl GitClient for LocalClient {
         Ok(crate::collectors::traits::Repository {
             id: 0, // 本地仓库没有 ID
             name: repo_name.clone(),
+            full_name: format!("local/{}", repo_name),
+            description: None,
+            html_url: format!("file://{}", self.repo_path.display()),
+            default_branch,
+            created_at,
+            updated_at,
+        })
+    }
+
+    async fn get_branches(&self, _owner: &str, _repo: &str) -> ApiResult<Vec<Branch>> {
+        let repo = self.open_repo()?;
+        let mut branches = Vec::new();
+
+        // 遍历所有本地分支
+        let branch_iter = repo
+            .branches(Some(git2::BranchType::Local))
+            .map_err(|e| ApiError::Unknown(format!("Failed to list branches: {}", e)))?;
+
+        for (branch, _) in branch_iter.flatten() {
+            if let Some(name) = branch.name().ok().flatten() {
+                let reference = branch.get();
+                let commit_sha = if let Ok(commit) = reference.peel_to_commit() {
+                    commit.id().to_string()
+                } else {
+                    continue;
+                };
+
+                branches.push(Branch {
+                    name: name.to_string(),
+                    commit_sha,
+                    protected: false, // 本地分支没有保护状态
+                });
+            }
+        }
+        Ok(branches)
+    }
+
+    async fn get_commits(
+        &self,
+        _owner: &str,
+        _repo: &str,
+        params: CommitsParams,
+    ) -> ApiResult<Vec<Commit>> {
+        let repo = self.open_repo()?;
+        let mut commits = Vec::new();
+
+        // 获取分支的起始 commit
+        let start_oid = self.get_branch_commit(&repo, &params.branch)?;
+
