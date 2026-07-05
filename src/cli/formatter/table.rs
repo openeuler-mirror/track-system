@@ -91,3 +91,50 @@ impl TableFormatter {
         for row in rows {
             let row_line = row
                 .iter()
+                .enumerate()
+                .map(|(i, cell)| {
+                    if i < col_widths.len() {
+                        format!("{:<width$}", cell, width = col_widths[i])
+                    } else {
+                        cell.to_string()
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join("  ");
+            output.push_str(&row_line);
+            output.push('\n');
+        }
+
+        Ok(output)
+    }
+
+    /// 渲染带边框的表格
+    pub fn render_bordered<T: Display>(
+        &self,
+        headers: &[&str],
+        rows: &[Vec<T>],
+    ) -> anyhow::Result<String> {
+        if headers.is_empty() {
+            return Ok(String::new());
+        }
+
+        let mut output = String::new();
+
+        // 计算每列的最大宽度
+        let mut col_widths: Vec<usize> = headers.iter().map(|h| h.len()).collect();
+
+        for row in rows {
+            for (i, cell) in row.iter().enumerate() {
+                if i < col_widths.len() {
+                    let cell_len = cell.to_string().len();
+                    if cell_len > col_widths[i] {
+                        col_widths[i] = cell_len;
+                    }
+                }
+            }
+        }
+
+        // 渲染顶部边框
+        let top_border = col_widths
+            .iter()
+            .map(|w| "─".repeat(w + 2))
