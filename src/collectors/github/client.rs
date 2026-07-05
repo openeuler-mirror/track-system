@@ -44,3 +44,49 @@ impl GitHubClient {
             .user_agent("track-system/0.1.0")
             .no_proxy()
             .build()?;
+
+        let token_str = token.into();
+        let token_opt = if token_str.is_empty() {
+            None
+        } else {
+            Some(token_str)
+        };
+
+        Ok(Self {
+            client,
+            token: token_opt,
+            base_url: GITHUB_API_BASE.to_string(),
+        })
+    }
+
+    /// 创建实现了 Collector trait 的适配器
+    pub fn as_collector(self) -> impl Collector {
+        use crate::collectors::{adapters::GitClientCollectorAdapter, traits::Platform};
+        GitClientCollectorAdapter::new(self, Platform::GitHub)
+    }
+
+    /// 创建用于测试的客户端
+    pub fn for_testing(token: impl Into<String>, base_url: impl Into<String>) -> ApiResult<Self> {
+        let client = Client::builder()
+            .timeout(DEFAULT_TIMEOUT)
+            .user_agent("track-system/0.1.0-test")
+            .no_proxy()
+            .build()?;
+
+        let token_str = token.into();
+        let token_opt = if token_str.is_empty() {
+            None
+        } else {
+            Some(token_str)
+        };
+
+        Ok(Self {
+            client,
+            token: token_opt,
+            base_url: base_url.into(),
+        })
+    }
+
+    async fn get<T: serde::de::DeserializeOwned>(&self, url: &str) -> ApiResult<T> {
+        let mut retries = 0;
+
