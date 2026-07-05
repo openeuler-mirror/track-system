@@ -131,3 +131,48 @@ pub async fn list_reports(
                 data.page, data.total_pages, data.total
             );
 
+            Ok(())
+        }
+        Err(e) => {
+            println!("{} 获取报告列表失败: {}", "✗".red().bold(), e);
+            Err(e.into())
+        }
+    }
+}
+
+/// 显示报告详情
+pub async fn show_report(api_client: &ApiClient, id: i64) -> Result<()> {
+    println!("正在获取报告详情...");
+    println!("  报告 ID: {}", id);
+    println!();
+
+    match api_client
+        .get::<ApiResponse<ReportDetail>>(&format!("/reports/{}", id))
+        .await
+    {
+        Ok(response) => {
+            let report = response.data;
+
+            println!("{}", "报告详情:".bold());
+            println!("  ID: {}", report.id);
+            println!("  跟踪配置 ID: {}", report.tracking_id);
+            println!("  报告类型: {}", report.report_type.cyan());
+            println!("  软件包: {}", report.package_name.cyan());
+
+            let status_str = match report.status.as_str() {
+                "completed" => "已完成".green(),
+                "pending" => "等待中".yellow(),
+                "failed" => "失败".red(),
+                _ => report.status.as_str().into(),
+            };
+            println!("  状态: {}", status_str);
+
+            println!("  创建时间: {}", format_datetime_local(&report.created_at));
+            println!("  更新时间: {}", format_datetime_local(&report.updated_at));
+
+            println!();
+            println!("{}", "报告内容:".bold());
+            println!("{}", serde_json::to_string_pretty(&report.content)?);
+
+            Ok(())
+        }
