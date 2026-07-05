@@ -416,3 +416,56 @@ pub enum ImportAction {
         #[arg(long, value_delimiter = ',')]
         files: Vec<String>,
 
+        /// 目标 tracking ID(可选,未提供时从 JSON 文件的 repo 字段自动解析)
+        #[arg(long)]
+        tracking_id: Option<i32>,
+    },
+}
+
+// ============== Config Commands ==============
+
+#[derive(Subcommand, Debug)]
+pub enum ConfigAction {
+    /// 初始化配置
+    #[command(about = "Initialize configuration")]
+    Init {
+        /// 配置文件路径
+        #[arg(long)]
+        path: Option<String>,
+    },
+
+    /// 验证配置
+    #[command(about = "Validate configuration")]
+    Validate {
+        /// 配置文件路径
+        #[arg(long)]
+        path: Option<String>,
+    },
+
+    /// 显示配置
+    #[command(about = "Show configuration")]
+    Show {
+        /// 配置部分（可选）
+        section: Option<String>,
+
+        /// 输出格式 (json, toml, yaml)
+        #[arg(long, default_value = "toml")]
+        format: String,
+    },
+}
+
+// ============== Database Commands ==============
+
+#[derive(Subcommand, Debug)]
+pub enum DbAction {
+    /// 初始化数据库
+    #[command(about = "Initialize database")]
+    Init,
+
+    /// 运行数据库迁移
+    #[command(about = "Run database migrations")]
+    Migrate,
+
+    /// 检查数据库状态
+    #[command(about = "Check database status")]
+    Status,
