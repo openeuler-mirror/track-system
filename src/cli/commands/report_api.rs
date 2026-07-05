@@ -176,3 +176,48 @@ pub async fn show_report(api_client: &ApiClient, id: i64) -> Result<()> {
 
             Ok(())
         }
+        Err(e) => {
+            println!("{} 获取报告详情失败: {}", "✗".red().bold(), e);
+            Err(e.into())
+        }
+    }
+}
+
+/// 导出报告
+pub async fn export_report(
+    api_client: &ApiClient,
+    id: i64,
+    format: String,
+    output: Option<String>,
+) -> Result<()> {
+    println!("正在导出报告...");
+    println!("  报告 ID: {}", id);
+    println!("  格式: {}", format);
+
+    match api_client
+        .get::<String>(&format!("/reports/{}/export?format={}", id, format))
+        .await
+    {
+        Ok(content) => {
+            if let Some(output_path) = output {
+                // 保存到文件
+                fs::write(&output_path, &content)?;
+                println!();
+                println!("{} 报告已导出", "✓".green().bold());
+                println!("  文件: {}", output_path.cyan());
+            } else {
+                // 输出到控制台
+                println!();
+                println!("{}", "报告内容:".bold());
+                println!("{}", content);
+            }
+
+            Ok(())
+        }
+        Err(e) => {
+            println!("{} 导出报告失败: {}", "✗".red().bold(), e);
+            Err(e.into())
+        }
+    }
+}
+
