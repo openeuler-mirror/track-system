@@ -86,3 +86,47 @@ impl GiteeClient {
     /// 创建实现了 Collector trait 的适配器
     pub fn as_collector(self) -> impl Collector {
         use crate::collectors::{adapters::GitClientCollectorAdapter, traits::Platform};
+        GitClientCollectorAdapter::new(self, Platform::Gitee)
+    }
+
+    /// 执行 GET 请求（带重试）
+    async fn get<T: serde::de::DeserializeOwned>(&self, url: &str) -> ApiResult<T> {
+        let mut retries = 0;
+
+        loop {
+            let response = self
+                .client
+                .get(url)
+                .query(&[("access_token", &self.token)])
+                .send()
+                .await?;
+
+            let status = response.status();
+
+            info!("Gitee API GET {}: {}", url, status);
+            // 成功响应
+            if status.is_success() {
+                return response.json::<T>().await.map_err(ApiError::from);
+            }
+
+            // 错误响应
+            let error_body = response.text().await.unwrap_or_default();
+
+            // 解析错误消息
+            let error_message = serde_json::from_str::<GiteeError>(&error_body)
+                .ok()
+                .map(|e| e.message)
+                .unwrap_or_else(|| {
+                    if error_body.is_empty() {
+                        format!("HTTP {}", status.as_u16())
+                    } else {
+                        error_body
+                    }
+                });
+
+            let error = ApiError::from_status(status.as_u16(), error_message);
+
+            // 判断是否可重试
+            if error.is_retryable() && retries < MAX_RETRIES {
+                retries += 1;
+                tokio::time::sleep(Duration::from_secs(2u64.pow(retries))).await;
