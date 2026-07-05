@@ -47,3 +47,52 @@ impl LocalClient {
 
         // 验证是否是 Git 仓库
         Repository::open(&path)
+            .map_err(|e| ApiError::InvalidConfig(format!("Not a valid Git repository: {}", e)))?;
+
+        Ok(Self { repo_path: path })
+    }
+
+    /// 打开仓库
+    fn open_repo(&self) -> ApiResult<Repository> {
+        Repository::open(&self.repo_path)
+            .map_err(|e| ApiError::Unknown(format!("Failed to open repository: {}", e)))
+    }
+
+    /// 获取分支的 commit SHA
+    fn get_branch_commit(&self, repo: &Repository, branch: &str) -> ApiResult<Oid> {
+        // 尝试多种分支引用格式
+        let branch_refs = vec![
+            format!("refs/heads/{}", branch),
+            format!("refs/remotes/origin/{}", branch),
+            branch.to_string(),
+        ];
+
+        for branch_ref in branch_refs {
+            if let Ok(reference) = repo.find_reference(&branch_ref) {
+                if let Ok(commit) = reference.peel_to_commit() {
+                    return Ok(commit.id());
+                }
+            }
+        }
+
+        Err(ApiError::NotFoundError(format!(
+            "Branch not found: {}",
+            branch
+        )))
+    }
+
+    /// 创建实现了 Collector trait 的适配器
+    pub fn as_collector(self) -> impl Collector {
+        use crate::collectors::adapters::GitClientCollectorAdapter;
+        GitClientCollectorAdapter::new(self, Platform::Local)
+    }
+}
+
+#[async_trait]
+impl GitClient for LocalClient {
+    async fn get_repository(
+        &self,
+        _owner: &str,
+        _repo: &str,
+    ) -> ApiResult<crate::collectors::traits::Repository> {
+        let repo = self.open_repo()?;
