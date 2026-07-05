@@ -30,3 +30,35 @@ impl JsonFormatter {
     }
 
     /// 设置是否美化输出
+    pub fn with_pretty(mut self, pretty: bool) -> Self {
+        self.pretty = pretty;
+        self
+    }
+
+    /// 格式化为紧凑 JSON
+    pub fn format_compact<T: Serialize>(&self, data: &T) -> anyhow::Result<String> {
+        Ok(serde_json::to_string(data)?)
+    }
+
+    /// 格式化为美化 JSON
+    pub fn format_pretty<T: Serialize>(&self, data: &T) -> anyhow::Result<String> {
+        Ok(serde_json::to_string_pretty(data)?)
+    }
+}
+
+impl Default for JsonFormatter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Formatter for JsonFormatter {
+    fn format<T: Serialize>(&self, data: &T) -> anyhow::Result<String> {
+        if self.pretty {
+            self.format_pretty(data)
+        } else {
+            self.format_compact(data)
+        }
+    }
+}
+
