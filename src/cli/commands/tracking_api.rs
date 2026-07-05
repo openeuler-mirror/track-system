@@ -96,3 +96,52 @@ async fn resolve_package_id(api_client: &ApiClient, input: &str) -> Result<i32> 
 
     // 目前服务端不支持按名称查询，拉取列表后匹配
     let packages: Vec<PackageDto> = api_client.get("/packages").await?;
+    if let Some(pkg) = packages.iter().find(|p| p.name == input) {
+        Ok(pkg.id)
+    } else {
+        Err(anyhow!(format!("未找到名称为 '{}' 的软件包", input)))
+    }
+}
+
+/// 执行跟踪配置管理命令
+pub async fn execute(api_client: &ApiClient, action: TrackingAction) -> Result<()> {
+    match action {
+        TrackingAction::Add {
+            package,
+            distro,
+            l1_repo,
+            l1_branch,
+            l2_repo,
+            l2_branch,
+            status,
+        } => {
+            add_tracking(
+                api_client, package, distro, l1_repo, l1_branch, l2_repo, l2_branch, status,
+            )
+            .await
+        }
+        TrackingAction::List {
+            limit,
+            package,
+            status,
+        } => list_tracking(api_client, limit, package, status).await,
+        TrackingAction::Show { id } => show_tracking(api_client, id).await,
+        TrackingAction::Pause { id } => update_tracking_status(api_client, id, false).await,
+        TrackingAction::Resume { id } => update_tracking_status(api_client, id, true).await,
+        TrackingAction::Remove { id, confirm } => remove_tracking(api_client, id, confirm).await,
+    }
+}
+
+/// 添加跟踪配置
+#[allow(clippy::too_many_arguments)]
+async fn add_tracking(
+    api_client: &ApiClient,
+    package: String,
+    distro: String,
+    l1_repo: String,
+    l1_branch: String,
+    l2_repo_path: String,
+    l2_branch: String,
+    status: String,
+) -> Result<()> {
+    println!("正在添加跟踪配置...");
