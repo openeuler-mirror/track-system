@@ -49,3 +49,55 @@ pub struct Commit {
     pub author_date: DateTime<Utc>,
     pub committer_name: String,
     pub committer_email: String,
+    pub committer_date: DateTime<Utc>,
+    pub html_url: String,
+    pub stats: Option<CommitStats>,
+}
+
+/// Commit 统计信息
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CommitStats {
+    pub additions: u32,
+    pub deletions: u32,
+    pub total: u32,
+}
+
+/// 文件内容
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FileContent {
+    pub name: String,
+    pub path: String,
+    pub sha: String,
+    pub size: u64,
+    pub content: String,  // Base64 编码的内容
+    pub encoding: String, // "base64"
+    pub download_url: String,
+}
+
+/// 分页参数
+#[derive(Debug, Clone)]
+pub struct PaginationParams {
+    pub page: u32,
+    pub per_page: u32,
+}
+
+impl Default for PaginationParams {
+    fn default() -> Self {
+        Self {
+            page: 1,
+            per_page: 30,
+        }
+    }
+}
+
+/// Issue 状态
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum IssueState {
+    Open,
+    Closed,
+    All,
+}
+
+impl IssueState {
+    pub fn as_query_value(&self) -> &'static str {
+        match self {
