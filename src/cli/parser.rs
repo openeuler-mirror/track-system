@@ -521,3 +521,55 @@ pub enum PackageAction {
     #[command(about = "Update package")]
     Update {
         /// 软件包名称
+        #[arg(long)]
+        name: String,
+        /// 新的同步间隔
+        #[arg(long)]
+        sync_interval: Option<String>,
+        /// 新的优先级等级
+        #[arg(long)]
+        level: Option<i32>,
+        /// 新的描述
+        #[arg(long)]
+        description: Option<String>,
+    },
+
+    /// 删除软件包
+    #[command(about = "Remove package")]
+    Remove {
+        /// 软件包名称
+        name: String,
+        /// 确认删除
+        #[arg(long)]
+        confirm: bool,
+    },
+}
+
+// ============== Distro Commands ==============
+
+#[derive(Subcommand, Debug)]
+pub enum DistroAction {
+    /// 添加发行版
+    #[command(about = "Add a new distribution")]
+    Add {
+        /// 发行版名称
+        #[arg(long)]
+        name: String,
+        /// 版本
+        #[arg(long)]
+        version: String,
+        /// 描述
+        #[arg(long)]
+        description: Option<String>,
+    },
+
+    /// 列出所有发行版
+    #[command(about = "List all distributions")]
+    List,
+
+    /// 显示发行版详情
+    #[command(about = "Show distribution details")]
+    Show {
+        /// 发行版名称或 ID
+        name_or_id: String,
+    },
