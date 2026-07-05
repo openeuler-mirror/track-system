@@ -44,3 +44,49 @@ impl<T: GitClient> GitClientCollectorAdapter<T> {
         Self { client, platform }
     }
 }
+
+// 类型别名，方便使用
+pub type GitHubAdapter = GitClientCollectorAdapter<GitHubClient>;
+pub type GiteeAdapter = GitClientCollectorAdapter<GiteeClient>;
+pub type GiteaAdapter = GitClientCollectorAdapter<GiteaClient>;
+pub type GitLabAdapter = GitClientCollectorAdapter<GitLabClient>;
+
+/// 规范化 spec 文件路径
+fn normalize_spec_path(repo: &str) -> String {
+    if repo.ends_with(".spec") {
+        repo.to_string()
+    } else {
+        format!("{}.spec", repo)
+    }
+}
+
+/// 从 spec 文件内容中提取版本号
+fn extract_spec_version(content: &str) -> Option<String> {
+    let re = Regex::new(r"(?m)^\s*Version\s*:\s*([\w\.\-]+)").ok()?;
+    re.captures(content)
+        .and_then(|caps| caps.get(1))
+        .map(|m| m.as_str().to_string())
+}
+
+/// 从 spec 文件内容中提取 release 号
+fn extract_spec_release(content: &str) -> Option<String> {
+    let re = Regex::new(r"(?m)^\s*Release\s*:\s*([^\r\n]+)").ok()?;
+    re.captures(content).and_then(|caps| caps.get(1)).map(|m| {
+        let raw = m.as_str().trim();
+        // 去掉常见的宏定义
+        let cleaned = raw
+            .replace("%{?dist}", "")
+            .replace("%{?scl:", "")
+            .replace("%{!?scl:", "")
+            .replace("}", "")
+            .trim()
+            .to_string();
+        cleaned
+    })
+}
+
+/// 计算 SHA256 哈希
+fn sha256_hex(data: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(data);
+    let digest = hasher.finalize();
