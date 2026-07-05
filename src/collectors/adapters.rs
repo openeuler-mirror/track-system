@@ -137,3 +137,49 @@ impl<T: GitClient> Collector for GitClientCollectorAdapter<T> {
             repo: repo.clone(),
             branch: config.branch.clone(),
             collected_at: Utc::now(),
+            commits: commit_metadata,
+            snapshot: None,    // L0/L1/L2 在这里不需要快照
+            files: Vec::new(), // 如果需要文件列表，后续可以添加
+            spec,
+            issues: Vec::new(), // 如果需要 issues，后续可以添加
+        })
+    }
+
+    fn name(&self) -> &str {
+        match self.platform {
+            Platform::GitHub => "GitHubCollector",
+            Platform::GitLab => "GitLabCollector",
+            Platform::Gitee => "GiteeCollector",
+            Platform::Gitea => "GiteaCollector",
+            Platform::Local => "LocalCollector",
+        }
+    }
+}
+
+impl<T: GitClient> GitClientCollectorAdapter<T> {
+    /// 采集 spec 文件内容
+    async fn collect_spec(&self, owner: &str, repo: &str, branch: &str) -> Option<SpecInfo> {
+        let spec_path = normalize_spec_path(repo);
+
+        info!(
+            owner = %owner,
+            repo = %repo,
+            branch = %branch,
+            spec_path = %spec_path,
+            "开始获取 spec 文件"
+        );
+
+        match self
+            .client
+            .get_file_content(owner, repo, &spec_path, branch)
+            .await
+        {
+            Ok(file) => {
+                // 文件内容为 Base64 编码，需要解码以提取版本和计算 SHA256
+                let normalized = file.content.replace('\n', "");
+                let bytes = match BASE64_STANDARD.decode(normalized.as_bytes()) {
+                    Ok(b) => b,
+                    Err(err) => {
+                        error!(
+                            owner = %owner,
+                            repo = %repo,
