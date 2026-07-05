@@ -50,3 +50,55 @@ pub enum Commands {
     /// 工作流相关命令
     #[command(hide = true)]
     Workflow {
+        #[command(subcommand)]
+        action: WorkflowAction,
+    },
+
+    /// L0轮询相关命令
+    #[command(hide = true)]
+    L0 {
+        #[command(subcommand)]
+        action: L0Action,
+    },
+
+    /// 对比分析相关命令
+    #[command(hide = true)]
+    Compare {
+        #[command(subcommand)]
+        action: CompareAction,
+    },
+
+    /// 快照管理相关命令
+    Snapshot {
+        #[command(subcommand)]
+        action: SnapshotAction,
+    },
+
+    /// 数据导出相关命令
+    #[command(hide = true)]
+    Export {
+        #[command(subcommand)]
+        action: ExportAction,
+    },
+
+    /// 数据导入相关命令
+    Import {
+        #[command(subcommand)]
+        action: ImportAction,
+    },
+
+    /// 配置管理相关命令
+    #[command(hide = true)]
+    Config {
+        #[command(subcommand)]
+        action: ConfigAction,
+    },
+
+    /// 数据库管理命令
+    #[command(hide = true)]
+    Db {
+        #[command(subcommand)]
+        action: DbAction,
+    },
+
+    /// 软件包管理命令
