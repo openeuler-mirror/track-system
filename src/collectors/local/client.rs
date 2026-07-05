@@ -96,3 +96,52 @@ impl GitClient for LocalClient {
         _repo: &str,
     ) -> ApiResult<crate::collectors::traits::Repository> {
         let repo = self.open_repo()?;
+
+        // 获取仓库名称（从路径）
+        let repo_name = self
+            .repo_path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("unknown")
+            .to_string();
+
+        // 获取默认分支
+        let head = repo
+            .head()
+            .map_err(|e| ApiError::Unknown(format!("Failed to get HEAD: {}", e)))?;
+
+        let default_branch = head.shorthand().unwrap_or("master").to_string();
+
+        // 获取第一个 commit 的时间作为创建时间
+        let mut revwalk = repo
+            .revwalk()
+            .map_err(|e| ApiError::Unknown(format!("Failed to create revwalk: {}", e)))?;
+        revwalk.push_head().ok();
+        revwalk.set_sorting(Sort::TIME | Sort::REVERSE).ok();
+
+        let created_at = if let Some(Ok(oid)) = revwalk.next() {
+            if let Ok(commit) = repo.find_commit(oid) {
+                let timestamp = commit.time().seconds();
+                Utc.timestamp_opt(timestamp, 0)
+                    .single()
+                    .unwrap_or_else(Utc::now)
+            } else {
+                Utc::now()
+            }
+        } else {
+            Utc::now()
+        };
+
+        // 获取最新 commit 的时间作为更新时间
+        let updated_at = if let Ok(head_commit) = repo.head().and_then(|h| h.peel_to_commit()) {
+            let timestamp = head_commit.time().seconds();
+            Utc.timestamp_opt(timestamp, 0)
+                .single()
+                .unwrap_or_else(Utc::now)
+        } else {
+            Utc::now()
+        };
+
+        Ok(crate::collectors::traits::Repository {
+            id: 0, // 本地仓库没有 ID
+            name: repo_name.clone(),
