@@ -106,3 +106,40 @@ pub struct UpdatePackageRequest {
 
 /// 创建发行版请求
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateDistroRequest {
+    pub name: String,
+    pub version: String,
+    pub description: Option<String>,
+}
+
+/// 更新发行版请求
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateDistroRequest {
+    pub name: Option<String>,
+    pub version: Option<String>,
+    pub description: Option<String>,
+}
+
+/// 创建跟踪配置请求（与服务端一致）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateTrackingRequest {
+    pub package_id: i32,
+    pub distro_id: i32,
+    pub l1_repo_owner: String,
+    pub l1_repo_name: String,
+    pub l1_branch: String,
+    pub l2_branch: String,
+    pub l2_repo_path: String,
+    pub tracking_status: Option<String>,
+}
+
+/// 更新跟踪配置请求（与服务端一致）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateTrackingRequest {
+    pub l1_repo_owner: Option<String>,
+    pub l1_repo_name: Option<String>,
+    pub l1_branch: Option<String>,
+    pub l2_branch: Option<String>,
+    pub l2_repo_path: Option<String>,
+    pub tracking_status: Option<String>,
+}
