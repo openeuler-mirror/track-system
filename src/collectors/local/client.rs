@@ -391,3 +391,52 @@ impl Collector for LocalClient {
             branch: config.branch.clone(),
             collected_at: Utc::now(),
             commits: commit_metadata,
+            files: Vec::new(),
+            spec: None,
+            issues: Vec::new(),
+            snapshot,
+        })
+    }
+
+    fn name(&self) -> &str {
+        "LocalCollector"
+    }
+
+    fn validate_config(&self, config: &CollectConfig) -> ApiResult<()> {
+        if config.platform != Platform::Local {
+            return Err(ApiError::InvalidConfig(
+                "LocalClient requires Platform::Local".to_string(),
+            ));
+        }
+
+        if config.repo_path.is_none() {
+            return Err(ApiError::InvalidConfig(
+                "Local platform requires repo_path".to_string(),
+            ));
+        }
+
+        if config.branch.is_empty() {
+            return Err(ApiError::InvalidConfig(
+                "Branch name is required".to_string(),
+            ));
+        }
+
+        Ok(())
+    }
+}
+
+impl LocalClient {
+    /// 采集快照数据（用于 L1/L2）
+    fn collect_snapshot(&self, repo: &Repository, branch: &str) -> ApiResult<SnapshotData> {
+        use crate::collectors::traits::{PatchFile, SourceFile};
+        use sha2::{Digest, Sha256};
+
+        // 获取分支的 commit
+        let commit_oid = self.get_branch_commit(repo, branch)?;
+        let commit = repo
+            .find_commit(commit_oid)
+            .map_err(|e| ApiError::Unknown(format!("Failed to find commit: {}", e)))?;
+
+        // 获取 tree
+        let tree = commit
+            .tree()
