@@ -678,3 +678,55 @@ pub enum TrackingAction {
 }
 
 // ============== Status Commands ==============
+
+#[derive(Subcommand, Debug)]
+pub enum StatusAction {
+    /// 系统概览
+    #[command(about = "Show system overview")]
+    Overview,
+
+    /// 调度器状态
+    #[command(about = "Show scheduler status")]
+    Scheduler,
+
+    /// 速率限制状态
+    #[command(about = "Show rate limit status")]
+    RateLimit,
+}
+
+// ============== Health Commands ==============
+
+#[derive(Subcommand, Debug)]
+pub enum HealthAction {
+    /// 检查系统健康状态
+    #[command(about = "Check system health")]
+    Check {
+        /// 检查特定组件
+        #[arg(long)]
+        component: Option<String>,
+    },
+}
+
+// ============== Server Commands ==============
+
+#[derive(Subcommand, Debug)]
+pub enum ServerAction {
+    /// 配置服务器连接
+    #[command(about = "Configure server connection")]
+    Config {
+        /// 服务器 URL
+        #[arg(long)]
+        url: Option<String>,
+
+        /// 认证 token
+        #[arg(long)]
+        token: Option<String>,
+
+        /// 显示当前配置
+        #[arg(long)]
+        show: bool,
+    },
+
+    /// 测试服务器连接
+    #[command(about = "Test server connection")]
+    Ping,
