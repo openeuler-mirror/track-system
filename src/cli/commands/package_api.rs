@@ -83,3 +83,46 @@ async fn add_package(
     api_client: &ApiClient,
     name: String,
     level: i32,
+    sync_interval: String,
+    l0_repo: Option<String>,
+    description: Option<String>,
+) -> Result<()> {
+    println!("正在添加软件包: {}", name.cyan());
+
+    let sync_interval_hours = parse_sync_interval_hours(&sync_interval)?;
+    let request = CreatePackageRequest {
+        name: name.clone(),
+        level,
+        sync_interval_hours,
+        l0_repo_url: l0_repo,
+        description,
+    };
+
+    // 服务端返回裸 PackageResponse
+    match api_client
+        .post::<_, PackageDto>("/packages", &request)
+        .await
+    {
+        Ok(pkg) => {
+            println!("{} 软件包添加成功", "✓".green().bold());
+            println!("  ID: {}", pkg.id);
+            println!("  名称: {}", pkg.name.cyan());
+            println!("  等级: {}", pkg.level);
+            println!("  同步间隔: {} 小时", pkg.sync_interval_hours);
+            if let Some(url) = pkg.l0_repo_url.clone() {
+                println!("  L0 仓库: {}", url);
+            }
+            if let Some(desc) = pkg.description.clone() {
+                println!("  描述: {}", desc);
+            }
+            Ok(())
+        }
+        Err(e) => {
+            println!("{} 添加软件包失败: {}", "✗".red().bold(), e);
+            Err(e.into())
+        }
+    }
+}
+
+/// 列出软件包
+async fn list_packages(api_client: &ApiClient, limit: u64) -> Result<()> {
