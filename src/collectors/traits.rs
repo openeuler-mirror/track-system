@@ -412,3 +412,55 @@ impl CollectConfig {
     }
 }
 
+/// Commit 元数据（简化版，用于采集结果）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CommitMetadata {
+    pub sha: String,
+    /// 提交标题
+    pub title: String,
+    pub message: String,
+    pub author: String,
+    pub email: String,
+    pub date: DateTime<Utc>,
+    pub files_changed: Vec<String>,
+}
+
+impl From<Commit> for CommitMetadata {
+    fn from(commit: Commit) -> Self {
+        Self {
+            sha: commit.sha,
+            title: commit.title,
+            message: commit.message,
+            author: commit.author_name,
+            email: commit.author_email,
+            date: commit.author_date,
+            files_changed: Vec::new(), // 需要额外获取
+        }
+    }
+}
+
+/// 快照数据（用于 L1/L2 采集）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SnapshotData {
+    pub spec_content: Option<String>,
+    pub spec_path: Option<String>,
+    pub spec_version: Option<String>,
+    pub spec_content_base64: Option<String>,
+    pub patches: Vec<PatchFile>,
+    pub spec_release: Option<String>,
+    pub spec_sha256: Option<String>,
+    pub source_files: Vec<SourceFile>,
+    pub file_count: usize,
+}
+
+/// Patch 文件信息
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PatchFile {
+    pub filename: String,
+    pub path: String,
+    pub content: String,
+    pub sha256: String,
+}
+
+/// 源码文件信息
+#[derive(Debug, Clone, Serialize, Deserialize)]
