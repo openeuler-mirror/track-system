@@ -129,3 +129,47 @@ async fn show_scheduler(api_client: &ApiClient) -> Result<()> {
         .await
     {
         Ok(response) => {
+            let scheduler = response.data;
+
+            println!("{}", "调度器状态:".bold());
+            println!(
+                "  运行状态: {}",
+                if scheduler.running {
+                    "运行中".green()
+                } else {
+                    "已停止".red()
+                }
+            );
+            println!("  活动任务: {}", scheduler.active_jobs);
+            println!("  待处理任务: {}", scheduler.pending_jobs);
+
+            Ok(())
+        }
+        Err(e) => {
+            println!("{} 获取调度器状态失败: {}", "✗".red().bold(), e);
+            Err(e.into())
+        }
+    }
+}
+
+/// 显示速率限制状态
+async fn show_rate_limit(api_client: &ApiClient) -> Result<()> {
+    println!("正在获取速率限制状态...");
+    println!();
+
+    match api_client
+        .get::<serde_json::Value>("/status/rate-limit")
+        .await
+    {
+        Ok(response) => {
+            println!("{}", "速率限制状态:".bold());
+            println!("{}", serde_json::to_string_pretty(&response)?);
+            Ok(())
+        }
+        Err(e) => {
+            println!("{} 获取速率限制状态失败: {}", "✗".red().bold(), e);
+            Err(e.into())
+        }
+    }
+}
+
