@@ -626,3 +626,55 @@ pub enum TrackingAction {
         #[arg(long, default_value = "active", help = "跟踪状态（active/paused）")]
         status: String,
     },
+
+    /// 列出所有跟踪配置
+    #[command(about = "List all tracking configurations")]
+    List {
+        /// 限制数量
+        #[arg(long, default_value = "20")]
+        limit: u64,
+        /// 按软件包过滤
+        #[arg(long)]
+        package: Option<String>,
+        /// 按状态过滤
+        #[arg(long)]
+        status: Option<String>,
+    },
+
+    /// 显示跟踪配置详情
+    #[command(about = "Show tracking configuration details")]
+    Show {
+        /// 跟踪配置 ID
+        #[arg(long)]
+        id: i32,
+    },
+
+    /// 暂停跟踪
+    #[command(about = "Pause tracking")]
+    Pause {
+        /// 跟踪配置 ID
+        #[arg(long)]
+        id: i32,
+    },
+
+    /// 恢复跟踪
+    #[command(about = "Resume tracking")]
+    Resume {
+        /// 跟踪配置 ID
+        #[arg(long)]
+        id: i32,
+    },
+
+    /// 删除跟踪配置
+    #[command(about = "Remove tracking configuration")]
+    Remove {
+        /// 跟踪配置 ID
+        #[arg(long)]
+        id: i32,
+        /// 确认删除
+        #[arg(long)]
+        confirm: bool,
+    },
+}
+
+// ============== Status Commands ==============
