@@ -469,3 +469,55 @@ pub enum DbAction {
     /// 检查数据库状态
     #[command(about = "Check database status")]
     Status,
+
+    /// 重置数据库（危险操作）
+    #[command(about = "Reset database (dangerous)")]
+    Reset {
+        #[arg(long)]
+        confirm: bool,
+    },
+}
+
+// ============== Package Commands ==============
+
+#[derive(Subcommand, Debug)]
+pub enum PackageAction {
+    /// 添加软件包
+    #[command(about = "Add a new package")]
+    Add {
+        /// 软件包名称
+        #[arg(long)]
+        name: String,
+        /// 优先级等级
+        #[arg(long)]
+        level: i32,
+        /// 同步间隔（如 12h, 24h）
+        #[arg(long)]
+        sync_interval: String,
+        /// L0 仓库 URL
+        #[arg(long)]
+        l0_repo: Option<String>,
+        /// 描述
+        #[arg(long)]
+        description: Option<String>,
+    },
+
+    /// 列出所有软件包
+    #[command(about = "List all packages")]
+    List {
+        /// 限制数量
+        #[arg(long, default_value = "20")]
+        limit: u64,
+    },
+
+    /// 显示软件包详情
+    #[command(about = "Show package details")]
+    Show {
+        /// 软件包名称或 ID
+        name_or_id: String,
+    },
+
+    /// 更新软件包
+    #[command(about = "Update package")]
+    Update {
+        /// 软件包名称
