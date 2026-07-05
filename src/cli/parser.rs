@@ -573,3 +573,56 @@ pub enum DistroAction {
         /// 发行版名称或 ID
         name_or_id: String,
     },
+
+    /// 删除发行版
+    #[command(about = "Remove distribution")]
+    Remove {
+        /// 发行版名称
+        name: String,
+        /// 确认删除
+        #[arg(long)]
+        confirm: bool,
+    },
+}
+
+// ============== Tracking Commands ==============
+
+#[derive(Subcommand, Debug)]
+pub enum TrackingAction {
+    /// 添加新的跟踪配置
+    #[command(about = "Add a new tracking configuration")]
+    Add {
+        /// 软件包名称或ID（名称需存在）
+        #[arg(long, help = "软件包名称或ID（名称需存在）")]
+        package: String,
+
+        /// 发行版ID（仅支持数字ID）
+        #[arg(long, help = "发行版ID（仅支持数字ID）")]
+        distro: String,
+
+        /// L1 仓库，支持 owner/repo、owner:repo 或完整URL（建议使用引号避免shell误解析）
+        #[arg(
+            long,
+            help = "L1 仓库，支持 owner/repo、owner:repo 或完整URL（请使用引号避免 shell 误解析）"
+        )]
+        l1_repo: String,
+
+        /// L1 分支名称
+        #[arg(long, help = "L1 分支名称")]
+        l1_branch: String,
+
+        /// L2 本地仓库路径（例如 /path/to/repo；不使用 & 或反引号）
+        #[arg(
+            long,
+            help = "L2 本地仓库路径（例如 /path/to/repo；不使用 & 或反引号）"
+        )]
+        l2_repo: String,
+
+        /// L2 分支名称
+        #[arg(long, default_value = "main", help = "L2 分支名称")]
+        l2_branch: String,
+
+        /// 跟踪状态（active/paused）
+        #[arg(long, default_value = "active", help = "跟踪状态（active/paused）")]
+        status: String,
+    },
