@@ -489,3 +489,53 @@ impl LocalClient {
                                     );
                                 }
                             }
+                        }
+                    }
+                    // 检查是否是 patch 文件
+                    else if path.ends_with(".patch") {
+                        if let Ok(text) = String::from_utf8(content.to_vec()) {
+                            let mut hasher = Sha256::new();
+                            hasher.update(content);
+                            let sha256 = format!("{:x}", hasher.finalize());
+
+                            patches.push(PatchFile {
+                                filename: entry.name().unwrap_or("").to_string(),
+                                path: path.clone(),
+                                content: text,
+                                sha256,
+                            });
+                        }
+                    }
+                    // 其他源文件
+                    else {
+                        let mut hasher = Sha256::new();
+                        hasher.update(content);
+                        let sha256 = format!("{:x}", hasher.finalize());
+
+                        source_files.push(SourceFile {
+                            path: path.clone(),
+                            sha256,
+                            size: content.len() as u64,
+                        });
+                    }
+                }
+            }
+
+            git2::TreeWalkResult::Ok
+        })
+        .ok();
+
+        Ok(SnapshotData {
+            spec_path,
+            spec_content,
+            spec_content_base64,
+            spec_version,
+            spec_release,
+            spec_sha256,
+            patches,
+            source_files,
+            file_count,
+        })
+    }
+}
+
