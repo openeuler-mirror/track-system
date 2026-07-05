@@ -74,3 +74,42 @@ async fn run_all_sync(api_client: &ApiClient) -> Result<()> {
 
     for tracking in trackings {
         let tracking_id = tracking["id"]
+            .as_i64()
+            .ok_or_else(|| anyhow::anyhow!("无效的 tracking ID"))? as i32;
+        let package_name = tracking["package_name"].as_str().unwrap_or("unknown");
+
+        print!("提交 {} (ID: {})... ", package_name, tracking_id);
+
+        match api_client
+            .post::<_, serde_json::Value>(
+                &format!("/sync/{}/queue", tracking_id),
+                &serde_json::json!({}),
+            )
+            .await
+        {
+            Ok(_) => {
+                println!("{}", "✓".green());
+                success_count += 1;
+            }
+            Err(e) => {
+                println!("{}: {}", "✗".red(), e);
+                failed_count += 1;
+            }
+        }
+    }
+
+    println!();
+    println!("完成: {} 成功, {} 失败", success_count, failed_count);
+
+    Ok(())
+}
+
+/// 批量执行指定的 tracking
+async fn batch_sync(api_client: &ApiClient, ids: Vec<i32>) -> Result<()> {
+    println!(
+        "{}",
+        format!("正在批量提交 {} 个同步任务...", ids.len()).cyan()
+    );
+
+    let mut success_count = 0;
+    let mut failed_count = 0;
