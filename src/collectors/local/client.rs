@@ -194,3 +194,52 @@ impl GitClient for LocalClient {
         // 获取分支的起始 commit
         let start_oid = self.get_branch_commit(&repo, &params.branch)?;
 
+        // 创建 revwalk
+        let mut revwalk = repo
+            .revwalk()
+            .map_err(|e| ApiError::Unknown(format!("Failed to create revwalk: {}", e)))?;
+
+        revwalk
+            .push(start_oid)
+            .map_err(|e| ApiError::Unknown(format!("Failed to push commit: {}", e)))?;
+
+        revwalk.set_sorting(Sort::TIME).ok();
+
+        // 遍历 commits
+        let limit = params.per_page as usize;
+        for oid_result in revwalk.take(limit) {
+            let oid = oid_result
+                .map_err(|e| ApiError::Unknown(format!("Failed to get commit OID: {}", e)))?;
+
+            let commit = repo
+                .find_commit(oid)
+                .map_err(|e| ApiError::Unknown(format!("Failed to find commit: {}", e)))?;
+
+            // 转换时间
+            let time = commit.time();
+            let timestamp = time.seconds();
+            let datetime = Utc
+                .timestamp_opt(timestamp, 0)
+                .single()
+                .unwrap_or_else(Utc::now);
+
+            // 检查时间范围
+            if let Some(since) = params.since {
+                if datetime < since {
+                    break;
+                }
+            }
+            if let Some(until) = params.until {
+                if datetime > until {
+                    continue;
+                }
+            }
+
+            // 提取作者和提交者信息
+            let author = commit.author();
+            let committer = commit.committer();
+
+            let author_name = author.name().unwrap_or("Unknown").to_string();
+            let author_email = author.email().unwrap_or("").to_string();
+            let committer_name = committer.name().unwrap_or("Unknown").to_string();
+            let committer_email = committer.email().unwrap_or("").to_string();
