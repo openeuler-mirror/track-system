@@ -155,3 +155,55 @@ pub enum SyncAction {
     /// 执行单个tracking的数据同步
     #[command(about = "Run sync for a specific tracking")]
     Run {
+        /// Tracking ID
+        tracking_id: i32,
+
+        /// 超时时间（秒）
+        #[arg(long, default_value = "3600")]
+        timeout: u64,
+
+        /// 失败是否继续
+        #[arg(long)]
+        continue_on_error: bool,
+    },
+
+    /// 执行所有待处理的同步任务
+    #[command(about = "Run sync for all pending trackings")]
+    RunAll {
+        /// 最大并发数
+        #[arg(long, default_value = "4")]
+        concurrency: usize,
+    },
+
+    /// 批量执行指定的tracking
+    #[command(about = "Run sync for multiple trackings")]
+    Batch {
+        /// Tracking IDs
+        ids: Vec<i32>,
+
+        /// 最大并发数
+        #[arg(long, default_value = "4")]
+        concurrency: usize,
+    },
+
+    /// 唤醒调度器，立即触发调度
+    #[command(about = "Wake up scheduler to trigger immediate scheduling")]
+    Wake {
+        /// 指定 tracking ID（可选，不指定则唤醒整个调度器）
+        #[arg(long)]
+        tracking_id: Option<i32>,
+    },
+
+    /// 显示同步状态
+    #[command(about = "Show sync status")]
+    Status,
+}
+
+// ============== Classify Commands ==============
+
+#[derive(Subcommand, Debug)]
+pub enum ClassifyAction {
+    /// 处理待分类的commits
+    #[command(about = "Process pending classification jobs")]
+    Process {
+        /// 处理数量限制
