@@ -44,3 +44,50 @@ impl TableFormatter {
         rows: &[Vec<T>],
     ) -> anyhow::Result<String> {
         if headers.is_empty() {
+            return Ok(String::new());
+        }
+
+        let mut output = String::new();
+
+        // 计算每列的最大宽度
+        let mut col_widths: Vec<usize> = headers.iter().map(|h| h.len()).collect();
+
+        for row in rows {
+            for (i, cell) in row.iter().enumerate() {
+                if i < col_widths.len() {
+                    let cell_len = cell.to_string().len();
+                    if cell_len > col_widths[i] {
+                        col_widths[i] = cell_len;
+                    }
+                }
+            }
+        }
+
+        // 渲染表头
+        let header_line = headers
+            .iter()
+            .enumerate()
+            .map(|(i, h)| format!("{:<width$}", h, width = col_widths[i]))
+            .collect::<Vec<_>>()
+            .join("  ");
+
+        if self.use_color {
+            output.push_str(&header_line.bold().to_string());
+        } else {
+            output.push_str(&header_line);
+        }
+        output.push('\n');
+
+        // 渲染分隔线
+        let separator = col_widths
+            .iter()
+            .map(|w| "-".repeat(*w))
+            .collect::<Vec<_>>()
+            .join("  ");
+        output.push_str(&separator);
+        output.push('\n');
+
+        // 渲染数据行
+        for row in rows {
+            let row_line = row
+                .iter()
