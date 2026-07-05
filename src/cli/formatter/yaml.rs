@@ -18,3 +18,24 @@ use serde::Serialize;
 use super::Formatter;
 
 /// YAML 格式化器
+pub struct YamlFormatter;
+
+impl YamlFormatter {
+    /// 创建新的 YAML 格式化器
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl Default for YamlFormatter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Formatter for YamlFormatter {
+    fn format<T: Serialize>(&self, data: &T) -> anyhow::Result<String> {
+        Ok(serde_yaml::to_string(data)?)
+    }
+}
+
