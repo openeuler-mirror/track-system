@@ -477,3 +477,51 @@ impl<'a> SyncService<'a> {
                 tracking_id: Set(tracking_id),
                 issue_number: Set(issue_number_str),
                 title: Set(api_issue.title),
+                state: Set(api_issue.state.to_string()),
+                author: Set(api_issue.author),
+                api_url: Set(api_issue.api_url),
+                labels: Set(labels_json),
+                created_at: Set(api_issue.created_at),
+                updated_at: Set(api_issue.updated_at),
+                closed_at: Set(api_issue.closed_at),
+                raw_payload: Set(Some(api_issue.raw_payload)),
+                ..Default::default()
+            };
+
+            Issues::insert(new_issue)
+                .exec(self.db)
+                .await
+                .context("插入 issue 失败")?;
+
+            synced_count += 1;
+        }
+
+        info!("新增 {} 个 issues", synced_count);
+        Ok(synced_count)
+    }
+
+    /// 更新 tracking 的同步时间
+    async fn update_tracking_sync_time(&self, tracking_id: i32) -> Result<()> {
+        let tracking_entity = Tracking::find_by_id(tracking_id)
+            .one(self.db)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Tracking 不存在"))?;
+
+        let mut active_model: tracking::ActiveModel = tracking_entity.into();
+        // 使用正确的字段名
+        active_model.last_sync_time = Set(Some(Utc::now()));
+        active_model.tracking_status = Set("active".to_string());
+        active_model.last_error = Set(None);
+        active_model.updated_at = Set(Utc::now());
+
+        active_model.update(self.db).await?;
+        Ok(())
+    }
+}
+
+/// 同步结果状态
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SyncStatus {
+    Success,
+    Skipped,
+    Failed,
