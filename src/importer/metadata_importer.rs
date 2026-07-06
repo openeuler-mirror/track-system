@@ -282,3 +282,51 @@ impl<'a> MetadataImporter<'a> {
         };
 
         // 插入新记录
+        let new_issue = issues::ActiveModel {
+            tracking_id: Set(tracking_id),
+            issue_number: Set(issue_number_str),
+            title: Set(issue_info.title.clone()),
+            state: Set(issue_info.state.clone()),
+            author: Set(issue_info
+                .author
+                .clone()
+                .unwrap_or_else(|| "unknown".to_string())),
+            api_url: Set(String::new()), // 从 JSON 中无法获取，设为空
+            labels: Set(labels_json),
+            created_at: Set(issue_info.created_at),
+            updated_at: Set(issue_info.updated_at),
+            closed_at: Set(issue_info.closed_at),
+            raw_payload: Set(None),
+            ..Default::default()
+        };
+
+        Issues::insert(new_issue)
+            .exec(self.db)
+            .await
+            .context("插入 issue 失败")?;
+
+        Ok(true)
+    }
+
+    /// 批量导入多个 JSON 文件
+    pub async fn import_batch(
+        &self,
+        file_paths: Vec<&Path>,
+        tracking_id: i32,
+    ) -> Result<Vec<ImportResult>> {
+        let mut results = Vec::new();
+
+        for file_path in file_paths {
+            match self.import_from_file(file_path, tracking_id).await {
+                Ok(result) => results.push(result),
+                Err(e) => {
+                    warn!("导入文件 {:?} 失败: {}", file_path, e);
+                    results.push(ImportResult::failed(e.to_string()));
+                }
+            }
+        }
+
+        Ok(results)
+    }
+}
+
