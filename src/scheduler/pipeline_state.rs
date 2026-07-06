@@ -39,3 +39,45 @@ pub struct PipelineState {
 
 impl PipelineState {
     pub fn new(job_id: i64, tracking_id: i32) -> Self {
+        Self {
+            job_id,
+            tracking_id,
+            current_stage: None,
+            completed_stages: Vec::new(),
+            stage_start_times: HashMap::new(),
+            can_cancel: true,
+            cancel_requested: false,
+        }
+    }
+
+    pub fn start_stage(&mut self, stage: PipelineStage) {
+        self.current_stage = Some(stage);
+        self.stage_start_times.insert(stage, Utc::now());
+    }
+
+    pub fn complete_stage(&mut self, stage: PipelineStage) {
+        self.completed_stages.push(stage);
+        self.current_stage = None;
+    }
+
+    pub fn request_cancel(&mut self) {
+        self.cancel_requested = true;
+    }
+
+    pub fn is_cancelled(&self) -> bool {
+        self.cancel_requested
+    }
+
+    pub fn progress_percent(&self) -> f32 {
+        let total_stages = PipelineStage::all_stages().len() as f32;
+        let completed = self.completed_stages.len() as f32;
+        (completed / total_stages) * 100.0
+    }
+
+    pub fn to_job_progress(&self, status: String) -> JobProgress {
+        JobProgress {
+            job_id: self.job_id,
+            tracking_id: self.tracking_id,
+            current_stage: self.current_stage,
+            completed_stages: self.completed_stages.clone(),
+            progress_percent: self.progress_percent(),
