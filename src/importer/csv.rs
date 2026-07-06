@@ -162,3 +162,44 @@ impl<'a> CsvImporter<'a> {
     }
 
     /// 导入 CSV 字符串（用于测试）
+    pub async fn import_from_string(&self, csv_content: &str) -> anyhow::Result<ImportResult> {
+        let mut reader = csv::ReaderBuilder::new()
+            .comment(Some(b'#'))
+            .from_reader(csv_content.as_bytes());
+
+        let mut stats = ImportStats::default();
+        let mut errors = Vec::new();
+
+        for (line_num, result) in reader.deserialize().enumerate() {
+            let line_num = line_num + 2;
+            stats.total += 1;
+
+            match result {
+                Ok(record) => match self.import_package(record).await {
+                    Ok(created) => {
+                        if created {
+                            stats.created += 1;
+                        } else {
+                            stats.updated += 1;
+                        }
+                    }
+                    Err(e) => {
+                        stats.failed += 1;
+                        errors.push(format!("第 {} 行: {}", line_num, e));
+                    }
+                },
+                Err(e) => {
+                    stats.failed += 1;
+                    errors.push(format!("第 {} 行解析错误: {}", line_num, e));
+                }
+            }
+        }
+
+        Ok(ImportResult {
+            success: errors.is_empty(),
+            stats,
+            errors,
+        })
+    }
+}
+
