@@ -144,3 +144,52 @@ impl<'a> MetadataImporter<'a> {
                 let mut pkg: packages::ActiveModel = existing_pkg.into();
                 pkg.level = Set(level);
                 pkg.sync_interval_hours = Set(sync_interval_hours);
+                pkg.updated_at = Set(Utc::now());
+                pkg.update(self.db).await?;
+                return Ok(PackageImportResult::Updated);
+            } else {
+                // 默认跳过
+                return Ok(PackageImportResult::Skipped);
+            }
+        }
+
+        // 插入新记录
+        let now = Utc::now();
+        let package = packages::ActiveModel {
+            name: Set(name.to_string()),
+            level: Set(level),
+            sync_interval_hours: Set(sync_interval_hours),
+            created_at: Set(now),
+            updated_at: Set(now),
+            ..Default::default()
+        };
+
+        package.insert(self.db).await?;
+        Ok(PackageImportResult::Imported)
+    }
+
+    /// 导入单个发行版
+    async fn import_distro(
+        &self,
+        distro_json: &serde_json::Value,
+        _options: &ImportOptions,
+    ) -> Result<bool, DbErr> {
+        use crate::entities::{distros, prelude::Distros};
+
+        let name = distro_json["name"].as_str().unwrap_or("");
+        let version = distro_json["version"].as_str().unwrap_or("");
+        let platform = distro_json["platform"].as_str().unwrap_or("");
+        let base_url = distro_json["base_url"].as_str().unwrap_or("");
+
+        // 检查是否已存在
+        let existing = Distros::find()
+            .filter(distros::Column::Name.eq(name))
+            .filter(distros::Column::Version.eq(version))
+            .one(self.db)
+            .await?;
+
+        if existing.is_some() {
+            // 已存在，跳过
+            return Ok(false);
+        }
+
