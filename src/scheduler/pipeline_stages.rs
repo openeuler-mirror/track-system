@@ -824,3 +824,55 @@ impl<'a> PipelineExecutor<'a> {
                                             match risk_client
                                                 .post(&risk_create_url)
                                                 .header("Content-Type", "application/json")
+                                                .json(&req)
+                                                .send()
+                                                .await
+                                            {
+                                                Ok(resp) if resp.status().is_success() => {
+                                                    let body =
+                                                        resp.text().await.unwrap_or_default();
+                                                    info!(
+                                                        tracking_id = tracking.id,
+                                                        commit_sha = %commit.commit_sha,
+                                                        body = body,
+                                                        "调用 risk/create 成功"
+                                                    );
+                                                }
+                                                Ok(resp) => {
+                                                    let status = resp.status().as_u16();
+                                                    let body =
+                                                        resp.text().await.unwrap_or_default();
+                                                    warn!(
+                                                        tracking_id = tracking.id,
+                                                        commit_sha = %commit.commit_sha,
+                                                        status = status,
+                                                        body = body,
+                                                        "调用 risk/create 失败"
+                                                    );
+                                                }
+                                                Err(err) => {
+                                                    warn!(
+                                                        tracking_id = tracking.id,
+                                                        commit_sha = %commit.commit_sha,
+                                                        error = %err,
+                                                        "调用 risk/create 失败"
+                                                    );
+                                                }
+                                            }
+                                        }
+
+                                        // 构建单个commit的信息
+                                        let commit_info = serde_json::json!({
+                                            "Description": commit.commit_message,
+                                            "Level": level,
+                                            "Reporter": commit.author_name,
+                                            "Software": &package_name,
+                                            "Version": &base_version,
+                                            "Release": &base_release,
+                                            "Platform": "noarch",
+                                            "DisclosureTime": commit.committed_at.to_rfc3339(),
+                                            "Source": &tracking.l1_repo_owner,
+                                            "CommitSha": commit.commit_sha,
+                                            "ChangeType": commit.primary_change_type.unwrap_or_else(|| "Unknown".to_string()),
+                                            "CVEList": commit.cve_list.unwrap_or_else(|| serde_json::json!([])),
+                                            "PackageID": tracking.package_id,
