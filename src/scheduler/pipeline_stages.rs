@@ -463,3 +463,54 @@ impl<'a> PipelineExecutor<'a> {
                 "patches_removed_list": r.patch_diff.l2_removed.iter().map(|p| serde_json::json!({
                     "filename": p.filename,
                     "path": p.path,
+                    "content_hash": p.content_hash,
+                    "size": p.size,
+                    "applied": p.applied,
+                })).collect::<Vec<_>>(),
+                "patches_identical": r.patch_diff.identical.len(),
+                "has_spec_changes": !r.spec_diff.content_identical,
+                "spec_diff": serde_json::json!({
+                    "version_diff": r.spec_diff.version_diff.as_ref().map(|v| serde_json::json!({
+                        "l1_version": v.l1_version,
+                        "l2_version": v.l2_version,
+                        "relationship": format!("{:?}", v.relationship),
+                    })),
+                    "diff_summary": r.spec_diff.diff_summary,
+                    "key_changes": r.spec_diff.key_changes,
+                    "build_requires_added": r.spec_diff.build_requires_added,
+                    "build_requires_removed": r.spec_diff.build_requires_removed,
+                    "configure_options_added": r.spec_diff.configure_options_added,
+                    "configure_options_removed": r.spec_diff.configure_options_removed,
+                }),
+                "conflicts": r.conflicts.len(),
+                "commit_diff": serde_json::json!({
+                    "l1_commits_count": r.commit_diff.l1_commits_count,
+                    "l2_commits_count": r.commit_diff.l2_commits_count,
+                    "behind_commits_count": r.commit_diff.behind_commits.len(),
+                    "behind_commits": r.commit_diff.behind_commits.iter().map(|c| serde_json::json!({
+                        "sha": c.sha,
+                        "title": c.title,
+                        "author": c.author,
+                        "authored_at": c.authored_at,
+                        "url": c.url,
+                        "stats": serde_json::json!({
+                            "additions": c.stats.additions,
+                            "deletions": c.stats.deletions,
+                            "files_changed": c.stats.files_changed,
+                        }),
+                        "primary_change_type": c.primary_change_type,
+                        "cve_list": c.cve_list,
+                    })).collect::<Vec<_>>(),
+                    "base_commit": r.commit_diff.base_commit.as_ref().map(|c| serde_json::json!({
+                        "sha": c.sha,
+                        "title": c.title,
+                        "author": c.author,
+                        "authored_at": c.authored_at,
+                    })),
+                    "base_version_release": r.commit_diff.base_version_release,
+                }),
+            }));
+
+        let l1_vs_l0_diff = l1_vs_l0.as_ref().map(|r| serde_json::json!({
+                "version_behind": r.version_behind,
+                "current_version": r.current_version,
