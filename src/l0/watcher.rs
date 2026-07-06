@@ -70,3 +70,39 @@ where
             .await
             .context("failed to collect commits from GitHub")?;
 
+        let commits = result.commits;
+
+        if commits.is_empty() {
+            return Ok(L0PollSummary::default());
+        }
+
+        let mut existing: HashSet<String> = l0_commits::Entity::find()
+            .filter(l0_commits::Column::PackageId.eq(package.id))
+            .all(self.db)
+            .await?
+            .into_iter()
+            .map(|model| model.commit_sha)
+            .collect();
+
+        let mut summary = L0PollSummary::default();
+
+        for commit in commits {
+            if !existing.insert(commit.sha.clone()) {
+                summary.commits_skipped += 1;
+                continue;
+            }
+
+            let metadata = json!({
+                "author": commit.author,
+                "email": commit.email,
+                "files_changed": commit.files_changed,
+            });
+
+            let active = l0_commits::ActiveModel {
+                package_id: Set(package.id),
+                repo: Set(format!("{}/{}", owner, repo)),
+                commit_sha: Set(commit.sha.clone()),
+                summary: Set(commit.message.clone()),
+                authored_at: Set(commit.date),
+                metadata: Set(Some(metadata)),
+                created_at: Set(Utc::now()),
