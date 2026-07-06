@@ -445,3 +445,53 @@ impl<'a> PipelineExecutor<'a> {
                 ))
             }
             PipelineStage::DiffComparison => {
+                let result = self
+                    .stage_diff_comparison(tracking, previous_results)
+                    .await?;
+                let details = serde_json::to_value(&result)?;
+                Ok(StageResult::success(
+                    stage,
+                    format!("对比完成，{} 个文件变更", result.files_changed),
+                    started_at,
+                    details,
+                ))
+            }
+            PipelineStage::Classification => {
+                let result = self
+                    .stage_classification(tracking, previous_results)
+                    .await?;
+                let details = serde_json::to_value(&result)?;
+                Ok(StageResult::success(
+                    stage,
+                    format!(
+                        "分类 {} 个 commits，发现 {} 个 CVE",
+                        result.classified_count, result.cve_count
+                    ),
+                    started_at,
+                    details,
+                ))
+            }
+            PipelineStage::ReportGeneration => {
+                let result = self
+                    .stage_report_generation(tracking, previous_results)
+                    .await?;
+                let details = serde_json::to_value(&result)?;
+                Ok(StageResult::success(
+                    stage,
+                    format!("生成报告 ID: {}", result.report_id),
+                    started_at,
+                    details,
+                ))
+            }
+            PipelineStage::BackportSuggestion => {
+                let result = self
+                    .stage_backport_suggestion(tracking, previous_results)
+                    .await?;
+                let details = serde_json::to_value(&result)?;
+                Ok(StageResult::success(
+                    stage,
+                    format!("生成 {} 个回合候选", result.candidates_count),
+                    started_at,
+                    details,
+                ))
+            }
