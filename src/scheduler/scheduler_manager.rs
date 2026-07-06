@@ -173,3 +173,47 @@ impl SchedulerManager {
                 );
 
                 sync_manager.complete_sync_task(tracking_id, false).await?;
+
+                return Err(err);
+            }
+        }
+
+        Ok(job_id)
+    }
+
+    /// 获取调度器状态
+    pub async fn get_scheduler_status(&self) -> Result<SchedulerStatus> {
+        let status = self.status.read().await;
+        Ok(status.clone())
+    }
+
+    /// 唤醒调度循环，立即执行调度
+    ///
+    /// # 参数
+    /// * `tracking_id` - 可选的 tracking_id，如果指定则只处理该任务，否则处理所有待处理任务
+    pub fn wake(&self, tracking_id: Option<i32>) {
+        let signal = match tracking_id {
+            Some(id) => {
+                info!(tracking_id = id, "手动唤醒调度器（指定任务）");
+                WakeSignal::Specific(id)
+            }
+            None => {
+                info!("手动唤醒调度器（所有任务）");
+                WakeSignal::All
+            }
+        };
+
+        if let Err(e) = self.wake_tx.send(signal) {
+            error!("发送唤醒信号失败: {}", e);
+        }
+    }
+
+    pub async fn execute_round(&self) -> Result<Vec<SyncJobResult>> {
+        self.execute_round_wake_up(false, None).await
+    }
+
+    /// 执行一轮调度
+    ///
+    /// # 参数
+    /// * `wake_up` - 是否唤醒调度器
+    /// * `tracking_id` - 可选的 tracking_id，如果指定则只处理该任务，否则处理所有待处理任务
