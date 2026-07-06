@@ -928,3 +928,55 @@ impl<'a> PipelineExecutor<'a> {
             source: Set("pipeline".to_string()),
             status: Set("success".to_string()),
             failure_reason: Set(None),
+            created_at: Set(Utc::now()),
+            updated_at: Set(Utc::now()),
+            ..Default::default()
+        };
+
+        let inserted = report.insert(self.db).await.context("插入报告记录失败")?;
+
+        info!(
+            tracking_id = tracking.id,
+            report_id = inserted.id,
+            commits_count = commit_reports.len(),
+            "报告生成成功"
+        );
+
+        Ok(ReportGenerationResult {
+            report_id: inserted.id as i64,
+            report_status: "success".to_string(),
+        })
+    }
+
+    /// 阶段 6: 回合建议
+    pub(super) async fn stage_backport_suggestion(
+        &self,
+        tracking: &tracking::Model,
+        _previous_results: &HashMap<PipelineStage, StageResult>,
+    ) -> Result<BackportSuggestionResult> {
+        info!(tracking_id = tracking.id, "执行回合建议阶段");
+
+        // 获取 package_id
+        let package_id = tracking.package_id;
+
+        // 使用 BackportAdvisor 生成回合候选
+        let advisor = BackportAdvisor::new(self.db);
+        let summary = advisor
+            .generate_for_package(package_id)
+            .await
+            .context("生成回合候选失败")?;
+
+        info!(
+            tracking_id = tracking.id,
+            candidates_created = summary.candidates_created,
+            candidates_skipped = summary.candidates_skipped,
+            "回合建议生成完成"
+        );
+
+        Ok(BackportSuggestionResult {
+            candidates_count: summary.candidates_created,
+            l0_commits_checked: summary.candidates_created + summary.candidates_skipped,
+        })
+    }
+}
+
