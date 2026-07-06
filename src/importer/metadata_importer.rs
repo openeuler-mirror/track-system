@@ -235,3 +235,50 @@ impl<'a> MetadataImporter<'a> {
             tracking_id: Set(tracking_id),
             commit_sha: Set(commit_info.sha.clone()),
             commit_message: Set(commit_info.message.clone()),
+            author_name: Set(commit_info.author_name.clone()),
+            author_email: Set(commit_info.author_email.clone()),
+            committed_at: Set(commit_info.author_date),
+            api_url: Set(String::new()), // 空字符串作为默认值
+            fetched_at: Set(Utc::now()),
+            created_at: Set(Utc::now()),
+            ..Default::default()
+        };
+
+        L1CommitRecords::insert(new_commit)
+            .exec(self.db)
+            .await
+            .context("插入 commit 失败")?;
+
+        Ok(true)
+    }
+
+    /// 导入单个 issue
+    async fn import_issue(&self, issue_info: &IssueInfo, tracking_id: i32) -> Result<bool> {
+        use sea_orm::{ColumnTrait, QueryFilter};
+
+        let issue_number_str = issue_info.number.to_string();
+
+        // 检查是否已存在
+        let existing = Issues::find()
+            .filter(issues::Column::TrackingId.eq(tracking_id))
+            .filter(issues::Column::IssueNumber.eq(&issue_number_str))
+            .one(self.db)
+            .await
+            .context("查询已有 issue 失败")?;
+
+        if existing.is_some() {
+            return Ok(false); // 已存在，跳过
+        }
+
+        // 转换 labels
+        let labels_json = if let Some(labels) = &issue_info.labels {
+            if !labels.is_empty() {
+                Some(serde_json::to_value(labels).unwrap_or(serde_json::Value::Null))
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        // 插入新记录
