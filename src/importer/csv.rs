@@ -39,3 +39,44 @@ pub struct ImportResult {
     pub success: bool,
     pub stats: ImportStats,
     pub errors: Vec<String>,
+}
+
+/// 导入统计
+#[derive(Debug, Default)]
+pub struct ImportStats {
+    pub total: usize,
+    pub created: usize,
+    pub updated: usize,
+    pub skipped: usize,
+    pub failed: usize,
+}
+
+/// CSV 导入器
+pub struct CsvImporter<'a> {
+    db: &'a DatabaseConnection,
+}
+
+impl<'a> CsvImporter<'a> {
+    /// 创建新的导入器
+    pub fn new(db: &'a DatabaseConnection) -> Self {
+        Self { db }
+    }
+
+    /// 从 CSV 文件导入软件包
+    pub async fn import_from_file(&self, path: impl AsRef<Path>) -> anyhow::Result<ImportResult> {
+        let path = path.as_ref();
+
+        // 读取 CSV 文件
+        let mut reader = csv::ReaderBuilder::new()
+            .comment(Some(b'#'))
+            .from_path(path)?;
+
+        let mut stats = ImportStats::default();
+        let mut errors = Vec::new();
+
+        // 逐行处理
+        for (line_num, result) in reader.deserialize().enumerate() {
+            let line_num = line_num + 2; // +2 因为有标题行和从0开始计数
+            stats.total += 1;
+
+            match result {
