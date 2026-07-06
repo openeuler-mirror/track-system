@@ -122,3 +122,45 @@ impl PipelineStateManager {
         if let Some(state) = states.get_mut(&job_id) {
             state.complete_stage(stage);
         }
+        Ok(())
+    }
+
+    /// 请求取消
+    pub fn request_cancel(&self, job_id: i64) -> Result<()> {
+        let mut states = self.states.write().unwrap();
+        if let Some(state) = states.get_mut(&job_id) {
+            state.request_cancel();
+            info!(job_id = job_id, "流水线取消请求已记录");
+        } else {
+            warn!(job_id = job_id, "流水线状态不存在");
+        }
+        Ok(())
+    }
+
+    /// 检查是否已取消
+    pub fn is_cancelled(&self, job_id: i64) -> bool {
+        let states = self.states.read().unwrap();
+        states
+            .get(&job_id)
+            .map(|s| s.is_cancelled())
+            .unwrap_or(false)
+    }
+
+    /// 获取任务进度
+    pub async fn get_progress(&self, job_id: i64) -> Result<JobProgress> {
+        // 从内存获取状态
+        let state = {
+            let states = self.states.read().unwrap();
+            states.get(&job_id).cloned()
+        };
+
+        if let Some(state) = state {
+            // 从数据库获取最新状态
+            let job = SyncJobs::find_by_id(job_id)
+                .one(self.db.as_ref())
+                .await?
+                .ok_or_else(|| anyhow::anyhow!("SyncJob {} 不存在", job_id))?;
+
+            Ok(state.to_job_progress(job.status))
+        } else {
+            // 如果内存中没有,从数据库读取
