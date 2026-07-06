@@ -525,3 +525,51 @@ pub enum SyncStatus {
     Success,
     Skipped,
     Failed,
+}
+
+/// 同步结果
+#[derive(Debug, Clone)]
+pub struct SyncResult {
+    pub status: SyncStatus,
+    pub commits_synced: usize,
+    pub issues_synced: usize,
+    pub message: String,
+}
+
+impl SyncResult {
+    pub fn success(commits: usize, issues: usize) -> Self {
+        Self {
+            status: SyncStatus::Success,
+            commits_synced: commits,
+            issues_synced: issues,
+            message: "同步成功".to_string(),
+        }
+    }
+
+    pub fn skipped(reason: &str) -> Self {
+        Self {
+            status: SyncStatus::Skipped,
+            commits_synced: 0,
+            issues_synced: 0,
+            message: reason.to_string(),
+        }
+    }
+
+    pub fn failed(reason: &str) -> Self {
+        Self {
+            status: SyncStatus::Failed,
+            commits_synced: 0,
+            issues_synced: 0,
+            message: reason.to_string(),
+        }
+    }
+
+    pub fn is_success(&self) -> bool {
+        matches!(self.status, SyncStatus::Success)
+    }
+
+    pub fn is_skipped(&self) -> bool {
+        matches!(self.status, SyncStatus::Skipped)
+    }
+}
+
