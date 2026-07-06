@@ -189,3 +189,51 @@ impl<'a> SyncService<'a> {
             tracking_id = tracking_id,
             platform = %platform,
             l1_branch = %tracking_entity.l1_branch,
+            l1_repo_owner = %tracking_entity.l1_repo_owner,
+            l1_repo_name = %tracking_entity.l1_repo_name,
+            "构建采集配置"
+        );
+        let config = CollectConfig::new(platform, &tracking_entity.l1_branch).with_remote(
+            &tracking_entity.l1_repo_owner,
+            &tracking_entity.l1_repo_name,
+        );
+
+        // 3. 验证配置
+        collector
+            .validate_config(&config)
+            .context("Collector 配置验证失败")?;
+
+        // 4. 执行采集
+        let collect_result = collector.collect(&config).await.context("采集数据失败")?;
+
+        info!(
+            tracking_id = tracking_id,
+            commits_count = collect_result.commits.len(),
+            "采集完成"
+        );
+
+        // 5. 保存采集结果到数据库
+        let commits_synced = self
+            .save_commits(
+                tracking_id,
+                &collect_result.commits,
+                &tracking_entity,
+                platform,
+            )
+            .await?;
+
+        // 6. 同步 issues（如果 Collector 支持）
+        let issues_synced = self
+            .sync_issues_from_collector(tracking_id, collector, &tracking_entity)
+            .await?;
+
+        // 7. 更新 tracking 的同步时间
+        self.update_tracking_sync_time(tracking_id).await?;
+
+        info!(
+            tracking_id = tracking_id,
+            commits = commits_synced,
+            issues = issues_synced,
+            "同步完成"
+        );
+
