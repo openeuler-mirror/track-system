@@ -49,3 +49,55 @@ struct RiskCreateReq {
     version: String,
     #[serde(rename = "release")]
     release: String,
+    #[serde(rename = "platform")]
+    platform: String,
+    #[serde(rename = "disclosure_time", skip_serializing_if = "Option::is_none")]
+    disclosure_time: Option<String>,
+    #[serde(rename = "source", skip_serializing_if = "Option::is_none")]
+    source: Option<String>,
+    #[serde(rename = "package_id")]
+    package_id: u64,
+    #[serde(rename = "inner_secret")]
+    inner_secret: String,
+}
+
+impl<'a> PipelineExecutor<'a> {
+    /// 阶段 1: L1 元数据获取
+    pub(super) async fn stage_l1_ingestion(
+        &self,
+        tracking: &tracking::Model,
+    ) -> Result<L1IngestionResult> {
+        info!(tracking_id = tracking.id, "执行 L1 元数据获取阶段");
+
+        let sync_service = SyncService::new(self.db);
+
+        // 使用新的 Collector 接口进行同步
+        // 注意：即使有注入的客户端，我们也使用 sync_tracking，
+        // 因为它会根据 tracking 配置自动选择合适的 Collector
+        let sync_result = sync_service.sync_tracking(tracking.id).await?;
+
+        // 检查同步状态
+        let has_new_data = match sync_result.status {
+            SyncStatus::Success => sync_result.commits_synced > 0 || sync_result.issues_synced > 0,
+            SyncStatus::Skipped => false,
+            SyncStatus::Failed => {
+                return Err(anyhow::anyhow!("L1 同步失败: {}", sync_result.message));
+            }
+        };
+
+        if !has_new_data {
+            info!(tracking_id = tracking.id, "L1 没有新数据，可以跳过后续阶段");
+        }
+
+        // 如果有新数据，生成并持久化 L1 快照
+        let (snapshot_path, snapshot_checksum) = if has_new_data {
+            let output_path = format!(
+                "/tmp/l1_snapshot_{}_{}.json",
+                tracking.id,
+                Utc::now().timestamp()
+            );
+
+            info!(
+                tracking_id = tracking.id,
+                repo_path = tracking.l1_repo_name,
+                "开始导出 L1 快照"
