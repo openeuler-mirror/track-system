@@ -242,3 +242,52 @@ impl<'a> MetadataImporter<'a> {
         let now = Utc::now();
         let track = tracking::ActiveModel {
             package_id: Set(package_id),
+            distro_id: Set(distro_id),
+            l1_branch: Set(l1_branch.to_string()),
+            l1_repo_owner: Set(l1_repo_owner.to_string()),
+            l1_repo_name: Set(l1_repo_name.to_string()),
+            l2_branch: Set(l2_branch.to_string()),
+            l2_repo_path: Set(l2_repo_path.to_string()),
+            tracking_status: Set(tracking_status.to_string()),
+            created_at: Set(now),
+            updated_at: Set(now),
+            ..Default::default()
+        };
+
+        track.insert(self.db).await?;
+        Ok(true)
+    }
+
+    /// 导入单个 commit 记录
+    async fn import_commit(&self, commit_json: &serde_json::Value) -> Result<bool, DbErr> {
+        use crate::entities::{l1_commit_records, prelude::L1CommitRecords};
+
+        let tracking_id = commit_json["tracking_id"].as_i64().unwrap_or(0) as i32;
+        let commit_sha = commit_json["commit_sha"].as_str().unwrap_or("");
+
+        // 检查是否已存在
+        let existing = L1CommitRecords::find()
+            .filter(l1_commit_records::Column::TrackingId.eq(tracking_id))
+            .filter(l1_commit_records::Column::CommitSha.eq(commit_sha))
+            .one(self.db)
+            .await?;
+
+        if existing.is_some() {
+            // 已存在，跳过
+            return Ok(false);
+        }
+
+        // 解析时间字段
+        let committed_at_str = commit_json["committed_at"].as_str().unwrap_or("");
+        let fetched_at_str = commit_json["fetched_at"].as_str().unwrap_or("");
+        let committed_at = DateTime::parse_from_rfc3339(committed_at_str)
+            .map(|dt| dt.with_timezone(&Utc))
+            .unwrap_or_else(|_| Utc::now());
+        let fetched_at = DateTime::parse_from_rfc3339(fetched_at_str)
+            .map(|dt| dt.with_timezone(&Utc))
+            .unwrap_or_else(|_| Utc::now());
+
+        // 插入新记录
+        let now = Utc::now();
+        let commit = l1_commit_records::ActiveModel {
+            tracking_id: Set(tracking_id),
