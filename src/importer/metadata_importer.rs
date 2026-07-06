@@ -92,3 +92,51 @@ pub struct ImportResult {
 impl ImportResult {
     pub fn success(
         commits_imported: usize,
+        commits_skipped: usize,
+        issues_imported: usize,
+        issues_skipped: usize,
+    ) -> Self {
+        Self {
+            commits_imported,
+            commits_skipped,
+            issues_imported,
+            issues_skipped,
+            success: true,
+            message: format!(
+                "导入成功: commits={}/{}, issues={}/{}",
+                commits_imported,
+                commits_imported + commits_skipped,
+                issues_imported,
+                issues_imported + issues_skipped
+            ),
+        }
+    }
+
+    pub fn failed(message: String) -> Self {
+        Self {
+            commits_imported: 0,
+            commits_skipped: 0,
+            issues_imported: 0,
+            issues_skipped: 0,
+            success: false,
+            message,
+        }
+    }
+}
+
+/// 元数据导入器
+pub struct MetadataImporter<'a> {
+    db: &'a DatabaseConnection,
+}
+
+impl<'a> MetadataImporter<'a> {
+    pub fn new(db: &'a DatabaseConnection) -> Self {
+        Self { db }
+    }
+
+    /// 从 JSON 文件导入元数据
+    pub async fn import_from_file(
+        &self,
+        file_path: &Path,
+        tracking_id: i32,
+    ) -> Result<ImportResult> {
