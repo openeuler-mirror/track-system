@@ -395,3 +395,53 @@ impl<'a> PipelineExecutor<'a> {
             message: message.clone(),
             stage_results,
             started_at,
+            finished_at,
+            total_duration,
+        };
+
+        info!(
+            job_id = job_id,
+            tracking_id = tracking_id,
+            success = success,
+            cancelled = cancelled,
+            duration = ?total_duration,
+            "同步流水线执行完成"
+        );
+
+        Ok(result)
+    }
+
+    /// 执行单个阶段
+    async fn execute_stage(
+        &self,
+        stage: PipelineStage,
+        tracking: &tracking::Model,
+        previous_results: &HashMap<PipelineStage, StageResult>,
+    ) -> Result<StageResult> {
+        let started_at = Utc::now();
+
+        match stage {
+            PipelineStage::L1Ingestion => {
+                let result = self.stage_l1_ingestion(tracking).await?;
+                let details = serde_json::to_value(&result)?;
+                Ok(StageResult::success(
+                    stage,
+                    format!(
+                        "获取 {} 个 commits, {} 个 issues",
+                        result.commits_synced, result.issues_synced
+                    ),
+                    started_at,
+                    details,
+                ))
+            }
+            PipelineStage::L2Snapshot => {
+                let result = self.stage_l2_snapshot(tracking).await?;
+                let details = serde_json::to_value(&result)?;
+                Ok(StageResult::success(
+                    stage,
+                    format!("生成快照，包含 {} 个文件", result.files_count),
+                    started_at,
+                    details,
+                ))
+            }
+            PipelineStage::DiffComparison => {
