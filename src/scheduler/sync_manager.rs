@@ -329,3 +329,50 @@ impl<'a> SyncManager<'a> {
 
     /// 获取跟踪配置
     pub async fn get_tracking(&self, tracking_id: i32) -> anyhow::Result<tracking::Model> {
+        Tracking::find_by_id(tracking_id)
+            .one(self.db)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Tracking {} not found", tracking_id))
+    }
+}
+
+impl<'a> SyncManager<'a> {
+    async fn apply_completion(
+        &self,
+        tracking_id: i32,
+        outcome: CompletionOutcome,
+    ) -> anyhow::Result<()> {
+        let track = Tracking::find_by_id(tracking_id)
+            .one(self.db)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Tracking {} not found", tracking_id))?;
+
+        let preserve_status = matches!(track.tracking_status.as_str(), "paused" | "archived");
+        let mut active: tracking::ActiveModel = track.clone().into();
+        let now = Utc::now();
+
+        match &outcome {
+            CompletionOutcome::Success => {
+                if !preserve_status {
+                    active.tracking_status = Set("active".to_string());
+                }
+                active.last_sync_time = Set(Some(now));
+                active.last_error = Set(None);
+            }
+            CompletionOutcome::Failure { message } => {
+                if !preserve_status {
+                    active.tracking_status = Set("error".to_string());
+                }
+                active.last_error = Set(Some(message.clone()));
+            }
+            CompletionOutcome::Skipped { reason } => {
+                if !preserve_status {
+                    active.tracking_status = Set("active".to_string());
+                }
+                active.last_error = Set(Some(reason.clone()));
+                // 保持 last_sync_time 不变
+            }
+        }
+
+        active.updated_at = Set(now);
+        active.update(self.db).await?;
