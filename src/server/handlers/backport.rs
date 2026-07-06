@@ -18,3 +18,24 @@ use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
 
 use crate::entities::backport_candidates;
 use crate::server::{dto::backport::BackportCandidateDto, state::AppState};
+
+pub async fn list_backport_candidates_handler(
+    Path(package_id): Path<i32>,
+    State(state): State<AppState>,
+) -> Result<Json<Vec<BackportCandidateDto>>, StatusCode> {
+    let db: &DatabaseConnection = &state.db;
+
+    let candidates = backport_candidates::Entity::find()
+        .filter(backport_candidates::Column::PackageId.eq(package_id))
+        .all(db)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    Ok(Json(
+        candidates
+            .into_iter()
+            .map(BackportCandidateDto::from)
+            .collect(),
+    ))
+}
+
