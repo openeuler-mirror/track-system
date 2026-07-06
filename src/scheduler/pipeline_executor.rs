@@ -147,3 +147,52 @@ pub struct L1IngestionResult {
     pub commits_synced: usize,
     pub issues_synced: usize,
     pub has_new_data: bool,
+    // 在 L1 阶段生成的快照文件路径（如果生成）
+    pub snapshot_path: Option<String>,
+    // 在 L1 阶段生成的快照校验值（如果生成）
+    pub snapshot_checksum: Option<String>,
+}
+
+/// L2 快照结果
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct L2SnapshotResult {
+    pub snapshot_id: Option<i64>,
+    pub snapshot_path: Option<String>,
+    pub files_count: usize,
+    pub has_new_data: bool,
+}
+
+/// 差异对比结果
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DiffComparisonResult {
+    pub report_id: Option<i64>,
+    pub files_changed: usize,
+    pub has_spec_changes: bool,
+}
+
+/// 变更分类结果
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClassificationResult {
+    pub classified_count: usize,
+    pub cve_count: usize,
+    pub needs_review_count: usize,
+}
+
+/// 报告生成结果
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReportGenerationResult {
+    pub report_id: i64,
+    pub report_status: String,
+}
+
+/// 回合建议结果
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BackportSuggestionResult {
+    pub candidates_count: usize,
+    pub l0_commits_checked: usize,
+}
+
+/// 流水线执行器
+#[allow(dead_code)]
+pub struct PipelineExecutor<'a> {
+    pub(super) db: &'a DatabaseConnection,
