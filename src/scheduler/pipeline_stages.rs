@@ -876,3 +876,55 @@ impl<'a> PipelineExecutor<'a> {
                                             "ChangeType": commit.primary_change_type.unwrap_or_else(|| "Unknown".to_string()),
                                             "CVEList": commit.cve_list.unwrap_or_else(|| serde_json::json!([])),
                                             "PackageID": tracking.package_id,
+                                            "Url": commit.api_url,
+                                        });
+                                        commit_reports.push(commit_info);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 构建报告摘要 - 使用commit_reports数组
+        let diff_summary = serde_json::json!({
+            "commits": commit_reports,
+            "total_behind_commits": commit_reports.len(),
+            "tracking_id": tracking.id,
+            "package_name": package_name,
+        });
+
+        // 从 classification_result 提取统计信息
+        let representative_changes = if let Some(class_stage) = classification_result {
+            if let Some(details) = class_stage.details.as_object() {
+                serde_json::json!({
+                    "classified_count": details.get("classified_count").and_then(|v| v.as_u64()).unwrap_or(0),
+                    "cve_count": details.get("cve_count").and_then(|v| v.as_u64()).unwrap_or(0),
+                    "needs_review_count": details.get("needs_review_count").and_then(|v| v.as_u64()).unwrap_or(0),
+                })
+            } else {
+                serde_json::json!({
+                    "classified_count": 0,
+                    "cve_count": 0,
+                    "needs_review_count": 0,
+                })
+            }
+        } else {
+            serde_json::json!({
+                "classified_count": 0,
+                "cve_count": 0,
+                "needs_review_count": 0,
+            })
+        };
+
+        // 创建报告记录到 tracking_reports 表（用于最终报告）
+        let report = tracking_reports::ActiveModel {
+            tracking_id: Set(tracking.id),
+            generated_at: Set(Utc::now()),
+            diff_summary: Set(diff_summary),
+            representative_changes: Set(Some(representative_changes)),
+            source: Set("pipeline".to_string()),
+            status: Set("success".to_string()),
+            failure_reason: Set(None),
