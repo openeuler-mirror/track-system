@@ -566,3 +566,55 @@ impl<'a> PipelineExecutor<'a> {
             created_at: Set(Utc::now()),
             updated_at: Set(Utc::now()),
             ..Default::default()
+        };
+
+        let inserted = report.insert(self.db).await.context("插入报告记录失败")?;
+
+        Ok(inserted.id as i64)
+    }
+
+    /// 阶段 4: 变更分类
+    pub(super) async fn stage_classification(
+        &self,
+        tracking: &tracking::Model,
+        _previous_results: &HashMap<PipelineStage, StageResult>,
+    ) -> Result<ClassificationResult> {
+        info!(tracking_id = tracking.id, "执行变更分类阶段");
+
+        // 获取所有待分类的 commits（classification_status = 'pending'）
+        let pending_commits = L1CommitRecords::find()
+            .filter(l1_commit_records::Column::TrackingId.eq(tracking.id))
+            .filter(l1_commit_records::Column::ClassificationStatus.eq("pending"))
+            .all(self.db)
+            .await
+            .context("查询待分类 commits 失败")?;
+
+        if pending_commits.is_empty() {
+            info!(tracking_id = tracking.id, "没有待分类的 commits");
+            return Ok(ClassificationResult {
+                classified_count: 0,
+                cve_count: 0,
+                needs_review_count: 0,
+            });
+        }
+
+        let classifier = ChangeClassifier::new(self.db);
+        let mut classified_count = 0;
+        let mut cve_count = 0;
+        let mut needs_review_count = 0;
+
+        for commit in pending_commits {
+            // 分类 commit
+            match classifier.classify_commit(commit.id).await {
+                Ok(classification) => {
+                    // 更新 commit 记录
+                    let mut active_commit: l1_commit_records::ActiveModel = commit.into();
+                    active_commit.primary_change_type =
+                        Set(Some(classification.primary_type.as_str().to_string()));
+                    active_commit.cve_list =
+                        Set(Some(serde_json::to_value(&classification.cve_numbers)?));
+                    active_commit.spec_changed = Set(classification.has_spec_change);
+                    active_commit.classification_status = Set("done".to_string());
+                    active_commit.updated_at = Set(Utc::now());
+
+                    active_commit
