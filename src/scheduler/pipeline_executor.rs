@@ -246,3 +246,53 @@ impl<'a> PipelineExecutor<'a> {
             .sync_manager
             .get_tracking(tracking_id)
             .await
+            .context("获取 tracking 配置失败")?;
+
+        let mut stage_results = HashMap::new();
+        let mut last_error: Option<String> = None;
+        let mut cancelled = false;
+        let mut skip_to_report_generation = false;
+
+        // 执行各个阶段
+        let stages = PipelineStage::all_stages();
+        for (index, stage) in stages.iter().enumerate() {
+            if skip_to_report_generation && *stage != PipelineStage::ReportGeneration {
+                continue;
+            }
+
+            // 检查是否已取消
+            if let Some(state_mgr) = &self.state_manager {
+                if state_mgr.is_cancelled(job_id) {
+                    warn!(job_id = job_id, "流水线已被取消");
+                    cancelled = true;
+                    last_error = Some("流水线已被用户取消".to_string());
+                    break;
+                }
+            }
+
+            info!(
+                job_id = job_id,
+                tracking_id = tracking_id,
+                stage = ?stage,
+                progress = format!("{}/{}", index + 1, stages.len()),
+                "执行流水线阶段"
+            );
+
+            // 更新当前阶段
+            if let Some(state_mgr) = &self.state_manager {
+                state_mgr.start_stage(job_id, *stage)?;
+            }
+
+            let stage_started_at = Utc::now();
+
+            let result = match self.execute_stage(*stage, &tracking, &stage_results).await {
+                Ok(result) => {
+                    info!(
+                        job_id = job_id,
+                        stage = ?stage,
+                        duration = ?result.duration,
+                        "阶段执行成功"
+                    );
+                    Telemetry::pipeline_stage_completed(tracking_id, stage.name(), true);
+                    result
+                }
