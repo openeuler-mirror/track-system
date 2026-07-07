@@ -112,3 +112,41 @@ pub async fn get_scheduler_status_handler(
         .scheduler_manager
         .as_ref()
         .ok_or(StatusCode::SERVICE_UNAVAILABLE)?;
+
+    // 获取调度器状态
+    let scheduler = scheduler_manager.read().await;
+    match scheduler.get_scheduler_status().await {
+        Ok(status) => Ok(Json(SchedulerStatusResponse {
+            running: status.running,
+            active_jobs: status.active_jobs,
+            pending_jobs: status.pending_jobs,
+            total_jobs_executed: status.total_jobs_executed,
+            last_execution: status.last_execution.map(|dt| dt.to_rfc3339()),
+        })),
+        Err(err) => {
+            tracing::error!(error = %err, "获取调度器状态失败");
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
+/// 执行一轮调度
+pub async fn execute_round_handler(
+    State(state): State<AppState>,
+    Json(_request): Json<ExecuteRoundRequest>,
+) -> Result<Json<ExecuteRoundResponse>, StatusCode> {
+    // 检查是否有调度器管理器
+    let scheduler_manager = state
+        .scheduler_manager
+        .as_ref()
+        .ok_or(StatusCode::SERVICE_UNAVAILABLE)?;
+
+    // 执行一轮调度
+    let scheduler = scheduler_manager.read().await;
+    match scheduler.execute_round().await {
+        Ok(results) => {
+            let succeeded = results.iter().filter(|r| r.success).count();
+            let failed = results.len() - succeeded;
+
+            Ok(Json(ExecuteRoundResponse {
+                executed: results.len(),
