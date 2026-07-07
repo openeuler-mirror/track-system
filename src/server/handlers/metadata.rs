@@ -151,3 +151,55 @@ pub async fn import_l1_metadata(
     use sea_orm::{EntityTrait, Set};
 
     // 验证请求
+    validate_import_request(request.tracking_id, &request.snapshot)?;
+
+    // 1. 验证 tracking_id 存在
+    let tracking = Tracking::find_by_id(request.tracking_id)
+        .one(state.db.as_ref())
+        .await
+        .map_err(ApiError::DatabaseError)?
+        .ok_or_else(|| ApiError::NotFound(format!("跟踪配置 {} 不存在", request.tracking_id)))?;
+
+    // 2. 保存快照到数据库（L1 使用 commit_records 和 issues 表）
+    let mut commits_imported = 0;
+    let mut commits_skipped = 0;
+    let mut issues_imported = 0;
+    let mut issues_skipped = 0;
+
+    // 导入 commits
+    for commit in &request.snapshot.commits {
+        match import_commit_record(state.db.as_ref(), request.tracking_id, commit).await {
+            Ok(true) => commits_imported += 1,
+            Ok(false) => commits_skipped += 1,
+            Err(e) => {
+                tracing::warn!("导入 L1 commit {} 失败: {}", commit.sha, e);
+                commits_skipped += 1;
+            }
+        }
+    }
+
+    // 导入 issues
+    for issue in &request.snapshot.issues {
+        match import_issue(state.db.as_ref(), request.tracking_id, issue).await {
+            Ok(true) => issues_imported += 1,
+            Ok(false) => issues_skipped += 1,
+            Err(e) => {
+                tracing::warn!("导入 L1 issue {} 失败: {}", issue.number, e);
+                issues_skipped += 1;
+            }
+        }
+    }
+
+    // 3. 更新跟踪配置的最后同步时间
+    let now = chrono::Utc::now();
+    let mut tracking_active: crate::entities::tracking::ActiveModel = tracking.into();
+    tracking_active.last_sync_time = Set(Some(now));
+    tracking_active.updated_at = Set(now);
+    tracking_active
+        .update(state.db.as_ref())
+        .await
+        .map_err(ApiError::DatabaseError)?;
+
+    // 4. 触发 L1 vs L0 对比任务（可选）
+    if let Err(e) = trigger_comparison_task(&state, request.tracking_id).await {
+        tracing::warn!("触发对比任务失败: {}", e);
