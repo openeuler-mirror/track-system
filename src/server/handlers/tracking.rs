@@ -267,3 +267,48 @@ pub async fn update_tracking(
 
     // 更新字段
     if let Some(l1_repo_owner) = req.l1_repo_owner {
+        active.l1_repo_owner = Set(l1_repo_owner);
+    }
+    if let Some(l1_repo_name) = req.l1_repo_name {
+        active.l1_repo_name = Set(l1_repo_name);
+    }
+    if let Some(l1_branch) = req.l1_branch {
+        active.l1_branch = Set(l1_branch);
+    }
+    if let Some(l2_branch) = req.l2_branch {
+        active.l2_branch = Set(l2_branch);
+    }
+    if let Some(l2_repo_path) = req.l2_repo_path {
+        active.l2_repo_path = Set(l2_repo_path);
+    }
+    if let Some(tracking_status) = req.tracking_status {
+        active.tracking_status = Set(tracking_status);
+    }
+
+    active.updated_at = Set(Utc::now());
+
+    let result = active.update(state.db.as_ref()).await?;
+
+    Ok(Json(ApiResponse::success(result.into())))
+}
+
+/// DELETE /api/tracking/:id
+///
+/// 删除跟踪配置
+pub async fn delete_tracking(
+    State(state): State<AppState>,
+    Path(id): Path<i32>,
+) -> ApiResult<Json<ApiResponse<()>>> {
+    // 查找现有配置
+    let tracking = Tracking::find_by_id(id)
+        .one(state.db.as_ref())
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("Tracking {} not found", id)))?;
+
+    // 删除
+    let active: tracking::ActiveModel = tracking.into();
+    active.delete(state.db.as_ref()).await?;
+
+    Ok(Json(ApiResponse::<()>::no_content()))
+}
+
