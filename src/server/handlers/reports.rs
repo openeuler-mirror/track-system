@@ -90,3 +90,49 @@ pub enum ExportFormat {
 
 /// GET /api/reports
 ///
+/// 查询报告列表（支持分页和过滤）
+pub async fn list_reports(
+    State(state): State<AppState>,
+    Query(query): Query<ReportListQuery>,
+) -> ApiResult<Json<ApiResponse<PaginatedResponse<ReportSummary>>>> {
+    use crate::entities::{prelude::*, tracking_reports};
+    use sea_orm::*;
+
+    let page = query.page.unwrap_or(1);
+    let page_size = query.page_size.unwrap_or(10);
+
+    // 验证分页参数
+    if page < 1 {
+        return Err(ApiError::BadRequest("Page must be >= 1".to_string()));
+    }
+    if !(1..=100).contains(&page_size) {
+        return Err(ApiError::BadRequest(
+            "Page size must be between 1 and 100".to_string(),
+        ));
+    }
+
+    // 构建查询
+    let mut query_builder = TrackingReports::find();
+
+    // 应用过滤条件
+    if let Some(tracking_id) = query.tracking_id {
+        query_builder = query_builder.filter(tracking_reports::Column::TrackingId.eq(tracking_id));
+    }
+    if let Some(report_type) = query.report_type {
+        query_builder = query_builder.filter(tracking_reports::Column::Source.eq(report_type));
+    }
+    if let Some(status) = query.status {
+        query_builder = query_builder.filter(tracking_reports::Column::Status.eq(status));
+    }
+
+    // 查询总数
+    let total = query_builder.clone().count(state.db.as_ref()).await?;
+
+    // 分页查询
+    let reports = query_builder
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .order_by_desc(tracking_reports::Column::CreatedAt)
+        .find_also_related(Tracking)
+        .all(state.db.as_ref())
+        .await?;
