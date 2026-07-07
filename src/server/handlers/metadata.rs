@@ -203,3 +203,54 @@ pub async fn import_l1_metadata(
     // 4. 触发 L1 vs L0 对比任务（可选）
     if let Err(e) = trigger_comparison_task(&state, request.tracking_id).await {
         tracing::warn!("触发对比任务失败: {}", e);
+    }
+
+    // 生成快照 ID（使用时间戳和 tracking_id）
+    let snapshot_id = format!("l1-{}-{}", request.tracking_id, now.timestamp());
+
+    tracing::info!(
+        "L1 元数据导入完成: snapshot_id={}, commits={}/{}, issues={}/{}",
+        snapshot_id,
+        commits_imported,
+        commits_imported + commits_skipped,
+        issues_imported,
+        issues_imported + issues_skipped
+    );
+
+    let response = ImportResponse {
+        snapshot_id,
+        tracking_id: request.tracking_id,
+        file_count: request.snapshot.files.len(),
+        imported_at: now,
+    };
+
+    Ok(Json(ApiResponse::created(response)))
+}
+
+/// POST /api/metadata/l2
+///
+/// 导入 L2（企业发行版）元数据
+pub async fn import_l2_metadata(
+    State(state): State<AppState>,
+    Json(request): Json<ImportL2Request>,
+) -> ApiResult<Json<ApiResponse<ImportResponse>>> {
+    use crate::entities::prelude::*;
+    use sea_orm::{EntityTrait, Set};
+
+    // 验证请求
+    validate_import_request(request.tracking_id, &request.snapshot)?;
+
+    // 1. 验证 tracking_id 存在
+    let tracking = Tracking::find_by_id(request.tracking_id)
+        .one(state.db.as_ref())
+        .await
+        .map_err(ApiError::DatabaseError)?
+        .ok_or_else(|| ApiError::NotFound(format!("跟踪配置 {} 不存在", request.tracking_id)))?;
+
+    // 2. 保存快照到数据库（L2 使用 l2_snapshots 表存储完整快照）
+    let snapshot_json = serde_json::to_value(&request.snapshot)
+        .map_err(|e| ApiError::BadRequest(format!("序列化快照失败: {}", e)))?;
+
+    // 计算快照校验和
+    let checksum = calculate_snapshot_checksum(&snapshot_json);
+
