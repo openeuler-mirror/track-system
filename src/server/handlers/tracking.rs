@@ -132,3 +132,48 @@ pub async fn list_tracking(
     let page_size = query.page_size.unwrap_or(10);
 
     // 验证分页参数
+    if page < 1 {
+        return Err(ApiError::BadRequest("Page must be >= 1".to_string()));
+    }
+    if !(1..=100).contains(&page_size) {
+        return Err(ApiError::BadRequest(
+            "Page size must be between 1 and 100".to_string(),
+        ));
+    }
+
+    // 构建查询
+    let mut query_builder = Tracking::find();
+
+    // 应用过滤条件
+    if let Some(package_id) = query.package_id {
+        query_builder = query_builder.filter(tracking::Column::PackageId.eq(package_id));
+    }
+    // if let Some(distro_id) = query.distro_id {
+    //     query_builder = query_builder.filter(tracking::Column::DistroId.eq(distro_id));
+    // }
+    if let Some(tracking_status) = query.tracking_status {
+        query_builder = query_builder.filter(tracking::Column::TrackingStatus.eq(tracking_status));
+    }
+
+    // 查询总数
+    let total = query_builder.clone().count(state.db.as_ref()).await?;
+
+    // 分页查询
+    let tracking_list = query_builder
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all(state.db.as_ref())
+        .await?;
+
+    let responses: Vec<TrackingResponse> = tracking_list.into_iter().map(Into::into).collect();
+    let paginated = PaginatedResponse::new(responses, total, page, page_size);
+
+    Ok(Json(ApiResponse::success(paginated)))
+}
+
+/// POST /api/tracking
+///
+/// 创建跟踪配置
+pub async fn create_tracking(
+    State(state): State<AppState>,
+    Json(req): Json<CreateTrackingRequest>,
