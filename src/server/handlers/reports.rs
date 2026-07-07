@@ -136,3 +136,49 @@ pub async fn list_reports(
         .find_also_related(Tracking)
         .all(state.db.as_ref())
         .await?;
+
+    // 转换为响应格式
+    let mut report_summaries = Vec::new();
+    for (report, tracking_opt) in reports {
+        // 获取 package 名称
+        let package_name = if let Some(tracking_model) = tracking_opt {
+            let package = Packages::find_by_id(tracking_model.package_id)
+                .one(state.db.as_ref())
+                .await?
+                .map(|p| p.name)
+                .unwrap_or_else(|| "unknown".to_string());
+            package
+        } else {
+            "unknown".to_string()
+        };
+
+        report_summaries.push(ReportSummary {
+            id: report.id as i64,
+            tracking_id: report.tracking_id,
+            report_type: report.source,
+            package_name,
+            status: report.status,
+            created_at: report.created_at,
+            updated_at: report.updated_at,
+        });
+    }
+
+    let response = PaginatedResponse::new(report_summaries, total, page, page_size);
+    Ok(Json(ApiResponse::success(response)))
+}
+
+/// GET /api/reports/:id
+///
+/// 获取报告详情
+pub async fn get_report(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+) -> ApiResult<Json<ApiResponse<ReportDetail>>> {
+    use crate::entities::prelude::*;
+    use sea_orm::*;
+
+    // 验证 ID
+    if id <= 0 {
+        return Err(ApiError::BadRequest("Invalid report ID".to_string()));
+    }
+
