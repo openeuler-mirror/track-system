@@ -178,3 +178,48 @@ impl IntoResponse for AuthError {
         let body = serde_json::json!({
             "success": false,
             "error": "AuthenticationError",
+            "message": message,
+        });
+
+        (status, axum::Json(body)).into_response()
+    }
+}
+
+/// 从请求头中提取 Bearer Token
+fn extract_bearer_token(headers: &axum::http::HeaderMap) -> Option<String> {
+    headers
+        .get(header::AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|auth| auth.strip_prefix("Bearer ").map(|s| s.to_string()))
+}
+
+/// JWT 认证中间件
+///
+/// 验证请求中的 JWT Token，并将 Claims 添加到请求扩展中
+pub async fn auth_middleware(
+    State(config): State<Arc<AuthConfig>>,
+    mut request: Request,
+    next: Next,
+) -> Result<Response, AuthError> {
+    // 提取 token
+    let token = extract_bearer_token(request.headers()).ok_or(AuthError::MissingToken)?;
+
+    // 验证 token
+    let generator = JwtTokenGenerator::new((*config).clone());
+    let claims = generator
+        .verify_token(&token)
+        .map_err(|_| AuthError::InvalidToken)?;
+
+    // 检查是否过期
+    if claims.is_expired() {
+        return Err(AuthError::ExpiredToken);
+    }
+
+    // 将 claims 添加到请求扩展中，供后续处理器使用
+    request.extensions_mut().insert(claims);
+
+    Ok(next.run(request).await)
+}
+
+/// 可选的认证中间件
+///
