@@ -13,3 +13,18 @@
 
 use axum::{
     routing::{delete, get, post},
+    Router,
+};
+
+use crate::server::{handlers::compare, state::AppState};
+
+/// 创建对比分析路由
+pub fn compare_routes() -> Router<AppState> {
+    Router::new()
+        // 创建对比任务
+        .route("/compare/l1-vs-l0", post(compare::compare_l1_vs_l0))
+        .route("/compare/l2-vs-l1", post(compare::compare_l2_vs_l1))
+        // 查询和管理对比任务（RESTful 风格）
+        .route("/compare/tasks/:id", get(compare::get_compare_status))
+        .route("/compare/tasks/:id", delete(compare::cancel_compare_task))
+}
