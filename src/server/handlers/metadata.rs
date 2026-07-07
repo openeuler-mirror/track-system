@@ -357,3 +357,54 @@ pub async fn delete_l0_metadata(
     Path(id): Path<String>,
 ) -> ApiResult<axum::http::StatusCode> {
     // TODO: 实现 L0 元数据删除
+    // 1. 查找指定 ID 的 L0 快照
+    // 2. 如果不存在，返回 404
+    // 3. 删除快照及相关数据
+    // 4. 返回 204 No Content
+
+    tracing::info!(snapshot_id = %id, "删除 L0 元数据");
+
+    Ok(axum::http::StatusCode::NO_CONTENT)
+}
+
+/// GET /api/metadata/l1
+///
+/// 列出 L1 元数据快照
+pub async fn list_l1_metadata(
+    State(_state): State<AppState>,
+    Query(query): Query<MetadataListQuery>,
+) -> ApiResult<Json<ApiResponse<Vec<MetadataSummary>>>> {
+    let _tracking_id = query.tracking_id;
+    Ok(Json(ApiResponse::success(vec![])))
+}
+
+/// GET /api/metadata/l1/:id
+///
+/// 获取 L1 元数据详情
+pub async fn get_l1_metadata(
+    State(_state): State<AppState>,
+    Path(id): Path<String>,
+) -> ApiResult<Json<ApiResponse<MetadataDetail>>> {
+    let detail = MetadataDetail {
+        id: id.clone(),
+        tracking_id: 1,
+        level: "l1".to_string(),
+        file_count: 0,
+        imported_at: chrono::Utc::now(),
+    };
+    Ok(Json(ApiResponse::success(detail)))
+}
+
+pub async fn delete_l1_metadata(
+    State(_state): State<AppState>,
+    Path(id): Path<String>,
+) -> ApiResult<axum::http::StatusCode> {
+    tracing::info!(snapshot_id = %id, "删除 L1 元数据");
+    Ok(axum::http::StatusCode::NO_CONTENT)
+}
+
+/// GET /api/metadata/l2
+///
+/// 列出 L2 元数据快照
+pub async fn list_l2_metadata(
+    State(_state): State<AppState>,
