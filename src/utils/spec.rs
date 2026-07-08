@@ -245,3 +245,53 @@ impl SpecParser {
             .clone()
             .ok_or_else(|| anyhow!("spec 文件中未找到 Version 字段"))
     }
+
+    /// 对比两个 spec 文件
+    pub fn compare(spec1: &ParsedSpec, spec2: &ParsedSpec) -> SpecComparison {
+        SpecComparison {
+            version_changed: spec1.version != spec2.version,
+            version_diff: if spec1.version != spec2.version {
+                Some((
+                    spec1.version.clone().unwrap_or_default(),
+                    spec2.version.clone().unwrap_or_default(),
+                ))
+            } else {
+                None
+            },
+            build_requires_added: Self::find_added(&spec1.build_requires, &spec2.build_requires),
+            build_requires_removed: Self::find_removed(
+                &spec1.build_requires,
+                &spec2.build_requires,
+            ),
+            requires_added: Self::find_added(&spec1.requires, &spec2.requires),
+            requires_removed: Self::find_removed(&spec1.requires, &spec2.requires),
+            configure_options_added: Self::find_added(
+                &spec1.configure_options,
+                &spec2.configure_options,
+            ),
+            configure_options_removed: Self::find_removed(
+                &spec1.configure_options,
+                &spec2.configure_options,
+            ),
+            sources_changed: spec1.sources != spec2.sources,
+            patches_changed: spec1.patches != spec2.patches,
+        }
+    }
+
+    /// 查找新增的项
+    fn find_added(old_list: &[String], new_list: &[String]) -> Vec<String> {
+        new_list
+            .iter()
+            .filter(|item| !old_list.contains(item))
+            .cloned()
+            .collect()
+    }
+
+    /// 查找删除的项
+    fn find_removed(old_list: &[String], new_list: &[String]) -> Vec<String> {
+        old_list
+            .iter()
+            .filter(|item| !new_list.contains(item))
+            .cloned()
+            .collect()
+    }
