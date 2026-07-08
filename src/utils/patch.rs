@@ -42,3 +42,47 @@ impl PatchParser {
         let re = Regex::new(r"CVE-\d{4}-\d{4,}").unwrap();
         let mut cves: Vec<String> = re
             .find_iter(content)
+            .map(|m| m.as_str().to_string())
+            .collect();
+
+        // 去重
+        cves.sort();
+        cves.dedup();
+        cves
+    }
+
+    /// 提取 patch 描述
+    /// 提取 patch 描述
+    ///
+    /// 从 patch 文件的头部注释中提取描述信息
+    pub fn extract_description(content: &str) -> Option<String> {
+        let lines: Vec<&str> = content.lines().collect();
+
+        // 查找第一个 diff 行之前的内容
+        let mut description_lines = Vec::new();
+        for line in lines {
+            if line.starts_with("diff ") || line.starts_with("--- ") {
+                break;
+            }
+
+            // 跳过空行和特殊标记
+            let trimmed = line.trim();
+            if trimmed.is_empty() || trimmed.starts_with("From ") || trimmed.starts_with("Date:") {
+                continue;
+            }
+
+            // 处理 Subject 行，提取实际内容
+            if trimmed.starts_with("Subject:") {
+                if let Some(subject_content) = trimmed.strip_prefix("Subject:").map(|s| s.trim()) {
+                    if !subject_content.is_empty() {
+                        description_lines.push(subject_content);
+                    }
+                }
+                continue;
+            }
+
+            description_lines.push(trimmed);
+        }
+
+        if description_lines.is_empty() {
+            None
