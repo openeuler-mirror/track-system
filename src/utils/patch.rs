@@ -86,3 +86,48 @@ impl PatchParser {
 
         if description_lines.is_empty() {
             None
+        } else {
+            Some(description_lines.join(" "))
+        }
+    }
+
+    /// 计算 patch 内容的 SHA256 哈希
+    pub fn calculate_hash(content: &str) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(content.as_bytes());
+        format!("{:x}", hasher.finalize())
+    }
+
+    /// 从文件名提取补丁序号
+    ///
+    /// 支持的格式：
+    /// - 0001-fix-bug.patch -> Some(1)
+    /// - fix-bug.patch -> None
+    pub fn extract_patch_number(filename: &str) -> Option<u32> {
+        let re = Regex::new(r"^(\d{4})-").unwrap();
+        re.captures(filename)
+            .and_then(|cap| cap.get(1))
+            .and_then(|m| m.as_str().parse::<u32>().ok())
+    }
+
+    /// 判断是否为 backport patch
+    ///
+    /// 通过文件名或内容判断是否为从上游回合的补丁
+    pub fn is_backport_patch(filename: &str, content: &str) -> bool {
+        let filename_lower = filename.to_lowercase();
+        let content_lower = content.to_lowercase();
+
+        // 检查文件名
+        if filename_lower.contains("backport")
+            || filename_lower.contains("upstream")
+            || filename_lower.contains("cherry-pick")
+        {
+            return true;
+        }
+
+        // 检查内容
+        if content_lower.contains("backport")
+            || content_lower.contains("cherry-pick")
+            || content_lower.contains("upstream commit")
+        {
+            return true;
