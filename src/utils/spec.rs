@@ -146,3 +146,53 @@ impl SpecParser {
                     }
                     "Requires" => {
                         spec.requires.extend(Self::parse_dependency_list(&value));
+                    }
+                    _ => {
+                        // 检查是否是 Source 或 Patch
+                        if key.starts_with("Source") {
+                            spec.sources.push(value);
+                        } else if key.starts_with("Patch") {
+                            spec.patches.push(value);
+                        } else if key.starts_with("%define") || key.starts_with("%global") {
+                            // 宏定义
+                            if let Some((macro_name, macro_value)) = Self::parse_macro(&value) {
+                                spec.macros.insert(macro_name, macro_value);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 保存最后一个 section
+        if let Some(section) = current_section {
+            Self::save_section(&mut spec, &section, &section_content);
+        }
+
+        Ok(spec)
+    }
+
+    /// 解析头部行（Key: Value 格式）
+    fn parse_header_line(line: &str) -> Option<(String, String)> {
+        if let Some(pos) = line.find(':') {
+            let key = line[..pos].trim().to_string();
+            let value = line[pos + 1..].trim().to_string();
+            Some((key, value))
+        } else {
+            None
+        }
+    }
+
+    /// 解析依赖列表（可能包含逗号分隔）
+    fn parse_dependency_list(value: &str) -> Vec<String> {
+        value
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect()
+    }
+
+    /// 解析宏定义
+    fn parse_macro(value: &str) -> Option<(String, String)> {
+        let parts: Vec<&str> = value.splitn(2, ' ').collect();
+        if parts.len() == 2 {
