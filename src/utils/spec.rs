@@ -196,3 +196,52 @@ impl SpecParser {
     fn parse_macro(value: &str) -> Option<(String, String)> {
         let parts: Vec<&str> = value.splitn(2, ' ').collect();
         if parts.len() == 2 {
+            Some((parts[0].trim().to_string(), parts[1].trim().to_string()))
+        } else {
+            None
+        }
+    }
+
+    /// 保存 section 内容
+    fn save_section(spec: &mut ParsedSpec, section: &str, content: &str) {
+        match section {
+            "build" => {
+                spec.build_section = Some(content.to_string());
+                // 提取 %configure 选项
+                spec.configure_options = Self::extract_configure_options(content);
+            }
+            "install" => {
+                spec.install_section = Some(content.to_string());
+            }
+            _ => {}
+        }
+    }
+
+    /// 从 %build section 提取 %configure 选项
+    fn extract_configure_options(content: &str) -> Vec<String> {
+        let mut options = Vec::new();
+
+        for line in content.lines() {
+            let trimmed = line.trim();
+            if trimmed.starts_with("%configure") || trimmed.starts_with("./configure") {
+                // 提取 configure 后面的所有选项
+                let parts: Vec<&str> = trimmed.split_whitespace().collect();
+                for part in parts.iter().skip(1) {
+                    // 跳过 %configure 或 ./configure
+                    // 只保留以 -- 开头的选项（标准的 configure 选项格式）
+                    if part.starts_with("--") {
+                        options.push(part.to_string());
+                    }
+                }
+            }
+        }
+
+        options
+    }
+
+    /// 提取版本号（处理宏展开）
+    pub fn extract_version(spec: &ParsedSpec) -> Result<String> {
+        spec.version
+            .clone()
+            .ok_or_else(|| anyhow!("spec 文件中未找到 Version 字段"))
+    }
