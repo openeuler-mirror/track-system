@@ -13,3 +13,19 @@ use axum::{
     routing::{delete, get, post, put},
     Router,
 };
+
+use crate::server::{handlers::package, state::AppState};
+
+/// 创建软件包路由
+pub fn package_routes() -> Router<AppState> {
+    Router::new()
+        .route("/packages", get(package::list_packages))
+        .route("/packages", post(package::create_package))
+        .route("/packages/:id", get(package::get_package))
+        .route("/packages/:id", put(package::update_package))
+        .route("/packages/:id", delete(package::delete_package))
+        .route(
+            "/packages/:id/tracking",
+            get(package::get_package_with_tracking),
+        )
+}
