@@ -97,3 +97,52 @@ impl SpecParser {
                     || trimmed.starts_with("%pre")
                     || trimmed.starts_with("%post")
                     || trimmed.starts_with("%preun")
+                    || trimmed.starts_with("%postun");
+
+                if is_section {
+                    // 保存上一个 section
+                    if let Some(section) = current_section.take() {
+                        Self::save_section(&mut spec, &section, &section_content);
+                        section_content.clear();
+                    }
+
+                    // 开始新 section
+                    if trimmed.starts_with("%build") {
+                        current_section = Some("build".to_string());
+                    } else if trimmed.starts_with("%install") {
+                        current_section = Some("install".to_string());
+                    } else {
+                        // 其他 section，暂时忽略
+                        current_section = Some("other".to_string());
+                    }
+                    continue;
+                }
+            }
+
+            // 如果在 section 中，收集内容
+            if current_section.is_some() {
+                section_content.push_str(line);
+                section_content.push('\n');
+                continue;
+            }
+
+            // 跳过空行和注释（只在头部区域）
+            if trimmed.is_empty() || trimmed.starts_with('#') {
+                continue;
+            }
+
+            // 解析头部字段
+            if let Some((key, value)) = Self::parse_header_line(trimmed) {
+                match key.as_str() {
+                    "Name" => spec.name = Some(value),
+                    "Version" => spec.version = Some(value),
+                    "Release" => spec.release = Some(value),
+                    "Summary" => spec.summary = Some(value),
+                    "License" => spec.license = Some(value),
+                    "URL" => spec.url = Some(value),
+                    "BuildRequires" => {
+                        spec.build_requires
+                            .extend(Self::parse_dependency_list(&value));
+                    }
+                    "Requires" => {
+                        spec.requires.extend(Self::parse_dependency_list(&value));
