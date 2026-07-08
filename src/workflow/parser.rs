@@ -90,3 +90,49 @@ pub struct RetryConfig {
     pub interval: u64,
 
     /// 重试退避倍数
+    #[serde(default = "default_backoff_multiplier")]
+    pub backoff_multiplier: f32,
+}
+
+/// 工作流执行策略
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum ExecutionPolicy {
+    /// 顺序执行
+    Sequential,
+    /// 并行执行
+    Parallel,
+    /// 有向无环图执行
+    DAG,
+}
+
+impl WorkflowConfig {
+    /// 从 YAML 文件加载工作流配置
+    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self> {
+        let content = std::fs::read_to_string(&path).context("读取工作流文件失败")?;
+        Self::from_yaml(&content)
+    }
+
+    /// 从 YAML 字符串解析工作流配置
+    pub fn from_yaml(yaml: &str) -> Result<Self> {
+        serde_yaml::from_str(yaml).context("解析工作流配置失败")
+    }
+
+    /// 验证工作流配置
+    pub fn validate(&self) -> Result<()> {
+        // 验证任务名称唯一性
+        let mut task_names = std::collections::HashSet::new();
+        for task in &self.tasks {
+            if !task_names.insert(&task.name) {
+                anyhow::bail!("任务名称重复: {}", task.name);
+            }
+        }
+
+        // 验证依赖关系
+        for task in &self.tasks {
+            for dep in &task.depends_on {
+                if !task_names.contains(dep) {
+                    anyhow::bail!("任务 {} 依赖不存在的任务: {}", task.name, dep);
+                }
+            }
+        }
