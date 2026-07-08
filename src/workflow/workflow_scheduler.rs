@@ -32,3 +32,37 @@ pub struct WorkflowScheduleItem {
 /// 工作流调度器
 pub struct WorkflowScheduler {
     items: HashMap<String, WorkflowScheduleItem>,
+}
+
+impl WorkflowScheduler {
+    /// 创建新的工作流调度器
+    pub fn new() -> Self {
+        Self {
+            items: HashMap::new(),
+        }
+    }
+
+    /// 添加工作流到调度
+    pub fn add_workflow(&mut self, item: WorkflowScheduleItem) {
+        self.items.insert(item.name.clone(), item);
+    }
+
+    /// 获取所有调度的工作流
+    pub fn list_workflows(&self) -> Vec<&WorkflowScheduleItem> {
+        self.items.values().collect()
+    }
+
+    /// 启动调度器
+    pub async fn start(&self) -> Result<()> {
+        info!("启动工作流调度器");
+        info!("已注册的工作流: {}", self.items.len());
+
+        for (name, item) in &self.items {
+            if item.enabled {
+                info!("  ✓ {}: {}", name, item.cron_expression);
+            } else {
+                info!("  ✗ {} (已禁用)", name);
+            }
+        }
+
+        // 这里可以使用 tokio-cron-scheduler 或其他调度库
