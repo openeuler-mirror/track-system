@@ -47,3 +47,53 @@ pub struct ParsedSpec {
     /// %install 部分内容
     pub install_section: Option<String>,
     /// 所有宏定义
+    pub macros: HashMap<String, String>,
+}
+
+/// spec 文件解析器
+pub struct SpecParser;
+
+impl SpecParser {
+    /// 解析 spec 文件内容
+    pub fn parse(content: &str) -> Result<ParsedSpec> {
+        let mut spec = ParsedSpec {
+            name: None,
+            version: None,
+            release: None,
+            summary: None,
+            license: None,
+            url: None,
+            sources: Vec::new(),
+            patches: Vec::new(),
+            build_requires: Vec::new(),
+            requires: Vec::new(),
+            configure_options: Vec::new(),
+            build_section: None,
+            install_section: None,
+            macros: HashMap::new(),
+        };
+
+        let mut current_section: Option<String> = None;
+        let mut section_content = String::new();
+
+        for line in content.lines() {
+            let trimmed = line.trim();
+
+            // 检测 section 开始（只检测 section 标记，不包括宏）
+            if trimmed.starts_with('%')
+                && !trimmed.starts_with("%{")
+                && !trimmed.starts_with("%configure")
+                && !trimmed.starts_with("%make")
+                && !trimmed.starts_with("%cmake")
+            {
+                // 检查是否是 section 标记
+                let is_section = trimmed.starts_with("%build")
+                    || trimmed.starts_with("%install")
+                    || trimmed.starts_with("%prep")
+                    || trimmed.starts_with("%files")
+                    || trimmed.starts_with("%changelog")
+                    || trimmed.starts_with("%description")
+                    || trimmed.starts_with("%package")
+                    || trimmed.starts_with("%pre")
+                    || trimmed.starts_with("%post")
+                    || trimmed.starts_with("%preun")
