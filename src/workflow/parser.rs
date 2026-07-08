@@ -182,3 +182,50 @@ impl WorkflowConfig {
             temp_visited.remove(task_name);
             visited.insert(task_name.to_string());
             Ok(())
+        }
+
+        for task in &self.tasks {
+            visit(
+                &task.name,
+                &self.tasks,
+                &mut sorted,
+                &mut visited,
+                &mut temp_visited,
+            )?;
+        }
+
+        Ok(sorted)
+    }
+
+    /// 替换变量占位符
+    pub fn substitute_variables(&mut self, vars: &HashMap<String, String>) {
+        for (key, value) in vars {
+            self.variables.insert(key.clone(), value.clone());
+        }
+    }
+}
+
+fn default_version() -> String {
+    "1.0".to_string()
+}
+
+fn default_execution_policy() -> ExecutionPolicy {
+    ExecutionPolicy::Sequential
+}
+
+fn default_timeout() -> u64 {
+    3600 // 1小时
+}
+
+fn default_max_retries() -> u32 {
+    0
+}
+
+fn default_retry_interval() -> u64 {
+    5
+}
+
+fn default_backoff_multiplier() -> f32 {
+    2.0
+}
+
