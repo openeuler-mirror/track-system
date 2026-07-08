@@ -86,3 +86,47 @@ impl WorkflowEngine {
                     continue;
                 } else {
                     info!("    跳过任务，依赖 {} 未完成", dep);
+                    self.task_status
+                        .insert(task.name.clone(), TaskStatus::Skipped);
+                    return Ok(());
+                }
+            }
+
+            // 执行任务
+            self.task_status
+                .insert(task.name.clone(), TaskStatus::Running);
+
+            match executor.execute_task(task, &self.config.variables).await {
+                Ok(result) => {
+                    info!("   任务完成");
+                    self.task_status
+                        .insert(task.name.clone(), TaskStatus::Success);
+                    self.task_results.insert(task.name.clone(), result);
+                }
+                Err(e) => {
+                    error!("   任务失败: {}", e);
+                    self.task_status
+                        .insert(task.name.clone(), TaskStatus::Failed);
+                    return Err(e);
+                }
+            }
+        }
+
+        info!(" 工作流执行完成");
+        Ok(())
+    }
+
+    /// 并行执行工作流任务
+    async fn execute_parallel(&mut self, executor: &TaskExecutor) -> Result<()> {
+        // 创建并发任务
+        let mut handles = vec![];
+
+        for task in &self.config.tasks {
+            let task_name = task.name.clone();
+            let task = task.clone();
+            let executor = executor.clone();
+            let variables = self.config.variables.clone();
+
+            let handle =
+                tokio::spawn(async move { executor.execute_task(&task, &variables).await });
+
