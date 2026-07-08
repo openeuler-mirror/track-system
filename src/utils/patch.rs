@@ -175,3 +175,48 @@ impl PatchParser {
         Ok(Self::parse(&filename, &content))
     }
 
+    /// 解析 patch 内容
+    pub fn parse(filename: &str, content: &str) -> ParsedPatch {
+        let cves_from_filename = Self::extract_cve_from_filename(filename);
+        let cves_from_content = Self::extract_cve_from_content(content);
+
+        // 合并并去重 CVE 列表
+        let mut all_cves = cves_from_filename;
+        all_cves.extend(cves_from_content);
+        all_cves.sort();
+        all_cves.dedup();
+
+        ParsedPatch {
+            filename: filename.to_string(),
+            description: Self::extract_description(content),
+            cve_ids: all_cves,
+            content_hash: Self::calculate_hash(content),
+            patch_number: Self::extract_patch_number(filename),
+            is_backport: Self::is_backport_patch(filename, content),
+            upstream_commit: Self::extract_upstream_commit(content),
+            content: content.to_string(),
+        }
+    }
+}
+
+/// 解析后的 Patch 信息
+#[derive(Debug, Clone)]
+pub struct ParsedPatch {
+    /// 文件名
+    pub filename: String,
+    /// 描述
+    pub description: Option<String>,
+    /// CVE 编号列表
+    pub cve_ids: Vec<String>,
+    /// 内容哈希
+    pub content_hash: String,
+    /// 补丁序号
+    pub patch_number: Option<u32>,
+    /// 是否为 backport patch
+    pub is_backport: bool,
+    /// 上游 commit SHA（如果是 backport）
+    pub upstream_commit: Option<String>,
+    /// 原始内容
+    pub content: String,
+}
+
