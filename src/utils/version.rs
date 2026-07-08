@@ -243,3 +243,53 @@ impl VersionParser {
             .unwrap_or(0);
 
         Ok(Version {
+            major,
+            minor,
+            patch,
+            pre_release,
+            build,
+            raw,
+        })
+    }
+
+    /// 批量解析版本列表
+    pub fn parse_list(version_strs: &[String]) -> Vec<Version> {
+        version_strs
+            .iter()
+            .filter_map(|s| Self::parse(s).ok())
+            .collect()
+    }
+
+    /// 查找最新稳定版本
+    pub fn find_latest_stable(versions: &[Version]) -> Option<&Version> {
+        versions
+            .iter()
+            .filter(|v| v.is_stable())
+            .max_by(|a, b| a.cmp(b))
+    }
+
+    /// 查找最新版本（包括预发布版本）
+    pub fn find_latest(versions: &[Version]) -> Option<&Version> {
+        versions.iter().max_by(|a, b| a.cmp(b))
+    }
+
+    /// 查找比指定版本新的所有版本
+    pub fn find_newer_versions<'a>(
+        current: &Version,
+        all_versions: &'a [Version],
+    ) -> Vec<&'a Version> {
+        all_versions
+            .iter()
+            .filter(|v| v.is_newer_than(current))
+            .collect()
+    }
+
+    /// 计算版本落后数量
+    pub fn count_versions_behind(current: &Version, all_versions: &[Version]) -> u32 {
+        all_versions
+            .iter()
+            .filter(|v| v.is_stable() && v.is_newer_than(current))
+            .count() as u32
+    }
+}
+
