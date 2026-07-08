@@ -145,3 +145,52 @@ impl Ord for Version {
 fn compare_pre_release(a: &str, b: &str) -> Ordering {
     // 预发布标识优先级：alpha < beta < rc < 其他
     let priority_a = get_pre_release_priority(a);
+    let priority_b = get_pre_release_priority(b);
+
+    match priority_a.cmp(&priority_b) {
+        Ordering::Equal => {
+            // 如果类型相同，尝试提取数字进行比较
+            let num_a = extract_pre_release_number(a);
+            let num_b = extract_pre_release_number(b);
+            match (num_a, num_b) {
+                (Some(na), Some(nb)) => na.cmp(&nb),
+                _ => a.cmp(b), // 字符串比较
+            }
+        }
+        ord => ord,
+    }
+}
+
+/// 获取预发布标识的优先级
+fn get_pre_release_priority(pre: &str) -> u8 {
+    let lower = pre.to_lowercase();
+    if lower.starts_with("alpha") {
+        1
+    } else if lower.starts_with("beta") {
+        2
+    } else if lower.starts_with("rc") {
+        3
+    } else {
+        4
+    }
+}
+
+/// 从预发布标识中提取数字
+fn extract_pre_release_number(pre: &str) -> Option<u32> {
+    // 提取字符串中的数字部分
+    let digits: String = pre.chars().filter(|c| c.is_ascii_digit()).collect();
+    digits.parse().ok()
+}
+
+/// 版本解析器
+pub struct VersionParser;
+
+impl VersionParser {
+    /// 解析版本字符串
+    ///
+    /// 支持的格式：
+    /// - 1.2.3
+    /// - 1.2.3-alpha
+    /// - 1.2.3-beta.1
+    /// - 1.2.3-rc.2
+    /// - v1.2.3
