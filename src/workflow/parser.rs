@@ -44,3 +44,49 @@ pub struct WorkflowConfig {
     pub execution_policy: ExecutionPolicy,
 }
 
+/// 任务配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskConfig {
+    /// 任务名称
+    pub name: String,
+
+    /// 任务类型 (sync, classify, compare, export, etc.)
+    pub task_type: String,
+
+    /// 任务参数
+    #[serde(default)]
+    pub parameters: HashMap<String, serde_yaml::Value>,
+
+    /// 依赖的任务（前置任务）
+    #[serde(default)]
+    pub depends_on: Vec<String>,
+
+    /// 重试策略
+    #[serde(default)]
+    pub retry: RetryConfig,
+
+    /// 超时时间（秒）
+    #[serde(default = "default_timeout")]
+    pub timeout: u64,
+
+    /// 是否并行执行
+    #[serde(default)]
+    pub parallel: bool,
+
+    /// 条件判断 (简单的表达式)
+    #[serde(default)]
+    pub condition: Option<String>,
+}
+
+/// 重试配置
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct RetryConfig {
+    /// 最大重试次数
+    #[serde(default = "default_max_retries")]
+    pub max_attempts: u32,
+
+    /// 重试间隔（秒）
+    #[serde(default = "default_retry_interval")]
+    pub interval: u64,
+
+    /// 重试退避倍数
