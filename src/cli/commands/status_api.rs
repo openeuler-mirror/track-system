@@ -301,3 +301,45 @@ mod tests {
         assert!(result.is_ok(), "Result failed: {:?}", result.err());
         mock.assert_async().await;
     }
+
+    #[tokio::test]
+    async fn test_show_scheduler_not_running() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/status/scheduler")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "data": {
+                        "running": false,
+                        "active_jobs": 0,
+                        "pending_jobs": 15
+                    }
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = show_scheduler(&client).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_show_scheduler_failure() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/status/scheduler")
+            .with_status(503)
+            .create_async()
+            .await;
+
+        let result = show_scheduler(&client).await;
+        assert!(result.is_err(), "Expected failure but got success");
+        mock.assert_async().await;
+    }
+
