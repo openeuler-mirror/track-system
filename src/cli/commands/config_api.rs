@@ -288,3 +288,43 @@ mod tests {
         let config = ClientConfig {
             server_url: "http://test.com".to_string(),
             auth_token: None,
+            timeout: 30,
+            verify_ssl: true,
+        };
+
+        let result = show_config_yaml(&config, None);
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+    }
+
+    #[tokio::test]
+    async fn test_show_config_toml_format() {
+        let config = ClientConfig {
+            server_url: "http://test.com".to_string(),
+            auth_token: Some("token".to_string()),
+            timeout: 30,
+            verify_ssl: true,
+        };
+
+        let result = show_config_toml(&config, None);
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+
+        let result = show_config_toml(&config, Some("server_url".to_string()));
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+
+        let result = show_config_toml(&config, Some("timeout".to_string()));
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+    }
+
+    #[tokio::test]
+    async fn test_show_config_unknown_section() {
+        let config = ClientConfig::default();
+        let result = show_config_json(&config, Some("unknown".to_string()));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_get_config_path_with_custom() {
+        let custom_path = "/custom/path/config.toml";
+        let result = get_config_path(Some(custom_path.to_string()));
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), PathBuf::from(custom_path));
