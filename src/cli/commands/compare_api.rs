@@ -259,3 +259,47 @@ async fn generate_report(
     Ok(())
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cli::client::ClientConfig;
+    use mockito::Server;
+
+    async fn setup_test_server() -> (mockito::ServerGuard, ApiClient) {
+        let server = Server::new_async().await;
+        let config = ClientConfig {
+            server_url: server.url(),
+            auth_token: Some("test_token".to_string()),
+            timeout: 30,
+            verify_ssl: true,
+        };
+        let client = ApiClient::new(config).unwrap();
+        (server, client)
+    }
+
+    #[tokio::test]
+    async fn test_compare_l1_vs_l0() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("POST", "/api/compare/l1-vs-l0")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "data": {
+                        "task_id": "task-123",
+                        "status": "pending",
+                        "created_at": "2024-01-01T00:00:00Z"
+                    }
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = compare_l1_vs_l0(&client, 1, None, None).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
