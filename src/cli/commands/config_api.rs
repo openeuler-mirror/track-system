@@ -207,3 +207,43 @@ fn get_default_config_path() -> Result<PathBuf> {
     Ok(home.join(".track-cli").join("config.toml"))
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    #[tokio::test]
+    async fn test_init_config() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join("config.toml");
+
+        let result = init_config(Some(config_path.to_str().unwrap().to_string())).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        assert!(config_path.exists());
+
+        // 验证配置内容
+        let content = fs::read_to_string(&config_path).unwrap();
+        let config: ClientConfig = toml::from_str(&content).unwrap();
+        assert_eq!(config.server_url, "http://localhost:3000");
+        assert_eq!(config.timeout, 30);
+        assert!(config.verify_ssl);
+    }
+
+    #[tokio::test]
+    async fn test_validate_config_valid() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join("config.toml");
+
+        // 创建有效配置文件
+        let config = ClientConfig {
+            server_url: "http://localhost:8080".to_string(),
+            auth_token: Some("test_token".to_string()),
+            timeout: 60,
+            verify_ssl: true,
+        };
+        let content = toml::to_string_pretty(&config).unwrap();
+        fs::write(&config_path, content).unwrap();
+
+        let result = validate_config(Some(config_path.to_str().unwrap().to_string())).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+    }
