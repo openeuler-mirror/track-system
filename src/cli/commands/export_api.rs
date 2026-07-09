@@ -210,3 +210,43 @@ mod tests {
         let (mut server, client) = setup_test_server().await;
 
         let mock = server
+            .mock("GET", "/api/export/metadata?format=json&package_id=10")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body("\"{\\\"result\\\": \\\"ok\\\"}\"")
+            .create_async()
+            .await;
+
+        let action = ExportAction::Metadata {
+            format: "json".to_string(),
+            output: None,
+            package_id: Some(10),
+        };
+        let result = execute(&client, action).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_execute_report_action() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/export/report/999?format=csv")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body("\"col1,col2\\nval1,val2\"")
+            .with_body("\"col1,col2\\nval1,val2\"")
+            .create_async()
+            .await;
+
+        let action = ExportAction::Report {
+            report_id: 999,
+            format: "csv".to_string(),
+            output: None,
+        };
+        let result = execute(&client, action).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+}
