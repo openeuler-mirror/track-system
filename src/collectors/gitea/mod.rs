@@ -217,3 +217,41 @@ mod tests {
             }
         ]);
 
+        let mock = server.mock(|when, then| {
+            when.method(GET)
+                .path("/repos/owner/test-repo/branches")
+                .header("Authorization", "token token");
+            then.status(200).json_body(branch_response);
+        });
+
+        let result = client.get_branches("owner", "test-repo").await;
+        mock.assert();
+        assert!(result.is_ok());
+        let branches = result.unwrap();
+        assert_eq!(branches.len(), 1);
+        assert_eq!(branches[0].name, "main");
+    }
+
+    #[tokio::test]
+    async fn test_get_commits() {
+        let server = MockServer::start();
+        let client = GiteaClient::new("token", server.base_url()).unwrap();
+
+        let commits_response = json!([
+            {
+                "sha": "sha",
+                "commit": {
+                    "message": "message",
+                    "author": {
+                        "name": "author",
+                        "email": "email",
+                        "date": "2023-01-01T00:00:00Z"
+                    },
+                    "committer": {
+                        "name": "committer",
+                        "email": "email",
+                        "date": "2023-01-01T00:00:00Z"
+                    }
+                },
+                "html_url": "url",
+                "stats": {
