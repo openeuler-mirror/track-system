@@ -495,3 +495,53 @@ mod tests {
 
         // Mock for update
         let update_mock = server
+            .mock("PUT", "/api/packages/10")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(create_test_package_dto(10, "update-pkg").to_string())
+            .create_async()
+            .await;
+
+        let result = update_package(
+            &client,
+            "update-pkg".to_string(),
+            Some("48h".to_string()),
+            None,
+            Some("Updated description".to_string()),
+        )
+        .await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        find_mock.assert_async().await;
+        update_mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_remove_package() {
+        let (mut server, client) = setup_test_server().await;
+
+        let find_mock = server
+            .mock("GET", "/api/packages")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(serde_json::json!([create_test_package_dto(20, "remove-pkg")]).to_string())
+            .create_async()
+            .await;
+
+        let delete_mock = server
+            .mock("DELETE", "/api/packages/20")
+            .with_status(204)
+            .create_async()
+            .await;
+
+        let result = remove_package(&client, "remove-pkg".to_string(), true).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        find_mock.assert_async().await;
+        delete_mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_remove_package_without_confirm() {
+        let (_server, client) = setup_test_server().await;
+        let result = remove_package(&client, "test-pkg".to_string(), false).await;
+        assert!(result.is_ok());
+    }
