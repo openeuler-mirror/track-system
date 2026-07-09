@@ -420,3 +420,52 @@ mod tests {
         let mock = server
             .mock("GET", "/api/snapshot/list?tracking_id=15")
             .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "snapshots": []
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let action = SnapshotAction::List {
+            tracking_id: Some(15),
+        };
+        let result = execute(&client, action).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_delete_snapshot_success() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("DELETE", "/api/snapshot/123")
+            .with_status(204)
+            .create_async()
+            .await;
+
+        let result = delete_snapshot(&client, 123).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_execute_delete_action() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("DELETE", "/api/snapshot/456")
+            .with_status(204)
+            .create_async()
+            .await;
+
+        let action = SnapshotAction::Delete { snapshot_id: 456 };
+        let result = execute(&client, action).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+}
