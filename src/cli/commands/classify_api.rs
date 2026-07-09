@@ -196,3 +196,43 @@ mod tests {
         mock.assert_async().await;
     }
 
+    #[tokio::test]
+    async fn test_run_classification_daemon() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("POST", "/api/classify/daemon/start")
+            .match_body(mockito::Matcher::Json(serde_json::json!({
+                "interval": 60,
+                "batch_size": 100
+            })))
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "daemon_id": "daemon-123",
+                    "status": "running"
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = run_classification_daemon(&client, 60, 100).await;
+        if let Err(e) = &result {
+            eprintln!("Test error: {:?}", e);
+        }
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_execute_process_action() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("POST", "/api/classify/process")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
