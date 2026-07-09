@@ -271,3 +271,41 @@ mod tests {
             .mock("GET", "/api/health")
             .with_status(200)
             .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "status": "healthy",
+                    "timestamp": "2024-01-01T00:00:00Z"
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = check_health(&client, None).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_execute_check_action() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/health")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "status": "healthy"
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let action = HealthAction::Check { component: None };
+        let result = execute(&client, action).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+}
