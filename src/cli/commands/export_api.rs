@@ -170,3 +170,43 @@ mod tests {
     async fn test_export_report_to_console() {
         let (mut server, client) = setup_test_server().await;
 
+        let mock = server
+            .mock("GET", "/api/export/report/456?format=html")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body("\"<html><body>Report</body></html>\"")
+            .create_async()
+            .await;
+
+        let result = export_report(&client, 456, "html".to_string(), None).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_export_report_to_file() {
+        let (mut server, client) = setup_test_server().await;
+        let temp_file = NamedTempFile::new().unwrap();
+        let file_path = temp_file.path().to_str().unwrap().to_string();
+
+        let mock = server
+            .mock("GET", "/api/export/report/789?format=pdf")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body("\"PDF content\"")
+            .create_async()
+            .await;
+
+        let result = export_report(&client, 789, "pdf".to_string(), Some(file_path.clone())).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+
+        let content = fs::read_to_string(&file_path).unwrap();
+        assert_eq!(content, "PDF content");
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_execute_metadata_action() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
