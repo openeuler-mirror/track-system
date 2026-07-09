@@ -356,3 +356,48 @@ mod tests {
                 serde_json::json!({
                     "data": {
                         "id": 123,
+                        "tracking_id": 10,
+                        "report_type": "comparison",
+                        "package_name": "test-package",
+                        "status": "completed",
+                        "content": {
+                            "summary": "Test report content",
+                            "changes": 10
+                        },
+                        "created_at": "2024-01-01T00:00:00Z",
+                        "updated_at": "2024-01-01T01:00:00Z"
+                    }
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = show_report(&client, 123).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_export_report_to_console() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/reports/456/export?format=json")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body("\"{\\\"exported\\\": \\\"data\\\"}\"")
+            .create_async()
+            .await;
+
+        let result = export_report(&client, 456, "json".to_string(), None).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_export_report_to_file() {
+        let (mut server, client) = setup_test_server().await;
+        let temp_file = NamedTempFile::new().unwrap();
+        let file_path = temp_file.path().to_str().unwrap().to_string();
+
