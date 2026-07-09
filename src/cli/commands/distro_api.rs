@@ -376,3 +376,48 @@ mod tests {
                 serde_json::json!({
                     "id": 10,
                     "name": "openSUSE",
+                    "version": "15.5"
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let action = DistroAction::Add {
+            name: "openSUSE".to_string(),
+            version: "15.5".to_string(),
+            description: None,
+        };
+        let result = execute(&client, action).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_execute_list_action() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/distros")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "data": []
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let action = DistroAction::List;
+        let result = execute(&client, action).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_execute_show_action() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
