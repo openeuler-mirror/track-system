@@ -183,3 +183,40 @@ mod tests {
 
         let result = execute_ping(&client).await;
         assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_execute_ping_failure() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/health")
+            .with_status(500)
+            .create_async()
+            .await;
+
+        let result = execute_ping(&client).await;
+        assert!(result.is_err(), "Expected failure but got success");
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_execute_info_success() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/health")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "status": "healthy",
+                    "database": "connected",
+                    "version": "1.0.0"
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
