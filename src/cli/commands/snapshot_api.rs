@@ -224,3 +224,52 @@ mod tests {
         let (mut server, client) = setup_test_server().await;
 
         let mock = server
+            .mock("POST", "/api/snapshot/create")
+            .match_body(mockito::Matcher::Json(serde_json::json!({
+                "tracking_id": 2,
+                "tag": "v1.0.0"
+            })))
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "snapshot_id": "snap-456",
+                    "created_at": "2024-01-01T00:00:00Z",
+                    "tag": "v1.0.0"
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = create_snapshot(&client, 2, Some("v1.0.0".to_string())).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_restore_snapshot_with_force() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("POST", "/api/snapshot/123/restore")
+            .match_body(mockito::Matcher::Json(serde_json::json!({
+                "force": true
+            })))
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "restored_records": 1000,
+                    "restored_at": "2024-01-01T01:00:00Z"
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = restore_snapshot(&client, 123, true).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
