@@ -322,3 +322,52 @@ mod tests {
                         {
                             "id": 1,
                             "tracking_id": 10,
+                            "tag": "v1.0",
+                            "created_at": "2024-01-01T00:00:00Z"
+                        }
+                    ]
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = list_snapshots(&client, Some(10)).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_list_snapshots_empty() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/snapshot/list")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "snapshots": []
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = list_snapshots(&client, None).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_execute_create_action() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("POST", "/api/snapshot/create")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "snapshot_id": "snap-test",
+                    "created_at": "2024-01-01T00:00:00Z"
