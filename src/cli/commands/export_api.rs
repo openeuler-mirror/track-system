@@ -90,3 +90,43 @@ async fn export_report(
     Ok(())
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cli::client::ClientConfig;
+    use mockito::Server;
+    use tempfile::NamedTempFile;
+
+    async fn setup_test_server() -> (mockito::ServerGuard, ApiClient) {
+        let server = Server::new_async().await;
+        let config = ClientConfig {
+            server_url: server.url(),
+            auth_token: Some("test_token".to_string()),
+            timeout: 30,
+            verify_ssl: true,
+        };
+        let client = ApiClient::new(config).unwrap();
+        (server, client)
+    }
+
+    #[tokio::test]
+    async fn test_export_metadata_to_console() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/export/metadata?format=json")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body("\"{\\\"data\\\": \\\"test metadata\\\"}\"")
+            .create_async()
+            .await;
+
+        let result = export_metadata(&client, "json".to_string(), None, None).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_export_metadata_with_package_id() {
+        let (mut server, client) = setup_test_server().await;
+
