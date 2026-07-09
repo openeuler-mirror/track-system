@@ -178,3 +178,42 @@ mod tests {
             "clone_url": "http://localhost/owner/test-repo.git",
             "owner": {
                 "id": 1,
+                "login": "owner",
+                "full_name": "owner",
+                "email": "owner@example.com",
+                "avatar_url": "url",
+                "language": "rust",
+                "username": "owner"
+            }
+        });
+
+        let _mock = server.mock(|when, then| {
+            when.method(GET)
+                .path("/repos/owner/test-repo")
+                .header("Authorization", "token token");
+            then.status(200).json_body(repo_response);
+        });
+
+        let result = client.get_repository("owner", "test-repo").await;
+        // mock.assert();
+        assert!(result.is_ok(), "Result error: {:?}", result.err());
+        let repo = result.unwrap();
+        assert_eq!(repo.name, "test-repo");
+    }
+
+    #[tokio::test]
+    async fn test_get_branches() {
+        let server = MockServer::start();
+        let client = GiteaClient::new("token", server.base_url()).unwrap();
+
+        let branch_response = json!([
+            {
+                "name": "main",
+                "commit": {
+                    "id": "sha",
+                    "url": "url"
+                },
+                "protected": true
+            }
+        ]);
+
