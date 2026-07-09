@@ -676,3 +676,52 @@ mod tests {
             },
             "commits": [],
             "issues": []
+        })
+        .to_string();
+
+        let snapshot = parse_snapshot_or_convert(&json, 99).unwrap();
+        assert!(snapshot.spec.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_import_single_file() {
+        let (mut server, client) = setup_test_server().await;
+
+        // 创建临时文件
+        let mut temp_file = NamedTempFile::new().unwrap();
+        temp_file
+            .write_all(create_test_snapshot_json().as_bytes())
+            .unwrap();
+        temp_file.flush().unwrap();
+
+        let mock = server
+            .mock("POST", "/api/metadata/l1")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "code": 200,
+                    "message": "success",
+                    "data": {
+                        "snapshot_id": "snap-test-123",
+                        "tracking_id": 1,
+                        "file_count": 10,
+                        "imported_at": "2024-01-01T00:00:00Z"
+                    }
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = import_single_file(&client, &temp_file.path().to_path_buf(), 1).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_import_single_file_unknown_origin_uses_l1_endpoint() {
+        let (mut server, client) = setup_test_server().await;
+
+        let json = serde_json::json!({
+            "tracking_id": 1,
