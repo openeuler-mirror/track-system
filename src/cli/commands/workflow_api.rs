@@ -224,3 +224,51 @@ mod tests {
             .await;
 
         let result = execute_workflow(
+            &client,
+            workflow_file.path().to_str().unwrap().to_string(),
+            vec![],
+        )
+        .await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_execute_workflow_with_vars() {
+        let (mut server, client) = setup_test_server().await;
+        let workflow_file = create_temp_workflow_file("workflow: test");
+
+        let mock = server
+            .mock("POST", "/api/workflow/execute")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "execution_id": 456,
+                    "status": "running"
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = execute_workflow(
+            &client,
+            workflow_file.path().to_str().unwrap().to_string(),
+            vec!["key1=value1".to_string(), "key2=value2".to_string()],
+        )
+        .await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_list_workflows() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/workflow/list")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
