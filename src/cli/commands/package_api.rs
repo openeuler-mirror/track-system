@@ -446,3 +446,52 @@ mod tests {
         list_mock.assert_async().await;
     }
 
+    #[tokio::test]
+    async fn test_show_package_by_id() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/packages/123")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(create_test_package_dto(123, "test-pkg").to_string())
+            .create_async()
+            .await;
+
+        let result = show_package(&client, "123".to_string()).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_show_package_by_name() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/packages")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(serde_json::json!([create_test_package_dto(1, "test-package")]).to_string())
+            .create_async()
+            .await;
+
+        let result = show_package(&client, "test-package".to_string()).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_update_package() {
+        let (mut server, client) = setup_test_server().await;
+
+        // Mock for finding package by name
+        let find_mock = server
+            .mock("GET", "/api/packages")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(serde_json::json!([create_test_package_dto(10, "update-pkg")]).to_string())
+            .create_async()
+            .await;
+
+        // Mock for update
+        let update_mock = server
