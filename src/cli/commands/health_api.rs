@@ -233,3 +233,41 @@ mod tests {
             .await;
 
         let result = check_component_health(&client, "database").await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_check_health_with_component() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/health?component=scheduler")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "status": "degraded",
+                    "details": {
+                        "status": "running",
+                        "lag": "high"
+                    }
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = check_health(&client, Some("scheduler".to_string())).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_check_health_without_component() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/health")
+            .with_status(200)
+            .with_header("content-type", "application/json")
