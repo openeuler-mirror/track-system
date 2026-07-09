@@ -371,3 +371,52 @@ mod tests {
                 serde_json::json!({
                     "snapshot_id": "snap-test",
                     "created_at": "2024-01-01T00:00:00Z"
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let action = SnapshotAction::Create {
+            tracking_id: 5,
+            tag: None,
+        };
+        let result = execute(&client, action).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_execute_restore_action() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("POST", "/api/snapshot/999/restore")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "restored_records": 500,
+                    "restored_at": "2024-01-01T01:00:00Z"
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let action = SnapshotAction::Restore {
+            snapshot_id: 999,
+            force: true,
+        };
+        let result = execute(&client, action).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_execute_list_action() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/snapshot/list?tracking_id=15")
+            .with_status(200)
