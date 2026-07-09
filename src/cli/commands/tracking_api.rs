@@ -588,3 +588,53 @@ mod tests {
             .with_status(200)
             .with_header("content-type", "application/json")
             .with_body(
+                serde_json::json!({
+                    "data": {
+                        "id": 5,
+                        "package_id": 1,
+                        "distro_id": 2,
+                        "l1_repo_owner": "owner",
+                        "l1_repo_name": "repo",
+                        "l1_branch": "main",
+                        "l2_branch": "openEuler-24.03-LTS",
+                        "l2_repo_path": "packages/repo",
+                        "tracking_status": "active",
+                        "last_sync_time": null,
+                        "last_l1_commit_sha": null,
+                        "last_l2_commit_sha": null,
+                        "created_at": "2024-01-01T00:00:00Z",
+                        "updated_at": "2024-01-01T00:00:00Z"
+                    }
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = update_tracking_status(&client, 5, true).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_remove_tracking_without_confirm() {
+        let (_server, client) = setup_test_server().await;
+        let result = remove_tracking(&client, 99, false).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_remove_tracking_with_confirm() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("DELETE", "/api/tracking/99")
+            .with_status(204)
+            .create_async()
+            .await;
+
+        let result = remove_tracking(&client, 99, true).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+}
