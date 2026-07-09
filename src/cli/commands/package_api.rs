@@ -396,3 +396,53 @@ mod tests {
             )
             .create_async()
             .await;
+
+        let result = list_packages(&client, 0).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_list_packages_with_limit() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/packages")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!([
+                    create_test_package_dto(1, "package1"),
+                    create_test_package_dto(2, "package2"),
+                    create_test_package_dto(3, "package3")
+                ])
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = list_packages(&client, 2).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_remove_package_not_found_returns_error() {
+        let (mut server, client) = setup_test_server().await;
+
+        let list_mock = server
+            .mock("GET", "/api/packages")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body("[]")
+            .create_async()
+            .await;
+
+        let result = remove_package(&client, "missing-package".to_string(), true).await;
+        assert!(result.is_err());
+        let msg = format!("{}", result.unwrap_err());
+        assert!(msg.contains("未找到软件包"));
+
+        list_mock.assert_async().await;
+    }
+
