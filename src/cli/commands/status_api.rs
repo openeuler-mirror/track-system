@@ -215,3 +215,46 @@ mod tests {
                             "pending_jobs": 2
                         }
                     }
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = show_overview(&client).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_show_overview_degraded() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/status")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "data": {
+                        "status": "degraded",
+                        "version": "1.0.0",
+                        "uptime": 1800,
+                        "database": {
+                            "connected": true,
+                            "pool_size": 5
+                        },
+                        "scheduler": {
+                            "running": false,
+                            "active_jobs": 0,
+                            "pending_jobs": 10
+                        }
+                    }
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = show_overview(&client).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
