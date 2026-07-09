@@ -278,3 +278,16 @@ fn format_json_value(value: &serde_json::Value) -> String {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_render_simple() {
+        let formatter = TableFormatter::new().with_color(false);
+        let headers = vec!["Name", "Age", "City"];
+        let rows = vec![vec!["Alice", "30", "New York"], vec!["Bob", "25", "London"]];
+
+        let result = formatter.render_simple(&headers, &rows).unwrap();
+        assert!(result.contains("Name"));
+        assert!(result.contains("Alice"));
