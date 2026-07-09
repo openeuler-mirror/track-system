@@ -184,3 +184,36 @@ mod tests {
                 id: 1,
                 tracking_id: 1,
                 commit_sha: "sha1".to_string(),
+                commit_message: "Fix CVE-2024-1234".to_string(),
+                author_name: "author".to_string(),
+                author_email: "author@example.com".to_string(),
+                committed_at: chrono::Utc::now(),
+                created_at: chrono::Utc::now(),
+                change_type: None,
+                primary_change_type: None,
+                cve_list: None,
+                spec_changed: false,
+                patch_stats: None,
+                classification_status: "pending".to_string(),
+                classification_notes: None,
+                sync_status: "pending".to_string(),
+                synced_to_l2_commit: None,
+                synced_at: None,
+                api_url: "https://api.github.com/repos/owner/repo/commits/sha1".to_string(),
+                fetched_at: chrono::Utc::now(),
+                files_changed_count: 1,
+                additions: 100,
+                deletions: 50,
+                updated_at: chrono::Utc::now(),
+                spec_version: None,
+                spec_release: None,
+            }]])
+            .into_connection();
+
+        let classifier = ChangeClassifier::new(&db);
+        let result = classifier.classify_commit(1).await.unwrap();
+
+        assert_eq!(result.primary_type, ChangeType::CVE);
+        assert_eq!(result.cve_numbers, vec!["CVE-2024-1234".to_string()]);
+    }
+}
