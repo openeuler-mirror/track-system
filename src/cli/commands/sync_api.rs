@@ -190,3 +190,53 @@ async fn show_sync_status(api_client: &ApiClient) -> Result<()> {
     Ok(())
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cli::client::ClientConfig;
+    use mockito::Server;
+
+    async fn setup_test_server() -> (mockito::ServerGuard, ApiClient) {
+        let server = Server::new_async().await;
+        let config = ClientConfig {
+            server_url: server.url(),
+            auth_token: Some("test_token".to_string()),
+            timeout: 30,
+            verify_ssl: true,
+        };
+        let client = ApiClient::new(config).unwrap();
+        (server, client)
+    }
+
+    #[tokio::test]
+    async fn test_run_sync() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("POST", "/api/sync/123/queue")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "job_id": 456,
+                    "status": "queued"
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = run_sync(&client, 123).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_run_all_sync_with_trackings() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock_list = server
+            .mock("GET", "/api/tracking?status=active")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
