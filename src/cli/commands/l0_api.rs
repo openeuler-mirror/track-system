@@ -132,3 +132,49 @@ mod tests {
     #[tokio::test]
     async fn test_poll_l0_all_packages() {
         let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("POST", "/api/l0/poll/all")
+            .match_body(mockito::Matcher::Json(serde_json::json!({})))
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "processed": 5,
+                    "total_new_commits": 50,
+                    "total_new_tags": 10,
+                    "total_new_releases": 3
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = poll_l0(&client, None).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_detect_diff() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("POST", "/api/l0/diff/456")
+            .match_body(mockito::Matcher::Json(serde_json::json!({})))
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "l0_version": "2.0.0",
+                    "l1_version": "1.5.0",
+                    "diff": {
+                        "new_commits": 25,
+                        "new_tags": 3,
+                        "version_behind": 1,
+                        "upgrade_available": true
+                    }
+                })
+                .to_string(),
+            )
+            .create_async()
