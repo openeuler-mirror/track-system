@@ -346,3 +346,53 @@ mod tests {
         assert!(parse_sync_interval_hours("12m").is_err());
         assert!(parse_sync_interval_hours("8761h").is_err());
     }
+
+    #[tokio::test]
+    async fn test_add_package() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("POST", "/api/packages")
+            .match_body(mockito::Matcher::Json(serde_json::json!({
+                "name": "test-package",
+                "level": 1,
+                "sync_interval_hours": 24,
+                "l0_repo_url": "https://github.com/test/repo",
+                "description": "Test package"
+            })))
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(create_test_package_dto(1, "test-package").to_string())
+            .create_async()
+            .await;
+
+        let result = add_package(
+            &client,
+            "test-package".to_string(),
+            1,
+            "24h".to_string(),
+            Some("https://github.com/test/repo".to_string()),
+            Some("Test package".to_string()),
+        )
+        .await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_list_packages() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/packages")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!([
+                    create_test_package_dto(1, "package1"),
+                    create_test_package_dto(2, "package2")
+                ])
+                .to_string(),
+            )
+            .create_async()
+            .await;
