@@ -178,3 +178,49 @@ mod tests {
                 .to_string(),
             )
             .create_async()
+            .await;
+
+        let result = detect_diff(&client, 456).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_detect_diff_no_upgrade() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("POST", "/api/l0/diff/789")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "l0_version": "1.0.0",
+                    "l1_version": "1.0.0",
+                    "diff": {
+                        "new_commits": 0,
+                        "new_tags": 0,
+                        "version_behind": 0,
+                        "upgrade_available": false
+                    }
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = detect_diff(&client, 789).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_execute_poll_action() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("POST", "/api/l0/poll/100")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
