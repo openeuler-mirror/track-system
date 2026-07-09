@@ -171,3 +171,25 @@ impl ClientConfig {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_default_config() {
+        let config = ClientConfig::default();
+        assert_eq!(config.server_url, "http://localhost:3000");
+        assert_eq!(config.timeout, 30);
+        assert!(config.verify_ssl);
+    }
+
+    #[test]
+    fn test_api_base_url() {
+        let config = ClientConfig {
+            server_url: "http://localhost:8080".to_string(),
+            ..Default::default()
+        };
+        assert_eq!(config.api_base_url(), "http://localhost:8080/api");
+
+        let config2 = ClientConfig {
+            server_url: "http://localhost:8080/".to_string(),
