@@ -392,3 +392,48 @@ mod tests {
                     }
                 })
                 .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let action = CompareAction::Tracking { tracking_id: 10 };
+        let result = execute(&client, action).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_execute_report_action() {
+        let (_server, client) = setup_test_server().await;
+
+        let action = CompareAction::Report {
+            format: "json".to_string(),
+            output: Some("report.json".to_string()),
+        };
+        let result = execute(&client, action).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+    }
+
+    #[tokio::test]
+    async fn test_compare_l1_vs_l0_with_snapshots() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("POST", "/api/compare/l1-vs-l0")
+            .match_body(mockito::Matcher::Json(serde_json::json!({
+                "tracking_id": 5,
+                "l0_snapshot_id": "snap-l0-1",
+                "l1_snapshot_id": "snap-l1-1"
+            })))
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "data": {
+                        "task_id": "task-with-snaps",
+                        "status": "pending",
+                        "created_at": "2024-01-01T00:00:00Z"
+                    }
+                })
+                .to_string(),
+            )
