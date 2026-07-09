@@ -311,3 +311,48 @@ mod tests {
             Some(5),
             Some("diff".to_string()),
         )
+        .await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_list_reports_empty() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/reports?page=1&page_size=10")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "data": {
+                        "items": [],
+                        "total": 0,
+                        "page": 1,
+                        "page_size": 10,
+                        "total_pages": 0
+                    }
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = list_reports(&client, None, None, None, None).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_show_report() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/reports/123")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "data": {
+                        "id": 123,
