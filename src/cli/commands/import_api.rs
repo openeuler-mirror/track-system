@@ -1166,3 +1166,52 @@ mod tests {
             .await;
 
         let result = import_batch_files(
+            &client,
+            vec![file1.path().to_path_buf(), file2.path().to_path_buf()],
+        )
+        .await;
+        assert!(result.is_err());
+        packages_mock.assert_async().await;
+        tracking_mock.assert_async().await;
+        import_mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_execute_metadata_action() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mut temp_file = NamedTempFile::new().unwrap();
+        temp_file
+            .write_all(create_test_snapshot_json().as_bytes())
+            .unwrap();
+        temp_file.flush().unwrap();
+
+        let mock = server
+            .mock("POST", "/api/metadata/l1")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "code": 200,
+                    "message": "success",
+                    "data": {
+                        "snapshot_id": "snap-exec-test",
+                        "tracking_id": 1,
+                        "file_count": 5,
+                        "imported_at": "2024-01-01T00:00:00Z"
+                    }
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let action = ImportAction::Metadata {
+            file: temp_file.path().to_str().unwrap().to_string(),
+            tracking_id: 1,
+        };
+        let result = execute(&client, action).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+}
