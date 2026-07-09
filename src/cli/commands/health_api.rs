@@ -157,3 +157,41 @@ async fn check_component_health(api_client: &ApiClient, component: &str) -> Resu
     Ok(())
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cli::client::ClientConfig;
+    use mockito::Server;
+
+    async fn setup_test_server() -> (mockito::ServerGuard, ApiClient) {
+        let server = Server::new_async().await;
+        let config = ClientConfig {
+            server_url: server.url(),
+            auth_token: Some("test_token".to_string()),
+            timeout: 30,
+            verify_ssl: true,
+        };
+        let client = ApiClient::new(config).unwrap();
+        (server, client)
+    }
+
+    #[tokio::test]
+    async fn test_check_all_health() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/health")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "status": "healthy",
+                    "database": {
+                        "status": "connected",
+                        "latency_ms": 5.2
+                    },
+                    "scheduler": {
+                        "status": "running",
+                        "active_jobs": 3,
+                        "pending_jobs": 10
+                    },
