@@ -113,3 +113,34 @@ mod tests {
         // Test Unknown
         let err = ApiError::from_status(400, "Bad Request".to_string());
         assert!(matches!(err, ApiError::Unknown(_)));
+    }
+
+    #[test]
+    fn test_is_retryable() {
+        // Retryable errors
+        assert!(ApiError::TimeoutError.is_retryable());
+        assert!(ApiError::ServerError("error".to_string()).is_retryable());
+        assert!(ApiError::RateLimitError("error".to_string()).is_retryable());
+        // Note: HttpError is hard to construct directly from reqwest::Error in test without mocking,
+        // but the logic is simple enough.
+
+        // Non-retryable errors
+        assert!(!ApiError::AuthenticationError("error".to_string()).is_retryable());
+        assert!(!ApiError::NotFoundError("error".to_string()).is_retryable());
+        assert!(!ApiError::Base64Error("error".to_string()).is_retryable());
+        assert!(!ApiError::InvalidConfig("error".to_string()).is_retryable());
+        assert!(!ApiError::Unknown("error".to_string()).is_retryable());
+    }
+
+    #[test]
+    fn test_error_display() {
+        let err = ApiError::AuthenticationError("auth failed".to_string());
+        assert_eq!(format!("{}", err), "认证失败: auth failed");
+
+        let err = ApiError::NotFoundError("not found".to_string());
+        assert_eq!(format!("{}", err), "资源不存在: not found");
+
+        let err = ApiError::TimeoutError;
+        assert_eq!(format!("{}", err), "请求超时");
+    }
+}
