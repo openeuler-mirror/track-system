@@ -872,3 +872,52 @@ mod tests {
         // Mock packages endpoint
         let packages_mock_1 = server
             .mock("GET", "/api/packages")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!([
+                    {
+                        "id": 10,
+                        "name": "test-package",
+                        "level": 1,
+                        "sync_interval_hours": 24,
+                        "l0_repo_url": "https://github.com/test/test",
+                        "description": "Test package",
+                        "created_at": "2024-01-01T00:00:00Z",
+                        "updated_at": "2024-01-01T00:00:00Z"
+                    }
+                ])
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        // Mock tracking endpoint
+        let tracking_mock = server
+            .mock("GET", "/api/tracking?page=1&page_size=100&package_id=10")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "code": 200,
+                    "message": "success",
+                    "data": {
+                        "items": [
+                            {
+                                "id": 100,
+                                "package_id": 10,
+                                "distro_id": 1,
+                                "l1_repo_owner": "test-owner",
+                                "l1_repo_name": "test-repo",
+                                "l1_branch": "main",
+                                "l2_branch": "openeuler",
+                                "l2_repo_path": "/path/to/repo",
+                                "tracking_status": "active",
+                                "last_sync_time": null,
+                                "last_l1_commit_sha": null,
+                                "last_l2_commit_sha": null,
+                                "created_at": "2024-01-01T00:00:00Z",
+                                "updated_at": "2024-01-01T00:00:00Z"
+                            }
+                        ],
+                        "total": 1
