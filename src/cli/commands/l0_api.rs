@@ -224,3 +224,50 @@ mod tests {
             .with_header("content-type", "application/json")
             .with_body(
                 serde_json::json!({
+                    "new_commits": 5,
+                    "new_tags": 1,
+                    "new_releases": 0
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let action = L0Action::Poll {
+            package_id: Some(100),
+        };
+        let result = execute(&client, action).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_execute_detect_diff_action() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("POST", "/api/l0/diff/200")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "l0_version": "3.0.0",
+                    "l1_version": "2.0.0",
+                    "diff": {
+                        "new_commits": 100,
+                        "new_tags": 5,
+                        "version_behind": 2,
+                        "upgrade_available": true
+                    }
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let action = L0Action::DetectDiff { package_id: 200 };
+        let result = execute(&client, action).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+}
