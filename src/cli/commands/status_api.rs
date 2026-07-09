@@ -258,3 +258,46 @@ mod tests {
 
         let result = show_overview(&client).await;
         assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_show_overview_failure() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/status")
+            .with_status(500)
+            .create_async()
+            .await;
+
+        let result = show_overview(&client).await;
+        assert!(result.is_err(), "Expected failure but got success");
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_show_scheduler() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("GET", "/api/status/scheduler")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "data": {
+                        "running": true,
+                        "active_jobs": 3,
+                        "pending_jobs": 7
+                    }
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = show_scheduler(&client).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
