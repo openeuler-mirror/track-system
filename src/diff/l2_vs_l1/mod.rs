@@ -2791,3 +2791,55 @@ Summary: Test package
             spec_release: None,
         };
 
+        let (commit, idx) =
+            L2VsL1Comparator::find_base_commit_from_records(&[model], "1.0.0", Some("1"));
+        assert!(commit.is_none());
+        assert!(idx.is_none());
+    }
+
+    #[test]
+    fn test_find_base_commit_with_release_match() {
+        let commit = CommitEntry {
+            sha: "s".to_string(),
+            title: "Version: 1.0.0 Release: 1".to_string(),
+            message: "Version: 1.0.0\nRelease: 1".to_string(),
+            author: "a".to_string(),
+            authored_at: Utc::now(),
+            url: None,
+            stats: crate::snapshot::types::ChangeStats {
+                additions: 0,
+                deletions: 0,
+                files_changed: 0,
+            },
+            primary_change_type: None,
+            cve_list: vec![],
+        };
+
+        let (base, idx) =
+            L2VsL1Comparator::find_base_commit(std::slice::from_ref(&commit), "1.0.0", Some("1"));
+        assert!(base.is_some());
+        assert_eq!(idx, Some(0));
+        assert_eq!(base.unwrap().sha, "s");
+    }
+
+    #[test]
+    fn test_find_base_commit_version_only_match() {
+        let commit = CommitEntry {
+            sha: "s".to_string(),
+            title: "bump v1.0.0".to_string(),
+            message: "bump v1.0.0".to_string(),
+            author: "a".to_string(),
+            authored_at: Utc::now(),
+            url: None,
+            stats: crate::snapshot::types::ChangeStats {
+                additions: 0,
+                deletions: 0,
+                files_changed: 0,
+            },
+            primary_change_type: None,
+            cve_list: vec![],
+        };
+
+        let (base, idx) =
+            L2VsL1Comparator::find_base_commit(std::slice::from_ref(&commit), "1.0.0", Some("9"));
+        assert!(base.is_some());
