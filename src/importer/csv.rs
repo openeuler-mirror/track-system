@@ -273,3 +273,39 @@ nginx,1,6,https://github.com/nginx/nginx,高性能Web服务器
         assert_eq!(result2.stats.updated, 1);
         assert_eq!(result2.stats.created, 0);
 
+        // 验证更新
+        let nginx = Packages::find()
+            .filter(packages::Column::Name.eq("nginx"))
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(nginx.level, 1);
+        assert_eq!(nginx.sync_interval_hours, 6);
+        assert_eq!(nginx.description, Some("高性能Web服务器".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_invalid_level() {
+        let db = Database::connect("sqlite::memory:")
+            .await
+            .expect("Failed to connect");
+
+        use migration::{Migrator, MigratorTrait};
+        Migrator::up(&db, None)
+            .await
+            .expect("Failed to run migrations");
+
+        let importer = CsvImporter::new(&db);
+
+        let csv = r#"name,level,sync_interval_hours,l0_repo_url,description
+nginx,5,12,https://github.com/nginx/nginx,Web服务器
+"#;
+        let result = importer.import_from_string(csv).await.unwrap();
+
+        assert!(!result.success);
+        assert_eq!(result.stats.failed, 1);
+        assert!(result.errors[0].contains("等级必须是 1、2 或 3"));
+    }
+}
