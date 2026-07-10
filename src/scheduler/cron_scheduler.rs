@@ -72,3 +72,33 @@ impl<'a> CronScheduler<'a> {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sea_orm::{DatabaseBackend, MockDatabase};
+
+    #[test]
+    fn test_cron_scheduler_creation() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+        let _scheduler = CronScheduler::new(&db);
+    }
+
+    #[tokio::test]
+    async fn test_check_and_queue_pending_tasks_empty() {
+        use crate::entities::{packages, tracking};
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<(tracking::Model, Option<packages::Model>), _, _>(vec![vec![]])
+            .into_connection();
+
+        let scheduler = CronScheduler::new(&db);
+        let result = scheduler.check_and_queue_pending_tasks().await.unwrap();
+        assert_eq!(result, 0);
+    }
+
+    #[tokio::test]
+    async fn test_check_and_queue_pending_tasks_with_data() {
+        use crate::entities::{packages, tracking};
+        use chrono::{Duration, Utc};
+
+        let tracking_model = tracking::Model {
