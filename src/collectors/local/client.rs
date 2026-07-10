@@ -616,3 +616,42 @@ mod tests {
         assert!(result.is_ok());
         let commits = result.unwrap();
         assert_eq!(commits.len(), 1);
+        assert_eq!(commits[0].message, "Initial commit");
+    }
+
+    #[tokio::test]
+    async fn test_get_file_content() {
+        let temp_dir = setup_test_repo();
+        let client = LocalClient::new(temp_dir.path()).unwrap();
+
+        let result = client
+            .get_file_content("owner", "repo", "test.txt", "master")
+            .await;
+        assert!(result.is_ok());
+        let file = result.unwrap();
+        assert_eq!(file.name, "test.txt");
+    }
+
+    #[tokio::test]
+    async fn test_collect() {
+        let temp_dir = setup_test_repo();
+        let client = LocalClient::new(temp_dir.path()).unwrap();
+
+        let config = CollectConfig {
+            platform: Platform::Local,
+            owner: None,
+            repo: None,
+            branch: "master".to_string(),
+            since: None,
+            until: None,
+            limit: None,
+            level: Some("l0".to_string()),
+            repo_path: Some(temp_dir.path().to_path_buf()),
+            api_url: None,
+            token: None,
+        };
+
+        let result = client.collect(&config).await;
+        assert!(result.is_ok());
+        let res = result.unwrap();
+        assert_eq!(res.level, "l0");
