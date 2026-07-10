@@ -360,3 +360,48 @@ mod tests {
             message: "first".to_string(),
             author: "test".to_string(),
             author_email: "test@example.com".to_string(),
+            committed_at: Utc::now(),
+            files_changed: 1,
+        };
+
+        let commit2 = GitCommit {
+            sha: "def456".to_string(),
+            message: "second".to_string(),
+            author: "test".to_string(),
+            author_email: "test@example.com".to_string(),
+            committed_at: Utc::now(),
+            files_changed: 1,
+        };
+
+        let l1 = vec![commit1.clone(), commit2.clone()];
+        let l2 = vec![commit1];
+
+        let diff = GitRepositoryClient::compute_diff(&l1, &l2);
+        assert_eq!(diff.l1_ahead.len(), 1);
+        assert_eq!(diff.l2_ahead.len(), 0);
+        assert_eq!(diff.l1_ahead[0].sha, "def456");
+    }
+
+    #[test]
+    fn test_compute_diff_l2_ahead() {
+        let commit1 = GitCommit {
+            sha: "abc123".to_string(),
+            message: "first".to_string(),
+            author: "test".to_string(),
+            author_email: "test@example.com".to_string(),
+            committed_at: Utc::now(),
+            files_changed: 1,
+        };
+
+        let commit2 = GitCommit {
+            sha: "def456".to_string(),
+            message: "second".to_string(),
+            author: "test".to_string(),
+            author_email: "test@example.com".to_string(),
+            committed_at: Utc::now(),
+            files_changed: 1,
+        };
+
+        let l1 = vec![commit1.clone()];
+        let l2 = vec![commit1, commit2.clone()];
+
