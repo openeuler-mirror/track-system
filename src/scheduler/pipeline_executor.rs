@@ -594,3 +594,52 @@ mod tests {
     #[test]
     fn test_stage_result_failure() {
         let started_at = Utc::now();
+
+        let result = StageResult::failure(
+            PipelineStage::L2Snapshot,
+            "失败消息".to_string(),
+            started_at,
+        );
+
+        assert_eq!(result.stage, PipelineStage::L2Snapshot);
+        assert!(!result.success);
+        assert_eq!(result.message, "失败消息");
+        assert_eq!(result.details, serde_json::json!({}));
+        assert!(result.finished_at >= started_at);
+    }
+
+    #[test]
+    fn test_l1_ingestion_result_serialization() {
+        let result = L1IngestionResult {
+            commits_synced: 10,
+            issues_synced: 5,
+            has_new_data: true,
+            snapshot_path: Some("/path/to/snapshot".to_string()),
+            snapshot_checksum: Some("abc123".to_string()),
+        };
+
+        let json = serde_json::to_value(&result).unwrap();
+        assert_eq!(json["commits_synced"], 10);
+        assert_eq!(json["issues_synced"], 5);
+        assert_eq!(json["has_new_data"], true);
+    }
+
+    #[test]
+    fn test_l2_snapshot_result_serialization() {
+        let result = L2SnapshotResult {
+            snapshot_id: Some(123),
+            snapshot_path: Some("/path/to/snapshot".to_string()),
+            files_count: 42,
+            has_new_data: true,
+        };
+
+        let json = serde_json::to_value(&result).unwrap();
+        assert_eq!(json["snapshot_id"], 123);
+        assert_eq!(json["files_count"], 42);
+        assert_eq!(json["has_new_data"], true);
+    }
+
+    #[test]
+    fn test_diff_comparison_result_serialization() {
+        let result = DiffComparisonResult {
+            report_id: Some(456),
