@@ -2265,3 +2265,55 @@ Summary: Test package
         };
 
         let result = L2VsL1Comparator::create_l1_snapshot("testpkg".to_string(), &snapshot);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("解码 spec 内容失败"));
+    }
+
+    #[test]
+    fn test_create_l1_snapshot_non_utf8_spec_content() {
+        use crate::snapshot::types::SnapshotOrigin;
+        use crate::snapshot::types::SpecEntry;
+        use base64::Engine;
+
+        let bytes = vec![0xffu8, 0xfeu8, 0xfdu8];
+        let spec_base64 = base64::engine::general_purpose::STANDARD.encode(bytes);
+
+        let snapshot = RepositorySnapshot {
+            tracking_id: 1,
+            origin: SnapshotOrigin::L1,
+            spec: Some(SpecEntry {
+                path: "testpkg.spec".to_string(),
+                version: Some("1.0.0".to_string()),
+                release: Some("1".to_string()),
+                sha256: "spec_hash".to_string(),
+                content_base64: spec_base64,
+            }),
+            files: vec![],
+            commits: vec![],
+            generated_at: Utc::now(),
+            issues: vec![],
+        };
+
+        let result = L2VsL1Comparator::create_l1_snapshot("testpkg".to_string(), &snapshot);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("spec 内容不是有效的 UTF-8"));
+    }
+
+    #[test]
+    fn test_analyze_customization_impact_empty() {
+        let comparator = L2VsL1Comparator::new();
+        let analysis = comparator.analyze_customization_impact(&[]).unwrap();
+        assert_eq!(analysis.total_customizations, 0);
+        assert_eq!(analysis.by_type.len(), 0);
+        assert!(analysis.summary.contains("未检测到定制内容"));
+    }
+
+    #[test]
+    fn test_analyze_customization_impact_includes_highlights() {
+        let comparator = L2VsL1Comparator::new();
