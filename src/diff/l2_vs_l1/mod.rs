@@ -2054,3 +2054,56 @@ Test package
             ],
             commits: vec![],
             generated_at: Utc::now(),
+            issues: vec![],
+        }
+    }
+
+    #[test]
+    fn test_patch_file_equality() {
+        let patch1 = PatchFile {
+            filename: "test.patch".to_string(),
+            path: "/path/to/test.patch".to_string(),
+            content_hash: "abc123".to_string(),
+            size: 1024,
+            applied: true,
+        };
+
+        let patch2 = patch1.clone();
+        assert_eq!(patch1, patch2);
+    }
+
+    #[test]
+    fn test_source_file_equality() {
+        let source1 = SourceFile {
+            filename: "test.tar.gz".to_string(),
+            path: "/path/to/test.tar.gz".to_string(),
+            content_hash: "def456".to_string(),
+            size: 2048,
+        };
+
+        let source2 = source1.clone();
+        assert_eq!(source1, source2);
+    }
+
+    #[test]
+    fn test_customization_type_equality() {
+        assert_eq!(
+            CustomizationType::VersionChange,
+            CustomizationType::VersionChange
+        );
+        assert_ne!(
+            CustomizationType::VersionChange,
+            CustomizationType::SecurityHardening
+        );
+    }
+
+    #[test]
+    fn test_version_relationship() {
+        assert_eq!(VersionRelationship::L2Newer, VersionRelationship::L2Newer);
+        assert_eq!(VersionRelationship::Same, VersionRelationship::Same);
+        assert_ne!(VersionRelationship::L2Newer, VersionRelationship::L2Older);
+    }
+
+    #[test]
+    fn test_sync_priority_ordering() {
+        assert!(SyncPriority::Critical < SyncPriority::High);
