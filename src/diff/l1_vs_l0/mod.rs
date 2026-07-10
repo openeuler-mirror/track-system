@@ -849,3 +849,50 @@ mod tests {
             all_versions: vec![
                 VersionTag {
                     version: "1.22.0".to_string(),
+                    date: Utc::now(),
+                    changelog: "Bug fixes".to_string(),
+                    is_stable: true,
+                },
+                VersionTag {
+                    version: "1.23.0".to_string(),
+                    date: Utc::now(),
+                    changelog: "Security fixes including CVE-2023-1234".to_string(),
+                    is_stable: true,
+                },
+                VersionTag {
+                    version: "1.24.0".to_string(),
+                    date: Utc::now(),
+                    changelog: "Performance improvements".to_string(),
+                    is_stable: true,
+                },
+            ],
+            changelogs: {
+                let mut map = HashMap::new();
+                map.insert(
+                    "1.23.0".to_string(),
+                    vec![ChangelogEntry {
+                        entry_type: "security".to_string(),
+                        description: "Fix CVE-2023-1234".to_string(),
+                        commit_sha: Some("abc123".to_string()),
+                    }],
+                );
+                map
+            },
+        };
+
+        let l1_info = L1VersionInfo {
+            package_name: "nginx".to_string(),
+            current_version: "1.22.0".to_string(),
+            patches: vec![PatchInfo {
+                filename: "CVE-2023-1234.patch".to_string(),
+                description: "Fix CVE-2023-1234 vulnerability".to_string(),
+                applied: true,
+                content_hash: Some("hash1".to_string()),
+            }],
+            cve_patches: vec![CveInfo {
+                cve_id: "CVE-2023-1234".to_string(),
+                patch_file: "CVE-2023-1234.patch".to_string(),
+                description: "Memory corruption vulnerability".to_string(),
+                severity: Some("High".to_string()),
+            }],
+        };
