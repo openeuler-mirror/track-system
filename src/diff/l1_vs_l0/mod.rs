@@ -801,3 +801,51 @@ mod tests {
                     description: "Fix buffer overflow in parser".to_string(),
                     commit_sha: Some("abc123def456".to_string()),
                 },
+                ChangelogEntry {
+                    entry_type: "security".to_string(),
+                    description: "Fix CVE-2023-1234: Memory corruption".to_string(),
+                    commit_sha: Some("def456abc123".to_string()),
+                },
+            ],
+        );
+
+        let upgradable_versions = vec![UpgradableVersion {
+            version: "1.23.0".to_string(),
+            release_date: Utc::now(),
+            is_security_release: true,
+            breaking_changes: Vec::new(),
+        }];
+
+        // 执行补丁分析
+        let analysis = comparator
+            .analyze_patches(&patches, &changelogs, &upgradable_versions)
+            .unwrap();
+
+        // 验证结果
+        assert_eq!(analysis.total_patches, 3);
+
+        // 应该识别出 2 个已合并的补丁（backport 和 CVE）
+        assert!(!analysis.merged_in_upstream.is_empty());
+
+        // 应该识别出至少 1 个仍需保留的补丁（custom feature）
+        assert!(!analysis.still_needed.is_empty());
+
+        // 可移除的补丁数应该等于已合并的补丁数
+        assert_eq!(
+            analysis.can_be_removed_after_upgrade,
+            analysis.merged_in_upstream.len()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_full_comparison_with_patches() {
+        let comparator = L1VsL0Comparator::new();
+
+        // 准备完整的测试数据
+        let l0_info = L0VersionInfo {
+            package_name: "nginx".to_string(),
+            latest_stable: "1.24.0".to_string(),
+            latest_version: "1.25.0-beta".to_string(),
+            all_versions: vec![
+                VersionTag {
+                    version: "1.22.0".to_string(),
