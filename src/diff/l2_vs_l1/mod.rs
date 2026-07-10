@@ -2475,3 +2475,56 @@ Summary: Test package
             content_identical: false,
             diff_summary: "x".to_string(),
             key_changes: vec![],
+            detailed_comparison: Some(SpecComparison {
+                version_changed: false,
+                version_diff: None,
+                build_requires_added: vec![],
+                build_requires_removed: vec![],
+                requires_added: vec![],
+                requires_removed: vec![],
+                configure_options_added: vec![],
+                configure_options_removed: vec![],
+                sources_changed: false,
+                patches_changed: false,
+            }),
+            build_requires_added: vec!["gcc".to_string()],
+            build_requires_removed: vec!["make".to_string()],
+            configure_options_added: vec!["--with-foo".to_string()],
+            configure_options_removed: vec!["--without-bar".to_string()],
+        };
+
+        let recs = comparator
+            .generate_config_recommendations(&spec_diff)
+            .unwrap();
+        assert_eq!(recs.len(), 2);
+        assert!(recs.iter().all(|r| r.priority == SyncPriority::Medium));
+        assert!(recs.iter().any(|r| r.description.contains("BuildRequires")));
+        assert!(recs.iter().any(|r| r.description.contains("configure")));
+    }
+
+    #[test]
+    fn test_generate_source_recommendations_added_and_modified() {
+        let comparator = L2VsL1Comparator::new();
+        let source_diff = SourceDiff {
+            l1_total: 2,
+            l2_total: 1,
+            l2_added: vec![SourceFile {
+                filename: "new.tar.gz".to_string(),
+                path: "new.tar.gz".to_string(),
+                content_hash: "h".to_string(),
+                size: 1,
+            }],
+            l2_removed: vec![],
+            l2_modified: vec![SourceModification {
+                filename: "cfg.ini".to_string(),
+                l1_hash: "a".to_string(),
+                l2_hash: "b".to_string(),
+            }],
+        };
+        let recs = comparator
+            .generate_source_recommendations(&source_diff)
+            .unwrap();
+        assert_eq!(recs.len(), 2);
+        assert!(recs.iter().all(|r| r.priority == SyncPriority::Low));
+        assert!(recs
+            .iter()
