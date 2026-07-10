@@ -250,3 +250,46 @@ mod tests {
         assert!(diff.is_some());
         if let Some(SpecDiff::Modified {
             l1_version,
+            l2_version,
+            ..
+        }) = diff
+        {
+            assert_eq!(l1_version, Some("1.0.1".to_string()));
+            assert_eq!(l2_version, Some("1.0.0".to_string()));
+        } else {
+            panic!("Expected Modified diff");
+        }
+    }
+
+    #[test]
+    fn test_diff_spec_added_deleted() {
+        let spec = SpecEntry {
+            path: "test.spec".to_string(),
+            sha256: "sha1".to_string(),
+            version: Some("1.0.0".to_string()),
+            release: Some("1".to_string()),
+            content_base64: "".to_string(),
+        };
+
+        // Added (L1 has, L2 none)
+        let diff_added = diff_spec(Some(&spec), None);
+        assert!(matches!(diff_added, Some(SpecDiff::Added { .. })));
+
+        // Deleted (L1 none, L2 has)
+        let diff_deleted = diff_spec(None, Some(&spec));
+        assert!(matches!(diff_deleted, Some(SpecDiff::Deleted { .. })));
+    }
+
+    #[test]
+    fn test_diff_snapshots_integration() {
+        let l1 = RepositorySnapshot::new(1, SnapshotOrigin::L1);
+        let l2 = RepositorySnapshot::new(1, SnapshotOrigin::L2);
+
+        let result = diff_snapshots(&l1, &l2);
+        assert!(result.is_ok());
+        let report = result.unwrap();
+        assert_eq!(report.tracking_id, 1);
+        assert_eq!(report.summary.l1_commits, 0);
+        assert_eq!(report.summary.l2_commits, 0);
+    }
+}
