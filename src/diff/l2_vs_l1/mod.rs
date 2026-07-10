@@ -3107,3 +3107,55 @@ Summary: Test package
             api_url: "http://example".to_string(),
             fetched_at: now,
             files_changed_count: 0,
+            additions: 0,
+            deletions: 0,
+            created_at: now,
+            updated_at: now,
+            spec_version: Some("9.9.9".to_string()),
+            spec_release: Some("1".to_string()),
+        };
+
+        let l1_model = l1_commit_records::Model {
+            id: 1,
+            tracking_id: 1,
+            commit_sha: "l1sha".to_string(),
+            commit_message: "no match".to_string(),
+            author_name: "a".to_string(),
+            author_email: "a@a".to_string(),
+            committed_at: now,
+            change_type: None,
+            primary_change_type: None,
+            cve_list: None,
+            spec_changed: true,
+            patch_stats: None,
+            classification_status: "done".to_string(),
+            classification_notes: None,
+            sync_status: "idle".to_string(),
+            synced_to_l2_commit: None,
+            synced_at: None,
+            api_url: "http://example".to_string(),
+            fetched_at: now,
+            files_changed_count: 0,
+            additions: 0,
+            deletions: 0,
+            created_at: now,
+            updated_at: now,
+            spec_version: Some("1.0.0".to_string()),
+            spec_release: Some("1".to_string()),
+        };
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<l2_commit_records::Model, _, _>(vec![vec![l2_model]])
+            .append_query_results::<l1_commit_records::Model, _, _>(vec![vec![l1_model]])
+            .into_connection();
+
+        let comparator = L2VsL1Comparator::new();
+        let l1_snapshot = L1Snapshot {
+            package_name: "p".to_string(),
+            version: "1.0.0".to_string(),
+            spec_content: "Name: p\nVersion: 1.0.0\nRelease: 1\n".to_string(),
+            spec_sha256: "a".to_string(),
+            patches: vec![],
+            source_files: vec![],
+            commits: vec![],
+            snapshot_at: now,
