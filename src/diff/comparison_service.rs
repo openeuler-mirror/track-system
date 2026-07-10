@@ -365,3 +365,46 @@ mod tests {
         let commit2 = create_test_git_commit("sha2", "Fix bug B", "bob");
         let commit3 = create_test_git_commit("sha3", "Update docs", "charlie");
 
+        let diff = CommitDiff {
+            l1_ahead: vec![commit1.clone(), commit2.clone()],
+            l2_ahead: vec![commit3.clone()],
+        };
+
+        let result = service
+            .build_detailed_diff(&tracking, &diff, "git_comparison")
+            .unwrap();
+
+        assert_eq!(result["tracking_id"], 1);
+        assert_eq!(result["method"], "git_comparison");
+        assert_eq!(result["l1_repo"], "upstream/test-repo");
+        assert_eq!(result["l1_branch"], "main");
+        assert_eq!(result["l2_branch"], "openeuler");
+        assert_eq!(result["commits_ahead"]["count"], 2);
+        assert_eq!(result["commits_behind"]["count"], 1);
+        assert_eq!(result["summary"]["l1_ahead"], 2);
+        assert_eq!(result["summary"]["l2_ahead"], 1);
+        assert_eq!(result["summary"]["needs_backport"], true);
+        assert_eq!(result["summary"]["needs_forward_port"], true);
+
+        // Verify commit details
+        let l1_commits = result["commits_ahead"]["commits"].as_array().unwrap();
+        assert_eq!(l1_commits.len(), 2);
+        assert_eq!(l1_commits[0]["sha"], "sha1");
+        assert_eq!(l1_commits[0]["message"], "Add feature A");
+        assert_eq!(l1_commits[0]["author"], "alice");
+        assert_eq!(l1_commits[0]["files_changed"], 5);
+
+        let l2_commits = result["commits_behind"]["commits"].as_array().unwrap();
+        assert_eq!(l2_commits.len(), 1);
+        assert_eq!(l2_commits[0]["sha"], "sha3");
+    }
+
+    #[test]
+    fn test_build_detailed_diff_empty() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+        let service = ComparisonService::new(&db);
+        let tracking = create_test_tracking_model();
+
+        let diff = CommitDiff {
+            l1_ahead: vec![],
+            l2_ahead: vec![],
