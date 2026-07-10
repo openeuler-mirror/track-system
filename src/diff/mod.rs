@@ -164,3 +164,46 @@ mod tests {
             l1_sha,
             l2_sha,
         } = &diff[0]
+        {
+            assert_eq!(path, "file1.txt");
+            assert_eq!(l1_sha, "sha1");
+            assert_eq!(l2_sha, "sha1_modified");
+        } else {
+            panic!("Expected Modified diff");
+        }
+    }
+
+    #[test]
+    fn test_diff_files_added_and_deleted() {
+        let l1_files = vec![FileEntry {
+            path: "file1.txt".to_string(),
+            sha256: "sha1".to_string(),
+            size: 100,
+            is_binary: false,
+        }];
+        let l2_files = vec![FileEntry {
+            path: "file2.txt".to_string(),
+            sha256: "sha2".to_string(),
+            size: 200,
+            is_binary: false,
+        }];
+
+        let diff = diff_files(&l1_files, &l2_files);
+        assert_eq!(diff.len(), 2);
+
+        let added = diff.iter().find(|d| matches!(d, FileDiff::Added { .. }));
+        let deleted = diff.iter().find(|d| matches!(d, FileDiff::Deleted { .. }));
+
+        assert!(added.is_some());
+        assert!(deleted.is_some());
+
+        if let Some(FileDiff::Added { path, sha }) = added {
+            assert_eq!(path, "file1.txt");
+            assert_eq!(sha, "sha1");
+        }
+
+        if let Some(FileDiff::Deleted { path, sha }) = deleted {
+            assert_eq!(path, "file2.txt");
+            assert_eq!(sha, "sha2");
+        }
+    }
