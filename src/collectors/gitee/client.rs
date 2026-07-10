@@ -218,3 +218,48 @@ impl IssueClient for GiteeClient {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::collectors::traits::{CommitsParams, IssueParams};
+    use httpmock::prelude::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_client_creation() {
+        let client = GiteeClient::new("test_token");
+        assert!(client.is_ok());
+    }
+
+    #[test]
+    fn test_client_with_custom_timeout() {
+        let client = GiteeClient::with_config("test_token", Duration::from_secs(60));
+        assert!(client.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_gitee_client_as_collector() {
+        let client = GiteeClient::new("token").unwrap();
+        let _collector = client.as_collector();
+    }
+
+    #[tokio::test]
+    async fn test_get_repository() {
+        let server = MockServer::start();
+        let client = GiteeClient::for_testing("token", server.base_url()).unwrap();
+
+        let repo_response = json!({
+            "id": 1,
+            "name": "test-repo",
+            "full_name": "owner/test-repo",
+            "html_url": "http://localhost/owner/test-repo",
+            "description": "test repo",
+            "private": false,
+            "created_at": "2023-01-01T00:00:00Z",
+            "updated_at": "2023-01-01T00:00:00Z",
+            "default_branch": "main",
+            "clone_url": "http://localhost/owner/test-repo.git"
+        });
+
+        let _mock = server.mock(|when, then| {
+            when.method(GET)
