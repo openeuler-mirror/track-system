@@ -654,3 +654,46 @@ mod tests {
         assert_eq!(config.repo, Some("repo".to_string()));
         assert_eq!(config.token, Some("token".to_string()));
         assert_eq!(config.api_url, Some("url".to_string()));
+        assert_eq!(config.limit, Some(10));
+        assert_eq!(config.level, Some("l2".to_string()));
+        assert!(config.since.is_some());
+        assert!(config.until.is_some());
+        assert!(config.repo_path.is_some());
+    }
+
+    struct TestCollector;
+
+    #[async_trait]
+    impl Collector for TestCollector {
+        async fn collect(&self, _config: &CollectConfig) -> ApiResult<CollectResult> {
+            unimplemented!()
+        }
+
+        fn name(&self) -> &str {
+            "TestCollector"
+        }
+    }
+
+    #[test]
+    fn test_validate_config() {
+        let collector = TestCollector;
+
+        // Test Remote platform validation
+        let config = CollectConfig::new(Platform::GitHub, "main");
+        assert!(collector.validate_config(&config).is_err()); // Missing owner/repo
+
+        let config = CollectConfig::new(Platform::GitHub, "main").with_remote("owner", "repo");
+        assert!(collector.validate_config(&config).is_ok());
+
+        // Test Local platform validation
+        let config = CollectConfig::new(Platform::Local, "main");
+        assert!(collector.validate_config(&config).is_err()); // Missing repo_path
+
+        let config = CollectConfig::new(Platform::Local, "main").with_local_path("/path");
+        assert!(collector.validate_config(&config).is_ok());
+
+        // Test Empty branch
+        let config = CollectConfig::new(Platform::GitHub, "").with_remote("owner", "repo");
+        assert!(collector.validate_config(&config).is_err());
+    }
+}
