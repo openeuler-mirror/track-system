@@ -143,3 +143,23 @@ fn parse_github_repo(url: &str) -> Result<(String, String)> {
     Ok((owner.to_string(), repo.to_string()))
 }
 
+#[cfg(test)]
+mod tests {
+    use super::parse_github_repo;
+
+    #[test]
+    fn test_parse_repo_variants() {
+        assert_eq!(
+            parse_github_repo("https://github.com/example/project").unwrap(),
+            ("example".to_string(), "project".to_string())
+        );
+        assert_eq!(
+            parse_github_repo("example/project").unwrap(),
+            ("example".to_string(), "project".to_string())
+        );
+        assert_eq!(
+            parse_github_repo("https://github.com/example/project.git").unwrap(),
+            ("example".to_string(), "project".to_string())
+        );
+    }
+}
