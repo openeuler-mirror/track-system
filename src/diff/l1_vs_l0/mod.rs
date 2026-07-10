@@ -992,3 +992,51 @@ mod tests {
             patch_file: "CVE-2023-9999.patch".to_string(),
             description: "Custom vulnerability".to_string(),
             severity: Some("Medium".to_string()),
+        }];
+
+        let mut changelogs = HashMap::new();
+        changelogs.insert(
+            "1.23.0".to_string(),
+            vec![ChangelogEntry {
+                entry_type: "feature".to_string(),
+                description: "Add new feature".to_string(),
+                commit_sha: Some("abc123".to_string()),
+            }],
+        );
+
+        // 执行 CVE 分析
+        let analysis = comparator
+            .analyze_cve_patches(&cve_patches, &changelogs)
+            .unwrap();
+
+        // 验证结果
+        assert_eq!(analysis.total_cves, 1);
+        assert_eq!(analysis.fixed_in_upstream.len(), 0);
+        assert_eq!(analysis.not_fixed_in_upstream.len(), 1);
+        assert_eq!(analysis.not_fixed_in_upstream[0].cve_id, "CVE-2023-9999");
+    }
+
+    #[tokio::test]
+    async fn test_cve_analysis_mixed_status() {
+        let comparator = L1VsL0Comparator::new();
+
+        // 准备测试数据：部分 CVE 已修复，部分未修复
+        let cve_patches = vec![
+            CveInfo {
+                cve_id: "CVE-2023-1234".to_string(),
+                patch_file: "CVE-2023-1234.patch".to_string(),
+                description: "Fixed in upstream".to_string(),
+                severity: Some("High".to_string()),
+            },
+            CveInfo {
+                cve_id: "CVE-2023-9999".to_string(),
+                patch_file: "CVE-2023-9999.patch".to_string(),
+                description: "Not fixed in upstream".to_string(),
+                severity: Some("Medium".to_string()),
+            },
+        ];
+
+        let mut changelogs = HashMap::new();
+        changelogs.insert(
+            "1.23.0".to_string(),
+            vec![ChangelogEntry {
