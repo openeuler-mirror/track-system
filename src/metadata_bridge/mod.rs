@@ -1268,3 +1268,54 @@ Patch1: fix.patch
         let commit = CommitEntry {
             sha: "sha".to_string(),
             title: "t".to_string(),
+            message: "m".to_string(),
+            author: "a".to_string(),
+            authored_at: Utc::now(),
+            url: None,
+            stats: ChangeStats {
+                additions: 1,
+                deletions: 2,
+                files_changed: 1,
+            },
+            primary_change_type: None,
+            cve_list: vec![],
+        };
+
+        let inserted = l2_commit_records::Model {
+            id: 1,
+            tracking_id: 1,
+            commit_sha: commit.sha.clone(),
+            commit_message: commit.message.clone(),
+            author_name: commit.author.clone(),
+            author_email: String::new(),
+            committed_at: commit.authored_at,
+            change_type: None,
+            primary_change_type: None,
+            cve_list: None,
+            spec_changed: false,
+            patch_stats: None,
+            classification_status: "pending".to_string(),
+            classification_notes: None,
+            sync_status: "not_synced".to_string(),
+            synced_to_l2_commit: None,
+            synced_at: None,
+            api_url: String::new(),
+            fetched_at: Utc::now(),
+            files_changed_count: commit.stats.files_changed,
+            additions: commit.stats.additions,
+            deletions: commit.stats.deletions,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            spec_version: Some("1.0.0".to_string()),
+            spec_release: Some("1".to_string()),
+        };
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<l2_commit_records::Model, _, _>(vec![vec![inserted]])
+            .into_connection();
+
+        let result = persist_l2_commits(&db, 1, &[commit], Some("1.0.0"), Some("1")).await;
+        assert!(result.is_ok());
+    }
+
+    #[test]
