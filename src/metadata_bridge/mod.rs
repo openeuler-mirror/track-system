@@ -1013,3 +1013,54 @@ mod tests {
 
     #[test]
     fn test_collect_files_from_spec_parses_patches_and_sources() {
+        let spec_text = r#"
+Name: test
+Version: 1.0.0
+Release: 1
+Source0: source.tar.gz
+Patch0: fix.patch
+Patch1: fix.patch
+"#;
+        let spec = SpecEntry {
+            path: "test.spec".to_string(),
+            version: Some("1.0.0".to_string()),
+            release: Some("1".to_string()),
+            sha256: "s".to_string(),
+            content_base64: BASE64_STANDARD.encode(spec_text),
+        };
+
+        let files = collect_files(SnapshotOrigin::L2, Some(&spec), None).unwrap();
+        assert!(files.iter().any(|f| f.path.contains("fix.patch")));
+        assert!(files.iter().any(|f| f.path.contains("source.tar.gz")));
+
+        let patch_count = files.iter().filter(|f| f.path == "fix.patch").count();
+        assert_eq!(patch_count, 1);
+    }
+
+    #[test]
+    fn test_collect_files_spec_base64_error() {
+        let spec = SpecEntry {
+            path: "test.spec".to_string(),
+            version: Some("1.0.0".to_string()),
+            release: Some("1".to_string()),
+            sha256: "s".to_string(),
+            content_base64: "%%%not_base64%%%".to_string(),
+        };
+
+        let err = collect_files(SnapshotOrigin::L2, Some(&spec), None)
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("Base64 解码 spec 内容失败"));
+    }
+
+    #[test]
+    fn test_collect_files_spec_non_utf8_error() {
+        let spec = SpecEntry {
+            path: "test.spec".to_string(),
+            version: Some("1.0.0".to_string()),
+            release: Some("1".to_string()),
+            sha256: "s".to_string(),
+            content_base64: BASE64_STANDARD.encode([0xffu8, 0xfeu8, 0xfdu8]),
+        };
+
+        let err = collect_files(SnapshotOrigin::L2, Some(&spec), None)
