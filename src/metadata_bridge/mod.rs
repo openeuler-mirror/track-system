@@ -1472,3 +1472,54 @@ Patch1: fix.patch
         assert!(b.is_binary);
     }
 
+    #[tokio::test]
+    async fn test_collect_spec_from_repo_finds_spec_and_extracts_version_release() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let root = temp_dir.path();
+        std::fs::write(
+            root.join("pkg.spec"),
+            "Name: pkg\nVersion: 1.2.3\nRelease: 7%{?dist}\n",
+        )
+        .unwrap();
+
+        let tracking_model = make_tracking_model(1);
+        let got = collect_spec(SnapshotOrigin::L2, &tracking_model, Some(root))
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(got.path, "pkg.spec");
+        assert_eq!(got.version, Some("1.2.3".to_string()));
+        assert_eq!(got.release, Some("7".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_collect_spec_from_repo_returns_none_when_missing() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let root = temp_dir.path();
+        let tracking_model = make_tracking_model(1);
+        let got = collect_spec(SnapshotOrigin::L2, &tracking_model, Some(root))
+            .await
+            .unwrap();
+        assert!(got.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_collect_commits_maps_models() {
+        let now = Utc::now();
+        let model = l1_commit_records::Model {
+            id: 1,
+            tracking_id: 1,
+            commit_sha: "sha".to_string(),
+            commit_message: "title\nbody".to_string(),
+            author_name: "a".to_string(),
+            author_email: "e".to_string(),
+            committed_at: now,
+            change_type: None,
+            primary_change_type: Some("bugfix".to_string()),
+            cve_list: Some(json!(["CVE-2025-1234"])),
+            spec_changed: false,
+            patch_stats: None,
+            classification_status: "pending".to_string(),
+            classification_notes: None,
+            sync_status: "not_synced".to_string(),
