@@ -1319,3 +1319,54 @@ Patch1: fix.patch
     }
 
     #[test]
+    fn test_parse_spec_from_repo_no_spec() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let (v, r) = parse_spec_from_repo(temp_dir.path()).unwrap();
+        assert!(v.is_none());
+        assert!(r.is_none());
+    }
+
+    fn make_tracking_model(id: i32) -> tracking::Model {
+        tracking::Model {
+            id,
+            package_id: 1,
+            distro_id: 1,
+            l1_branch: "main".to_string(),
+            l1_repo_owner: "o".to_string(),
+            l1_repo_name: "r".to_string(),
+            l2_branch: "b".to_string(),
+            l2_repo_path: "/x".to_string(),
+            tracking_status: "idle".to_string(),
+            last_sync_time: None,
+            last_l1_commit_sha: None,
+            last_l2_commit_sha: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            last_error: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_export_l2_snapshot_tracking_not_found() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<tracking::Model, _, _>(vec![vec![]])
+            .into_connection();
+
+        let result = export_l2_snapshot(
+            &db,
+            1,
+            PathBuf::from("/tmp/track-system-metadata-bridge-test-repo"),
+            PathBuf::from("/tmp/track-system-metadata-bridge-test.json"),
+        )
+        .await;
+
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("tracking configuration not found"));
+    }
+
+    #[tokio::test]
+    async fn test_build_repository_snapshot_repo_path_missing_bails() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
