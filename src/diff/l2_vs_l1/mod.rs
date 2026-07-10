@@ -3475,3 +3475,56 @@ CFLAGS="-fstack-protector-strong -D_FORTIFY_SOURCE=2"
         assert_eq!(diff.l2_commits_count, 8);
         assert!(diff.base_commit.is_none());
         assert!(diff.base_version_release.is_some());
+    }
+
+    #[test]
+    fn test_customization_analysis_structure() {
+        let analysis = CustomizationAnalysis {
+            total_customizations: 3,
+            by_type: HashMap::new(),
+            summary: "Test summary".to_string(),
+        };
+
+        assert_eq!(analysis.total_customizations, 3);
+        assert_eq!(analysis.summary, "Test summary");
+    }
+
+    #[test]
+    fn test_sync_recommendation_structure() {
+        let rec = SyncRecommendation {
+            priority: SyncPriority::High,
+            recommendation_type: SyncType::SecurityPatch,
+            description: "Security fix needed".to_string(),
+            affected_files: vec!["test.patch".to_string()],
+            estimated_effort: EffortLevel::Medium,
+        };
+
+        assert_eq!(rec.priority, SyncPriority::High);
+        assert_eq!(rec.recommendation_type, SyncType::SecurityPatch);
+        assert_eq!(rec.estimated_effort, EffortLevel::Medium);
+    }
+
+    #[test]
+    fn test_merge_conflict_structure() {
+        let conflict = MergeConflict {
+            conflict_type: ConflictType::PatchConflict,
+            description: "Patch modified in both versions".to_string(),
+            files: vec!["test.patch".to_string()],
+            resolution_hint: "Manual merge required".to_string(),
+        };
+
+        assert_eq!(conflict.conflict_type, ConflictType::PatchConflict);
+        assert_eq!(conflict.files.len(), 1);
+    }
+
+    #[test]
+    fn test_l2_vs_l1_comparator_creation() {
+        let comparator = L2VsL1Comparator::new();
+
+        // Both should be valid instances
+        assert_eq!(
+            std::mem::size_of_val(&comparator),
+            std::mem::size_of::<L2VsL1Comparator>()
+        );
+    }
+}
