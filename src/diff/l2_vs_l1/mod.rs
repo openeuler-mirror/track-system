@@ -3370,3 +3370,55 @@ CFLAGS="-fstack-protector-strong -D_FORTIFY_SOURCE=2"
         let patches = vec![PatchFile {
             filename: "CVE-2023-1234-fix.patch".to_string(),
             path: "/patches/CVE-2023-1234-fix.patch".to_string(),
+            content_hash: "hash1".to_string(),
+            size: 100,
+            applied: true,
+        }];
+
+        let customizations = L2VsL1Comparator::analyze_patch_customizations(&patches).unwrap();
+        assert_eq!(customizations.len(), 1);
+        assert!(matches!(
+            customizations[0].customization_type,
+            CustomizationType::SecurityHardening
+        ));
+    }
+
+    #[test]
+    fn test_analyze_patch_customizations_custom() {
+        let patches = vec![PatchFile {
+            filename: "custom-enterprise-feature.patch".to_string(),
+            path: "/patches/custom-enterprise-feature.patch".to_string(),
+            content_hash: "hash1".to_string(),
+            size: 100,
+            applied: true,
+        }];
+
+        let customizations = L2VsL1Comparator::analyze_patch_customizations(&patches).unwrap();
+        assert_eq!(customizations.len(), 1);
+        assert!(matches!(
+            customizations[0].customization_type,
+            CustomizationType::FeatureModification
+        ));
+    }
+
+    #[test]
+    fn test_analyze_patch_customizations_config() {
+        let patches = vec![PatchFile {
+            filename: "configure-options.patch".to_string(),
+            path: "/patches/configure-options.patch".to_string(),
+            content_hash: "hash1".to_string(),
+            size: 100,
+            applied: true,
+        }];
+
+        let customizations = L2VsL1Comparator::analyze_patch_customizations(&patches).unwrap();
+        assert_eq!(customizations.len(), 1);
+        assert!(matches!(
+            customizations[0].customization_type,
+            CustomizationType::ConfigurationChange
+        ));
+    }
+
+    #[test]
+    fn test_analyze_patch_customizations_performance() {
+        let patches = vec![PatchFile {
