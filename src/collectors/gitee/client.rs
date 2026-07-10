@@ -263,3 +263,49 @@ mod tests {
 
         let _mock = server.mock(|when, then| {
             when.method(GET)
+                .path("/repos/owner/test-repo")
+                .query_param("access_token", "token");
+            then.status(200).json_body(repo_response);
+        });
+
+        let result = client.get_repository("owner", "test-repo").await;
+        // mock.assert();
+        assert!(result.is_ok(), "Result error: {:?}", result.err());
+        let repo = result.unwrap();
+        assert_eq!(repo.name, "test-repo");
+    }
+
+    #[tokio::test]
+    async fn test_get_branches() {
+        let server = MockServer::start();
+        let client = GiteeClient::for_testing("token", server.base_url()).unwrap();
+
+        let branch_response = json!([
+            {
+                "name": "main",
+                "commit": {
+                    "sha": "sha",
+                    "url": "url"
+                },
+                "protected": true
+            }
+        ]);
+
+        let mock = server.mock(|when, then| {
+            when.method(GET)
+                .path("/repos/owner/test-repo/branches")
+                .query_param("access_token", "token");
+            then.status(200).json_body(branch_response);
+        });
+
+        let result = client.get_branches("owner", "test-repo").await;
+        mock.assert();
+        assert!(result.is_ok());
+        let branches = result.unwrap();
+        assert_eq!(branches.len(), 1);
+        assert_eq!(branches[0].name, "main");
+    }
+
+    #[tokio::test]
+    async fn test_get_commits() {
+        let server = MockServer::start();
