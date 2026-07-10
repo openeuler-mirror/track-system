@@ -274,3 +274,49 @@ mod tests {
         let client = GitHubClient::for_testing("token", server.base_url()).unwrap();
 
         let commits_response = json!([
+            {
+                "sha": "sha",
+                "commit": {
+                    "message": "message",
+                    "author": {
+                        "name": "author",
+                        "email": "email",
+                        "date": "2023-01-01T00:00:00Z"
+                    },
+                    "committer": {
+                        "name": "committer",
+                        "email": "email",
+                        "date": "2023-01-01T00:00:00Z"
+                    },
+                    "title": "title"
+                },
+                "html_url": "url",
+                "stats": {
+                    "total": 10,
+                    "additions": 5,
+                    "deletions": 5
+                }
+            }
+        ]);
+
+        let mock = server.mock(|when, then| {
+            when.method(GET)
+                .path("/repos/owner/test-repo/commits")
+                .query_param("sha", "main")
+                .query_param("page", "1")
+                .query_param("per_page", "30")
+                .header("Authorization", "Bearer token");
+            then.status(200).json_body(commits_response);
+        });
+
+        let params = CommitsParams::new("main");
+        let result = client.get_commits("owner", "test-repo", params).await;
+        mock.assert();
+        assert!(result.is_ok());
+        let commits = result.unwrap();
+        assert_eq!(commits.len(), 1);
+        assert_eq!(commits[0].sha, "sha");
+    }
+
+    #[tokio::test]
+    async fn test_get_file_content() {
