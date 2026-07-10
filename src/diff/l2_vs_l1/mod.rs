@@ -3317,3 +3317,56 @@ Summary: Test package
         ];
 
         let sources = L2VsL1Comparator::extract_source_files(&files).unwrap();
+        assert_eq!(sources.len(), 1);
+        assert_eq!(sources[0].filename, "source.tar.gz");
+    }
+
+    #[test]
+    fn test_analyze_spec_customizations_with_markers() {
+        let spec_content = r#"
+# Custom: Enterprise build
+# Version modified for compatibility
+Name: test
+Version: 1.0.0
+"#;
+
+        let customizations = L2VsL1Comparator::analyze_spec_customizations(spec_content).unwrap();
+        assert!(!customizations.is_empty());
+        assert!(customizations
+            .iter()
+            .any(|c| matches!(c.customization_type, CustomizationType::Other)));
+        assert!(customizations
+            .iter()
+            .any(|c| matches!(c.customization_type, CustomizationType::VersionChange)));
+    }
+
+    #[test]
+    fn test_analyze_spec_customizations_config() {
+        let spec_content = r#"
+%configure --with-ssl --enable-shared --disable-static
+"#;
+
+        let customizations = L2VsL1Comparator::analyze_spec_customizations(spec_content).unwrap();
+        assert!(customizations
+            .iter()
+            .any(|c| matches!(c.customization_type, CustomizationType::ConfigurationChange)));
+    }
+
+    #[test]
+    fn test_analyze_spec_customizations_security() {
+        let spec_content = r#"
+# Security: Hardening enabled
+CFLAGS="-fstack-protector-strong -D_FORTIFY_SOURCE=2"
+"#;
+
+        let customizations = L2VsL1Comparator::analyze_spec_customizations(spec_content).unwrap();
+        assert!(customizations
+            .iter()
+            .any(|c| matches!(c.customization_type, CustomizationType::SecurityHardening)));
+    }
+
+    #[test]
+    fn test_analyze_patch_customizations_security() {
+        let patches = vec![PatchFile {
+            filename: "CVE-2023-1234-fix.patch".to_string(),
+            path: "/patches/CVE-2023-1234-fix.patch".to_string(),
