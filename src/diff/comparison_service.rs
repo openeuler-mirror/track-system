@@ -236,3 +236,46 @@ impl<'a> ComparisonService<'a> {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::diff::git_client::{CommitDiff, GitCommit};
+    use chrono::Utc;
+    use sea_orm::{DatabaseBackend, MockDatabase};
+
+    fn create_test_tracking_model() -> tracking::Model {
+        tracking::Model {
+            id: 1,
+            package_id: 1,
+            distro_id: 1,
+            l1_branch: "main".to_string(),
+            l1_repo_owner: "upstream".to_string(),
+            l1_repo_name: "test-repo".to_string(),
+            l2_branch: "openeuler".to_string(),
+            l2_repo_path: "/tmp/test-repo".to_string(),
+            tracking_status: "active".to_string(),
+            last_sync_time: Some(Utc::now()),
+            last_l1_commit_sha: Some("abc123".to_string()),
+            last_l2_commit_sha: Some("def456".to_string()),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            last_error: None,
+        }
+    }
+
+    fn create_test_git_commit(sha: &str, message: &str, author: &str) -> GitCommit {
+        GitCommit {
+            sha: sha.to_string(),
+            message: message.to_string(),
+            author: author.to_string(),
+            author_email: format!("{}@example.com", author),
+            committed_at: Utc::now(),
+            files_changed: 5,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_new() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+        let service = ComparisonService::new(&db);
+        // Verify service is created successfully
