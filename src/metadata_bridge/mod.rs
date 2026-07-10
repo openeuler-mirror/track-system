@@ -1676,3 +1676,54 @@ Patch1: fix.patch
                 path: "pkg.spec".to_string(),
                 version: Some("1.0.0".to_string()),
                 release: Some("1".to_string()),
+                sha256: "s".to_string(),
+                content_base64: "".to_string(),
+            });
+
+            let summary = persist_snapshot(&db, &snapshot, path).await.unwrap();
+            let content = std::fs::read_to_string(path).unwrap();
+            assert_eq!(summary.tracking_id, 1);
+            assert_eq!(summary.spec_version, Some("1.0.0".to_string()));
+            assert_eq!(summary.checksum, sha256_hex(content.as_bytes()));
+        }
+    }
+
+    #[test]
+    fn test_parse_spec_from_repo_finds_spec() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            temp_dir.path().join("pkg.spec"),
+            "Name: pkg\nVersion: 1.2.3\nRelease: 4\n",
+        )
+        .unwrap();
+        let (v, r) = parse_spec_from_repo(temp_dir.path()).unwrap();
+        assert_eq!(v, Some("1.2.3".to_string()));
+        assert_eq!(r, Some("4".to_string()));
+    }
+
+    #[test]
+    fn test_collect_commits_from_repo_errors_when_not_git_repo() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let err = collect_commits_from_repo(temp_dir.path())
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("git log 执行失败") || err.contains("执行 git log 失败"));
+    }
+
+    #[test]
+    fn test_collect_commits_from_repo_parses_commits_and_stats() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let repo = temp_dir.path();
+
+        assert!(Command::new("git")
+            .args(["-C", repo.to_str().unwrap(), "init"])
+            .status()
+            .unwrap()
+            .success());
+        assert!(Command::new("git")
+            .args([
+                "-C",
+                repo.to_str().unwrap(),
+                "config",
+                "user.email",
+                "a@b.c",
