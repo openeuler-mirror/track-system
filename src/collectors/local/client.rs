@@ -539,3 +539,41 @@ impl LocalClient {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::path::Path;
+    use tempfile::TempDir;
+
+    fn setup_test_repo() -> TempDir {
+        let temp_dir = TempDir::new().unwrap();
+        let repo = Repository::init(temp_dir.path()).unwrap();
+
+        // Create a commit
+        let path = temp_dir.path().join("test.txt");
+        fs::write(&path, "test content").unwrap();
+
+        let mut index = repo.index().unwrap();
+        index.add_path(Path::new("test.txt")).unwrap();
+        index.write().unwrap();
+
+        let tree_id = index.write_tree().unwrap();
+        let tree = repo.find_tree(tree_id).unwrap();
+
+        let sig = git2::Signature::now("Test User", "test@example.com").unwrap();
+        repo.commit(Some("HEAD"), &sig, &sig, "Initial commit", &tree, &[])
+            .unwrap();
+
+        temp_dir
+    }
+
+    #[test]
+    fn test_local_client_creation() {
+        // Test invalid path
+        let result = LocalClient::new("/nonexistent/path");
+        assert!(result.is_err());
+
+        // Test valid repo
+        let temp_dir = setup_test_repo();
+        let result = LocalClient::new(temp_dir.path());
