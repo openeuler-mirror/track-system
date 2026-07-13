@@ -278,3 +278,39 @@ mod tests {
         assert_eq!(progress.progress_percent, 0.0);
     }
 
+    #[tokio::test]
+    async fn test_update_job_status() {
+        use crate::entities::sync_jobs;
+        use sea_orm::{DatabaseBackend, MockDatabase};
+
+        let job_model = sync_jobs::Model {
+            id: 1,
+            tracking_id: 100,
+            job_kind: "sync".to_string(),
+            scheduled_at: Utc::now(),
+            started_at: Some(Utc::now()),
+            finished_at: None,
+            status: "running".to_string(),
+            error: None,
+            attempt_count: 0,
+            priority: 0,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results(vec![vec![job_model.clone()]])
+            .append_query_results(vec![vec![job_model]]) // update returning
+            .into_connection();
+        let db = Arc::new(db);
+        let manager = PipelineStateManager::new(db);
+
+        let result = manager.update_job_status(1, "completed").await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_state_manager_create_start_complete_cleanup() {
+        use crate::entities::sync_jobs;
+        use sea_orm::{DatabaseBackend, MockDatabase};
+
