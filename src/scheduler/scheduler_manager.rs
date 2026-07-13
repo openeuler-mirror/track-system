@@ -451,3 +451,52 @@ mod tests_extra {
             updated_at: Utc::now(),
             last_error: None,
         };
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<sync_jobs::Model, _, _>(vec![vec![job.clone()]])
+            .append_query_results::<sync_jobs::Model, _, _>(vec![vec![job.clone()]])
+            .append_query_results::<tracking::Model, _, _>(vec![vec![track.clone()]])
+            .append_query_results::<tracking::Model, _, _>(vec![vec![track.clone()]])
+            .append_query_results::<tracking::Model, _, _>(vec![vec![track.clone()]])
+            .append_query_results::<tracking::Model, _, _>(vec![vec![track.clone()]])
+            .append_query_results::<sync_jobs::Model, _, _>(vec![vec![job.clone()]])
+            .append_query_results::<sync_jobs::Model, _, _>(vec![vec![job.clone()]])
+            .into_connection();
+
+        let db = Arc::new(db);
+        let config = SchedulerConfig::default();
+        let (manager, _rx) = SchedulerManager::new(db, None, config);
+
+        let job_id = manager.trigger_manual_sync(200).await.unwrap();
+        assert_eq!(job_id, 77);
+
+        let status = manager.get_scheduler_status().await.unwrap();
+        assert_eq!(status.total_jobs_executed, 1);
+        assert!(status.last_execution.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_execute_round_wake_specific_single() {
+        use crate::entities::{compare_reports, packages, sync_jobs, tracking, tracking_reports};
+        use chrono::Utc;
+        use sea_orm::{DatabaseBackend, MockDatabase};
+
+        let package_model = packages::Model {
+            id: 1,
+            name: "pkg".to_string(),
+            level: 1,
+            sync_interval_hours: 24,
+            l0_repo_url: None,
+            description: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let track = tracking::Model {
+            id: 300,
+            package_id: 1,
+            distro_id: 1,
+            l1_branch: "main".to_string(),
+            l1_repo_owner: "owner".to_string(),
+            l1_repo_name: "repo".to_string(),
+            l2_branch: "local".to_string(),
