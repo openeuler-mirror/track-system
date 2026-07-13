@@ -596,3 +596,50 @@ mod tests {
             l1_repo_owner: None,
             l1_repo_name: None,
             l1_branch: Some("develop".to_string()),
+            l2_branch: None,
+            l2_repo_path: None,
+            tracking_status: None,
+        };
+
+        let result = update_tracking(State(state), Path(1), Json(req)).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_update_tracking_not_found() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<tracking::Model, _, _>([vec![]])
+            .into_connection();
+        let state = AppState::without_external_clients(db);
+
+        let req = UpdateTrackingRequest {
+            l1_repo_owner: None,
+            l1_repo_name: None,
+            l1_branch: Some("develop".to_string()),
+            l2_branch: None,
+            l2_repo_path: None,
+            tracking_status: None,
+        };
+
+        let result = update_tracking(State(state), Path(999), Json(req)).await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            ApiError::NotFound(msg) => assert!(msg.contains("Tracking 999 not found")),
+            _ => panic!("Expected NotFound error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_delete_tracking_success() {
+        let mock_tracking = create_mock_tracking(1, 1);
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results([[mock_tracking]])
+            .append_exec_results([sea_orm::MockExecResult {
+                last_insert_id: 1,
+                rows_affected: 1,
+            }])
+            .into_connection();
+        let state = AppState::without_external_clients(db);
+
+        let result = delete_tracking(State(state), Path(1)).await;
