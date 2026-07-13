@@ -149,3 +149,37 @@ impl From<ComponentCommit> for ComponentCommitDto {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_list_components() {
+        let result = list_components().await;
+        assert_eq!(result.0.len(), 3);
+        assert!(result.0.contains(&"glibc"));
+        assert!(result.0.contains(&"gcc"));
+        assert!(result.0.contains(&"python"));
+    }
+
+    #[test]
+    fn test_component_commit_dto_conversion() {
+        let commit = ComponentCommit {
+            sha: "abc123".to_string(),
+            message: "Test commit".to_string(),
+            author_name: "John Doe".to_string(),
+            author_email: "john@example.com".to_string(),
+            authored_at: chrono::Utc::now(),
+            url: "https://example.com/commit/abc123".to_string(),
+            additions: Some(10),
+            deletions: Some(5),
+            total: Some(15),
+        };
+
+        let dto: ComponentCommitDto = commit.clone().into();
+        assert_eq!(dto.sha, commit.sha);
+        assert_eq!(dto.message, commit.message);
+        assert_eq!(dto.author_name, commit.author_name);
+        assert_eq!(dto.author_email, commit.author_email);
+        assert_eq!(dto.additions, commit.additions);
+        assert_eq!(dto.deletions, commit.deletions);
