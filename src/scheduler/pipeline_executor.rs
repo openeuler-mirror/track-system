@@ -741,3 +741,52 @@ mod tests {
             error: None,
             attempt_count: 0,
             priority: 0,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let track = tracking::Model {
+            id: 21,
+            package_id: 1,
+            distro_id: 1,
+            l1_branch: "main".to_string(),
+            l1_repo_owner: "owner".to_string(),
+            l1_repo_name: "repo".to_string(),
+            l2_branch: "local".to_string(),
+            l2_repo_path: "/tmp/l2".to_string(),
+            tracking_status: "paused".to_string(),
+            last_sync_time: Some(Utc::now()),
+            last_l1_commit_sha: None,
+            last_l2_commit_sha: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            last_error: None,
+        };
+
+        let _pkg = packages::Model {
+            id: 1,
+            name: "pkg".to_string(),
+            level: 1,
+            sync_interval_hours: 24,
+            l0_repo_url: None,
+            description: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let report = tracking_reports::Model {
+            id: 1,
+            tracking_id: track.id,
+            generated_at: Utc::now(),
+            diff_summary: serde_json::json!({}),
+            representative_changes: None,
+            source: "pipeline".to_string(),
+            status: "success".to_string(),
+            failure_reason: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<sync_jobs::Model, _, _>(vec![vec![job.clone()]])
+            .append_query_results::<sync_jobs::Model, _, _>(vec![vec![job.clone()]])
