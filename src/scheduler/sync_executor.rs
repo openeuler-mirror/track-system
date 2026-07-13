@@ -277,3 +277,46 @@ mod tests {
         assert_eq!(stats.succeeded, 1);
         assert_eq!(stats.failed, 0);
         assert_eq!(stats.skipped, 0);
+    }
+
+    #[test]
+    fn test_sync_execution_stats_record_skipped() {
+        let mut stats = SyncExecutionStats::default();
+        let outcome = SyncResult {
+            status: SyncStatus::Skipped,
+            commits_synced: 0,
+            issues_synced: 0,
+            message: "Skipped".to_string(),
+        };
+
+        stats.record_outcome(1, &outcome);
+
+        assert_eq!(stats.processed, 1);
+        assert_eq!(stats.succeeded, 0);
+        assert_eq!(stats.skipped, 1);
+        assert_eq!(stats.failed, 0);
+    }
+
+    #[test]
+    fn test_sync_execution_stats_record_failed() {
+        let mut stats = SyncExecutionStats::default();
+        let outcome = SyncResult {
+            status: SyncStatus::Failed,
+            commits_synced: 0,
+            issues_synced: 0,
+            message: "Error occurred".to_string(),
+        };
+
+        stats.record_outcome(1, &outcome);
+
+        assert_eq!(stats.processed, 1);
+        assert_eq!(stats.succeeded, 0);
+        assert_eq!(stats.skipped, 0);
+        assert_eq!(stats.failed, 1);
+        assert_eq!(stats.errors.len(), 1);
+        assert_eq!(stats.errors[0].0, 1);
+        assert_eq!(stats.errors[0].1, "Error occurred");
+    }
+
+    #[test]
+    fn test_sync_execution_stats_record_error() {
