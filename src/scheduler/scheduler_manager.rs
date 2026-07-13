@@ -598,3 +598,52 @@ mod tests_extra {
             scheduled_at: Utc::now(),
             started_at: Some(Utc::now()),
             finished_at: None,
+            status: "running".to_string(),
+            error: None,
+            attempt_count: 0,
+            priority: 0,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let track = tracking::Model {
+            id: 400,
+            package_id: 1,
+            distro_id: 1,
+            l1_branch: "main".to_string(),
+            l1_repo_owner: "owner".to_string(),
+            l1_repo_name: "repo".to_string(),
+            l2_branch: "local".to_string(),
+            l2_repo_path: "/tmp/l2".to_string(),
+            tracking_status: "idle".to_string(),
+            last_sync_time: Some(Utc::now()),
+            last_l1_commit_sha: None,
+            last_l2_commit_sha: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            last_error: None,
+        };
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            // queue_sync_job: find_active_sync_job
+            .append_query_results::<sync_jobs::Model, _, _>(vec![vec![job.clone()]])
+            // execute_sync_job: get_sync_job -> empty (error path)
+            .append_query_results::<sync_jobs::Model, _, _>(vec![vec![]])
+            // apply_completion: Tracking::find_by_id
+            .append_query_results::<tracking::Model, _, _>(vec![vec![track.clone()]])
+            // apply_completion: update tracking (RETURNING 模拟)
+            .append_query_results::<tracking::Model, _, _>(vec![vec![track.clone()]])
+            // apply_completion: find_latest_sync_job
+            .append_query_results::<sync_jobs::Model, _, _>(vec![vec![job.clone()]])
+            // apply_completion: update job (RETURNING 模拟)
+            .append_query_results::<sync_jobs::Model, _, _>(vec![vec![job.clone()]])
+            .into_connection();
+
+        let db = Arc::new(db);
+        let config = SchedulerConfig::default();
+        let (manager, _rx) = SchedulerManager::new(db, None, config);
+
+        let result = manager.trigger_manual_sync(400).await;
+        assert!(result.is_err());
+    }
+}
