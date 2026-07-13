@@ -266,3 +266,27 @@ mod tests {
     fn test_paginated_response() {
         let items = vec![1, 2, 3];
         let response = PaginatedResponse::new(items, 100, 1, 10);
+        assert_eq!(response.total, 100);
+        assert_eq!(response.page, 1);
+        assert_eq!(response.page_size, 10);
+        assert_eq!(response.total_pages, 10);
+    }
+
+    #[test]
+    fn test_error_response() {
+        let error = ErrorResponse::bad_request("Invalid input");
+        assert_eq!(error.code, 400);
+        assert_eq!(error.message, "Invalid input");
+    }
+
+    #[test]
+    fn test_component_status() {
+        let status = ComponentStatus::healthy();
+        assert_eq!(status.status, "healthy");
+        assert!(status.message.is_none());
+
+        let unhealthy = ComponentStatus::unhealthy("Connection failed");
+        assert_eq!(unhealthy.status, "unhealthy");
+        assert_eq!(unhealthy.message, Some("Connection failed".to_string()));
+    }
+}
