@@ -173,3 +173,42 @@ mod tests {
         assert_eq!(snapshots[1]["tracking_id"], 10);
     }
 
+    #[tokio::test]
+    async fn test_list_snapshots_empty() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<l2_snapshots::Model, _, _>([vec![]])
+            .into_connection();
+
+        let state = AppState::without_external_clients(db);
+        let query = ListSnapshotsQuery {
+            tracking_id: Some(999),
+        };
+
+        let result = list_snapshots(State(state), Query(query)).await;
+        assert!(result.is_ok());
+
+        let response = result.unwrap();
+        let snapshots = response.0["snapshots"].as_array().unwrap();
+        assert_eq!(snapshots.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_list_snapshots_without_tag() {
+        let mock_snapshot = l2_snapshots::Model {
+            id: 3,
+            tracking_id: 20,
+            snapshot_type: "L2".to_string(),
+            checksum: "abc123".to_string(),
+            payload: serde_json::json!({"other_field": "value"}),
+            created_at: chrono::Utc::now(),
+        };
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results([[mock_snapshot]])
+            .into_connection();
+
+        let state = AppState::without_external_clients(db);
+        let query = ListSnapshotsQuery { tracking_id: None };
+
+        let result = list_snapshots(State(state), Query(query)).await;
+        assert!(result.is_ok());
