@@ -864,3 +864,52 @@ mod tests {
             title: "issue title".to_string(),
             state: "open".to_string(),
             author: "author".to_string(),
+            api_url: String::new(),
+            labels: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            closed_at: None,
+            raw_payload: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_import_l0_metadata_success() {
+        init_test_tracing();
+
+        let tracking = create_tracking_model(1, 10);
+        let updated_tracking = create_tracking_model(1, 10);
+        let sync_job = create_sync_job_model(1, 1);
+        let inserted_commit = create_l0_commit_model(1, 10, "sha1");
+        tracing::debug!(
+            test = "test_import_l0_metadata_success",
+            tracking_id = tracking.id,
+            package_id = tracking.package_id,
+            "start"
+        );
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<crate::entities::tracking::Model, _, _>(vec![vec![tracking]])
+            .append_query_results::<l0_commits::Model, _, _>(vec![vec![]])
+            .append_query_results::<l0_commits::Model, _, _>(vec![vec![inserted_commit]])
+            .append_query_results::<crate::entities::tracking::Model, _, _>(vec![vec![
+                updated_tracking,
+            ]])
+            .append_query_results::<sync_jobs::Model, _, _>(vec![vec![]])
+            .append_query_results::<sync_jobs::Model, _, _>(vec![vec![sync_job]])
+            .into_connection();
+
+        let state = AppState::without_external_clients(db);
+
+        let mut snapshot = RepositorySnapshot::new(1, crate::snapshot::types::SnapshotOrigin::L1);
+        snapshot.commits.push(create_commit_entry("sha1"));
+        tracing::debug!(
+            test = "test_import_l0_metadata_success",
+            snapshot_tracking_id = snapshot.tracking_id,
+            commits = snapshot.commits.len(),
+            issues = snapshot.issues.len(),
+            files = snapshot.files.len(),
+            origin = ?snapshot.origin,
+            "built snapshot"
+        );
+
