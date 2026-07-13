@@ -790,3 +790,52 @@ mod tests {
         let db = MockDatabase::new(DatabaseBackend::Postgres)
             .append_query_results::<sync_jobs::Model, _, _>(vec![vec![job.clone()]])
             .append_query_results::<sync_jobs::Model, _, _>(vec![vec![job.clone()]])
+            .append_query_results::<sync_jobs::Model, _, _>(vec![vec![job.clone()]])
+            .append_query_results::<tracking::Model, _, _>(vec![vec![track.clone()]])
+            .append_query_results::<tracking::Model, _, _>(vec![vec![track.clone()]])
+            .append_query_results::<packages::Model, _, _>(vec![vec![_pkg.clone()]])
+            .append_query_results::<tracking_reports::Model, _, _>(vec![vec![report]])
+            .append_query_results::<sync_jobs::Model, _, _>(vec![vec![job.clone()]])
+            .append_query_results::<sync_jobs::Model, _, _>(vec![vec![job.clone()]])
+            .into_connection();
+
+        // Use a state manager to avoid None paths
+        let db_arc = std::sync::Arc::new(db);
+        let state_mgr =
+            std::sync::Arc::new(crate::scheduler::PipelineStateManager::new(db_arc.clone()));
+        let executor =
+            PipelineExecutor::with_state_manager(db_arc.as_ref(), None, state_mgr.clone());
+
+        // Execute
+        let result = executor.execute_sync_job(11).await.unwrap();
+        assert!(result
+            .stage_results
+            .contains_key(&PipelineStage::L1Ingestion));
+        // L1 阶段无新数据时，仍应继续生成报告（便于周期任务留下运行痕迹）
+        assert!(result
+            .stage_results
+            .contains_key(&PipelineStage::ReportGeneration));
+    }
+
+    #[tokio::test]
+    async fn test_get_job_progress_with_state_manager() {
+        use crate::entities::sync_jobs;
+        use sea_orm::{DatabaseBackend, MockDatabase};
+        use std::sync::Arc;
+
+        let job_model = sync_jobs::Model {
+            id: 1,
+            tracking_id: 10,
+            job_kind: "sync".to_string(),
+            scheduled_at: Utc::now(),
+            started_at: Some(Utc::now()),
+            finished_at: None,
+            status: "running".to_string(),
+            error: None,
+            attempt_count: 0,
+            priority: 0,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
