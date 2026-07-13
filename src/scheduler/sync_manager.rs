@@ -771,3 +771,53 @@ mod tests {
             id: 11,
             package_id: 2,
             distro_id: 1,
+            l1_branch: "main".to_string(),
+            l1_repo_owner: "owner".to_string(),
+            l1_repo_name: "repo".to_string(),
+            l2_branch: "local".to_string(),
+            l2_repo_path: "/path".to_string(),
+            tracking_status: "idle".to_string(),
+            last_sync_time: Some(now - Duration::hours(25)),
+            last_l1_commit_sha: None,
+            last_l2_commit_sha: None,
+            created_at: now,
+            updated_at: now,
+            last_error: None,
+        };
+
+        let pkg1 = packages::Model {
+            id: 1,
+            name: "pkg1".to_string(),
+            level: 1,
+            sync_interval_hours: 24,
+            l0_repo_url: None,
+            description: None,
+            created_at: now - Duration::hours(100),
+            updated_at: now,
+        };
+
+        let pkg2 = packages::Model {
+            id: 2,
+            name: "pkg2".to_string(),
+            level: 1,
+            sync_interval_hours: 24,
+            l0_repo_url: None,
+            description: None,
+            created_at: now - Duration::hours(100),
+            updated_at: now,
+        };
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<(tracking::Model, Option<packages::Model>), _, _>(vec![vec![
+                (paused_track.clone(), Some(pkg1)),
+                (idle_track.clone(), Some(pkg2)),
+            ]])
+            .into_connection();
+
+        let manager = SyncManager::new(&db);
+        let tasks = manager.get_pending_sync_tasks_ordered(false).await.unwrap();
+        assert_eq!(tasks.len(), 1);
+        assert_eq!(tasks[0].id, 11);
+    }
+
+    #[tokio::test]
