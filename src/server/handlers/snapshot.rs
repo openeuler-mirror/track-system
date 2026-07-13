@@ -212,3 +212,42 @@ mod tests {
 
         let result = list_snapshots(State(state), Query(query)).await;
         assert!(result.is_ok());
+
+        let response = result.unwrap();
+        let snapshots = response.0["snapshots"].as_array().unwrap();
+        assert_eq!(snapshots.len(), 1);
+        assert_eq!(snapshots[0]["id"], 3);
+        assert!(snapshots[0]["tag"].is_null());
+    }
+
+    #[tokio::test]
+    async fn test_delete_snapshot_success() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_exec_results([sea_orm::MockExecResult {
+                last_insert_id: 0,
+                rows_affected: 1,
+            }])
+            .into_connection();
+
+        let state = AppState::without_external_clients(db);
+        let result = delete_snapshot(State(state), axum::extract::Path(10)).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), axum::http::StatusCode::NO_CONTENT);
+    }
+
+    #[tokio::test]
+    async fn test_delete_snapshot_not_found() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_exec_results([sea_orm::MockExecResult {
+                last_insert_id: 0,
+                rows_affected: 0,
+            }])
+            .into_connection();
+
+        let state = AppState::without_external_clients(db);
+        let result = delete_snapshot(State(state), axum::extract::Path(999)).await;
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(matches!(err, ApiError::NotFound(_)));
+    }
+}
