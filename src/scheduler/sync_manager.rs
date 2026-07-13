@@ -720,3 +720,54 @@ mod tests {
             description: None,
             created_at: base,
             updated_at: Utc::now(),
+        };
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results(vec![vec![tracking_model]])
+            .append_query_results(vec![vec![package_model]])
+            .into_connection();
+
+        let manager = SyncManager::new(&db);
+        let next_sync = manager.calculate_next_sync_time(1).await.unwrap();
+        assert_eq!(next_sync, base);
+    }
+
+    #[tokio::test]
+    async fn test_get_pending_sync_tasks_ordered_empty() {
+        use sea_orm::{DatabaseBackend, MockDatabase};
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<(tracking::Model, Option<packages::Model>), _, _>(vec![vec![]])
+            .into_connection();
+        let manager = SyncManager::new(&db);
+        let tasks = manager.get_pending_sync_tasks_ordered(false).await.unwrap();
+        assert!(tasks.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_get_pending_sync_tasks_ordered_skips_paused() {
+        use crate::entities::{packages, tracking};
+        use sea_orm::{DatabaseBackend, MockDatabase};
+
+        let now = Utc::now();
+        let paused_track = tracking::Model {
+            id: 10,
+            package_id: 1,
+            distro_id: 1,
+            l1_branch: "main".to_string(),
+            l1_repo_owner: "owner".to_string(),
+            l1_repo_name: "repo".to_string(),
+            l2_branch: "local".to_string(),
+            l2_repo_path: "/path".to_string(),
+            tracking_status: "paused".to_string(),
+            last_sync_time: None,
+            last_l1_commit_sha: None,
+            last_l2_commit_sha: None,
+            created_at: now,
+            updated_at: now,
+            last_error: None,
+        };
+
+        let idle_track = tracking::Model {
+            id: 11,
+            package_id: 2,
+            distro_id: 1,
