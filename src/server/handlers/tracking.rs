@@ -643,3 +643,51 @@ mod tests {
         let state = AppState::without_external_clients(db);
 
         let result = delete_tracking(State(state), Path(1)).await;
+        assert!(result.is_ok());
+        let response = result.unwrap();
+        assert_eq!(response.0.code, 204);
+    }
+
+    #[tokio::test]
+    async fn test_delete_tracking_not_found() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<tracking::Model, _, _>([vec![]])
+            .into_connection();
+        let state = AppState::without_external_clients(db);
+
+        let result = delete_tracking(State(state), Path(999)).await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            ApiError::NotFound(msg) => assert!(msg.contains("Tracking 999 not found")),
+            _ => panic!("Expected NotFound error"),
+        }
+    }
+
+    #[test]
+    fn test_tracking_response_from_model() {
+        let model = create_mock_tracking(1, 1);
+        let response: TrackingResponse = model.clone().into();
+
+        assert_eq!(response.id, model.id);
+        assert_eq!(response.package_id, model.package_id);
+        assert_eq!(response.l1_repo_owner, model.l1_repo_owner);
+        assert_eq!(response.l1_repo_name, model.l1_repo_name);
+        assert_eq!(response.tracking_status, model.tracking_status);
+    }
+
+    #[test]
+    fn test_update_tracking_request_partial_update() {
+        let req = UpdateTrackingRequest {
+            l1_repo_owner: Some("new_owner".to_string()),
+            l1_repo_name: None,
+            l1_branch: None,
+            l2_branch: Some("new_branch".to_string()),
+            l2_repo_path: None,
+            tracking_status: None,
+        };
+
+        assert!(req.l1_repo_owner.is_some());
+        assert!(req.l1_repo_name.is_none());
+        assert!(req.l2_branch.is_some());
+    }
+}
