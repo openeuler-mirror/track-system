@@ -1651,3 +1651,55 @@ Summary: Test package
                 l1_total: 0,
                 l2_total: 0,
                 l2_added: vec![],
+                l2_modified: vec![],
+                l2_removed: vec![],
+                identical: vec![],
+            },
+            source_diff: diff::l2_vs_l1::SourceDiff {
+                l1_total: 0,
+                l2_total: 0,
+                l2_added: vec![],
+                l2_removed: vec![],
+                l2_modified: vec![],
+            },
+            customization_analysis: diff::l2_vs_l1::CustomizationAnalysis {
+                total_customizations: 0,
+                by_type: std::collections::HashMap::new(),
+                summary: String::new(),
+            },
+            sync_recommendations: vec![],
+            conflicts: vec![],
+            commit_diff: diff::l2_vs_l1::CommitDiff {
+                l1_commits_count: 0,
+                l2_commits_count: 0,
+                behind_commits: vec![],
+                base_commit: None,
+                base_version_release: None,
+            },
+            created_at: Utc::now(),
+        };
+
+        let l1_report = diff::l1_vs_l0::L1VsL0Report {
+            id: None,
+            package_name: "pkg".to_string(),
+            current_version: "1.0.0".to_string(),
+            latest_stable: "1.0.0".to_string(),
+            latest_version: "1.0.0".to_string(),
+            version_behind: 0,
+            upgradable_versions: vec![],
+            patch_analysis: diff::l1_vs_l0::PatchAnalysis {
+                total_patches: 0,
+                merged_in_upstream: vec![],
+                still_needed: vec![],
+                can_be_removed_after_upgrade: 0,
+            },
+            cve_analysis: diff::l1_vs_l0::CveAnalysis {
+                total_cves: 0,
+                fixed_in_upstream: vec![],
+                not_fixed_in_upstream: vec![],
+            },
+            recommendations: vec![],
+            created_at: Utc::now(),
+        };
+
+        let l2_opt = Some(l2_report);
