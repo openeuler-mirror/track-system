@@ -246,3 +246,47 @@ mod tests {
         let state = AppState::without_external_clients(db);
         let request = CreatePackageRequest {
             name: "new-package".to_string(),
+            level: 1,
+            sync_interval_hours: 0,
+            l0_repo_url: Some("https://github.com/example/repo".to_string()),
+            description: Some("Test package".to_string()),
+        };
+
+        let result = create_package(State(state), Json(request)).await;
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(matches!(err, ApiError::BadRequest(_)));
+    }
+
+    #[tokio::test]
+    async fn test_get_package_found() {
+        let mock_package = create_mock_package(1, "glibc");
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results([[mock_package.clone()]])
+            .into_connection();
+
+        let state = AppState::without_external_clients(db);
+        let result = get_package(State(state), Path(1)).await;
+
+        assert!(result.is_ok());
+        let response = result.unwrap();
+        assert_eq!(response.0.id, 1);
+        assert_eq!(response.0.name, "glibc");
+    }
+
+    #[tokio::test]
+    async fn test_get_package_not_found() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<packages::Model, _, _>([[]])
+            .into_connection();
+
+        let state = AppState::without_external_clients(db);
+        let result = get_package(State(state), Path(999)).await;
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(matches!(err, ApiError::NotFound(_)));
+    }
+
+    #[tokio::test]
