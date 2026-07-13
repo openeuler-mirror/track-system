@@ -549,3 +549,52 @@ mod tests_extra {
             failure_reason: None,
             created_at: now,
             updated_at: now,
+        };
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<(tracking::Model, Option<packages::Model>), _, _>(vec![vec![(
+                track.clone(),
+                Some(package_model.clone()),
+            )]])
+            .append_query_results::<sync_jobs::Model, _, _>(vec![vec![job.clone()]])
+            .append_query_results::<sync_jobs::Model, _, _>(vec![vec![job.clone()]])
+            .append_query_results::<tracking::Model, _, _>(vec![vec![track.clone()]])
+            .append_query_results::<tracking::Model, _, _>(vec![vec![track.clone()]])
+            .append_query_results::<tracking::Model, _, _>(vec![vec![track.clone()]])
+            .append_query_results::<tracking::Model, _, _>(vec![vec![track.clone()]])
+            .append_query_results::<sync_jobs::Model, _, _>(vec![vec![job.clone()]])
+            .append_query_results::<compare_reports::Model, _, _>(vec![vec![compare_model.clone()]])
+            .append_query_results::<tracking_reports::Model, _, _>(vec![vec![
+                tracking_report.clone()
+            ]])
+            .append_query_results::<sync_jobs::Model, _, _>(vec![vec![job.clone()]])
+            .into_connection();
+
+        let db = Arc::new(db);
+        let config = SchedulerConfig::default();
+        let (manager, _rx) = SchedulerManager::new(db, None, config);
+
+        let results = manager
+            .execute_round_wake_up(true, Some(300))
+            .await
+            .unwrap();
+        assert_eq!(results.len(), 1);
+        assert!(
+            !results[0].success,
+            "当前测试未 mock 完整流水线依赖（如 L1/L2 快照与对比数据），因此应失败"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_trigger_manual_sync_error_job_missing() {
+        use crate::entities::{sync_jobs, tracking};
+        use chrono::Utc;
+        use sea_orm::{DatabaseBackend, MockDatabase};
+
+        let job = sync_jobs::Model {
+            id: 99,
+            tracking_id: 400,
+            job_kind: "sync".to_string(),
+            scheduled_at: Utc::now(),
+            started_at: Some(Utc::now()),
+            finished_at: None,
