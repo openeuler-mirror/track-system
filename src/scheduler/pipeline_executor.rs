@@ -692,3 +692,52 @@ mod tests {
     }
 
     #[test]
+    fn test_job_progress_structure() {
+        let progress = JobProgress {
+            job_id: 1,
+            tracking_id: 2,
+            current_stage: Some(PipelineStage::L1Ingestion),
+            completed_stages: vec![],
+            progress_percent: 0.0,
+            status: "running".to_string(),
+        };
+
+        assert_eq!(progress.job_id, 1);
+        assert_eq!(progress.tracking_id, 2);
+        assert!(progress.current_stage.is_some());
+        assert_eq!(progress.status, "running");
+    }
+
+    #[test]
+    fn test_pipeline_executor_creation() {
+        let db = sea_orm::MockDatabase::new(sea_orm::DatabaseBackend::Postgres).into_connection();
+        let executor = PipelineExecutor::new(&db, None);
+        assert!(executor.state_manager.is_none());
+        assert!(executor.client.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_cancel_job_without_state_manager() {
+        let db = sea_orm::MockDatabase::new(sea_orm::DatabaseBackend::Postgres).into_connection();
+        let executor = PipelineExecutor::new(&db, None);
+        let result = executor.cancel_job(1).await;
+        // Should succeed but do nothing
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_execute_sync_job_l1_skips_following_stages() {
+        use crate::entities::{packages, sync_jobs, tracking, tracking_reports};
+
+        // Prepare job and tracking
+        let job = sync_jobs::Model {
+            id: 11,
+            tracking_id: 21,
+            job_kind: "sync".to_string(),
+            scheduled_at: Utc::now(),
+            started_at: Some(Utc::now()),
+            finished_at: None,
+            status: "running".to_string(),
+            error: None,
+            attempt_count: 0,
+            priority: 0,
