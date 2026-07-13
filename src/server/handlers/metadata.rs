@@ -764,3 +764,53 @@ mod tests {
             number: number.to_string(),
             title: "issue title".to_string(),
             state: "open".to_string(),
+            author: "author".to_string(),
+            labels: vec!["bug".to_string()],
+            updated_at: Utc::now(),
+        }
+    }
+
+    fn create_tracking_model(id: i32, package_id: i32) -> crate::entities::tracking::Model {
+        crate::entities::tracking::Model {
+            id,
+            package_id,
+            distro_id: 1,
+            l1_branch: "main".to_string(),
+            l1_repo_owner: "owner".to_string(),
+            l1_repo_name: "repo".to_string(),
+            l2_branch: "local".to_string(),
+            l2_repo_path: "/path".to_string(),
+            tracking_status: "idle".to_string(),
+            last_sync_time: None,
+            last_l1_commit_sha: None,
+            last_l2_commit_sha: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            last_error: None,
+        }
+    }
+
+    fn create_sync_job_model(id: i64, tracking_id: i32) -> sync_jobs::Model {
+        sync_jobs::Model {
+            id,
+            tracking_id,
+            job_kind: "sync".to_string(),
+            scheduled_at: Utc::now(),
+            started_at: None,
+            finished_at: None,
+            status: "pending".to_string(),
+            error: None,
+            attempt_count: 0,
+            priority: 0,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+
+    fn create_l0_commit_model(id: i64, package_id: i32, sha: &str) -> l0_commits::Model {
+        l0_commits::Model {
+            id,
+            package_id,
+            repo: "https://example.com/commit".to_string(),
+            commit_sha: sha.to_string(),
+            summary: "title".to_string(),
