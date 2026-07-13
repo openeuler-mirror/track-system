@@ -454,3 +454,50 @@ mod tests {
 
         let req = CreateTrackingRequest {
             package_id: 1,
+            distro_id: 1,
+            l1_repo_owner: "".to_string(), // Empty
+            l1_repo_name: "repo".to_string(),
+            l1_branch: "main".to_string(),
+            l2_branch: "main".to_string(),
+            l2_repo_path: "/path".to_string(),
+            tracking_status: None,
+        };
+
+        let result = create_tracking(State(state), Json(req)).await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            ApiError::BadRequest(msg) => assert!(msg.contains("l1_repo_owner is required")),
+            _ => panic!("Expected BadRequest error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_create_tracking_empty_repo_name() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+        let state = AppState::without_external_clients(db);
+
+        let req = CreateTrackingRequest {
+            package_id: 1,
+            distro_id: 1,
+            l1_repo_owner: "owner".to_string(),
+            l1_repo_name: "".to_string(), // Empty
+            l1_branch: "main".to_string(),
+            l2_branch: "main".to_string(),
+            l2_repo_path: "/path".to_string(),
+            tracking_status: None,
+        };
+
+        let result = create_tracking(State(state), Json(req)).await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            ApiError::BadRequest(msg) => assert!(msg.contains("l1_repo_name is required")),
+            _ => panic!("Expected BadRequest error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_create_tracking_package_not_found() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<packages::Model, _, _>([vec![]]) // Package not found
+            .into_connection();
+        let state = AppState::without_external_clients(db);
