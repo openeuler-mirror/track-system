@@ -362,3 +362,46 @@ mod tests {
         assert_eq!(stats.skipped, 1);
         assert_eq!(stats.failed, 1);
         assert_eq!(stats.errors.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_execute_batch_empty() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+        let executor = SyncExecutor::new(&db, None);
+
+        let stats = executor.execute_batch(vec![]).await;
+
+        assert_eq!(stats.discovered, 0);
+        assert_eq!(stats.processed, 0);
+    }
+
+    #[tokio::test]
+    async fn test_execute_pending_tasks_limit() {
+        use crate::entities::tracking;
+        use chrono::Utc;
+
+        let tracking_model = tracking::Model {
+            id: 1,
+            package_id: 1,
+            distro_id: 1,
+            l1_branch: "main".to_string(),
+            l1_repo_owner: "owner".to_string(),
+            l1_repo_name: "repo".to_string(),
+            l2_branch: "local".to_string(),
+            l2_repo_path: "/tmp/l2".to_string(),
+            tracking_status: "idle".to_string(),
+            last_sync_time: Some(Utc::now() - chrono::Duration::hours(25)),
+            last_l1_commit_sha: None,
+            last_l2_commit_sha: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            last_error: None,
+        };
+
+        // Mock pending tasks query
+        // ... (rest of the comment)
+
+        use crate::entities::{packages, sync_jobs};
+        let package_model = packages::Model {
+            id: 1,
+            name: "pkg".to_string(),
