@@ -1754,3 +1754,55 @@ Summary: Test package
             l1_repo_owner: "owner".to_string(),
             l1_repo_name: "repo".to_string(),
             l2_branch: "local".to_string(),
+            l2_repo_path: "/path".to_string(),
+            tracking_status: "idle".to_string(),
+            last_sync_time: Some(Utc::now()),
+            last_l1_commit_sha: None,
+            last_l2_commit_sha: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            last_error: None,
+        };
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<crate::entities::l1_commit_records::Model, _, _>(vec![vec![]])
+            .into_connection();
+
+        let executor = PipelineExecutor::new(&db, None);
+        let prev = std::collections::HashMap::new();
+        let result = executor
+            .stage_classification(&tracking_model, &prev)
+            .await
+            .unwrap();
+        assert_eq!(result.classified_count, 0);
+        assert_eq!(result.cve_count, 0);
+        assert_eq!(result.needs_review_count, 0);
+    }
+
+    #[tokio::test]
+    async fn test_stage_classification_with_pending_commits() {
+        use crate::analyzer::{ChangeClassification, ChangeType};
+        use crate::entities::l1_commit_records::{ActiveModel as L1ActiveModel, Model as L1Model};
+        use chrono::Utc;
+        use sea_orm::MockExecResult;
+
+        let tracking_model = tracking::Model {
+            id: 1,
+            package_id: 1,
+            distro_id: 1,
+            l1_branch: "main".to_string(),
+            l1_repo_owner: "owner".to_string(),
+            l1_repo_name: "repo".to_string(),
+            l2_branch: "local".to_string(),
+            l2_repo_path: "/path".to_string(),
+            tracking_status: "idle".to_string(),
+            last_sync_time: Some(Utc::now()),
+            last_l1_commit_sha: None,
+            last_l2_commit_sha: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            last_error: None,
+        };
+
+        let pending_commit = L1Model {
+            id: 1,
