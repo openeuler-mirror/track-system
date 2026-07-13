@@ -814,3 +814,53 @@ mod tests {
             repo: "https://example.com/commit".to_string(),
             commit_sha: sha.to_string(),
             summary: "title".to_string(),
+            authored_at: Utc::now(),
+            metadata: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+
+    fn create_l1_commit_record_model(
+        id: i32,
+        tracking_id: i32,
+        sha: &str,
+    ) -> l1_commit_records::Model {
+        l1_commit_records::Model {
+            id,
+            tracking_id,
+            commit_sha: sha.to_string(),
+            commit_message: "message".to_string(),
+            author_name: "author".to_string(),
+            author_email: String::new(),
+            committed_at: Utc::now(),
+            change_type: None,
+            primary_change_type: Some("feature".to_string()),
+            cve_list: None,
+            spec_changed: false,
+            patch_stats: None,
+            classification_status: "unclassified".to_string(),
+            classification_notes: None,
+            sync_status: "not_synced".to_string(),
+            synced_to_l2_commit: None,
+            synced_at: None,
+            api_url: "https://example.com/commit".to_string(),
+            fetched_at: Utc::now(),
+            files_changed_count: 1,
+            additions: 1,
+            deletions: 1,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            spec_version: None,
+            spec_release: None,
+        }
+    }
+
+    fn create_issue_model(id: i32, tracking_id: i32, number: &str) -> issues::Model {
+        issues::Model {
+            id,
+            tracking_id,
+            issue_number: number.to_string(),
+            title: "issue title".to_string(),
+            state: "open".to_string(),
+            author: "author".to_string(),
