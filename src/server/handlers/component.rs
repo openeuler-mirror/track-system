@@ -218,3 +218,37 @@ mod tests {
             branch: None,
             spec: None,
         };
+
+        let result = get_component(State(state), Path("glibc".to_string()), Query(params)).await;
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), StatusCode::SERVICE_UNAVAILABLE);
+    }
+    #[tokio::test]
+    async fn test_query_components_error_without_clients() {
+        use axum::extract::State;
+        use sea_orm::{DatabaseBackend, MockDatabase};
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+        let state = AppState::without_external_clients(db);
+
+        let request = ComponentQueryRequest {
+            components: vec![ComponentRequest {
+                name: "glibc".to_string(),
+                platform: None,
+                owner: None,
+                branch: None,
+                spec: None,
+            }],
+        };
+
+        let result = query_components(State(state), Json(request)).await;
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), StatusCode::SERVICE_UNAVAILABLE);
+    }
+
+    #[tokio::test]
+    async fn test_list_component_commits_error_without_clients() {
+        use sea_orm::{DatabaseBackend, MockDatabase};
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+        let state = AppState::without_external_clients(db);
