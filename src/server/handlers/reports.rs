@@ -454,3 +454,48 @@ mod tests {
             page: Some(1),
             page_size: Some(101),
             tracking_id: None,
+            report_type: None,
+            status: None,
+        };
+        let result = list_reports(State(state.clone()), Query(query)).await;
+        assert!(result.is_err());
+        if let Err(ApiError::BadRequest(msg)) = result {
+            assert!(msg.contains("Page size must be between 1 and 100"));
+        }
+
+        // Test invalid page_size (0)
+        let query = ReportListQuery {
+            page: Some(1),
+            page_size: Some(0),
+            tracking_id: None,
+            report_type: None,
+            status: None,
+        };
+        let result = list_reports(State(state), Query(query)).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_get_report_invalid_id() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+        let state = AppState::without_external_clients(db);
+
+        // Test with invalid ID (0)
+        let result = get_report(State(state.clone()), Path(0)).await;
+        assert!(result.is_err());
+        if let Err(ApiError::BadRequest(msg)) = result {
+            assert!(msg.contains("Invalid report ID"));
+        }
+
+        // Test with invalid ID (negative)
+        let result = get_report(State(state), Path(-1)).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_export_report_invalid_id() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+        let state = AppState::without_external_clients(db);
+
+        let query = ExportFormatQuery {
+            format: Some(ExportFormat::Json),
