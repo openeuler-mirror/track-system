@@ -870,3 +870,26 @@ fn sheet_rels_xml(rows: &[CveFixComparisonRow]) -> String {
             ));
             rid += 1;
         }
+    }
+    xml.push_str("</Relationships>");
+    xml
+}
+
+fn inline_str_cell(cell_ref: &str, value: &str, style: usize) -> String {
+    format!(
+        r#"<c r="{cell_ref}" s="{style}" t="inlineStr"><is><t xml:space="preserve">{}</t></is></c>"#,
+        xml_escape(value)
+    )
+}
+
+fn cell_ref(col_idx: usize, row_idx: usize) -> String {
+    let col = (b'A' + col_idx as u8) as char;
+    format!("{col}{row_idx}")
+}
+
+fn write_stored_zip(path: &Path, files: &[(String, Vec<u8>)]) -> Result<()> {
+    let mut output = Vec::new();
+    let mut central_directory = Vec::new();
+    let dos_time = 0u16;
+    let dos_date = (46u16 << 9) | (1u16 << 5) | 1u16;
+
