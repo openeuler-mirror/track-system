@@ -22,3 +22,27 @@ impl SbomCommunitySyncConfig {
 
         let endpoint_url = required_env("SBOM_COMMUNITY_SYNC_URL")?;
         let inner_secret = required_env("SBOM_COMMUNITY_INNER_SECRET")?;
+        let timeout_secs = std::env::var("SBOM_COMMUNITY_SYNC_TIMEOUT_SECS")
+            .ok()
+            .and_then(|value| value.parse::<u64>().ok())
+            .filter(|value| *value > 0)
+            .unwrap_or(5);
+        let status = optional_env("SBOM_COMMUNITY_SYNC_STATUS");
+
+        Ok(Some(Self {
+            endpoint_url,
+            inner_secret,
+            timeout: Duration::from_secs(timeout_secs),
+            status,
+        }))
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct SbomCommunitySyncClient {
+    client: Client,
+    config: SbomCommunitySyncConfig,
+}
+
+impl SbomCommunitySyncClient {
+    pub fn new(config: SbomCommunitySyncConfig) -> Result<Self> {
