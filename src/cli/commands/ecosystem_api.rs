@@ -1154,3 +1154,26 @@ mod tests {
                         {"key": "organization_structure", "value": "委员会 + SIG"},
                         {"key": "foundation_status", "value": "开放原子开源基金会"},
                         {"key": "cla_policy", "value": "贡献前需要签署 CLA"}
+                    ]
+                }
+            },
+            "raw_evidence": [
+                {
+                    "assessment_category": "source",
+                    "data": {
+                        "version_lifecycle": "LTS 两年一发，四年支持",
+                        "license_policy": "Mulan PSL v2"
+                    }
+                }
+            ]
+        });
+
+        assert_eq!(
+            find_source_focus_value(&payload, "organization_structure").as_deref(),
+            Some("委员会 + SIG")
+        );
+        assert_eq!(
+            find_source_focus_value(&payload, "version_lifecycle").as_deref(),
+            Some("LTS 两年一发，四年支持")
+        );
+        assert_eq!(
