@@ -2363,6 +2363,11 @@ impl<'a> PipelineExecutor<'a> {
 
                     classified_count += 1;
                     cve_count += classification.cve_numbers.len();
+                    classified_commits.push(ClassifiedCommitResult {
+                        commit_sha,
+                        primary_change_type,
+                        cve_list: cve_numbers,
+                    });
 
                     // 检查是否需要人工审核
                     if classification.primary_type.as_str() == "MixedChange" {
