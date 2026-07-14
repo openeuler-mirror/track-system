@@ -644,3 +644,26 @@ impl GitHubPlatformCollector {
             "supports_choosealicense": supports_choosealicense,
             "supports_license_detection": supports_license_detection,
             "mentions_default_copyright_rule": mentions_default_copyright_rule,
+        })
+    }
+
+    async fn collect_gov_takedown_stats(&self, client: &Client, token: Option<&str>) -> Value {
+        let mut request = client
+            .get(GITHUB_GOV_TAKEDOWNS_API)
+            .header("Accept", "application/vnd.github+json")
+            .header("X-GitHub-Api-Version", "2022-11-28");
+        if let Some(t) = token {
+            request = request.bearer_auth(t);
+        }
+        match request.send().await {
+            Err(e) => {
+                warn!(error = %e, "gov-takedowns API 请求失败");
+                json!({ "error": e.to_string(), "total_requests": null })
+            }
+            Ok(resp) if !resp.status().is_success() => {
+                let status = resp.status().as_u16();
+                let body = resp.text().await.unwrap_or_default();
+                warn!(status, body = %body, "gov-takedowns API 返回非 2xx");
+                json!({ "error": format!("HTTP {}: {}", status, body), "total_requests": null })
+            }
+            Ok(resp) => match resp.json::<Value>().await {
