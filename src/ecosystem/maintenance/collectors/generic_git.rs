@@ -561,3 +561,26 @@ fn generic_git_timeouts() -> GenericGitTimeouts {
         ),
         io_timeout: configured_timeout(GENERIC_GIT_IO_TIMEOUT_ENV, DEFAULT_IO_TIMEOUT_SECS),
     }
+}
+
+fn generic_git_cache_retention_enabled() -> bool {
+    std::env::var(GENERIC_GIT_CACHE_RETENTION_ENV)
+        .ok()
+        .as_deref()
+        .map(parse_bool_env)
+        .unwrap_or(false)
+}
+
+fn parse_bool_env(value: &str) -> bool {
+    matches!(
+        value.trim().to_ascii_lowercase().as_str(),
+        "1" | "true" | "yes" | "y" | "on" | "enable" | "enabled"
+    )
+}
+
+fn configured_timeout(env_key: &str, default_secs: u64) -> Duration {
+    let secs = std::env::var(env_key)
+        .ok()
+        .and_then(|value| value.parse::<u64>().ok())
+        .filter(|secs| *secs > 0)
+        .unwrap_or(default_secs);
