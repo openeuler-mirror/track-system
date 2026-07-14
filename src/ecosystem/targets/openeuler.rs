@@ -857,3 +857,26 @@ mod tests {
             evidence[1]["data"]["foundation_consistency"],
             "POSSIBLY_INCONSISTENT"
         );
+        assert_eq!(evidence[2]["data"]["lts_every_four_years"], true);
+        assert_eq!(evidence[2]["data"]["sp_policy_mentioned"], true);
+        assert_eq!(
+            evidence[3]["data"]["community_repo_license_detected"],
+            "Mulan PSL v2"
+        );
+        assert_eq!(evidence[4]["data"]["cla_required"], true);
+    }
+
+    #[test]
+    fn detect_openeuler_lifecycle_from_jsonld_body() {
+        let collector = OpenEulerCommunityCollector::new();
+        let page = PageSnapshot {
+            http_status: Some(200),
+            keyword_lines: Vec::new(),
+            plain_text: "openEuler 生命周期管理".to_string(),
+            raw_body: r#"
+                <html><head>
+                <script type="application/ld+json">
+                {
+                  "@context":"https://schema.org",
+                  "@type":"FAQPage",
+                  "mainEntity":[
