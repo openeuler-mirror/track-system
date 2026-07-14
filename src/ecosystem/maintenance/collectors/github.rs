@@ -46,3 +46,27 @@ struct GitHubApi {
     client: Client,
     token: Option<String>,
     base_url: String,
+}
+
+impl GitHubMaintenanceCollector {
+    pub fn new() -> Self {
+        Self
+    }
+
+    pub fn matches_package(package: &packages::Model) -> bool {
+        package
+            .l0_repo_url
+            .as_deref()
+            .and_then(parse_github_repo)
+            .is_some()
+    }
+
+    pub async fn collect(&self, package: &packages::Model) -> Result<Vec<Value>> {
+        if !Self::matches_package(package) {
+            return Ok(Vec::new());
+        }
+
+        let repo_url = package
+            .l0_repo_url
+            .as_deref()
+            .ok_or_else(|| anyhow!("package {} missing l0_repo_url", package.name))?;
