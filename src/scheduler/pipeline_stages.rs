@@ -4929,4 +4929,93 @@ Summary: Test package
         assert!(result.report_id > 0);
         mock.assert_calls(1);
     }
+
+    #[test]
+    fn compact_l0_community_assessment_keeps_security_quality_focus() {
+        use crate::entities::{ecosystem_reports, ecosystem_targets};
+
+        let now = Utc::now();
+        let target = ecosystem_targets::Model {
+            id: 11,
+            name: "bash".to_string(),
+            target_type: "component".to_string(),
+            platform: Some("github".to_string()),
+            role: "l0".to_string(),
+            homepage_url: Some("https://github.com/bminor/bash".to_string()),
+            api_base_url: Some("https://api.github.com".to_string()),
+            owner: Some("bminor".to_string()),
+            repo: Some("bash".to_string()),
+            default_branch: Some("master".to_string()),
+            status: "active".to_string(),
+            refresh_interval_hours: 24,
+            rule_profile: "default".to_string(),
+            metadata: None,
+            last_collected_at: None,
+            last_report_at: None,
+            last_error: None,
+            created_at: now,
+            updated_at: now,
+        };
+        let report = ecosystem_reports::Model {
+            id: 22,
+            target_id: 11,
+            report_type: "ecosystem_profile".to_string(),
+            status: "success".to_string(),
+            overall_risk: "MEDIUM".to_string(),
+            confidence: "HIGH".to_string(),
+            summary: "summary".to_string(),
+            dimensions: serde_json::json!({}),
+            evidence_summary: None,
+            report_payload: serde_json::json!({
+                "sections": {
+                    "security": {
+                        "level": "LOW",
+                        "confidence": "HIGH",
+                        "score": 90,
+                        "coverage": 100,
+                        "reasons": ["安全流程较稳定"],
+                        "evidence_refs": ["security:cve_process"],
+                        "indicators": [
+                            {"key": "has_security_policy", "value": true},
+                            {"key": "unrelated_metric", "value": "drop"}
+                        ]
+                    },
+                    "quality": {
+                        "level": "MEDIUM",
+                        "confidence": "HIGH",
+                        "score": 70,
+                        "coverage": 80,
+                        "reasons": ["发布物签名证据不足"],
+                        "evidence_refs": ["quality:release_quality"],
+                        "indicators": [
+                            {"key": "signed_releases", "value": false},
+                            {"key": "another_unrelated_metric", "value": "drop"}
+                        ]
+                    }
+                }
+            }),
+            generated_at: now,
+            created_at: now,
+            updated_at: now,
+        };
+
+        let compact = compact_l0_community_assessment(&target, &report);
+        assert_eq!(compact["target"]["name"], "bash");
+        assert_eq!(
+            compact["security"]["indicators"].as_array().unwrap().len(),
+            1
+        );
+        assert_eq!(
+            compact["security"]["indicators"][0]["key"],
+            "has_security_policy"
+        );
+        assert_eq!(
+            compact["quality"]["indicators"].as_array().unwrap().len(),
+            1
+        );
+        assert_eq!(
+            compact["quality"]["indicators"][0]["key"],
+            "signed_releases"
+        );
+    }
 }
