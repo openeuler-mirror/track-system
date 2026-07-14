@@ -509,3 +509,26 @@ mod tests {
         assert_eq!(
             response.data.and_then(|data| data.action),
             Some("updated".to_string())
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn config_from_env_is_disabled_by_default() {
+        let _enabled = EnvGuard::remove("SBOM_COMMUNITY_SYNC_ENABLED");
+
+        assert!(SbomCommunitySyncConfig::from_env().unwrap().is_none());
+    }
+
+    #[test]
+    #[serial]
+    fn config_from_env_requires_url_and_secret_when_enabled() {
+        let _enabled = EnvGuard::set("SBOM_COMMUNITY_SYNC_ENABLED", "true");
+        let _url = EnvGuard::remove("SBOM_COMMUNITY_SYNC_URL");
+        let _secret = EnvGuard::remove("SBOM_COMMUNITY_INNER_SECRET");
+
+        let err = SbomCommunitySyncConfig::from_env().unwrap_err();
+
+        assert!(err.to_string().contains("SBOM_COMMUNITY_SYNC_URL"));
+    }
+
