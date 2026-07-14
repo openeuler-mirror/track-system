@@ -33,7 +33,7 @@ const MAX_RETRIES: u32 = 3;
 /// Gitee API 客户端
 pub struct GiteeClient {
     client: Client,
-    token: String,
+    token: Option<String>,
     base_url: String,
 }
 
