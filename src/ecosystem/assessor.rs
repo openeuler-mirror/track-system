@@ -303,3 +303,58 @@ fn build_security_assessment(raw_evidence: &[Value]) -> EcosystemSubAssessment {
     )
 }
 
+fn build_quality_assessment(raw_evidence: &[Value]) -> EcosystemSubAssessment {
+    let entries = entries_by_category(raw_evidence, "quality");
+    let indicators = collect_indicators(&entries);
+    let required_keys = [
+        "dedicated_code_reviewers",
+        "required_reviews",
+        "signed_releases",
+        "provenance_attestation",
+        "release_checklist",
+    ];
+    let (coverage, missing) = coverage_for_keys(&indicators, &required_keys);
+    let mut score = 100 - (missing.len() as i32 * 8);
+    let mut reasons = vec![format!("质量评估已纳入 {} 个证据条目", entries.len())];
+
+    let dedicated_code_reviewers =
+        indicator_i64(&indicators, "dedicated_code_reviewers").unwrap_or(0);
+    let required_reviews = indicator_i64(&indicators, "required_reviews").unwrap_or(0);
+    let signed_releases = indicator_bool(&indicators, "signed_releases").unwrap_or(false);
+    let provenance_attestation =
+        indicator_bool(&indicators, "provenance_attestation").unwrap_or(false);
+    let release_checklist = indicator_bool(&indicators, "release_checklist").unwrap_or(false);
+
+    if dedicated_code_reviewers == 0 {
+        score -= 20;
+        reasons.push("未识别到专人代码审查责任人".to_string());
+    }
+    if required_reviews < 1 {
+        score -= 15;
+        reasons.push("代码审查门槛偏低".to_string());
+    }
+    if !signed_releases {
+        score -= 24;
+        reasons.push("发布物未体现数字签名能力".to_string());
+    }
+    if !provenance_attestation {
+        score -= 12;
+        reasons.push("缺少发布来源证明或供应链佐证".to_string());
+    }
+    if !release_checklist {
+        score -= 8;
+        reasons.push("发布检查清单流程不明确".to_string());
+    }
+    if dedicated_code_reviewers >= 2 && signed_releases {
+        reasons.push("审查责任人与发布签名机制较明确".to_string());
+    }
+    reasons.extend(missing.iter().map(|key| format!("缺少质量指标: {}", key)));
+    finalize_assessment(
+        score,
+        coverage,
+        reasons,
+        indicators,
+        collect_evidence_refs(&entries),
+    )
+}
+
