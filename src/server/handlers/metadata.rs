@@ -250,7 +250,9 @@ pub async fn import_l2_metadata(
         .ok_or_else(|| ApiError::NotFound(format!("跟踪配置 {} 不存在", request.tracking_id)))?;
 
     // 2. 保存快照到数据库（L2 使用 l2_snapshots 表存储完整快照）
-    let snapshot_json = serde_json::to_value(&request.snapshot)
+    let mut snapshot = request.snapshot;
+    normalize_imported_snapshot_spec_version_release(&mut snapshot);
+    let snapshot_json = serde_json::to_value(&snapshot)
         .map_err(|e| ApiError::BadRequest(format!("序列化快照失败: {}", e)))?;
 
     // 计算快照校验和
