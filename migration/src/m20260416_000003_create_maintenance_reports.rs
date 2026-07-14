@@ -109,3 +109,25 @@ impl MigrationTrait for Migration {
             .create_index(
                 Index::create()
                     .name("idx_maintenance_reports_target")
+                    .table(MaintenanceReports::Table)
+                    .col(MaintenanceReports::PackageId)
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(MaintenanceReports::Table).to_owned())
+            .await
+    }
+}
+
+fn timestamp_type(backend: DatabaseBackend) -> Alias {
+    match backend {
+        DatabaseBackend::Postgres => Alias::new("timestamp with time zone"),
+        _ => Alias::new("timestamp"),
+    }
+}
+
+#[derive(DeriveIden)]
