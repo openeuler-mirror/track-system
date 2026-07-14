@@ -285,3 +285,151 @@ impl Default for Config {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn valid_config() -> Config {
+        let mut config = Config::default();
+        config.packages.push(PackageConfig {
+            name: "openssl".to_string(),
+            level: 1,
+            sync_interval_hours: 24,
+            l0_repo_url: "https://example.test/openssl.git".to_string(),
+            description: Some("crypto library".to_string()),
+        });
+        config.distros.push(DistroConfig {
+            name: "CTyunOS".to_string(),
+            version: "25.07".to_string(),
+        });
+        config.trackings.push(TrackingConfig {
+            package: "openssl".to_string(),
+            distro: "CTyunOS".to_string(),
+            l1: L1Config {
+                branch: "openEuler-24.03-LTS-SP3".to_string(),
+                repo_owner: "src-openeuler".to_string(),
+                repo_name: "openssl".to_string(),
+            },
+            l2: L2Config {
+                branch: "CTyunOS25.07".to_string(),
+                repo_path: "/path/that/does/not/need/to/exist".to_string(),
+            },
+            status: "active".to_string(),
+        });
+        config
+    }
+
+    #[test]
+    fn validate_accepts_minimal_sqlite_config() {
+        let config = valid_config();
+
+        assert!(config.validate().is_ok());
+        assert_eq!(config.database_url(), "sqlite://track_system.db?mode=rwc");
+    }
+
+    #[test]
+    fn database_url_formats_postgresql_connection() {
+        let mut config = valid_config();
+        config.database = DatabaseConfig {
+            db_type: "postgresql".to_string(),
+            sqlite: None,
+            postgresql: Some(PostgresqlConfig {
+                host: "db.example.test".to_string(),
+                port: 5432,
+                database: "track".to_string(),
+                username: "track_user".to_string(),
+                password: "secret".to_string(),
+            }),
+        };
+
+        assert!(config.validate().is_ok());
+        assert_eq!(
+            config.database_url(),
+            "postgresql://track_user:secret@db.example.test:5432/track"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_missing_database_details() {
+        let mut config = valid_config();
+        config.database.sqlite = None;
+
+        let err = config.validate().unwrap_err().to_string();
+
+        assert!(err.contains("SQLite 配置缺失"));
+    }
+
+    #[test]
+    fn validate_rejects_unknown_database_type() {
+        let mut config = valid_config();
+        config.database.db_type = "mysql".to_string();
+
+        let err = config.validate().unwrap_err().to_string();
+
+        assert!(err.contains("不支持的数据库类型"));
+    }
+
+    #[test]
+    fn validate_rejects_empty_packages_and_distros() {
+        let mut config = valid_config();
+        config.packages.clear();
+        assert!(config
+            .validate()
+            .unwrap_err()
+            .to_string()
+            .contains("至少需要配置一个软件包"));
+
+        let mut config = valid_config();
+        config.distros.clear();
+        assert!(config
+            .validate()
+            .unwrap_err()
+            .to_string()
+            .contains("至少需要配置一个发行版"));
+    }
+
+    #[test]
+    fn validate_rejects_tracking_references_to_missing_entities() {
+        let mut config = valid_config();
+        config.trackings[0].package = "missing".to_string();
+        assert!(config
+            .validate()
+            .unwrap_err()
+            .to_string()
+            .contains("跟踪配置引用了不存在的软件包"));
+
+        let mut config = valid_config();
+        config.trackings[0].distro = "missing".to_string();
+        assert!(config
+            .validate()
+            .unwrap_err()
+            .to_string()
+            .contains("跟踪配置引用了不存在的发行版"));
+    }
+
+    #[test]
+    fn save_to_file_and_from_file_round_trip_yaml_config() {
+        let config = valid_config();
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.yaml");
+
+        config.save_to_file(&path).unwrap();
+        let loaded = Config::from_file(&path).unwrap();
+
+        assert_eq!(loaded.packages[0].name, "openssl");
+        assert_eq!(loaded.distros[0].version, "25.07");
+        assert_eq!(loaded.trackings[0].l1.repo_name, "openssl");
+    }
+
+    #[test]
+    fn from_file_reports_yaml_parse_errors() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("bad.yaml");
+        std::fs::write(&path, "database: [").unwrap();
+
+        let err = Config::from_file(&path).unwrap_err().to_string();
+
+        assert!(err.contains("无法解析配置文件"));
+    }
+}
