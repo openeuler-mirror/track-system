@@ -23,3 +23,28 @@ pub struct L0RepoCacheWarmItem {
     pub package_id: i32,
     pub package_name: String,
     pub repo_url: Option<String>,
+    pub cache_path: Option<String>,
+    pub default_branch: Option<String>,
+    pub cache_retained: bool,
+    pub status: String,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub struct L0RepoCacheWarmSummary {
+    pub scanned_packages: usize,
+    pub warmed_packages: usize,
+    pub skipped_no_repo: usize,
+    pub failed_packages: usize,
+    pub results: Vec<L0RepoCacheWarmItem>,
+}
+
+pub struct L0RepoCacheService<'a> {
+    db: &'a DatabaseConnection,
+}
+
+impl<'a> L0RepoCacheService<'a> {
+    pub fn new(db: &'a DatabaseConnection) -> Self {
+        Self { db }
+    }
+
