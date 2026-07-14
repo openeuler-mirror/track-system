@@ -300,6 +300,9 @@ impl SchedulerManager {
 
         let mut results = Vec::new();
         let executor = PipelineExecutor::new(&self.db, self.client.clone());
+        let mut round_artifact_writer = RoundCveFixComparisonWriter::new();
+        let mut round_artifact_report_ids: Vec<i32> = Vec::new();
+        let mut packages_to_refresh_after_artifacts: Vec<(i32, i32)> = Vec::new();
 
         // 限制并发数量
         let limit = self.config.max_concurrent_jobs.min(pending_tasks.len());
