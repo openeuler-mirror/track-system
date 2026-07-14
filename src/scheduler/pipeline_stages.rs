@@ -1597,8 +1597,8 @@ impl<'a> PipelineExecutor<'a> {
             report_id: Some(report_id),
             files_changed,
             has_spec_changes,
-            l2_vs_l1_diff: None,
-            l1_vs_l0_diff: None,
+            l2_vs_l1_diff: l2_vs_l1_result.as_ref().map(l2_vs_l1_diff_summary),
+            l1_vs_l0_diff: l1_vs_l0_result.as_ref().map(l1_vs_l0_diff_summary),
         })
     }
 
