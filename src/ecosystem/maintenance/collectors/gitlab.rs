@@ -212,3 +212,26 @@ fn parse_gitlab_repo(url: &str) -> Option<GitLabRepoRef> {
 fn normalize_repo_url(url: &str) -> Option<Url> {
     if let Ok(parsed) = Url::parse(url) {
         return Some(parsed);
+    }
+
+    let candidate = format!("https://{}", url.trim());
+    Url::parse(&candidate).ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_gitlab_repo_supports_public_and_self_hosted() {
+        let repo = parse_gitlab_repo("https://gitlab.com/group/project.git").unwrap();
+        assert_eq!(repo.api_base, "https://gitlab.com/api/v4");
+        assert_eq!(repo.owner, "group");
+        assert_eq!(repo.repo, "project");
+
+        let repo = parse_gitlab_repo("https://gitlab.gnome.org/GNOME/libsecret").unwrap();
+        assert_eq!(repo.api_base, "https://gitlab.gnome.org/api/v4");
+        assert_eq!(repo.owner, "GNOME");
+        assert_eq!(repo.repo, "libsecret");
+    }
+}
