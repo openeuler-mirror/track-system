@@ -228,3 +228,26 @@ impl<'a> MaintenanceService<'a> {
         };
 
         report
+            .insert(self.db)
+            .await
+            .context("insert maintenance report failed")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ecosystem::maintenance::types::{MaintenanceDimension, MaintenanceSubAssessment};
+    use sea_orm::{DatabaseBackend, MockDatabase};
+
+    fn package(repo_url: Option<&str>) -> packages::Model {
+        let now = Utc::now();
+        packages::Model {
+            id: 5,
+            name: "openssl".to_string(),
+            level: 1,
+            sync_interval_hours: 24,
+            l0_repo_url: repo_url.map(str::to_string),
+            description: Some("crypto library".to_string()),
+            created_at: now,
+            updated_at: now,
