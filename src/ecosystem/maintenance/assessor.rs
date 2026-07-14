@@ -261,3 +261,26 @@ fn coverage_for_keys(
     let mut missing = Vec::new();
     let mut present = 0;
     for key in required_keys {
+        if indicators
+            .iter()
+            .any(|indicator| indicator.key == *key && indicator.status != "missing")
+        {
+            present += 1;
+        } else {
+            missing.push((*key).to_string());
+        }
+    }
+    let coverage = if required_keys.is_empty() {
+        100
+    } else {
+        (present * 100 / required_keys.len()) as i32
+    };
+    (coverage, missing)
+}
+
+fn indicator_i64(indicators: &[MaintenanceIndicator], key: &str) -> Option<i64> {
+    indicators
+        .iter()
+        .find(|indicator| indicator.key == key)
+        .and_then(|indicator| match &indicator.value {
+            Value::Number(number) => number.as_i64(),
