@@ -491,3 +491,26 @@ mod tests {
         assert_eq!(freshness_score(48), 70);
         assert_eq!(freshness_score(96), 50);
 
+        let indicators = vec![
+            MaintenanceIndicator {
+                key: "flag".to_string(),
+                label: "flag".to_string(),
+                value: json!("true"),
+                status: "present".to_string(),
+                source: "test".to_string(),
+            },
+            MaintenanceIndicator {
+                key: "invalid_flag".to_string(),
+                label: "invalid_flag".to_string(),
+                value: json!("maybe"),
+                status: "present".to_string(),
+                source: "test".to_string(),
+            },
+            MaintenanceIndicator {
+                key: "number".to_string(),
+                label: "number".to_string(),
+                value: json!("42"),
+                status: "present".to_string(),
+                source: "test".to_string(),
+            },
+            MaintenanceIndicator {
