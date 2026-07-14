@@ -255,3 +255,26 @@ fn build_plain_body(config: &MailConfig, artifact: &ReportArtifact) -> String {
         } else {
             body.push_str("\n\n正文预览:");
             let mut current_system_version = "";
+            for row in preview_rows {
+                if row.system_version != current_system_version {
+                    current_system_version = &row.system_version;
+                    body.push_str(&format!("\n\n[{}]", current_system_version));
+                }
+                body.push_str(&format!(
+                    "\n- {} | {} | 上游修复版本: {} | 当前版本: {} | {}",
+                    row.package,
+                    row.cve_or_issue,
+                    row.upstream_fixed_version,
+                    row.ctyunos_current_version,
+                    truncate_text(
+                        &row.description.replace('\n', " "),
+                        PREVIEW_DESCRIPTION_MAX_CHARS
+                    )
+                ));
+            }
+            if artifact.preview_rows.len() > config.embed_xlsx_preview_max_rows {
+                body.push_str(&format!(
+                    "\n\n仅展示前 {} 行，完整内容请查看附件。",
+                    config.embed_xlsx_preview_max_rows
+                ));
+            }
