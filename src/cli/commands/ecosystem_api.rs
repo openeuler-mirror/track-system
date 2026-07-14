@@ -1131,3 +1131,26 @@ mod tests {
         assert_eq!(
             normalize_lookup_key("openEuler Community"),
             "openeulercommunity"
+        );
+        assert_eq!(normalize_lookup_key("OpenEuler"), "openeuler");
+    }
+
+    #[test]
+    fn ecosystem_preset_recognizes_openeuler_aliases() {
+        for input in ["openeuler", "OpenEuler", "openEuler Community"] {
+            let preset = ecosystem_preset_from_name(input).expect("preset should exist");
+            assert_eq!(preset.canonical_name, "openEuler Community");
+            assert_eq!(preset.platform.as_deref(), Some("openeuler"));
+            assert_eq!(preset.rule_profile, "openeuler_community");
+        }
+    }
+
+    #[test]
+    fn find_source_focus_value_prefers_indicator_and_fallbacks_to_raw_evidence() {
+        let payload = serde_json::json!({
+            "sections": {
+                "source": {
+                    "indicators": [
+                        {"key": "organization_structure", "value": "委员会 + SIG"},
+                        {"key": "foundation_status", "value": "开放原子开源基金会"},
+                        {"key": "cla_policy", "value": "贡献前需要签署 CLA"}
