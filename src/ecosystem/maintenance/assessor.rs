@@ -376,3 +376,26 @@ fn freshness_score(refresh_interval_hours: i32) -> i32 {
         "LOW" => 90,
         "MEDIUM" => 70,
         _ => 50,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample_target() -> packages::Model {
+        let now = Utc::now();
+        packages::Model {
+            id: 1,
+            name: "openssl".to_string(),
+            level: 1,
+            sync_interval_hours: 24,
+            l0_repo_url: Some("https://github.com/openssl/openssl".to_string()),
+            description: None,
+            created_at: now,
+            updated_at: now,
+        }
+    }
+
+    #[test]
+    fn assess_target_builds_maintenance_section() {
