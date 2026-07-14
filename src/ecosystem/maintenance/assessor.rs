@@ -166,3 +166,27 @@ fn finalize_assessment(
         confidence: confidence_from_coverage(coverage).to_string(),
         score,
         coverage,
+        reasons,
+        evidence_refs,
+        indicators,
+    }
+}
+
+fn build_evidence_catalog(raw_evidence: &[Value]) -> Value {
+    let mut category_counts: BTreeMap<String, usize> = BTreeMap::new();
+    let mut subcategory_counts: BTreeMap<String, usize> = BTreeMap::new();
+    let mut sources = BTreeSet::new();
+
+    for entry in raw_evidence {
+        if let Some(category) = entry.get("assessment_category").and_then(Value::as_str) {
+            *category_counts.entry(category.to_string()).or_default() += 1;
+        }
+        if let Some(subcategory) = entry.get("assessment_subcategory").and_then(Value::as_str) {
+            *subcategory_counts
+                .entry(subcategory.to_string())
+                .or_default() += 1;
+        }
+        if let Some(source_name) = entry.get("source_name").and_then(Value::as_str) {
+            sources.insert(source_name.to_string());
+        }
+    }
