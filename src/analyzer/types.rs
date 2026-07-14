@@ -94,3 +94,16 @@ impl Default for ChangeClassification {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn change_type_as_str_returns_stable_labels() {
+        assert_eq!(ChangeType::CVE.as_str(), "CVE");
+        assert_eq!(ChangeType::Bugfix.as_str(), "Bugfix");
+        assert_eq!(ChangeType::Backport.as_str(), "Backport");
+        assert_eq!(ChangeType::Unknown.as_str(), "Unknown");
+    }
+}
