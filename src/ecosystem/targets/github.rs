@@ -1012,3 +1012,26 @@ mod tests {
             trade_page,
             gov_page,
             terms_page,
+            licensing_page,
+            dmca_page,
+            stats,
+        );
+
+        assert_eq!(evidence.len(), 8);
+        assert_eq!(evidence[0]["source_type"], "github_platform_overview");
+        assert_eq!(evidence[0]["data"]["about_http_status"], 200);
+        assert_eq!(evidence[1]["data"]["microsoft_acquisition_completed"], true);
+        assert_eq!(evidence[2]["data"]["ofac_license_for_iran"], true);
+        assert_eq!(evidence[3]["data"]["users_own_content"], true);
+        assert_eq!(evidence[4]["data"]["supports_user_appeal"], true);
+        assert_eq!(evidence[5]["data"]["supports_license_detection"], true);
+        assert_eq!(evidence[6]["data"]["dmca_safe_harbor_mentioned"], true);
+        assert_eq!(evidence[7]["data"]["total_requests"], 3);
+        assert_eq!(
+            evidence[7]["data"]["requests_by_requester"]["RequesterA"],
+            2
+        );
+    }
+
+    #[test]
+    fn parse_gov_takedown_tree_counts_by_requester() {
