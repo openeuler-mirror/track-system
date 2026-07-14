@@ -3059,6 +3059,8 @@ mod tests {
         let result = ReportGenerationResult {
             report_id: 999,
             report_status: "success".to_string(),
+            cve_fix_comparison_input: None,
+            cve_fix_comparison_xlsx: None,
         };
 
         assert_eq!(result.report_id, 999);
