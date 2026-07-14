@@ -28,7 +28,7 @@ use sea_orm::{
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use tracing::{error, info};
+use tracing::{debug, error, info};
 use walkdir::WalkDir;
 
 use crate::{
