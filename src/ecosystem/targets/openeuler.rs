@@ -765,3 +765,26 @@ mod tests {
                 ],
                 12,
             ),
+            plain_text: text.to_string(),
+            raw_body: String::new(),
+            error: None,
+        }
+    }
+
+    #[test]
+    fn strip_tags_keeps_plain_text() {
+        let html =
+            "<html><body><h1>openEuler Committee</h1><p>OpenAtom Foundation</p></body></html>";
+        let text = strip_tags(html);
+        assert!(text.contains("openEuler Committee"));
+        assert!(text.contains("OpenAtom Foundation"));
+    }
+
+    #[test]
+    fn detect_openeuler_lifecycle_from_text() {
+        let collector = OpenEulerCommunityCollector::new();
+        let page = PageSnapshot {
+            http_status: Some(200),
+            keyword_lines: Vec::new(),
+            plain_text: "社区版本分为长期支持版本和创新版本。长期支持版本自25年8月起生效，发布间隔周期定为4年，提供4年社区支持。LTS版本全版本生命周期6年(4+2)，可申请延长至8年。openEuler每隔12个月会发布一个社区创新版本，提供6个月社区支持。SP版本生命周期原则上按照小SP 9个月、大SP 24个月执行。".to_string(),
+            raw_body: String::new(),
