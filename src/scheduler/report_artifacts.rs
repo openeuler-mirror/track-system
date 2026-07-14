@@ -1123,3 +1123,26 @@ fn next_version_segment(value: &str, mut pos: usize) -> Option<(bool, &str, usiz
     }
     if pos >= bytes.len() {
         return None;
+    }
+
+    let is_numeric = bytes[pos].is_ascii_digit();
+    let start = pos;
+    while pos < bytes.len()
+        && if is_numeric {
+            bytes[pos].is_ascii_digit()
+        } else {
+            bytes[pos].is_ascii_alphabetic()
+        }
+    {
+        pos += 1;
+    }
+
+    Some((is_numeric, &value[start..pos], pos))
+}
+
+fn compare_numeric_segment(left: &str, right: &str) -> Ordering {
+    let left_trimmed = left.trim_start_matches('0');
+    let right_trimmed = right.trim_start_matches('0');
+    let left_normalized = if left_trimmed.is_empty() {
+        "0"
+    } else {
