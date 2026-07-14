@@ -12,6 +12,7 @@
 pub mod backport;
 pub mod compare;
 pub mod component;
+pub mod ecosystem;
 pub mod health;
 pub mod metadata;
 pub mod package;
@@ -23,6 +24,7 @@ pub mod tracking;
 pub use backport::backport_routes;
 pub use compare::compare_routes;
 pub use component::component_routes;
+pub use ecosystem::ecosystem_routes;
 pub use health::health_routes;
 pub use metadata::metadata_routes;
 pub use package::package_routes;
