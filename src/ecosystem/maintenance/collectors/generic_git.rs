@@ -722,3 +722,26 @@ fn normalize_tag_version(reference: &str) -> Option<String> {
         candidate.push_str(&pre.as_str().to_ascii_lowercase());
         if let Some(num) = captures
             .name("pre_num")
+            .filter(|num| !num.as_str().is_empty())
+        {
+            candidate.push_str(num.as_str());
+        }
+    }
+
+    if is_probable_date_tag_version(&candidate) {
+        return None;
+    }
+    VersionParser::parse(&candidate).ok()?;
+
+    Some(candidate)
+}
+
+fn is_non_release_tag(tag: &str) -> bool {
+    let lower = tag.to_ascii_lowercase();
+    ["snapshot", "nightly", "test", "tmp", "debug", "wip", "dev"]
+        .iter()
+        .any(|needle| lower.contains(needle))
+}
+
+fn is_probable_date_tag_version(version: &str) -> bool {
+    let parts = version
