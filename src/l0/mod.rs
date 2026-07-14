@@ -9,8 +9,10 @@
  * more details.
  */
 
+pub mod cache_service;
 pub mod polling_service;
 mod watcher;
 
+pub use cache_service::{L0RepoCacheService, L0RepoCacheWarmItem, L0RepoCacheWarmSummary};
 pub use polling_service::L0PollingService;
 pub use watcher::{L0PollSummary, L0Watcher};
