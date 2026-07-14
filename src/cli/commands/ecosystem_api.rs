@@ -694,3 +694,26 @@ fn print_source_focus_details(report_payload: &Value) {
     );
     println!(
         "    - 运营方: {}",
+        operator_name.unwrap_or_else(|| "-".to_string())
+    );
+    println!(
+        "    - 版本生命周期: {}",
+        lifecycle.unwrap_or_else(|| "-".to_string())
+    );
+    print_lifecycle_structured_details(report_payload);
+    if let Some(trade_controls) = trade_controls {
+        println!("    - 贸易管制情况: {}", trade_controls);
+    }
+    print_github_trade_controls_details(report_payload);
+    if let Some(ip_policy) = ip_policy {
+        println!("    - 知识产权情况: {}", ip_policy);
+    }
+    print_github_ip_policy_details(report_payload);
+    if let Some(government_takedown) = government_takedown {
+        println!("    - 政府下架情况: {}", government_takedown);
+    }
+    print_github_government_takedown_details(report_payload);
+    print_github_gov_takedown_archive_details(report_payload);
+    println!(
+        "    - 许可证信息: {}",
+        license.unwrap_or_else(|| "-".to_string())
