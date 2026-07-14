@@ -721,3 +721,26 @@ impl AtomGitPlatformCollector {
             } else {
                 ""
             }
+        );
+
+        json!({
+            "summary": summary,
+            "content_removal_reserved": content_removal_reserved,
+            "public_authority_disclosure": public_authority_disclosure,
+            "national_security_disclosure": national_security_disclosure,
+            "publishes_public_requests": publishes_public_requests,
+            "route_reachable": route_reachable,
+            "machine_readable_policy_text": machine_readable_policy_text,
+            "same_as_random_probe": same_as_random_probe,
+            "government_keyword_lines": extract_keyword_lines(
+                &combined,
+                &["删除", "行政机关", "司法机关", "公共权力机构", "国家安全"],
+                10
+            ),
+        })
+    }
+
+    fn detect_license_policy(&self, terms_page: &PageSnapshot) -> Value {
+        let text = terms_page.plain_text.as_str();
+        let supports_license_templates = text.contains("开源许可证协议模板");
+        let license_remains_with_author = text.contains("版权归作者本人所有");
