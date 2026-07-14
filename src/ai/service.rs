@@ -190,3 +190,27 @@ fn sources_to_check(context: &AiContext) -> Vec<String> {
 
     sources
 }
+
+fn l0_security_quality_findings(
+    context: &AiContext,
+    fallback_risk: AiRiskLevel,
+) -> Vec<AiAnalysisFinding> {
+    let Some(assessment) = l0_community_assessment(context) else {
+        return Vec::new();
+    };
+
+    let mut findings = Vec::new();
+    if let Some(section) = assessment.get("security") {
+        findings.push(AiAnalysisFinding {
+            title: "L0 社区安全评估".to_string(),
+            risk: section_risk(section, fallback_risk),
+            evidence: section_evidence_summary(
+                section,
+                &[
+                    "has_security_policy",
+                    "cve_fix_commits_last_12_months",
+                    "cve_linked_issues_last_12_months",
+                    "median_cve_fix_days",
+                    "open_cve_backlog",
+                ],
+            ),
