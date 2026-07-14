@@ -417,3 +417,30 @@ fn entries_by_category<'a>(raw_evidence: &'a [Value], category: &str) -> Vec<&'a
         .collect()
 }
 
+fn collect_indicators(entries: &[&Value]) -> Vec<EcosystemIndicator> {
+    let mut indicators = Vec::new();
+    for entry in entries {
+        let source_name = entry
+            .get("source_name")
+            .and_then(Value::as_str)
+            .unwrap_or("unknown");
+        let subcategory = entry
+            .get("assessment_subcategory")
+            .and_then(Value::as_str)
+            .unwrap_or("general");
+
+        if let Some(data) = entry.get("data").and_then(Value::as_object) {
+            for (key, value) in data {
+                indicators.push(EcosystemIndicator {
+                    key: key.to_string(),
+                    label: indicator_label(key).to_string(),
+                    value: value.clone(),
+                    status: indicator_status(value).to_string(),
+                    source: format!("{}:{}", source_name, subcategory),
+                });
+            }
+        }
+    }
+    indicators
+}
+
