@@ -1158,3 +1158,26 @@ mod tests {
             body_fingerprint: Some("gpg".to_string()),
             looks_like_spa_shell: false,
             error: None,
+        };
+        let release_overview_page = PageSnapshot {
+            http_status: Some(200),
+            keyword_lines: Vec::new(),
+            plain_text: "Releases 是软件发布列表。".to_string(),
+            body_fingerprint: Some("release".to_string()),
+            looks_like_spa_shell: false,
+            error: None,
+        };
+        let release_operations_page = PageSnapshot {
+            http_status: Some(200),
+            keyword_lines: Vec::new(),
+            plain_text: "可以下载源码和附件。".to_string(),
+            body_fingerprint: Some("release-ops".to_string()),
+            looks_like_spa_shell: false,
+            error: None,
+        };
+        let result = collector.detect_download_integrity(
+            &gpg_page,
+            &release_overview_page,
+            &release_operations_page,
+        );
+        assert_eq!(result["supports_gpg_commit_tag_verification"], true);
