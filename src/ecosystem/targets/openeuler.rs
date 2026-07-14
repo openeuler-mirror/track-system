@@ -972,3 +972,26 @@ fn extract_vitepress_lifecycle_component_path(raw_body: &str) -> Option<String> 
     let component_re = Regex::new(r#"(?i)(?:href|src)=["']([^"']*TheLifecycle\.[^"']*\.js)["']"#)
         .expect("vitepress component regex");
     component_re
+        .captures(raw_body)
+        .and_then(|captures| captures.get(1).map(|m| m.as_str().to_string()))
+}
+
+fn to_absolute_asset_url(base_url: &str, asset_path: &str) -> String {
+    if asset_path.starts_with("http://") || asset_path.starts_with("https://") {
+        return asset_path.to_string();
+    }
+
+    let base = reqwest::Url::parse(base_url).expect("valid base url");
+    base.join(asset_path).expect("valid asset path").to_string()
+}
+
+fn extract_lifecycle_text_from_vitepress_asset(body: &str) -> String {
+    let mut segments = Vec::new();
+
+    let json_parse_re =
+        Regex::new(r#"JSON\.parse\('((?:\\.|[^'])*)'\)"#).expect("json parse regex");
+    for captures in json_parse_re.captures_iter(body) {
+        let Some(raw) = captures.get(1).map(|m| m.as_str()) else {
+            continue;
+        };
+        if let Ok(json_value) = serde_json::from_str::<Value>(raw) {
