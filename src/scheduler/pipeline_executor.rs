@@ -169,6 +169,10 @@ pub struct DiffComparisonResult {
     pub report_id: Option<i64>,
     pub files_changed: usize,
     pub has_spec_changes: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub l2_vs_l1_diff: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub l1_vs_l0_diff: Option<serde_json::Value>,
 }
 
 /// 变更分类结果
