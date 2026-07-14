@@ -94,3 +94,26 @@ fn compact_json(value: &serde_json::Value, max_chars: usize) -> String {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::ai::types::AiAnalysisSource;
+
+    #[test]
+    fn build_messages_contains_context() {
+        let context = AiContext {
+            source: AiAnalysisSource::AdHoc,
+            target_name: Some("nginx".to_string()),
+            target_type: Some("package".to_string()),
+            platform: Some("github".to_string()),
+            report_type: Some("test".to_string()),
+            rule_risk: Some("medium".to_string()),
+            rule_confidence: Some("high".to_string()),
+            rule_summary: Some("summary".to_string()),
+            evidence: serde_json::json!({"k":"v"}),
+        };
+        let messages = build_messages(
+            &context,
+            None,
+            "中文",
+            1000,
+            AiPromptOptions {
+                allow_external_research: true,
