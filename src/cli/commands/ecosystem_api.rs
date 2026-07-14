@@ -70,3 +70,27 @@ pub async fn execute(api_client: &ApiClient, action: EcosystemAction) -> Result<
             metadata,
         } => {
             let preset = ecosystem_preset_from_name(&name);
+            let request = CreateEcosystemTargetRequest {
+                name: preset
+                    .as_ref()
+                    .map(|preset| preset.canonical_name.clone())
+                    .unwrap_or(name),
+                target_type: target_type
+                    .or_else(|| preset.as_ref().map(|preset| preset.target_type.clone()))
+                    .unwrap_or_else(default_target_type),
+                platform: platform
+                    .or_else(|| preset.as_ref().and_then(|preset| preset.platform.clone())),
+                role: role
+                    .or_else(|| preset.as_ref().map(|preset| preset.role.clone()))
+                    .unwrap_or_else(default_role),
+                homepage_url: homepage_url.or_else(|| {
+                    preset
+                        .as_ref()
+                        .and_then(|preset| preset.homepage_url.clone())
+                }),
+                api_base_url: api_base_url.or_else(|| {
+                    preset
+                        .as_ref()
+                        .and_then(|preset| preset.api_base_url.clone())
+                }),
+                owner: owner.or_else(|| preset.as_ref().and_then(|preset| preset.owner.clone())),
