@@ -713,3 +713,26 @@ impl GitHubPlatformCollector {
                 &["DMCA", "safe harbor", "counter notice", "copyright © GitHub", "copyright infringement"],
                 10
             ),
+        })
+    }
+}
+
+/// 将 GitHub Tree API 响应解析为政府下架请求统计。
+///
+/// 仓库路径约定：每条请求是一个 blob 文件，路径首级目录即"请求方"。
+/// 根目录文件（README 等）不计入统计。
+fn parse_gov_takedown_tree(tree_resp: &Value) -> Value {
+    let truncated = tree_resp
+        .get("truncated")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    let tree = match tree_resp.get("tree").and_then(|v| v.as_array()) {
+        Some(arr) => arr,
+        None => return json!({ "error": "missing tree field", "total_requests": null }),
+    };
+
+    let mut requests_by_requester: std::collections::BTreeMap<String, u64> =
+        std::collections::BTreeMap::new();
+    let mut total_requests: u64 = 0;
+
+    for entry in tree {
