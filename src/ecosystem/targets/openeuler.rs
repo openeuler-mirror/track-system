@@ -489,3 +489,26 @@ impl OpenEulerCommunityCollector {
         };
 
         json!({
+            "summary": summary,
+            "detected_committees": detected_committees,
+        })
+    }
+
+    fn detect_foundation_status(
+        &self,
+        about_page: &PageSnapshot,
+        foundation_page: &PageSnapshot,
+    ) -> Value {
+        let about_text = about_page.plain_text.to_ascii_lowercase();
+        let foundation_text = foundation_page.plain_text.to_ascii_lowercase();
+        let about_mentions_openatom = about_text.contains("openatom foundation")
+            || about_page.plain_text.contains("开放原子开源基金会");
+        let foundation_page_mentions_openatom = foundation_text.contains("openatom foundation")
+            || foundation_page.plain_text.contains("开放原子开源基金会");
+        let about_mentions_incubated =
+            about_text.contains("incubated and operated") || about_page.plain_text.contains("孵化");
+        let foundation_mentions_graduated = foundation_page.plain_text.contains("毕业项目");
+        let consistency = if about_mentions_incubated && foundation_mentions_graduated {
+            "POSSIBLY_INCONSISTENT"
+        } else if about_mentions_openatom || foundation_page_mentions_openatom {
+            "CONSISTENT"
