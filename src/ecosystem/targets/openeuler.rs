@@ -142,3 +142,27 @@ impl OpenEulerCommunityCollector {
                 &[
                     "CLA",
                     "Contributor License Agreement",
+                    "Sign the CLA",
+                    "Individual CLA",
+                    "Corporate CLA",
+                    "Employee CLA",
+                ],
+            )
+            .await;
+        self.log_page_result("openEuler contribution", &contribution_page);
+        let docs_terms_page = self
+            .fetch_page(
+                &client,
+                OPENEULER_DOCS_TERMS_URL,
+                &[
+                    "CC BY-SA 4.0",
+                    "Creative Commons",
+                    "MulanPSL2",
+                    "Trademarks",
+                ],
+            )
+            .await;
+        self.log_page_result("openEuler docs terms", &docs_terms_page);
+        let license_text = self
+            .fetch_raw_text(&client, OPENEULER_GITEE_LICENSE_URL)
+            .await;
