@@ -847,18 +847,47 @@ impl L1VsL0Comparator {
         patch_analysis: &PatchAnalysis,
         cve_analysis: &CveAnalysis,
         upgradable_versions: &[UpgradableVersion],
+        maintenance_status: &MaintenanceStatus,
+        outdated_version: &OutdatedVersionAssessment,
+        lts: &LtsAssessment,
     ) -> Result<Vec<String>> {
         let mut recommendations = Vec::new();
+
+        if let Some(notice) = maintenance_status.matched_notice.as_ref() {
+            let until = notice
+                .support_until
+                .as_deref()
+                .map(|value| format!("，维护截止日期为 {}", value))
+                .unwrap_or_default();
+            recommendations.push(format!(
+                "识别到当前组件版本相关停维信息{}，来源：{}",
+                until, notice.source
+            ));
+        }
+
+        if outdated_version.is_outdated {
+            recommendations.push(format!(
+                "当前组件版本与 L1 最新版本相差 {} 个大版本，已达到过时版本阈值 {}，建议规划升级",
+                outdated_version.major_version_gap.unwrap_or(0),
+                outdated_version.threshold_major_versions
+            ));
+        }
+
+        match lts.is_lts {
+            Some(true) => recommendations.push("当前版本识别为 LTS/长期维护版本".to_string()),
+            Some(false) => recommendations.push("当前版本未识别为 LTS/长期维护版本".to_string()),
+            None => recommendations.push("未能从 L1 仓库信息确认当前版本是否为 LTS".to_string()),
+        }
 
         // 1. 版本落后建议
         if version_comparison.is_outdated {
             if version_comparison.behind_count == 0 {
-                recommendations.push("当前版本已是最新稳定版本".to_string());
+                recommendations.push("当前组件版本已与 L1 最新版本对齐".to_string());
             } else if version_comparison.behind_count == 1 {
-                recommendations.push("当前版本落后 1 个版本，建议升级到最新稳定版本".to_string());
+                recommendations.push("当前组件版本落后 L1 1 个版本，建议规划同步".to_string());
             } else {
                 recommendations.push(format!(
-                    "当前版本落后 {} 个版本，强烈建议升级到最新稳定版本",
+                    "当前组件版本落后 L1 {} 个版本，建议尽快规划同步",
                     version_comparison.behind_count
                 ));
             }
