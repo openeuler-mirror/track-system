@@ -502,3 +502,26 @@ mod tests {
                                 {"key": "required_reviews", "value": 1},
                                 {"key": "signed_releases", "value": false}
                             ]
+                        }
+                    }
+                }
+            }),
+        };
+
+        let response = service
+            .analyze(
+                context,
+                AiAnalysisRequest {
+                    question: None,
+                    language: None,
+                    max_evidence_chars: None,
+                    allow_external_research: None,
+                },
+            )
+            .await
+            .unwrap();
+
+        let titles = response
+            .findings
+            .iter()
+            .map(|finding| finding.title.as_str())
