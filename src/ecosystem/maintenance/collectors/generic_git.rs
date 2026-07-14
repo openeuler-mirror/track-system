@@ -1044,3 +1044,26 @@ mod tests {
         assert_eq!(evidence[0]["data"]["committers_last_12_months"], 1);
         assert_eq!(evidence[1]["data"]["social_metrics_supported"], false);
         assert_eq!(evidence[1]["data"]["stars"], Value::Null);
+    }
+
+    #[test]
+    fn cached_mirror_key_is_stable_and_readable() {
+        let repo_url = "https://git.savannah.gnu.org/git/bash.git";
+        let lhs = cached_mirror_key(repo_url);
+        let rhs = cached_mirror_key(repo_url);
+
+        assert_eq!(lhs, rhs);
+        assert!(lhs.ends_with("-bash"));
+        assert!(cached_mirror_path(repo_url)
+            .display()
+            .to_string()
+            .ends_with(&format!("{}.git", lhs)));
+    }
+
+    #[test]
+    fn parse_default_branch_ref_from_ls_remote_output() {
+        assert_eq!(
+            parse_default_branch_ref("ref: refs/heads/main\tHEAD"),
+            Some("refs/heads/main".to_string())
+        );
+        assert_eq!(parse_default_branch_ref("deadbeef\tHEAD"), None);
