@@ -814,3 +814,26 @@ fn run_git_command_with_timeout(
             child.kill().ok();
             let _ = child.wait();
             let stderr = read_child_pipe(&mut child.stderr).unwrap_or_default();
+            let detail = String::from_utf8_lossy(&stderr).trim().to_string();
+            if detail.is_empty() {
+                return Err(anyhow!(
+                    "{} timed out after {}s",
+                    operation,
+                    timeout.as_secs()
+                ));
+            }
+
+            return Err(anyhow!(
+                "{} timed out after {}s: {}",
+                operation,
+                timeout.as_secs(),
+                detail
+            ));
+        }
+
+        thread::sleep(GIT_WAIT_POLL_INTERVAL);
+    }
+}
+
+fn read_child_pipe(pipe: &mut Option<impl Read>) -> Result<Vec<u8>> {
+    let mut buf = Vec::new();
