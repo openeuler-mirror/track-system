@@ -2447,6 +2447,93 @@ impl<'a> PipelineExecutor<'a> {
         let mut commit_reports = Vec::new();
         let mut base_version = String::new();
         let mut base_release = String::new();
+        let mut l1_vs_l0_summary: Option<Value> = None;
+        let mut version_warnings: Vec<String> = Vec::new();
+        let mut diff_context_from_pipeline = false;
+        let classification_overrides = classification_overrides(classification_result);
+
+        let mut snapshot_version: Option<String> = None;
+        let mut snapshot_release: Option<String> = None;
+        let mut l1_snapshot_version: Option<String> = None;
+        let mut l1_snapshot_release: Option<String> = None;
+
+        {
+            use crate::entities::l2_snapshots;
+            use crate::snapshot::types::RepositorySnapshot;
+
+            let l1_snapshot_record = L2Snapshots::find()
+                .filter(l2_snapshots::Column::TrackingId.eq(tracking.id))
+                .filter(l2_snapshots::Column::SnapshotType.eq("l1"))
+                .order_by_desc(l2_snapshots::Column::CreatedAt)
+                .one(self.db)
+                .await?;
+
+            let l2_snapshot_record =
+                latest_l2_snapshot_record_for_tracking(self.db, tracking).await?;
+
+            if let Some(snapshot) = l1_snapshot_record {
+                match serde_json::from_value::<RepositorySnapshot>(snapshot.payload.clone()) {
+                    Ok(snapshot_data) => {
+                        if let Some(spec) = snapshot_data.spec {
+                            if let Some(version) = spec.version {
+                                if !version.is_empty() {
+                                    l1_snapshot_version = Some(version);
+                                }
+                            }
+                            if let Some(release) = spec.release {
+                                if !release.is_empty() {
+                                    l1_snapshot_release = Some(release);
+                                }
+                            }
+                        }
+                    }
+                    Err(err) => {
+                        warn!(
+                            tracking_id = tracking.id,
+                            error = %err,
+                            "解析 L1 快照 payload 失败"
+                        );
+                    }
+                }
+            }
+
+            if let Some(snapshot) = l2_snapshot_record {
+                match serde_json::from_value::<RepositorySnapshot>(snapshot.payload.clone()) {
+                    Ok(snapshot_data) => {
+                        if let Some(spec) = snapshot_data.spec {
+                            if let Some(version) = spec.version {
+                                if !version.is_empty() {
+                                    snapshot_version = Some(version);
+                                }
+                            }
+                            if let Some(release) = spec.release {
+                                if !release.is_empty() {
+                                    snapshot_release = Some(release);
+                                }
+                            }
+                        }
+                    }
+                    Err(err) => {
+                        warn!(
+                            tracking_id = tracking.id,
+                            error = %err,
+                            "解析 L2 快照 payload 失败"
+                        );
+                    }
+                }
+            }
+        }
+
+        if base_version.is_empty() {
+            if let Some(version) = snapshot_version.clone() {
+                base_version = version;
+            }
+        }
+        if base_release.is_empty() {
+            if let Some(release) = snapshot_release.clone() {
+                base_release = release;
+            }
+        }
 
         // 从 diff_result 中获取 report_id，然后查询 compare_reports 表
         if let Some(diff_stage) = diff_result {
