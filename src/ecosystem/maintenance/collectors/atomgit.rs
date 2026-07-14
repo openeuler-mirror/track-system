@@ -214,3 +214,26 @@ async fn collect_activity(
         commit_total,
         commit_total_is_lower_bound,
         commits_last_12_months,
+        commits_last_12_months_is_lower_bound,
+        committers_last_12_months,
+    })
+}
+
+async fn count_commits(
+    client: &Client,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    branch: &str,
+    since: Option<chrono::DateTime<Utc>>,
+    max_pages: u32,
+) -> Result<(i64, bool)> {
+    let mut total = 0_i64;
+
+    for page in 1..=max_pages {
+        let commits = fetch_commit_page(
+            client,
+            token,
+            owner,
+            repo,
+            branch,
