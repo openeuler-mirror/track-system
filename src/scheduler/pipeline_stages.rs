@@ -2146,11 +2146,135 @@ impl<'a> PipelineExecutor<'a> {
         &self,
         tracking: &tracking::Model,
     ) -> Result<Option<diff::l1_vs_l0::L1VersionInfo>> {
-        // TODO: 从 commit_records 和快照提取 L1 版本信息
-        // 需要解析 spec 文件和 patch 文件
-        warn!(tracking_id = tracking.id, "L1 版本信息提取功能待实现");
+        use crate::entities::{l2_snapshots, prelude::*};
+        use crate::snapshot::types::RepositorySnapshot;
+        use crate::utils::PatchParser;
+        use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
+        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 
-        Ok(None)
+        let package_name = Packages::find_by_id(tracking.package_id)
+            .one(self.db)
+            .await?
+            .map(|package| package.name)
+            .unwrap_or_else(|| tracking.l1_repo_name.clone());
+
+        let l1_snapshot_record = L2Snapshots::find()
+            .filter(l2_snapshots::Column::TrackingId.eq(tracking.id))
+            .filter(l2_snapshots::Column::SnapshotType.eq("l1"))
+            .order_by_desc(l2_snapshots::Column::CreatedAt)
+            .one(self.db)
+            .await?;
+
+        let l2_snapshot_record = latest_l2_snapshot_record_for_tracking(self.db, tracking).await?;
+
+        let mut current_version = None;
+        let mut component_version = None;
+        let mut spec_text = String::new();
+        let mut patches = Vec::new();
+        let mut cve_patches = Vec::new();
+
+        if let Some(snapshot_record) = l1_snapshot_record {
+            let snapshot: RepositorySnapshot = serde_json::from_value(snapshot_record.payload)
+                .context("解析 L1 快照 payload 失败")?;
+            if let Some(spec) = snapshot.spec {
+                current_version = spec
+                    .version
+                    .clone()
+                    .filter(|value| !value.trim().is_empty());
+                if let Ok(decoded) = BASE64_STANDARD.decode(spec.content_base64.replace('\n', "")) {
+                    spec_text = String::from_utf8(decoded).unwrap_or_default();
+                }
+            }
+
+            for file in snapshot
+                .files
+                .iter()
+                .filter(|file| is_patch_path(&file.path))
+            {
+                let filename = std::path::Path::new(&file.path)
+                    .file_name()
+                    .and_then(|value| value.to_str())
+                    .unwrap_or(file.path.as_str())
+                    .to_string();
+                patches.push(diff::l1_vs_l0::PatchInfo {
+                    filename: filename.clone(),
+                    description: file.path.clone(),
+                    applied: true,
+                    content_hash: Some(file.sha256.clone()),
+                });
+
+                for cve_id in PatchParser::extract_cve_from_filename(&filename) {
+                    cve_patches.push(diff::l1_vs_l0::CveInfo {
+                        cve_id,
+                        patch_file: filename.clone(),
+                        description: file.path.clone(),
+                        severity: None,
+                    });
+                }
+            }
+        }
+
+        if let Some(snapshot_record) = l2_snapshot_record {
+            let snapshot: RepositorySnapshot = serde_json::from_value(snapshot_record.payload)
+                .context("解析 L2 快照 payload 失败")?;
+            component_version = snapshot
+                .spec
+                .and_then(|spec| spec.version)
+                .filter(|value| !value.trim().is_empty());
+        }
+
+        let commits = L1CommitRecords::find()
+            .filter(l1_commit_records::Column::TrackingId.eq(tracking.id))
+            .order_by_desc(l1_commit_records::Column::CommittedAt)
+            .all(self.db)
+            .await?;
+
+        if current_version.is_none() {
+            current_version = commits
+                .iter()
+                .find_map(|commit| commit.spec_version.clone())
+                .filter(|value| !value.trim().is_empty());
+        }
+
+        let mut known_versions = Vec::new();
+        if let Some(version) = current_version.as_ref() {
+            known_versions.push(version.clone());
+        }
+        for commit in &commits {
+            if let Some(version) = commit.spec_version.as_ref() {
+                if !version.trim().is_empty() && !known_versions.iter().any(|v| v == version) {
+                    known_versions.push(version.clone());
+                }
+            }
+        }
+
+        let current_version = match current_version {
+            Some(version) => version,
+            None => {
+                warn!(tracking_id = tracking.id, "未能从 L1 仓库信息识别当前版本");
+                return Ok(None);
+            }
+        };
+
+        let latest_version = latest_version_from_strings(&known_versions);
+        let commit_messages = commits
+            .iter()
+            .map(|commit| commit.commit_message.clone())
+            .collect::<Vec<_>>();
+        let (is_lts, lts_evidence) =
+            detect_lts_from_l1_sources(tracking, &spec_text, &commit_messages);
+
+        Ok(Some(diff::l1_vs_l0::L1VersionInfo {
+            package_name,
+            current_version,
+            component_version,
+            latest_version,
+            known_versions,
+            is_lts,
+            lts_evidence,
+            patches,
+            cve_patches,
+        }))
     }
 
     /// 保存对比报告
