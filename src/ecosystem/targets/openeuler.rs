@@ -719,3 +719,26 @@ fn strip_tags(text: &str) -> String {
     let text = text.replace('\r', "");
     let text = newline_re.replace_all(&text, "\n");
     whitespace_re.replace_all(&text, " ").trim().to_string()
+}
+
+fn extract_keyword_lines(text: &str, keywords: &[&str], max_lines: usize) -> Vec<String> {
+    let mut lines = Vec::new();
+    for raw in text.lines() {
+        let line = raw.trim();
+        if line.is_empty() {
+            continue;
+        }
+        let lower = line.to_ascii_lowercase();
+        if keywords
+            .iter()
+            .any(|keyword| lower.contains(&keyword.to_ascii_lowercase()))
+        {
+            let normalized = line.split_whitespace().collect::<Vec<_>>().join(" ");
+            if !lines.contains(&normalized) {
+                lines.push(normalized);
+            }
+            if lines.len() >= max_lines {
+                break;
+            }
+        }
+    }
