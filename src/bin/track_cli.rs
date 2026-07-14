@@ -20,9 +20,12 @@ use anyhow::Result;
 use clap::CommandFactory;
 use track_system::cli::{Cli, CliExecutor};
 use track_system::i18n::{apply_clap_i18n, apply_help_i18n, detect_lang_from_args, init_i18n};
+use track_system::utils::load_track_system_env;
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    load_track_system_env();
+
     let raw_args: Vec<String> = std::env::args().collect();
     let arg_lang = detect_lang_from_args(&raw_args);
     let locale = init_i18n(arg_lang.as_deref());
