@@ -30,6 +30,8 @@ pub mod l0_commits;
 pub mod l1_commit_records;
 pub mod l2_commit_records;
 pub mod l2_snapshots;
+pub mod maintenance_evidence_snapshots;
+pub mod maintenance_reports;
 pub mod packages;
 pub mod spec_changes;
 pub mod spec_snapshots;
