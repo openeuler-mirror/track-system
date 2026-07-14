@@ -271,6 +271,19 @@ async fn add_tracking(
 
 }
 
+
+pub(crate) async fn create_tracking_with_default_repos(
+    _api_client: &ApiClient,
+    package: String,
+    _distro: String,
+    _status: String,
+) -> Result<()> {
+    Err(anyhow!(
+        "tracking 默认仓库创建尚未接入: package={}",
+        package
+    ))
+}
+
 /// 列出跟踪配置
 async fn list_tracking(
     api_client: &ApiClient,
