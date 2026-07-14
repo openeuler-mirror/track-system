@@ -2823,6 +2823,115 @@ mod tests {
         }
     }
 
+    fn test_tracking_model(
+        id: i32,
+        package_id: i32,
+        l1_branch: &str,
+        l2_branch: &str,
+    ) -> tracking::Model {
+        tracking::Model {
+            id,
+            package_id,
+            distro_id: 1,
+            l1_branch: l1_branch.to_string(),
+            l1_repo_owner: "owner".to_string(),
+            l1_repo_name: "repo".to_string(),
+            l2_branch: l2_branch.to_string(),
+            l2_repo_path: "/path".to_string(),
+            tracking_status: "idle".to_string(),
+            last_sync_time: Some(Utc::now()),
+            last_l1_commit_sha: None,
+            last_l2_commit_sha: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            last_error: None,
+            platform: Some("Gitee".to_string()),
+        }
+    }
+
+    fn test_package_model(id: i32, name: &str) -> packages::Model {
+        packages::Model {
+            id,
+            name: name.to_string(),
+            level: 1,
+            sync_interval_hours: 24,
+            l0_repo_url: None,
+            description: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+
+    fn test_repository_snapshot(
+        tracking_id: i32,
+        origin: crate::snapshot::types::SnapshotOrigin,
+        package_name: &str,
+        version: &str,
+        release: &str,
+        commit_sha: &str,
+    ) -> crate::snapshot::types::RepositorySnapshot {
+        use crate::snapshot::types::{
+            ChangeStats, CommitEntry, FileEntry, RepositorySnapshot, SpecEntry,
+        };
+        use base64::Engine;
+
+        let spec_content = format!(
+            "Name: {package_name}\nVersion: {version}\nRelease: {release}\nSummary: Test package\n"
+        );
+        let spec_base64 = base64::engine::general_purpose::STANDARD.encode(spec_content.as_bytes());
+
+        RepositorySnapshot {
+            tracking_id,
+            generated_at: Utc::now(),
+            origin,
+            files: vec![FileEntry {
+                path: format!("{package_name}.c"),
+                size: 10,
+                sha256: format!("{package_name}-{version}-{release}"),
+                is_binary: false,
+            }],
+            spec: Some(SpecEntry {
+                path: format!("{package_name}.spec"),
+                sha256: format!("spec-{version}-{release}"),
+                version: Some(version.to_string()),
+                release: Some(release.to_string()),
+                content_base64: spec_base64,
+            }),
+            commits: vec![CommitEntry {
+                sha: commit_sha.to_string(),
+                title: "Update package".to_string(),
+                message: "Update package".to_string(),
+                author: "dev".to_string(),
+                authored_at: Utc::now(),
+                url: None,
+                stats: ChangeStats {
+                    additions: 1,
+                    deletions: 0,
+                    files_changed: 1,
+                },
+                primary_change_type: None,
+                cve_list: vec![],
+            }],
+            issues: vec![],
+        }
+    }
+
+    fn test_snapshot_model(
+        id: i32,
+        tracking_id: i32,
+        snapshot_type: &str,
+        snapshot: &crate::snapshot::types::RepositorySnapshot,
+    ) -> l2_snapshots::Model {
+        l2_snapshots::Model {
+            id,
+            tracking_id,
+            snapshot_type: snapshot_type.to_string(),
+            checksum: format!("checksum-{id}"),
+            payload: serde_json::to_value(snapshot).unwrap(),
+            created_at: Utc::now(),
+        }
+    }
+
     #[test]
     fn test_l1_ingestion_result_has_new_data() {
         let result = L1IngestionResult {
