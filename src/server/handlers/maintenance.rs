@@ -62,3 +62,24 @@ pub async fn list_reports(
 
     let total = builder.clone().count(state.db.as_ref()).await?;
     let items = builder
+        .order_by_desc(maintenance_reports::Column::GeneratedAt)
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all(state.db.as_ref())
+        .await?;
+    let resp = items.into_iter().map(Into::into).collect();
+    Ok(Json(ApiResponse::success(PaginatedResponse::new(
+        resp, total, page, page_size,
+    ))))
+}
+
+pub async fn get_report(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+) -> ApiResult<Json<ApiResponse<MaintenanceReportResponse>>> {
+    let report = MaintenanceReports::find_by_id(id)
+        .one(state.db.as_ref())
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("maintenance report {} not found", id)))?;
+    Ok(Json(ApiResponse::success(report.into())))
+}
