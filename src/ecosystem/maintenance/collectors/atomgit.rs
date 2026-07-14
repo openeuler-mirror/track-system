@@ -306,3 +306,26 @@ async fn collect_recent_activity(
 
 async fn fetch_commit_page(
     client: &Client,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    branch: &str,
+    since: Option<chrono::DateTime<Utc>>,
+    page: u32,
+    per_page: u32,
+) -> Result<Vec<Commit>> {
+    let url = format!("{}/repos/{}/{}/commits", ATOMGIT_API_BASE, owner, repo);
+    let mut query = vec![
+        ("sha", branch.to_string()),
+        ("page", page.to_string()),
+        ("per_page", per_page.to_string()),
+    ];
+    if let Some(since) = since {
+        query.push(("since", since.to_rfc3339()));
+    }
+    let mut request = client.get(&url).bearer_auth(token);
+    request = request.query(&query);
+
+    let response = request
+        .send()
+        .await
