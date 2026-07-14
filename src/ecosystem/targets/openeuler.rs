@@ -949,3 +949,26 @@ fn extract_lifecycle_text_from_raw_body(raw_body: &str) -> String {
         let Some(script_body) = captures.get(1).map(|m| m.as_str()) else {
             continue;
         };
+        let Ok(json_value) = serde_json::from_str::<Value>(script_body) else {
+            continue;
+        };
+        collect_text_segments_from_json(&json_value, &mut segments);
+    }
+
+    segments.join(" ")
+}
+
+fn extract_vitepress_lifecycle_asset_path(raw_body: &str) -> Option<String> {
+    let asset_re = Regex::new(
+        r#"(?i)(?:href|src)=["']([^"']*zh_other_lifecycle_index\.md\.[^"']*\.lean\.js)["']"#,
+    )
+    .expect("vitepress asset regex");
+    asset_re
+        .captures(raw_body)
+        .and_then(|captures| captures.get(1).map(|m| m.as_str().to_string()))
+}
+
+fn extract_vitepress_lifecycle_component_path(raw_body: &str) -> Option<String> {
+    let component_re = Regex::new(r#"(?i)(?:href|src)=["']([^"']*TheLifecycle\.[^"']*\.js)["']"#)
+        .expect("vitepress component regex");
+    component_re
