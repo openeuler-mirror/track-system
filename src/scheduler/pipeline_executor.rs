@@ -178,6 +178,16 @@ pub struct ClassificationResult {
     pub needs_review_count: usize,
 }
 
+
+
+/// 单个 commit 的变更分类结果
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClassifiedCommitResult {
+    pub commit_sha: String,
+    pub primary_change_type: String,
+    pub cve_list: Vec<String>,
+}
+
 /// 报告生成结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReportGenerationResult {
