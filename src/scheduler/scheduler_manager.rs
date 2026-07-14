@@ -139,6 +139,11 @@ impl SchedulerManager {
         info!(tracking_id = tracking_id, "手动触发同步");
 
         let sync_manager = SyncManager::new(&self.db);
+        let tracking = sync_manager
+            .get_tracking(tracking_id)
+            .await
+            .context("获取 tracking 失败")?;
+        let package_id = tracking.package_id;
 
         // 创建 sync_job
         let job = sync_manager
