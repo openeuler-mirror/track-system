@@ -73,10 +73,26 @@ pub struct ReportDetail {
     pub status: String,
     /// 报告内容（JSON）
     pub content: serde_json::Value,
+    /// 维护评估摘要（可选）
+    pub maintenance_summary: Option<ReportMaintenanceSummary>,
     /// 创建时间
     pub created_at: chrono::DateTime<chrono::Utc>,
     /// 更新时间
     pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReportMaintenanceSummary {
+    pub report_id: i64,
+    pub overall_risk: String,
+    pub confidence: String,
+    pub generated_at: chrono::DateTime<chrono::Utc>,
+    pub commit_total: Option<i64>,
+    pub commits_last_12_months: Option<i64>,
+    pub committers_last_12_months: Option<i64>,
+    pub last_commit_at: Option<String>,
+    pub stars: Option<i64>,
+    pub forks: Option<i64>,
 }
 
 /// 报告导出格式
