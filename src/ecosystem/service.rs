@@ -248,16 +248,22 @@ impl<'a> EcosystemService<'a> {
 
         let mut evidence = Vec::new();
 
-        if platform.contains("gitee")
-            || platform.contains("openeuler")
-            || target.target_type.contains("community")
-        {
+        if OpenEulerCommunityCollector::matches_target(target) {
+            evidence.extend(OpenEulerCommunityCollector::new().collect(target).await?);
+        }
+        if GitHubPlatformCollector::matches_target(target) {
+            evidence.extend(GitHubPlatformCollector::new().collect(target).await?);
+        }
+        if AtomGitPlatformCollector::matches_target(target) {
+            evidence.extend(AtomGitPlatformCollector::new().collect(target).await?);
+        }
+        if platform.contains("gitee") {
             evidence.extend(GiteeEcosystemCollector::new().collect(target).await?);
         }
-        if platform.contains("github") {
+        if platform.contains("github") && !GitHubPlatformCollector::matches_target(target) {
             evidence.extend(GitHubEcosystemCollector::new().collect(target).await?);
         }
-        if platform.contains("atomgit") {
+        if platform.contains("atomgit") && !AtomGitPlatformCollector::matches_target(target) {
             evidence.extend(AtomGitEcosystemCollector::new().collect(target).await?);
         }
 
