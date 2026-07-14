@@ -231,6 +231,7 @@ pub async fn get_report(
         package_name,
         status: report_model.status,
         content: report_model.diff_summary,
+        maintenance_summary,
         created_at: report_model.created_at,
         updated_at: report_model.updated_at,
     };
