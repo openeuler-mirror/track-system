@@ -1767,3 +1767,26 @@ mod tests {
                 system_version: "ctyunos-25.07".to_string(),
                 ctyunos_current_version: "9.5-2".to_string(),
                 default_upstream_version: "9.5-4".to_string(),
+                commit_reports: vec![serde_json::json!({
+                    "Description": "Fix coreutils issue",
+                    "CVEList": [],
+                })],
+            })
+            .unwrap();
+
+        assert_eq!(writer.artifacts().len(), 2);
+        assert!(writer.artifacts()[0].path.contains("_part01.xlsx"));
+        assert!(writer.artifacts()[1].path.contains("_part02.xlsx"));
+        assert_eq!(writer.artifacts()[0].rows, 1);
+        assert_eq!(writer.artifacts()[1].rows, 1);
+        assert_eq!(second.path, writer.artifacts()[1].path);
+        assert_eq!(
+            &fs::read(&writer.artifacts()[0].path).unwrap()[..4],
+            b"PK\x03\x04"
+        );
+        assert_eq!(
+            &fs::read(&writer.artifacts()[1].path).unwrap()[..4],
+            b"PK\x03\x04"
+        );
+    }
+
