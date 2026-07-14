@@ -3947,7 +3947,12 @@ Summary: Test package
             last_error: None,
         };
 
-        let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<packages::Model, _, _>(vec![vec![]])
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![]])
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![]])
+            .append_query_results::<l1_commit_records::Model, _, _>(vec![vec![]])
+            .into_connection();
         let executor = PipelineExecutor::new(&db, None);
         let result = executor.get_l1_version_info(&tracking_model).await.unwrap();
         assert!(result.is_none());
