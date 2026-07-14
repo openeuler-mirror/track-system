@@ -41,3 +41,24 @@ pub async fn get_latest_report(
 }
 
 pub async fn list_reports(
+    State(state): State<AppState>,
+    Query(query): Query<MaintenanceReportListQuery>,
+) -> ApiResult<Json<ApiResponse<PaginatedResponse<MaintenanceReportResponse>>>> {
+    let page = query.page.unwrap_or(1);
+    let page_size = query.page_size.unwrap_or(10);
+    if page < 1 || !(1..=100).contains(&page_size) {
+        return Err(ApiError::BadRequest(
+            "invalid pagination parameters".to_string(),
+        ));
+    }
+
+    let mut builder = MaintenanceReports::find();
+    if let Some(package_id) = query.package_id {
+        builder = builder.filter(maintenance_reports::Column::PackageId.eq(package_id));
+    }
+    if let Some(report_type) = query.report_type {
+        builder = builder.filter(maintenance_reports::Column::ReportType.eq(report_type));
+    }
+
+    let total = builder.clone().count(state.db.as_ref()).await?;
+    let items = builder
