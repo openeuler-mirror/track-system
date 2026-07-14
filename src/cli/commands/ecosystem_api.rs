@@ -786,3 +786,26 @@ fn print_github_trade_controls_details(report_payload: &Value) {
     }
     if source_focus_bool(report_payload, "public_repo_access_in_sanctioned_regions") == Some(true) {
         details.push("      * 开源访问: 在部分受制裁地区维持公共仓库/开源协作访问".to_string());
+    }
+    if source_focus_bool(report_payload, "itar_restriction_mentioned") == Some(true) {
+        details.push("      * ITAR 限制: GitHub.com 不适合托管 ITAR 受控数据".to_string());
+    }
+    if source_focus_bool(report_payload, "restricted_regions_mentioned") == Some(true) {
+        details.push("      * 受限范围: 涉及受制裁国家/地区及被拒绝方访问限制".to_string());
+    }
+
+    print_structured_details_block("      贸易管制字段:", details);
+}
+
+fn print_github_ip_policy_details(report_payload: &Value) {
+    let mut details = Vec::new();
+
+    if source_focus_bool(report_payload, "users_own_content") == Some(true) {
+        details.push("      * 内容归属: 用户保有其发布内容的所有权".to_string());
+    }
+    if source_focus_bool(report_payload, "license_grant_to_host_content") == Some(true) {
+        details
+            .push("      * 平台授权: 用户需授予 GitHub 托管、展示、解析内容的必要许可".to_string());
+    }
+    if source_focus_bool(report_payload, "github_retains_platform_ip") == Some(true) {
+        details.push(
