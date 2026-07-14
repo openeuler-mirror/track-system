@@ -13,13 +13,42 @@
 
 use anyhow::Result;
 use colored::Colorize;
+use serde::{Deserialize, Serialize};
 
 use crate::cli::{client::ApiClient, parser::L0Action};
+
+#[derive(Debug, Serialize, Deserialize)]
+struct ApiResponse<T> {
+    data: Option<T>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct L0RepoCacheWarmItemDto {
+    package_id: i32,
+    package_name: String,
+    repo_url: Option<String>,
+    cache_path: Option<String>,
+    default_branch: Option<String>,
+    #[serde(default)]
+    cache_retained: bool,
+    status: String,
+    message: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct L0RepoCacheWarmSummaryDto {
+    scanned_packages: usize,
+    warmed_packages: usize,
+    skipped_no_repo: usize,
+    failed_packages: usize,
+    results: Vec<L0RepoCacheWarmItemDto>,
+}
 
 /// 执行 L0 命令
 pub async fn execute(api_client: &ApiClient, action: L0Action) -> Result<()> {
     match action {
         L0Action::Poll { package_id } => poll_l0(api_client, package_id).await,
+        L0Action::WarmCache { package_id } => warm_cache(api_client, package_id).await,
         L0Action::DetectDiff { package_id } => detect_diff(api_client, package_id).await,
     }
 }
@@ -49,6 +78,64 @@ async fn poll_l0(api_client: &ApiClient, package_id: Option<i32>) -> Result<()> 
         println!("总新 commits: {}", result["total_new_commits"]);
         println!("总新 tags: {}", result["total_new_tags"]);
         println!("总新 releases: {}", result["total_new_releases"]);
+    }
+
+    Ok(())
+}
+
+
+/// 预热 L0 仓库缓存
+async fn warm_cache(api_client: &ApiClient, package_id: Option<i32>) -> Result<()> {
+    if let Some(id) = package_id {
+        println!(
+            "{}",
+            format!("正在预热 package {} 的 L0 仓库缓存...", id).cyan()
+        );
+
+        let response = api_client
+            .post::<_, ApiResponse<L0RepoCacheWarmItemDto>>(
+                &format!("/l0/cache/warm/{}", id),
+                &serde_json::json!({}),
+            )
+            .await?;
+        let result = response
+            .data
+            .ok_or_else(|| anyhow::anyhow!("服务端未返回 L0 仓库缓存预热结果"))?;
+
+        println!("{}", "✓ 预热完成".green());
+        println!("Package: {} ({})", result.package_name, result.package_id);
+        if let Some(repo_url) = result.repo_url {
+            println!("Repo: {}", repo_url);
+        }
+        if let Some(cache_path) = result.cache_path {
+            println!("Cache: {}", cache_path);
+        }
+        if let Some(default_branch) = result.default_branch {
+            println!("Branch: {}", default_branch);
+        }
+        println!(
+            "缓存保留: {}",
+            if result.cache_retained { "是" } else { "否" }
+        );
+        println!("状态: {}", result.status);
+    } else {
+        println!("{}", "正在预热所有 L0 仓库缓存...".cyan());
+
+        let response = api_client
+            .post::<_, ApiResponse<L0RepoCacheWarmSummaryDto>>(
+                "/l0/cache/warm/all",
+                &serde_json::json!({}),
+            )
+            .await?;
+        let result = response
+            .data
+            .ok_or_else(|| anyhow::anyhow!("服务端未返回 L0 仓库缓存预热汇总"))?;
+
+        println!("{}", "✓ 预热完成".green());
+        println!("扫描 packages: {}", result.scanned_packages);
+        println!("预热成功: {}", result.warmed_packages);
+        println!("缺少仓库地址跳过: {}", result.skipped_no_repo);
+        println!("失败: {}", result.failed_packages);
     }
 
     Ok(())

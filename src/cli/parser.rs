@@ -296,6 +296,13 @@ pub enum L0Action {
         package_id: Option<i32>,
     },
 
+    /// 主动预热 L0 仓库缓存
+    #[command(about = "Warm cached mirrors for L0 repositories")]
+    WarmCache {
+        /// Package ID (可选，不指定则预热所有有 L0 仓库地址的软件包)
+        package_id: Option<i32>,
+    },
+
     /// 检测L0与L1的差异
     #[command(about = "Detect differences between L0 and L1")]
     DetectDiff {
