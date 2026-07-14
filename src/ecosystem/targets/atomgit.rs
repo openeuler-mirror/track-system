@@ -353,3 +353,26 @@ impl AtomGitPlatformCollector {
                     "publishes_public_requests": government_takedown["publishes_public_requests"],
                     "government_policy_route_reachable": government_takedown["route_reachable"],
                     "government_policy_machine_readable": government_takedown["machine_readable_policy_text"],
+                    "government_policy_same_as_generic_spa": government_takedown["same_as_random_probe"],
+                    "government_keyword_lines": government_takedown["government_keyword_lines"],
+                    "government_http_status": gov_policy_page.http_status,
+                    "government_error": gov_policy_page.error,
+                }
+            }),
+            json!({
+                "source_type": "atomgit_license_policy",
+                "source_name": "atomgit_license_policy",
+                "source_url": ATOMGIT_TERMS_URL,
+                "assessment_category": "source",
+                "assessment_subcategory": "license_policy",
+                "data": {
+                    "license_policy": license_policy["summary"],
+                    "supports_license_templates": license_policy["supports_license_templates"],
+                    "license_remains_with_author": license_policy["license_remains_with_author"],
+                    "license_keyword_lines": license_policy["license_keyword_lines"],
+                    "license_http_status": terms_page.http_status,
+                    "license_error": terms_page.error,
+                }
+            }),
+            json!({
+                "source_type": "atomgit_cla_policy",
