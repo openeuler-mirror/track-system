@@ -1464,11 +1464,17 @@ mod tests {
                 );
                 map
             },
+            maintenance_notices: vec![],
         };
 
         let l1_info = L1VersionInfo {
             package_name: "nginx".to_string(),
             current_version: "1.22.0".to_string(),
+            component_version: None,
+            latest_version: Some("1.24.0".to_string()),
+            known_versions: vec!["1.22.0".to_string(), "1.24.0".to_string()],
+            is_lts: Some(true),
+            lts_evidence: vec!["L1 分支包含 LTS 标识".to_string()],
             patches: vec![PatchInfo {
                 filename: "CVE-2023-1234.patch".to_string(),
                 description: "Fix CVE-2023-1234 vulnerability".to_string(),
