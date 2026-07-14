@@ -26,6 +26,7 @@ use crate::{
         state::AppState,
     },
     snapshot::types::RepositorySnapshot,
+    spec::parse_spec,
 };
 
 /// L0 元数据导入请求
