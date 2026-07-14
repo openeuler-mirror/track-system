@@ -206,3 +206,26 @@ mod tests {
         recent_pages: Vec<Vec<Commit>>,
     }
 
+    #[async_trait]
+    impl GitClient for MockGitClient {
+        async fn get_repository(&self, _owner: &str, _repo: &str) -> ApiResult<Repository> {
+            unreachable!("repository lookup is not used in activity tests")
+        }
+
+        async fn get_branches(&self, _owner: &str, _repo: &str) -> ApiResult<Vec<Branch>> {
+            unreachable!("branch lookup is not used in activity tests")
+        }
+
+        async fn get_commits(
+            &self,
+            _owner: &str,
+            _repo: &str,
+            params: CommitsParams,
+        ) -> ApiResult<Vec<Commit>> {
+            let page_index = params.page.saturating_sub(1) as usize;
+            if params.per_page == 1 && params.since.is_none() {
+                return Ok(self.latest.clone());
+            }
+
+            if params.since.is_some() {
+                return Ok(self
