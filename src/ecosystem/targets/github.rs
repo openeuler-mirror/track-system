@@ -966,3 +966,26 @@ mod tests {
         let terms_page = PageSnapshot {
             http_status: Some(200),
             keyword_lines: Vec::new(),
+            plain_text: "Users may view and fork public repositories.".to_string(),
+            error: None,
+        };
+        let result = collector.detect_license_policy(&licensing_page, &terms_page);
+        assert_eq!(result["supports_choosealicense"], true);
+        assert_eq!(result["supports_license_detection"], true);
+        assert_eq!(result["mentions_default_copyright_rule"], true);
+    }
+
+    #[test]
+    fn build_evidence_records_maps_detected_github_signals() {
+        let collector = GitHubPlatformCollector::new();
+        let about_page = page(
+            "GitHub is a complete developer platform and cloud-based platform where 100M+ Developers, 4M+ Organizations and 420M+ Repositories store, share, and work together with others to write code.",
+        );
+        let corporate_page = page(
+            "The Microsoft acquisition of GitHub is complete. GitHub will operate independently as a community, platform, and business. This is my first day as CEO.",
+        );
+        let trade_page = page(
+            "GitHub may be subject to Export Administration Regulations, OFAC, sanctioned regions including Crimea, Cuba, Russia, Belarus and North Korea, and is not designed for ITAR. GitHub secured a license from OFAC for Iran and keeps public repository services available.",
+        );
+        let gov_page = page(
+            "GitHub limits the geographic scope where possible, allows the affected users to appeal, and posts the official request in the public gov-takedowns repository.",
