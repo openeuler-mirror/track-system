@@ -118,3 +118,27 @@ fn build_maintenance_assessment(raw_evidence: &[Value]) -> MaintenanceSubAssessm
         reasons.push("近 12 个月提交频次不足".to_string());
     }
     if committers_last_12_months < 5 {
+        score -= 16;
+        reasons.push("近 12 个月活跃提交者数量偏少".to_string());
+    }
+    if last_commit_age_days > 90 {
+        score -= 20;
+        reasons.push(format!("最近一次提交距今已 {} 天", last_commit_age_days));
+    }
+    if social_metrics_supported && stars + forks < 50 {
+        score -= 8;
+        reasons.push("社区关注度与分叉规模偏低".to_string());
+    }
+    if social_metrics_supported && stars >= 500 {
+        reasons.push("仓库具备一定社区关注度".to_string());
+    }
+    if !social_metrics_supported {
+        reasons.push(
+            "上游平台未提供统一的 star/fork 社区指标，当前仅基于 Git 历史活跃度评估".to_string(),
+        );
+    }
+    reasons.extend(
+        missing
+            .iter()
+            .map(|key| format!("缺少维护状态指标: {}", key)),
+    );
