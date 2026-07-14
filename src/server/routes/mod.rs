@@ -9,11 +9,14 @@
  * more details.
  */
 
+pub mod ai;
 pub mod backport;
 pub mod compare;
 pub mod component;
 pub mod ecosystem;
 pub mod health;
+pub mod l0;
+pub mod maintenance;
 pub mod metadata;
 pub mod package;
 pub mod reports;
