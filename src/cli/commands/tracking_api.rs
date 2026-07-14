@@ -572,6 +572,58 @@ async fn show_tracking(api_client: &ApiClient, id: i32) -> Result<()> {
             if let Some(sha) = track.last_l2_commit_sha {
                 println!("  最近 L2 提交: {}", sha);
             }
+            if let Some(maintenance) = &track.maintenance_summary {
+                println!("  维护评估摘要:");
+                println!("    - 报告 ID: {}", maintenance.report_id);
+                println!("    - 风险等级: {}", maintenance.overall_risk);
+                println!("    - 置信度: {}", maintenance.confidence);
+                println!(
+                    "    - 报告时间: {}",
+                    format_datetime_local(&maintenance.generated_at)
+                );
+                println!(
+                    "    - Commit 总数: {}",
+                    maintenance
+                        .commit_total
+                        .map(|value| value.to_string())
+                        .unwrap_or_else(|| "-".to_string())
+                );
+                println!(
+                    "    - 近 12 月 Commit 数: {}",
+                    maintenance
+                        .commits_last_12_months
+                        .map(|value| value.to_string())
+                        .unwrap_or_else(|| "-".to_string())
+                );
+                println!(
+                    "    - 近 12 月 Committer 数: {}",
+                    maintenance
+                        .committers_last_12_months
+                        .map(|value| value.to_string())
+                        .unwrap_or_else(|| "-".to_string())
+                );
+                println!(
+                    "    - 最近一次 Commit 时间: {}",
+                    maintenance
+                        .last_commit_at
+                        .clone()
+                        .unwrap_or_else(|| "-".to_string())
+                );
+                println!(
+                    "    - Stars: {}",
+                    maintenance
+                        .stars
+                        .map(|value| value.to_string())
+                        .unwrap_or_else(|| "-".to_string())
+                );
+                println!(
+                    "    - Forks: {}",
+                    maintenance
+                        .forks
+                        .map(|value| value.to_string())
+                        .unwrap_or_else(|| "-".to_string())
+                );
+            }
             println!("  创建时间: {}", format_datetime_local(&track.created_at));
             println!("  更新时间: {}", format_datetime_local(&track.updated_at));
             Ok(())
