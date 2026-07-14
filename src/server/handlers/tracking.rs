@@ -748,3 +748,111 @@ mod tests {
         assert!(req.l2_branch.is_some());
     }
 }
+
+async fn build_tracking_response(
+    db: &DatabaseConnection,
+    model: tracking::Model,
+) -> Result<TrackingResponse, ApiError> {
+    let package = Packages::find_by_id(model.package_id)
+        .one(db)
+        .await
+        .map_err(ApiError::from)?;
+    let maintenance_summary = latest_maintenance_summary(db, model.package_id).await?;
+
+    Ok(TrackingResponse {
+        id: model.id,
+        package_id: model.package_id,
+        package_name: package.as_ref().map(|pkg| pkg.name.clone()),
+        package_level: package.as_ref().map(|pkg| pkg.level),
+        l0_repo_url: package.as_ref().and_then(|pkg| pkg.l0_repo_url.clone()),
+        distro_id: model.distro_id,
+        l1_repo_owner: model.l1_repo_owner,
+        l1_repo_name: model.l1_repo_name,
+        l1_branch: model.l1_branch,
+        l2_branch: model.l2_branch,
+        l2_repo_path: model.l2_repo_path,
+        tracking_status: model.tracking_status,
+        last_sync_time: model.last_sync_time,
+        last_l1_commit_sha: model.last_l1_commit_sha,
+        last_l2_commit_sha: model.last_l2_commit_sha,
+        maintenance_summary,
+        created_at: model.created_at,
+        updated_at: model.updated_at,
+    })
+}
+
+async fn latest_maintenance_summary(
+    db: &DatabaseConnection,
+    package_id: i32,
+) -> Result<Option<TrackingMaintenanceSummary>, ApiError> {
+    let report = MaintenanceReports::find()
+        .filter(maintenance_reports::Column::PackageId.eq(package_id))
+        .order_by_desc(maintenance_reports::Column::GeneratedAt)
+        .one(db)
+        .await
+        .map_err(ApiError::from)?;
+
+    Ok(report.map(|report| TrackingMaintenanceSummary {
+        report_id: report.id,
+        overall_risk: report.overall_risk,
+        confidence: report.confidence,
+        generated_at: report.generated_at,
+        commit_total: find_report_i64(&report.report_payload, "commit_total"),
+        commits_last_12_months: find_report_i64(&report.report_payload, "commits_last_12_months"),
+        committers_last_12_months: find_report_i64(
+            &report.report_payload,
+            "committers_last_12_months",
+        ),
+        last_commit_at: find_report_string(&report.report_payload, "last_commit_at"),
+        stars: find_report_i64(&report.report_payload, "stars"),
+        forks: find_report_i64(&report.report_payload, "forks"),
+    }))
+}
+
+fn find_report_i64(report_payload: &Value, key: &str) -> Option<i64> {
+    find_report_json_value(report_payload, key).and_then(|value| match value {
+        Value::Number(number) => number.as_i64(),
+        Value::String(text) => text.parse::<i64>().ok(),
+        _ => None,
+    })
+}
+
+fn find_report_string(report_payload: &Value, key: &str) -> Option<String> {
+    find_report_json_value(report_payload, key).and_then(|value| match value {
+        Value::String(text) if !text.trim().is_empty() => Some(text),
+        Value::Number(number) => Some(number.to_string()),
+        Value::Bool(flag) => Some(flag.to_string()),
+        _ => None,
+    })
+}
+
+fn find_report_json_value(report_payload: &Value, key: &str) -> Option<Value> {
+    report_payload
+        .get("section")
+        .and_then(|section| section.get("indicators"))
+        .and_then(Value::as_array)
+        .and_then(|indicators| {
+            indicators.iter().find_map(|indicator| {
+                let indicator_key = indicator.get("key").and_then(Value::as_str)?;
+                if indicator_key == key {
+                    indicator.get("value").cloned()
+                } else {
+                    None
+                }
+            })
+        })
+        .or_else(|| {
+            report_payload
+                .get("raw_evidence")
+                .and_then(Value::as_array)
+                .and_then(|entries| {
+                    entries.iter().find_map(|entry| {
+                        let category = entry.get("assessment_category").and_then(Value::as_str)?;
+                        if category != "maintenance" {
+                            return None;
+                        }
+                        entry.get("data").and_then(|data| data.get(key)).cloned()
+                    })
+                })
+        })
+}
