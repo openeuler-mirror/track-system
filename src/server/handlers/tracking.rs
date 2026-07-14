@@ -650,10 +650,14 @@ mod tests {
         let mock_tracking = create_mock_tracking(1, 1);
         let mut updated_tracking = mock_tracking.clone();
         updated_tracking.l1_branch = "develop".to_string();
+        let mock_package = create_mock_package(1);
+        let mock_report = create_mock_maintenance_report(1);
 
         let db = MockDatabase::new(DatabaseBackend::Postgres)
             .append_query_results([[mock_tracking]]) // Find tracking
             .append_query_results([[updated_tracking]]) // Updated result
+            .append_query_results([[mock_package]])
+            .append_query_results([[mock_report]])
             .into_connection();
         let state = AppState::without_external_clients(db);
 
