@@ -1744,3 +1744,26 @@ mod tests {
         let _state_guard = EnvVarGuard::set(
             "TRACK_XLSX_ISSUE_NUMBER_STATE_FILE",
             dir.path().join("issue-state").to_str().unwrap(),
+        );
+        let mut writer = RoundCveFixComparisonWriter::new();
+
+        writer
+            .append_input(CveFixComparisonInput {
+                tracking_id: 1,
+                package_name: "bash".to_string(),
+                system_version: "ctyunos-22.06".to_string(),
+                ctyunos_current_version: "5.2-1".to_string(),
+                default_upstream_version: "5.2-3".to_string(),
+                commit_reports: vec![serde_json::json!({
+                    "Description": "Fix bash issue",
+                    "CVEList": [],
+                })],
+            })
+            .unwrap();
+        let second = writer
+            .append_input(CveFixComparisonInput {
+                tracking_id: 2,
+                package_name: "coreutils".to_string(),
+                system_version: "ctyunos-25.07".to_string(),
+                ctyunos_current_version: "9.5-2".to_string(),
+                default_upstream_version: "9.5-4".to_string(),
