@@ -50,3 +50,29 @@ impl<'a> MaintenanceSyncService<'a> {
                 now,
                 package.sync_interval_hours,
                 latest.as_ref().map(|report| report.generated_at),
+            ) {
+                summary.skipped_not_due += 1;
+                continue;
+            }
+
+            summary.due_packages += 1;
+            match maintenance_service.refresh_package(package.id).await {
+                Ok(_) => summary.refreshed_packages += 1,
+                Err(_) => summary.failed_packages += 1,
+            }
+        }
+
+        Ok(summary)
+    }
+}
+
+fn should_refresh_package(
+    now: DateTime<Utc>,
+    sync_interval_hours: i32,
+    latest_report_at: Option<DateTime<Utc>>,
+) -> bool {
+    let interval_hours = sync_interval_hours.max(1) as i64;
+    match latest_report_at {
+        Some(last) => (now - last).num_hours() >= interval_hours,
+        None => true,
+    }
