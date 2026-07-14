@@ -283,3 +283,26 @@ async fn collect_recent_activity(
             COMMITS_PER_PAGE,
         )
         .await?;
+        if commits.is_empty() {
+            return Ok((total, false, identities.len() as i64));
+        }
+
+        total += commits.len() as i64;
+        for commit in &commits {
+            identities.insert(normalized_commit_identity(commit));
+        }
+
+        if commits.len() < COMMITS_PER_PAGE as usize {
+            return Ok((total, false, identities.len() as i64));
+        }
+    }
+
+    warn!(
+        owner,
+        repo, branch, max_pages, "AtomGit 近 12 个月活跃度统计达到页数上限，返回下界"
+    );
+    Ok((total, true, identities.len() as i64))
+}
+
+async fn fetch_commit_page(
+    client: &Client,
