@@ -832,3 +832,26 @@ fn print_github_government_takedown_details(report_payload: &Value) {
 
     print_structured_details_block("      政府下架字段:", details);
 }
+
+fn print_github_gov_takedown_archive_details(report_payload: &Value) {
+    // archive_error 为 null 表示无错误，为 String 表示采集失败 → 跳过展示
+    let archive_error = find_source_raw_evidence_json_value(report_payload, "archive_error");
+    if matches!(&archive_error, Some(v) if v.is_string()) {
+        return;
+    }
+
+    let total = match find_source_raw_evidence_json_value(report_payload, "total_requests")
+        .and_then(|v| v.as_u64())
+    {
+        Some(n) => n,
+        None => return,
+    };
+
+    let truncated = find_source_raw_evidence_json_value(report_payload, "truncated")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+
+    let by_requester = find_source_raw_evidence_json_value(report_payload, "requests_by_requester");
+
+    let trunc_note = if truncated {
+        "（列表已截断，实际更多）"
