@@ -358,3 +358,27 @@ fn indicator_value_to_string(value: &Value) -> String {
 fn infer_risk_from_context(context: &AiContext) -> AiRiskLevel {
     context
         .rule_risk
+        .as_deref()
+        .map(AiRiskLevel::from_report_value)
+        .unwrap_or(AiRiskLevel::Unknown)
+}
+
+fn string_field(value: &Value, key: &str) -> Option<String> {
+    value.get(key)?.as_str().map(ToString::to_string)
+}
+
+fn bool_field(value: &Value, key: &str) -> bool {
+    value.get(key).and_then(Value::as_bool).unwrap_or(false)
+}
+
+fn parse_string_array(value: &Value, key: &str) -> Vec<String> {
+    value
+        .get(key)
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(Value::as_str)
+                .map(ToString::to_string)
+                .collect()
+        })
