@@ -1032,6 +1032,53 @@ mod tests {
     }
 
     #[test]
+    fn test_extract_spec_ignores_subpackage_version_release() {
+        let content = r#"
+%global openssh_release 13
+
+Name:           openssh
+Version:        9.6p1
+Release:        %{openssh_release}
+
+%package -n pam_ssh_agent_auth
+Version:        0.10.4
+Release:        5.%{openssh_release}
+"#;
+
+        assert_eq!(extract_spec_version(content), Some("9.6p1".to_string()));
+        assert_eq!(extract_spec_release(content), Some("13".to_string()));
+    }
+
+    #[test]
+    fn test_normalize_snapshot_spec_version_release_expands_imported_macros() {
+        let spec_text = r#"
+%global openssh_release 16
+
+Name:           openssh
+Version:        9.6p1
+Release:        %{openssh_release}
+
+%package -n pam_ssh_agent_auth
+Version:        0.10.4
+Release:        5.%{openssh_release}
+"#;
+        let mut snapshot = RepositorySnapshot::new(1, SnapshotOrigin::L2);
+        snapshot.spec = Some(SpecEntry {
+            path: "openssh.spec".to_string(),
+            sha256: "sha".to_string(),
+            version: Some("9.6p1".to_string()),
+            release: Some("%{openssh_release}".to_string()),
+            content_base64: BASE64_STANDARD.encode(spec_text),
+        });
+
+        normalize_snapshot_spec_version_release(&mut snapshot);
+
+        let spec = snapshot.spec.as_ref().unwrap();
+        assert_eq!(spec.version.as_deref(), Some("9.6p1"));
+        assert_eq!(spec.release.as_deref(), Some("16"));
+    }
+
+    #[test]
     fn test_sha256_hex_known_value() {
         let got = sha256_hex(b"hello world");
         assert_eq!(
