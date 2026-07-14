@@ -949,6 +949,8 @@ impl<'a> PipelineExecutor<'a> {
         Ok(ReportGenerationResult {
             report_id: inserted.id as i64,
             report_status: "success".to_string(),
+            cve_fix_comparison_input: None,
+            cve_fix_comparison_xlsx: None,
         })
     }
 
