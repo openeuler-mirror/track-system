@@ -140,3 +140,26 @@ impl MailService {
     pub async fn send_xlsx_artifact(&self, artifact: &ReportArtifact) -> Result<()> {
         if !self.config.enabled {
             debug!("xlsx 邮件发送未启用");
+            return Ok(());
+        }
+        self.config.validate_enabled()?;
+        if artifact.rows == 0 {
+            debug!(path = %artifact.path, "xlsx 内容为空，跳过邮件发送");
+            return Ok(());
+        }
+
+        let attachment_path = PathBuf::from(&artifact.path);
+        let message = build_artifact_message(&self.config, artifact, &attachment_path)?;
+        let transport = build_transport(&self.config)?;
+
+        tokio::time::timeout(self.config.timeout, transport.send(message))
+            .await
+            .context("发送 xlsx 邮件超时")?
+            .context("发送 xlsx 邮件失败")?;
+
+        info!(
+            path = %artifact.path,
+            rows = artifact.rows,
+            recipients = self.config.to.join(","),
+            "xlsx 邮件发送成功"
+        );
