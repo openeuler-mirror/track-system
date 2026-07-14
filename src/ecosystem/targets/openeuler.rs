@@ -1018,3 +1018,26 @@ fn extract_lifecycle_text_from_vitepress_component(body: &str) -> String {
             let text = matched.as_str().replace("\\n", "\n");
             if contains_lifecycle_signals(&text) {
                 segments.push(text);
+            }
+        }
+    }
+    segments.join("\n")
+}
+
+fn contains_lifecycle_signals(text: &str) -> bool {
+    let keywords = [
+        "长期支持版本",
+        "LTS版本",
+        "创新版本",
+        "发布间隔周期定为4年",
+        "4年社区支持",
+        "12个月会发布一个社区创新版本",
+        "生命周期6年",
+        "SP版本生命周期",
+    ];
+    keywords.iter().any(|keyword| text.contains(keyword))
+}
+
+fn collect_text_segments_from_json(value: &Value, segments: &mut Vec<String>) {
+    match value {
+        Value::String(text) => {
