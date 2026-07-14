@@ -791,3 +791,26 @@ fn run_git_command_with_timeout(
     let started_at = Instant::now();
     loop {
         if let Some(status) = child
+            .try_wait()
+            .with_context(|| format!("wait git command failed: {}", operation))?
+        {
+            let stdout = read_child_pipe(&mut child.stdout)?;
+            let stderr = read_child_pipe(&mut child.stderr)?;
+            let output = Output {
+                status,
+                stdout,
+                stderr,
+            };
+
+            if output.status.success() {
+                return Ok(output);
+            }
+
+            let detail = command_output_message(&output);
+            return Err(anyhow!("{}: {}", operation, detail));
+        }
+
+        if started_at.elapsed() >= timeout {
+            child.kill().ok();
+            let _ = child.wait();
+            let stderr = read_child_pipe(&mut child.stderr).unwrap_or_default();
