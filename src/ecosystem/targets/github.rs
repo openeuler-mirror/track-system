@@ -621,3 +621,26 @@ impl GitHubPlatformCollector {
         let supports_license_detection =
             lower.contains("licensee") || lower.contains("licenses api");
         let mentions_default_copyright_rule = lower.contains("default copyright laws apply");
+        let summary = format!(
+            "GitHub 提供开源许可证选择与识别能力{}{}{}",
+            if supports_choosealicense {
+                "，包括 Choose a License 指引"
+            } else {
+                ""
+            },
+            if supports_license_detection {
+                "、Licensee/License API 等许可证识别能力"
+            } else {
+                ""
+            },
+            if mentions_default_copyright_rule || terms_page.plain_text.contains("fork") {
+                "；若仓库未声明许可证，则默认版权法仍然适用"
+            } else {
+                ""
+            }
+        );
+        json!({
+            "summary": summary,
+            "supports_choosealicense": supports_choosealicense,
+            "supports_license_detection": supports_license_detection,
+            "mentions_default_copyright_rule": mentions_default_copyright_rule,
