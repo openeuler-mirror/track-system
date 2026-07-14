@@ -93,6 +93,46 @@ impl<'a> EcosystemService<'a> {
         })
     }
 
+    async fn sync_report_to_sbom(
+        &self,
+        target: &ecosystem_targets::Model,
+        report: &ecosystem_reports::Model,
+    ) {
+        let client = match SbomCommunitySyncClient::from_env() {
+            Ok(Some(client)) => client,
+            Ok(None) => return,
+            Err(error) => {
+                tracing::warn!(
+                    target_id = target.id,
+                    report_id = report.id,
+                    error = %error,
+                    "SBOM 社区同步配置无效，跳过同步"
+                );
+                return;
+            }
+        };
+
+        match client.sync_report(target, report).await {
+            Ok(response) => {
+                tracing::info!(
+                    target_id = target.id,
+                    report_id = report.id,
+                    sbom_code = response.code,
+                    sbom_msg = %response.msg,
+                    "SBOM 社区同步成功"
+                );
+            }
+            Err(error) => {
+                tracing::warn!(
+                    target_id = target.id,
+                    report_id = report.id,
+                    error = %error,
+                    "SBOM 社区同步失败，生态评估报告已保留"
+                );
+            }
+        }
+    }
+
     pub async fn latest_report(&self, target_id: i32) -> Result<Option<ecosystem_reports::Model>> {
         let report = EcosystemReports::find()
             .filter(ecosystem_reports::Column::TargetId.eq(target_id))
