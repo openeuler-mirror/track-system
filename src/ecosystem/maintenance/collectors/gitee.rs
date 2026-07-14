@@ -137,3 +137,26 @@ async fn fetch_repository(
     client: &Client,
     owner: &str,
     repo: &str,
+) -> Result<GiteeRepositorySnapshot> {
+    let url = format!("{}/repos/{}/{}", GITEE_API_BASE, owner, repo);
+    let mut request = client.get(&url);
+    if let Ok(token) = std::env::var("GITEE_ACCESS_TOKEN") {
+        if !token.trim().is_empty() {
+            request = request.query(&[("access_token", token)]);
+        }
+    }
+
+    let response = request
+        .send()
+        .await
+        .context("send gitee repository request failed")?;
+    let status = response.status();
+    if !status.is_success() {
+        let body = response.text().await.unwrap_or_default();
+        return Err(anyhow!("Gitee API HTTP {}: {}", status.as_u16(), body));
+    }
+
+    response
+        .json::<GiteeRepositorySnapshot>()
+        .await
+        .context("parse gitee repository response failed")
