@@ -811,3 +811,26 @@ mod tests {
         };
 
         let cla = collector.detect_cla_policy(&page);
+        assert_eq!(cla["cla_required"], true);
+        assert_eq!(cla["cla_types"].as_array().map(|v| v.len()), Some(3));
+    }
+
+    #[test]
+    fn build_evidence_records_maps_openeuler_source_signals() {
+        let collector = OpenEulerCommunityCollector::new();
+        let about_page = page("openEuler is incubated and operated by the OpenAtom Foundation.");
+        let organization_page = page(
+            "openEuler Committee, Technical Committee, Marketing Committee, User Committee, Security Committee and Special Interest Groups are part of governance.",
+        );
+        let foundation_page = page("开放原子开源基金会 openEuler 毕业项目。");
+        let lifecycle_page = page(
+            "社区版本分为长期支持版本和创新版本。长期支持版本发布间隔周期定为4年，提供4年社区支持。LTS版本全版本生命周期6年(4+2)，可申请延长至8年。openEuler每隔12个月会发布一个社区创新版本，提供6个月社区支持。SP版本生命周期原则上按照小 SP 和大 SP 执行。",
+        );
+        let contribution_page = page(
+            "Sign the openEuler Contributor License Agreement (CLA). Individual CLA. Corporate CLA. Employee CLA.",
+        );
+        let docs_terms_page = page("Docs are under CC BY-SA 4.0 and footer mentions MulanPSL2.");
+        let license_text = page("Mulan PSL v2 license text for openEuler community repository.");
+
+        let evidence = collector.build_evidence_records(
+            about_page,
