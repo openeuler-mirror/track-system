@@ -692,3 +692,26 @@ mod tests {
                     ctyunos_current_version: "9.5-2".to_string(),
                     system_version: "CTyunOS25.07".to_string(),
                     description: "Fix coreutils issue".to_string(),
+                    xingkong_ticket_no: "97883".to_string(),
+                    commit_url: None,
+                },
+            ],
+        };
+
+        let plain = build_plain_body(&config, &artifact);
+        let html = build_html_body(&config, &artifact);
+
+        assert!(plain.contains("bash"));
+        assert!(!plain.contains("coreutils"));
+        assert!(plain.contains("仅展示前 1 行"));
+        assert!(html.contains("bash"));
+        assert!(!html.contains("coreutils"));
+        assert!(html.contains("仅展示前 1 行"));
+    }
+
+    struct EnvVarGuard {
+        key: &'static str,
+        old_value: Option<String>,
+    }
+
+    impl EnvVarGuard {
