@@ -26,6 +26,14 @@ use crate::cli::formatter::format_datetime_local;
 use crate::cli::parser::TrackingAction;
 use crate::collectors::traits::Platform;
 
+const DEFAULT_BRANCH_MAPPINGS: [(&str, &str); 5] = [
+    ("2.0.1", "openEuler-20.03-LTS-SP4"),
+    ("22.06", "openEuler-20.03-LTS-SP4"),
+    ("23.01", "openEuler-22.03-LTS-SP4"),
+    ("25.05", "openEuler-22.03-LTS-SP4"),
+    ("25.07", "openEuler-24.03-LTS-SP1"),
+];
+
 /// API 响应包装
 #[derive(Debug, Serialize, Deserialize)]
 struct ApiResponse<T> {
