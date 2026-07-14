@@ -1269,3 +1269,26 @@ mod tests {
     #[test]
     fn github_structured_flags_can_be_extracted() {
         let payload = serde_json::json!({
+            "sections": {
+                "source": {
+                    "indicators": [
+                        {"key": "ofac_license_for_iran", "value": true},
+                        {"key": "public_repo_access_in_sanctioned_regions", "value": true},
+                        {"key": "itar_restriction_mentioned", "value": true},
+                        {"key": "restricted_regions_mentioned", "value": true},
+                        {"key": "users_own_content", "value": true},
+                        {"key": "license_grant_to_host_content", "value": true},
+                        {"key": "github_retains_platform_ip", "value": true},
+                        {"key": "supports_geographic_limit", "value": true},
+                        {"key": "supports_user_appeal", "value": true},
+                        {"key": "publishes_public_requests", "value": true},
+                        {"key": "supports_choosealicense", "value": true},
+                        {"key": "supports_license_detection", "value": true},
+                        {"key": "mentions_default_copyright_rule", "value": true},
+                        {"key": "dmca_safe_harbor_mentioned", "value": true},
+                        {"key": "counter_notice_supported", "value": true},
+                        {"key": "github_copyright_notice_mentioned", "value": true}
+                    ]
+                }
+            }
+        });
