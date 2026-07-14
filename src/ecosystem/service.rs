@@ -238,3 +238,40 @@ impl<'a> EcosystemService<'a> {
         })
     }
 
+    fn build_evidence_summary(
+        &self,
+        target: &ecosystem_targets::Model,
+        evidence_payloads: &[Value],
+    ) -> Value {
+        let mut category_counts: BTreeMap<String, usize> = BTreeMap::new();
+        let mut subcategory_counts: BTreeMap<String, usize> = BTreeMap::new();
+        let mut source_names = BTreeSet::new();
+
+        for payload in evidence_payloads {
+            if let Some(category) = payload.get("assessment_category").and_then(Value::as_str) {
+                *category_counts.entry(category.to_string()).or_default() += 1;
+            }
+            if let Some(subcategory) = payload
+                .get("assessment_subcategory")
+                .and_then(Value::as_str)
+            {
+                *subcategory_counts
+                    .entry(subcategory.to_string())
+                    .or_default() += 1;
+            }
+            if let Some(source_name) = payload.get("source_name").and_then(Value::as_str) {
+                source_names.insert(source_name.to_string());
+            }
+        }
+
+        json!({
+            "evidence_count": evidence_payloads.len(),
+            "target_type": target.target_type,
+            "platform": target.platform,
+            "rule_profile": target.rule_profile,
+            "category_counts": category_counts,
+            "subcategory_counts": subcategory_counts,
+            "sources": source_names.into_iter().collect::<Vec<_>>(),
+        })
+    }
+
