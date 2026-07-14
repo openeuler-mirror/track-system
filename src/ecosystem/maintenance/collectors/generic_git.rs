@@ -142,3 +142,27 @@ impl GenericGitMaintenanceCollector {
                     "forks": null,
                 }
             }),
+        ])
+    }
+
+    pub async fn collect_version_catalog(&self, package: &packages::Model) -> Result<Value> {
+        let repo_url = package
+            .l0_repo_url
+            .as_deref()
+            .ok_or_else(|| anyhow!("package {} missing l0_repo_url", package.name))?;
+
+        let repo_url_owned = repo_url.to_string();
+        let versions =
+            tokio::task::spawn_blocking(move || collect_remote_versions(&repo_url_owned))
+                .await
+                .context("join generic git version catalog collector failed")??;
+
+        Ok(build_version_catalog_evidence(repo_url, &versions))
+    }
+}
+
+fn collect_metrics(repo_url: &str) -> Result<GenericGitMetrics> {
+    with_synced_mirror(repo_url, |repo, _repo_path| compute_metrics(repo))
+}
+
+pub fn warm_cached_mirror(repo_url: &str) -> Result<GenericGitMirrorCacheSummary> {
