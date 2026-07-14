@@ -394,3 +394,45 @@ impl SpecComparison {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_simple_spec() {
+        let content = r#"
+Name: nginx
+Version: 1.22.0
+Release: 1%{?dist}
+Summary: High performance web server
+License: BSD
+URL: https://nginx.org/
+
+Source0: nginx-1.22.0.tar.gz
+Patch0: 0001-fix-bug.patch
+
+BuildRequires: gcc, make
+Requires: openssl
+
+%description
+Nginx is a web server.
+
+%build
+%configure --with-http_ssl_module --enable-threads
+make %{?_smp_mflags}
+
+%install
+make install DESTDIR=%{buildroot}
+
+%files
+%{_bindir}/nginx
+
+%changelog
+* Mon Jan 01 2024 Test <test@example.com> - 1.22.0-1
+- Initial package
+"#;
+
+        let spec = SpecParser::parse(content).unwrap();
+
+        assert_eq!(spec.name, Some("nginx".to_string()));
+        assert_eq!(spec.version, Some("1.22.0".to_string()));
