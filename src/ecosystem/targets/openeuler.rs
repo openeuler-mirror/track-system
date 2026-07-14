@@ -94,3 +94,27 @@ impl OpenEulerCommunityCollector {
                 OPENEULER_ORGANIZATION_URL,
                 &[
                     "openEuler Committee",
+                    "Technical Committee",
+                    "Marketing Committee",
+                    "User Committee",
+                    "Security Committee",
+                    "SIG",
+                    "OpenAtom Foundation",
+                ],
+            )
+            .await;
+        self.log_page_result("openEuler organization", &organization_page);
+        let foundation_page = self
+            .fetch_page(
+                &client,
+                OPENEULER_FOUNDATION_URL,
+                &["开放原子开源基金会", "openEuler", "开源欧拉", "项目"],
+            )
+            .await;
+        self.log_page_result("openEuler foundation", &foundation_page);
+        let lifecycle_page = self
+            .fetch_page(
+                &client,
+                OPENEULER_LIFECYCLE_URL,
+                &[
+                    "LTS",
