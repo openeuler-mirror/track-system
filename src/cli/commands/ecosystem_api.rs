@@ -214,3 +214,27 @@ fn normalize_create_name(input: String) -> String {
 }
 
 fn ecosystem_preset_from_name(input: &str) -> Option<EcosystemPreset> {
+    let key = normalize_lookup_key(input);
+    if key.contains("openeuler") {
+        return Some(EcosystemPreset {
+            canonical_name: "openEuler Community".to_string(),
+            target_type: "community".to_string(),
+            platform: Some("openeuler".to_string()),
+            role: "governance".to_string(),
+            homepage_url: Some("https://www.openeuler.org/en/".to_string()),
+            api_base_url: Some("https://gitee.com/api/v5".to_string()),
+            owner: Some("openeuler".to_string()),
+            repo: Some("community".to_string()),
+            default_branch: Some("master".to_string()),
+            rule_profile: "openeuler_community".to_string(),
+        });
+    }
+    if key == "github" || key.contains("githubplatform") || key.contains("githubcommunity") {
+        return Some(EcosystemPreset {
+            canonical_name: "GitHub Platform".to_string(),
+            target_type: "platform".to_string(),
+            platform: Some("github".to_string()),
+            role: "hosting".to_string(),
+            homepage_url: Some("https://github.com/about".to_string()),
+            api_base_url: Some("https://api.github.com".to_string()),
+            owner: None,
