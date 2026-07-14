@@ -554,3 +554,26 @@ mod tests {
         assert_eq!(config.smtp_tls, SmtpTlsMode::Wrapper);
         assert_eq!(config.to, vec!["a@example.com", "b@example.com"]);
         assert_eq!(config.cc, vec!["c@example.com"]);
+        config.validate_enabled().unwrap();
+    }
+
+    #[test]
+    #[serial]
+    fn config_from_env_decrypts_smtp_password() {
+        let _guard = env_lock().lock().unwrap();
+        let dir = tempdir().unwrap();
+        let key_path = dir.path().join("smtp-password.key");
+        let key = [7_u8; 32];
+        fs::write(
+            &key_path,
+            format!("base64:{}", general_purpose::STANDARD.encode(key)),
+        )
+        .unwrap();
+        let cipher = Aes256Gcm::new_from_slice(&key).unwrap();
+        let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
+        let ciphertext = cipher
+            .encrypt(&nonce, "secret-password".as_bytes())
+            .unwrap();
+        let mut payload = nonce.to_vec();
+        payload.extend(ciphertext);
+        let encrypted = general_purpose::STANDARD.encode(payload);
