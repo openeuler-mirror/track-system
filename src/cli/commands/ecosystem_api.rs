@@ -1200,3 +1200,26 @@ mod tests {
             assert_eq!(preset.platform.as_deref(), Some("atomgit"));
             assert_eq!(preset.rule_profile, "atomgit_platform");
         }
+    }
+
+    #[test]
+    fn source_focus_bool_reads_indicator_and_raw_evidence() {
+        let payload = serde_json::json!({
+            "sections": {
+                "source": {
+                    "indicators": [
+                        {"key": "has_lts_policy", "value": true}
+                    ]
+                }
+            },
+            "raw_evidence": [
+                {
+                    "assessment_category": "source",
+                    "data": {
+                        "innovation_support_six_months": true
+                    }
+                }
+            ]
+        });
+
+        assert_eq!(source_focus_bool(&payload, "has_lts_policy"), Some(true));
