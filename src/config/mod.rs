@@ -151,12 +151,11 @@ impl Config {
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self> {
         let content = fs::read_to_string(path.as_ref())
             .with_context(|| format!("无法读取配置文件: {:?}", path.as_ref()))?;
-        
-        let config: Config = serde_yaml::from_str(&content)
-            .context("无法解析配置文件")?;
-        
+
+        let config: Config = serde_yaml::from_str(&content).context("无法解析配置文件")?;
+
         config.validate()?;
-        
+
         Ok(config)
     }
 
