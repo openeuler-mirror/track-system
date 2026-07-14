@@ -417,3 +417,26 @@ mod tests {
         })));
         let report = report(json!({
             "raw_evidence": [
+                {
+                    "data": {
+                        "organization_structure": "委员会 + SIG 分层治理",
+                        "foundation_status": "开放原子开源基金会孵化并运营"
+                    }
+                },
+                {
+                    "data": {
+                        "version_lifecycle": "LTS 版本提供长期支持",
+                        "license_policy": "Mulan PSL v2",
+                        "cla_policy": "贡献前需要签署 CLA"
+                    }
+                }
+            ]
+        }));
+
+        let req = build_community_inner_sync_request(&target, &report, &config());
+
+        assert_eq!(req.name, "openEuler Community");
+        assert_eq!(
+            req.website_url.as_deref(),
+            Some("https://www.openeuler.org")
+        );
