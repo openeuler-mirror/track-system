@@ -74,7 +74,7 @@ impl<'a> SyncService<'a> {
         let token = self.get_platform_token(&platform)?;
 
         // 4. 创建 Collector
-        let collector = self.create_collector(platform, token)?;
+        let collector = self.create_collector(platform, token, &tracking_entity.l1_branch)?;
 
         // 5. 使用 Collector 进行同步
         self.sync_tracking_with_collector(tracking_id, collector.as_ref())
