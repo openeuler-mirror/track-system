@@ -166,3 +166,27 @@ impl AiAnalysisService {
 }
 
 fn sources_to_check(context: &AiContext) -> Vec<String> {
+    let target = context
+        .target_name
+        .as_deref()
+        .unwrap_or("目标组件")
+        .to_string();
+    let mut sources = Vec::new();
+
+    if l0_community_assessment(context).is_none() {
+        sources.push(format!(
+            "{} L0 仓库 SECURITY.md、安全公告、security advisories 或 CVE 修复记录",
+            target
+        ));
+        sources.push(format!(
+            "{} L0 仓库 releases/tags 页面、发布说明、签名文件、checksum 或 provenance/attestation 资料",
+            target
+        ));
+        sources.push(format!(
+            "{} L0 仓库 CONTRIBUTING、CODEOWNERS、pull request review 规则或维护者文档",
+            target
+        ));
+    }
+
+    sources
+}
