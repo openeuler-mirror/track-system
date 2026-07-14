@@ -182,3 +182,26 @@ impl<'a> MaintenanceService<'a> {
             }
             if let Some(subcategory) = payload
                 .get("assessment_subcategory")
+                .and_then(Value::as_str)
+            {
+                *subcategory_counts
+                    .entry(subcategory.to_string())
+                    .or_default() += 1;
+            }
+            if let Some(source_name) = payload.get("source_name").and_then(Value::as_str) {
+                source_names.insert(source_name.to_string());
+            }
+        }
+
+        json!({
+            "evidence_count": evidence_payloads.len(),
+            "package_id": package.id,
+            "package_name": package.name,
+            "package_level": package.level,
+            "l0_repo_url": package.l0_repo_url,
+            "category_counts": category_counts,
+            "subcategory_counts": subcategory_counts,
+            "sources": source_names.into_iter().collect::<Vec<_>>(),
+        })
+    }
+
