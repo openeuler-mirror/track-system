@@ -598,3 +598,27 @@ fn print_target_detail(target: &EcosystemTargetDto) {
     }
     println!(
         "  最近采集: {}",
+        target
+            .last_collected_at
+            .as_ref()
+            .map(format_datetime_local)
+            .unwrap_or_else(|| "-".to_string())
+    );
+    println!(
+        "  最近报告: {}",
+        target
+            .last_report_at
+            .as_ref()
+            .map(format_datetime_local)
+            .unwrap_or_else(|| "-".to_string())
+    );
+    if let Some(last_error) = &target.last_error {
+        println!("  最近错误: {}", last_error.red());
+    }
+    if let Some(metadata) = &target.metadata {
+        println!("  Metadata: {}", metadata);
+    }
+    println!("  创建时间: {}", format_datetime_local(&target.created_at));
+    println!("  更新时间: {}", format_datetime_local(&target.updated_at));
+}
+
