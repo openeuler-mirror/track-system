@@ -906,3 +906,26 @@ fn compute_metrics(repo: &Repository) -> Result<GenericGitMetrics> {
     }
 
     Ok(GenericGitMetrics {
+        default_branch,
+        last_commit_at,
+        commit_total,
+        commits_last_12_months,
+        committers_last_12_months: unique_committers.len() as i64,
+    })
+}
+
+fn normalize_source_url(repo_url: &str) -> String {
+    if Url::parse(repo_url).is_ok() {
+        repo_url
+            .trim_end_matches('/')
+            .trim_end_matches(".git")
+            .to_string()
+    } else {
+        repo_url.to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use git2::{Oid, Signature};
