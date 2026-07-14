@@ -256,3 +256,26 @@ fn repository_contact_info(target: &ecosystem_targets::Model) -> Option<String> 
         }
         (_, Some(owner), Some(repo)) => Some(format!("{owner}/{repo}")),
         _ => None,
+    }
+}
+
+fn default_function_description(target: &ecosystem_targets::Model) -> String {
+    match target.target_type.as_str() {
+        "community" => format!("{} 开源社区生态评估目标", target.name),
+        "platform" => format!("{} 开源平台生态评估目标", target.name),
+        _ => format!("{} 生态评估目标", target.name),
+    }
+}
+
+fn metadata_string(metadata: Option<&Value>, key: &str) -> Option<String> {
+    metadata.and_then(|value| data_string(value, key))
+}
+
+fn data_string(value: &Value, key: &str) -> Option<String> {
+    value
+        .get(key)
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned)
+}
