@@ -16,3 +16,10 @@ pub fn ecosystem_routes() -> Router<AppState> {
             "/ecosystem/targets/:id/refresh",
             post(ecosystem::refresh_target),
         )
+        .route(
+            "/ecosystem/targets/:id/latest-report",
+            get(ecosystem::get_latest_report),
+        )
+        .route("/ecosystem/reports", get(ecosystem::list_reports))
+        .route("/ecosystem/reports/:id", get(ecosystem::get_report))
+}
