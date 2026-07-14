@@ -622,3 +622,27 @@ fn print_target_detail(target: &EcosystemTargetDto) {
     println!("  更新时间: {}", format_datetime_local(&target.updated_at));
 }
 
+fn print_report_detail(report: &EcosystemReportDto, verbose: bool) {
+    println!();
+    println!("{}", "生态报告详情:".bold());
+    println!("  ID: {}", report.id);
+    println!("  目标 ID: {}", report.target_id);
+    println!("  报告类型: {}", report.report_type);
+    println!("  状态: {}", report.status);
+    println!("  综合风险: {}", report.overall_risk);
+    println!("  置信度: {}", report.confidence);
+    println!("  摘要: {}", report.summary);
+    print_source_focus_details(&report.report_payload);
+    println!("  维度摘要: {}", report.dimensions);
+    if verbose {
+        if let Some(evidence_summary) = &report.evidence_summary {
+            println!("  证据摘要: {}", evidence_summary);
+        }
+        println!("  报告载荷: {}", report.report_payload);
+    } else if let Some(evidence_summary) = &report.evidence_summary {
+        println!("  证据摘要: {}", evidence_summary);
+    }
+    println!(
+        "  生成时间: {}",
+        format_datetime_local(&report.generated_at)
+    );
