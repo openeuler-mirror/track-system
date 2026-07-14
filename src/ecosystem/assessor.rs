@@ -444,3 +444,65 @@ fn collect_indicators(entries: &[&Value]) -> Vec<EcosystemIndicator> {
     indicators
 }
 
+fn collect_evidence_refs(entries: &[&Value]) -> Vec<String> {
+    let mut refs = BTreeSet::new();
+    for entry in entries {
+        let source_name = entry
+            .get("source_name")
+            .and_then(Value::as_str)
+            .unwrap_or("unknown");
+        let subcategory = entry
+            .get("assessment_subcategory")
+            .and_then(Value::as_str)
+            .unwrap_or("general");
+        refs.insert(format!("{}:{}", source_name, subcategory));
+    }
+    refs.into_iter().collect()
+}
+
+fn coverage_for_keys(
+    indicators: &[EcosystemIndicator],
+    required_keys: &[&str],
+) -> (i32, Vec<String>) {
+    let mut missing = Vec::new();
+    let mut present = 0;
+    for key in required_keys {
+        if indicators
+            .iter()
+            .any(|indicator| indicator.key == *key && indicator.status != "missing")
+        {
+            present += 1;
+        } else {
+            missing.push((*key).to_string());
+        }
+    }
+    let coverage = if required_keys.is_empty() {
+        100
+    } else {
+        (present * 100 / required_keys.len()) as i32
+    };
+    (coverage, missing)
+}
+
+fn contains_risk_phrase(entries: &[&Value], keys: &[&str]) -> bool {
+    entries.iter().any(|entry| {
+        entry
+            .get("data")
+            .and_then(Value::as_object)
+            .map(|data| {
+                keys.iter().any(|key| {
+                    data.get(*key)
+                        .and_then(Value::as_str)
+                        .map(|value| {
+                            value.contains("限制")
+                                || value.contains("制裁")
+                                || value.contains("下架")
+                                || value.contains("风控")
+                        })
+                        .unwrap_or(false)
+                })
+            })
+            .unwrap_or(false)
+    })
+}
+
