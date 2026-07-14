@@ -228,12 +228,11 @@ impl Config {
 
     /// 保存配置到文件
     pub fn save_to_file<P: AsRef<Path>>(&self, path: P) -> Result<()> {
-        let content = serde_yaml::to_string(self)
-            .context("无法序列化配置")?;
-        
+        let content = serde_yaml::to_string(self).context("无法序列化配置")?;
+
         fs::write(path.as_ref(), content)
             .with_context(|| format!("无法写入配置文件: {:?}", path.as_ref()))?;
-        
+
         Ok(())
     }
 }
