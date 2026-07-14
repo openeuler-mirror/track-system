@@ -1607,9 +1607,8 @@ impl<'a> PipelineExecutor<'a> {
         &self,
         tracking: &tracking::Model,
     ) -> Result<Option<diff::l2_vs_l1::L2VsL1Report>> {
-        use crate::entities::l2_snapshots;
-        use crate::entities::prelude::{L2Snapshots, Packages};
-        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
+        use crate::entities::prelude::Packages;
+        use sea_orm::EntityTrait;
 
         info!(tracking_id = tracking.id, "执行 L2 vs L1 对比");
 
