@@ -46,3 +46,27 @@ pub struct MailConfig {
     pub smtp_tls: SmtpTlsMode,
     pub from: String,
     pub to: Vec<String>,
+    pub cc: Vec<String>,
+    pub subject: String,
+    pub timeout: Duration,
+    pub embed_xlsx_preview: bool,
+    pub embed_xlsx_preview_max_rows: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SmtpTlsMode {
+    StartTls,
+    Wrapper,
+    None,
+}
+
+impl MailConfig {
+    pub fn from_env() -> Self {
+        Self {
+            enabled: env_bool("TRACK_MAIL_ENABLED", false),
+            smtp_host: env_string("TRACK_MAIL_SMTP_HOST").unwrap_or_default(),
+            smtp_port: env_u16("TRACK_MAIL_SMTP_PORT", 25),
+            smtp_username: env_string("TRACK_MAIL_SMTP_USERNAME"),
+            smtp_password: smtp_password_from_env(),
+            smtp_tls: SmtpTlsMode::from_env_value(
+                env_string("TRACK_MAIL_SMTP_TLS")
