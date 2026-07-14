@@ -293,3 +293,30 @@ impl VersionParser {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_version_creation() {
+        let v = Version::new(1, 2, 3);
+        assert_eq!(v.major, 1);
+        assert_eq!(v.minor, 2);
+        assert_eq!(v.patch, 3);
+        assert!(v.is_stable());
+        assert_eq!(v.to_string(), "1.2.3");
+    }
+
+    #[test]
+    fn test_version_with_pre_release() {
+        let v = Version::with_pre_release(1, 2, 3, "beta.1");
+        assert_eq!(v.major, 1);
+        assert_eq!(v.minor, 2);
+        assert_eq!(v.patch, 3);
+        assert!(v.is_pre_release());
+        assert_eq!(v.pre_release, Some("beta.1".to_string()));
+        assert_eq!(v.to_string(), "1.2.3-beta.1");
+    }
+
+    #[test]
+    fn test_version_comparison() {
