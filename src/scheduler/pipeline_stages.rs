@@ -4248,12 +4248,14 @@ Summary: Test package
     #[serial]
     async fn test_stage_report_generation_min() {
         use crate::entities::{
-            compare_reports, l1_commit_records, l2_snapshots, packages, tracking, tracking_reports,
+            compare_reports, ecosystem_targets, l1_commit_records, l2_snapshots, packages,
+            tracking, tracking_reports,
         };
         use chrono::Utc;
         use sea_orm::{DatabaseBackend, MockDatabase};
 
         let _risk_enabled_guard = EnvVarGuard::set("RISK_CREATE_ENABLED", "false");
+        let _ai_enabled_guard = EnvVarGuard::set("AI_ANALYSIS_ENABLED", "false");
 
         let tracking_model = tracking::Model {
             id: 2,
