@@ -587,6 +587,60 @@ mod tests {
     }
 
     #[test]
+    fn resolve_server_addr_uses_cli_addr_first() {
+        let _guard = env_lock().lock().unwrap();
+        std::env::set_var("SERVER_ADDR", "127.0.0.1:5000");
+        std::env::set_var("SERVER_HOST", "127.0.0.1");
+        std::env::set_var("SERVER_PORT", "6000");
+
+        assert_eq!(
+            resolve_server_addr(Some("0.0.0.0:7000".to_string())),
+            "0.0.0.0:7000"
+        );
+
+        std::env::remove_var("SERVER_ADDR");
+        std::env::remove_var("SERVER_HOST");
+        std::env::remove_var("SERVER_PORT");
+    }
+
+    #[test]
+    fn resolve_server_addr_uses_server_addr_env() {
+        let _guard = env_lock().lock().unwrap();
+        std::env::set_var("SERVER_ADDR", "127.0.0.1:5000");
+        std::env::set_var("SERVER_HOST", "127.0.0.1");
+        std::env::set_var("SERVER_PORT", "6000");
+
+        assert_eq!(resolve_server_addr(None), "127.0.0.1:5000");
+
+        std::env::remove_var("SERVER_ADDR");
+        std::env::remove_var("SERVER_HOST");
+        std::env::remove_var("SERVER_PORT");
+    }
+
+    #[test]
+    fn resolve_server_addr_uses_host_and_port_env() {
+        let _guard = env_lock().lock().unwrap();
+        std::env::remove_var("SERVER_ADDR");
+        std::env::set_var("SERVER_HOST", "127.0.0.1");
+        std::env::set_var("SERVER_PORT", "8080");
+
+        assert_eq!(resolve_server_addr(None), "127.0.0.1:8080");
+
+        std::env::remove_var("SERVER_HOST");
+        std::env::remove_var("SERVER_PORT");
+    }
+
+    #[test]
+    fn resolve_server_addr_falls_back_to_default() {
+        let _guard = env_lock().lock().unwrap();
+        std::env::remove_var("SERVER_ADDR");
+        std::env::remove_var("SERVER_HOST");
+        std::env::remove_var("SERVER_PORT");
+
+        assert_eq!(resolve_server_addr(None), "0.0.0.0:3000");
+    }
+
+    #[test]
     fn cli_parse_run_once_command() {
         let args = vec!["track-server", "run-once", "--max-concurrent", "3"];
         let cli = Cli::parse_from(args);
