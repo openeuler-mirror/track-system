@@ -381,6 +381,35 @@ mod tests {
         }
     }
 
+    fn create_mock_maintenance_report(package_id: i32) -> maintenance_reports::Model {
+        maintenance_reports::Model {
+            id: 9,
+            package_id,
+            report_type: "maintenance_profile".to_string(),
+            status: "completed".to_string(),
+            overall_risk: "LOW".to_string(),
+            confidence: "HIGH".to_string(),
+            summary: "ok".to_string(),
+            dimensions: serde_json::json!({}),
+            evidence_summary: Some(serde_json::json!({})),
+            report_payload: serde_json::json!({
+                "section": {
+                    "indicators": [
+                        {"key": "commit_total", "value": 1000},
+                        {"key": "commits_last_12_months", "value": 100},
+                        {"key": "committers_last_12_months", "value": 10},
+                        {"key": "last_commit_at", "value": "2026-01-01T00:00:00Z"},
+                        {"key": "stars", "value": 2000},
+                        {"key": "forks", "value": 300}
+                    ]
+                }
+            }),
+            generated_at: chrono::Utc::now(),
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        }
+    }
+
     #[test]
     fn test_tracking_list_query_defaults() {
         let query = TrackingListQuery {
