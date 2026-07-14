@@ -24,3 +24,29 @@ use crate::{
         dto::AiAnalyzeRequest,
         error::{ApiError, ApiResult},
         state::AppState,
+    },
+};
+
+pub async fn analyze_ecosystem_report(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+    Json(req): Json<AiAnalyzeRequest>,
+) -> ApiResult<Json<ApiResponse<crate::ai::AiAnalysisResponse>>> {
+    let report = EcosystemReports::find_by_id(id)
+        .one(state.db.as_ref())
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("ecosystem report {} not found", id)))?;
+    let target = EcosystemTargets::find()
+        .filter(ecosystem_targets::Column::Id.eq(report.target_id))
+        .one(state.db.as_ref())
+        .await?;
+
+    let context = AiContext {
+        source: AiAnalysisSource::EcosystemReport,
+        target_name: target.as_ref().map(|item| item.name.clone()),
+        target_type: target.as_ref().map(|item| item.target_type.clone()),
+        platform: target.as_ref().and_then(|item| item.platform.clone()),
+        report_type: Some(report.report_type.clone()),
+        rule_risk: Some(report.overall_risk.clone()),
+        rule_confidence: Some(report.confidence.clone()),
+        rule_summary: Some(report.summary.clone()),
