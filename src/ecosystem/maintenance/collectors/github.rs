@@ -545,3 +545,26 @@ mod tests {
                 .header(
                     "link",
                     "<http://example.test/commits?per_page=1&page=42>; rel=\"last\"",
+                )
+                .json_body(json!([commit_json(
+                    "latest",
+                    Some("latest@example.com"),
+                    None,
+                    &now
+                )]));
+        });
+        let _recent_count_mock = server.mock(|when, then| {
+            when.method(GET)
+                .path("/repos/openssl/openssl/commits")
+                .query_param("sha", "master")
+                .query_param("per_page", "1")
+                .query_param("page", "1")
+                .query_param_exists("since");
+            then.status(200).json_body(json!([commit_json(
+                "recent",
+                Some("recent@example.com"),
+                None,
+                &now
+            )]));
+        });
+        let _recent_committers_mock = server.mock(|when, then| {
