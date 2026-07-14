@@ -679,6 +679,7 @@ mod tests {
             classified_count: 20,
             cve_count: 3,
             needs_review_count: 7,
+            commits: Vec::new(),
         };
 
         let json = serde_json::to_value(&result).unwrap();
