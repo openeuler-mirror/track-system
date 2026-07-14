@@ -1035,3 +1035,26 @@ mod tests {
 
     #[test]
     fn parse_gov_takedown_tree_counts_by_requester() {
+        let tree_resp = serde_json::json!({
+            "sha": "abc123",
+            "url": "https://api.github.com/repos/github/gov-takedowns/git/trees/abc123",
+            "truncated": false,
+            "tree": [
+                {"path": "README.md", "type": "blob", "sha": "aaa"},
+                {"path": "Russia",    "type": "tree", "sha": "bbb"},
+                {"path": "Russia/2022-01-russia.md",  "type": "blob", "sha": "ccc"},
+                {"path": "Russia/2023-02-russia.md",  "type": "blob", "sha": "ddd"},
+                {"path": "Turkey",    "type": "tree", "sha": "eee"},
+                {"path": "Turkey/2022-01-turkey.md",  "type": "blob", "sha": "fff"},
+                {"path": "Germany/2021-01-germany.md", "type": "blob", "sha": "ggg"},
+            ]
+        });
+        let result = parse_gov_takedown_tree(&tree_resp);
+
+        assert_eq!(result["total_requests"], 4);
+        assert_eq!(result["truncated"], false);
+        assert_eq!(result["requests_by_requester"]["Russia"], 2);
+        assert_eq!(result["requests_by_requester"]["Turkey"], 1);
+        assert_eq!(result["requests_by_requester"]["Germany"], 1);
+        // 根目录 blob (README.md) 不计入
+        assert!(result["requests_by_requester"].get("").is_none());
