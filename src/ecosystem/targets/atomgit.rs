@@ -22,3 +22,27 @@ const ATOMGIT_TRADE_CONTROLS_URL: &str =
     "https://atomgit.com/site-policy/other-site-policies/atomgit-and-trade-controls";
 const ATOMGIT_IP_POLICY_URL: &str =
     "https://atomgit.com/site-policy/content-removal-policies/dmca-takedown-policy";
+const ATOMGIT_GOV_TAKEDOWN_URL: &str =
+    "https://atomgit.com/site-policy/other-site-policies/atomgit-government-takedown-policy";
+const DEFAULT_TIMEOUT_SECS: u64 = 40;
+
+#[derive(Debug, Clone)]
+struct PageSnapshot {
+    http_status: Option<u16>,
+    keyword_lines: Vec<String>,
+    plain_text: String,
+    body_fingerprint: Option<String>,
+    looks_like_spa_shell: bool,
+    error: Option<String>,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct AtomGitPlatformCollector;
+
+impl AtomGitPlatformCollector {
+    pub fn new() -> Self {
+        Self
+    }
+
+    pub fn matches_target(target: &ecosystem_targets::Model) -> bool {
+        let name_key = normalize_lookup_key(&target.name);
