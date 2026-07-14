@@ -210,3 +210,26 @@ fn extract_source_focus(report_payload: &Value) -> SourceFocus {
     let Some(raw_evidence) = report_payload.get("raw_evidence").and_then(Value::as_array) else {
         return focus;
     };
+
+    for entry in raw_evidence {
+        let Some(data) = entry.get("data") else {
+            continue;
+        };
+
+        fill_once(
+            &mut focus.organization_structure,
+            data_string(data, "organization_structure"),
+        );
+        fill_once(
+            &mut focus.foundation_info,
+            data_string(data, "foundation_status").or_else(|| data_string(data, "foundation_info")),
+        );
+        fill_once(
+            &mut focus.operator_info,
+            data_string(data, "operator_info")
+                .or_else(|| data_string(data, "operator_supply_risk")),
+        );
+        fill_once(
+            &mut focus.version_lifecycle,
+            data_string(data, "version_lifecycle"),
+        );
