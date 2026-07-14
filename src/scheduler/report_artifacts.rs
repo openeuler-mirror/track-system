@@ -1836,3 +1836,26 @@ mod tests {
                     "Url": "https://example.com/grep/commit/1",
                 })],
             })
+            .unwrap();
+        let rewritten_rows = cve_fix_comparison_rows_for_inputs_with_issue_start(
+            &writer.inputs,
+            writer.issue_start_number,
+        );
+
+        assert_eq!(rewritten_rows[0].cve_or_issue, first_issue);
+        assert_ne!(rewritten_rows[1].cve_or_issue, first_issue);
+    }
+
+    #[test]
+    #[serial]
+    fn writes_one_sheet_per_system_version() {
+        let _blacklist_guard = EnvVarGuard::set("TRACK_XLSX_SYSTEM_VERSION_BLACKLIST", "");
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("report.xlsx");
+        let rows = vec![
+            CveFixComparisonRow {
+                package: "bash".to_string(),
+                cve_or_issue: "CVE-2026-1234".to_string(),
+                upstream_fixed_version: "5.2-3".to_string(),
+                ctyunos_current_version: "5.2-1".to_string(),
+                system_version: "CTyunOS22.06".to_string(),
