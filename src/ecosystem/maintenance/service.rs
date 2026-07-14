@@ -274,3 +274,26 @@ mod tests {
                 level: "medium".to_string(),
                 confidence: "high".to_string(),
                 score: 70,
+                coverage: 80,
+                reasons: vec!["moderate activity".to_string()],
+                evidence_refs: vec!["package".to_string()],
+                indicators: Vec::new(),
+            },
+            dimensions,
+            evidence_summary: json!({"evidence_count": 1}),
+            report_payload: json!({"context": {"package_id": 5}}),
+            generated_at: Utc::now(),
+        }
+    }
+
+    #[test]
+    fn evidence_summary_counts_categories_subcategories_and_sources() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+        let service = MaintenanceService::new(&db);
+        let package = package(Some("https://github.com/openssl/openssl.git"));
+        let evidence = vec![
+            json!({
+                "assessment_category": "maintenance",
+                "assessment_subcategory": "package_definition",
+                "source_name": "package"
+            }),
