@@ -164,3 +164,26 @@ fn parse_pagure_repo(url: &str) -> Option<PagureRepoRef> {
         .collect::<Vec<_>>();
 
     match host {
+        "pagure.io" => {
+            if segments.is_empty() {
+                return None;
+            }
+            let repo = segments.last()?.to_string();
+            let owner = if segments.len() > 1 {
+                segments[..segments.len() - 1].join("/")
+            } else {
+                "pagure".to_string()
+            };
+            Some(PagureRepoRef {
+                api_url: format!(
+                    "{}://{}/api/0/{}",
+                    normalized.scheme(),
+                    host,
+                    segments.join("/")
+                ),
+                owner,
+                repo,
+                platform: "pagure",
+            })
+        }
+        "src.fedoraproject.org" => {
