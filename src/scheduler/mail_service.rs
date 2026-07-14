@@ -117,3 +117,26 @@ impl SmtpTlsMode {
         }
     }
 }
+
+pub struct MailService {
+    config: MailConfig,
+}
+
+impl MailService {
+    pub fn from_env() -> Self {
+        Self {
+            config: MailConfig::from_env(),
+        }
+    }
+
+    pub fn new(config: MailConfig) -> Self {
+        Self { config }
+    }
+
+    pub fn enabled(&self) -> bool {
+        self.config.enabled
+    }
+
+    pub async fn send_xlsx_artifact(&self, artifact: &ReportArtifact) -> Result<()> {
+        if !self.config.enabled {
+            debug!("xlsx 邮件发送未启用");
