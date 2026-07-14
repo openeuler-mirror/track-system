@@ -142,3 +142,27 @@ pub async fn execute(api_client: &ApiClient, action: EcosystemAction) -> Result<
                 .and_then(ecosystem_preset_from_name);
             let request = UpdateEcosystemTargetRequest {
                 name: normalized_name,
+                target_type: target_type
+                    .or_else(|| preset.as_ref().map(|preset| preset.target_type.clone())),
+                platform: platform
+                    .or_else(|| preset.as_ref().and_then(|preset| preset.platform.clone())),
+                role: role.or_else(|| preset.as_ref().map(|preset| preset.role.clone())),
+                homepage_url: homepage_url.or_else(|| {
+                    preset
+                        .as_ref()
+                        .and_then(|preset| preset.homepage_url.clone())
+                }),
+                api_base_url: api_base_url.or_else(|| {
+                    preset
+                        .as_ref()
+                        .and_then(|preset| preset.api_base_url.clone())
+                }),
+                owner: owner.or_else(|| preset.as_ref().and_then(|preset| preset.owner.clone())),
+                repo: repo.or_else(|| preset.as_ref().and_then(|preset| preset.repo.clone())),
+                default_branch: default_branch.or_else(|| {
+                    preset
+                        .as_ref()
+                        .and_then(|preset| preset.default_branch.clone())
+                }),
+                status,
+                refresh_interval_hours,
