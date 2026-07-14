@@ -422,3 +422,26 @@ mod tests {
     }
 
     #[test]
+    fn assess_target_penalizes_stale_and_sparse_maintenance() {
+        let mut target = sample_target();
+        target.sync_interval_hours = 96;
+        let raw_evidence = vec![
+            json!({
+                "source_name": "generic_git_repository_activity",
+                "assessment_category": "maintenance",
+                "assessment_subcategory": "repository_activity",
+                "data": {
+                    "collector": "generic_git",
+                    "repo_html_url": target.l0_repo_url,
+                    "default_branch": "main",
+                    "commit_total": "12",
+                    "commits_last_12_months": "2",
+                    "committers_last_12_months": "1",
+                    "last_commit_at": (Utc::now() - chrono::Duration::days(180)).to_rfc3339()
+                }
+            }),
+            json!({
+                "source_name": "generic_git_platform_capability",
+                "assessment_category": "maintenance",
+                "assessment_subcategory": "platform_capability",
+                "data": {
