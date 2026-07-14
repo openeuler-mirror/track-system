@@ -667,3 +667,26 @@ impl GitHubPlatformCollector {
                 json!({ "error": format!("HTTP {}: {}", status, body), "total_requests": null })
             }
             Ok(resp) => match resp.json::<Value>().await {
+                Err(e) => {
+                    warn!(error = %e, "gov-takedowns API JSON 解析失败");
+                    json!({ "error": e.to_string(), "total_requests": null })
+                }
+                Ok(tree_resp) => parse_gov_takedown_tree(&tree_resp),
+            },
+        }
+    }
+
+    fn detect_copyright_info(&self, terms_page: &PageSnapshot, dmca_page: &PageSnapshot) -> Value {
+        let terms = terms_page.plain_text.as_str();
+        let dmca = dmca_page.plain_text.as_str();
+        let dmca_lower = dmca.to_ascii_lowercase();
+        let terms_lower = terms.to_ascii_lowercase();
+        let dmca_safe_harbor_mentioned = dmca_lower.contains("safe harbor");
+        let counter_notice_supported = dmca_lower.contains("counter notice");
+        let github_copyright_notice_mentioned = terms_lower.contains("copyright © github")
+            || terms_lower.contains("copyright & dmca policy");
+        let summary = format!(
+            "GitHub 提供版权投诉与 DMCA 处理机制{}{}{}",
+            if dmca_safe_harbor_mentioned {
+                "，强调平台维持 DMCA safe harbor 合规"
+            } else {
