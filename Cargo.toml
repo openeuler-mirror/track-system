@@ -93,6 +93,7 @@ md5 = "0.7"
 
 # 文件遍历
 walkdir = "2.5"
+tempfile = "3.10"
 
 # 异步 trait
 async-trait = "0.1"
