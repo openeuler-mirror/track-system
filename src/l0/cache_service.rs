@@ -123,3 +123,28 @@ impl<'a> L0RepoCacheService<'a> {
                     message: "package missing l0_repo_url".to_string(),
                 });
             }
+        };
+
+        let package_id = package.id;
+        let package_name = package.name.clone();
+        let repo_url_for_warm = repo_url.clone();
+        let warmed = tokio::task::spawn_blocking(move || warm_cached_mirror(&repo_url_for_warm))
+            .await
+            .context("join l0 cache warm task failed")??;
+
+        Ok(L0RepoCacheWarmItem {
+            package_id,
+            package_name,
+            repo_url: Some(warmed.repo_url),
+            cache_path: Some(warmed.cache_path.display().to_string()),
+            default_branch: warmed.default_branch,
+            cache_retained: warmed.cache_retained,
+            status: "warmed".to_string(),
+            message: if warmed.cache_retained {
+                "cache warmed".to_string()
+            } else {
+                "cache warmed and cleaned because retention is disabled".to_string()
+            },
+        })
+    }
+}
