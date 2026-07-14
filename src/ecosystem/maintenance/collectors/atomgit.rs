@@ -118,3 +118,27 @@ impl AtomGitMaintenanceCollector {
                     "assessment_category": "maintenance",
                     "assessment_subcategory": "repository_activity",
                     "data": {
+                        "collector": "atomgit_live_api",
+                        "platform": "atomgit",
+                        "owner": owner,
+                        "repo": repo,
+                        "repo_html_url": html_url,
+                        "default_branch": activity.default_branch,
+                        "commit_total": activity.commit_total,
+                        "commit_total_is_lower_bound": activity.commit_total_is_lower_bound,
+                        "commits_last_12_months": activity.commits_last_12_months,
+                        "commits_last_12_months_is_lower_bound": activity.commits_last_12_months_is_lower_bound,
+                        "committers_last_12_months": activity.committers_last_12_months,
+                        "last_commit_at": activity.last_commit_at,
+                        "stars": repo_info.stargazers_count,
+                        "forks": repo_info.forks_count,
+                    }
+                })),
+                Err(error) => warn!(
+                    owner = owner,
+                    repo = repo,
+                    package = package.name,
+                    error = %error,
+                    "AtomGit 活跃度指标采集失败，仅返回平台元数据"
+                ),
+            }
