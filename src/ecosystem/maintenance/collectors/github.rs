@@ -430,3 +430,26 @@ mod tests {
     }
 
     #[test]
+    fn parse_last_page_from_link_extracts_last_page() {
+        let link = "<https://api.github.com/repositories/1/commits?per_page=1&page=2>; rel=\"next\", <https://api.github.com/repositories/1/commits?per_page=1&page=185>; rel=\"last\"";
+        assert_eq!(parse_last_page_from_link(link), Some(185));
+    }
+
+    #[test]
+    fn parse_last_page_from_link_returns_none_without_last() {
+        let link =
+            "<https://api.github.com/repositories/1/commits?per_page=1&page=2>; rel=\"next\"";
+        assert_eq!(parse_last_page_from_link(link), None);
+    }
+
+    #[test]
+    fn parse_github_repo_accepts_standard_variants() {
+        assert_eq!(
+            parse_github_repo("https://github.com/example/project"),
+            Some(("example".to_string(), "project".to_string()))
+        );
+        assert_eq!(
+            parse_github_repo("https://github.com/example/project.git"),
+            Some(("example".to_string(), "project".to_string()))
+        );
+        assert_eq!(
