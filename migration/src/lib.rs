@@ -64,6 +64,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20260331_000002_create_ecosystem_bindings::Migration),
             Box::new(m20260331_000003_create_ecosystem_evidence_snapshots::Migration),
             Box::new(m20260331_000004_create_ecosystem_reports::Migration),
+            Box::new(m20260416_000002_create_maintenance_evidence_snapshots::Migration),
+            Box::new(m20260416_000003_create_maintenance_reports::Migration),
         ]
     }
 }
