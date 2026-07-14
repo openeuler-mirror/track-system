@@ -61,37 +61,47 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(EcosystemTargets::Metadata).json().null())
                     .col(
                         ColumnDef::new(EcosystemTargets::LastCollectedAt)
-                            .timestamp_with_time_zone()
+                            .custom(timestamp_type(backend))
                             .null(),
                     )
                     .col(
                         ColumnDef::new(EcosystemTargets::LastReportAt)
-                            .timestamp_with_time_zone()
+                            .custom(timestamp_type(backend))
                             .null(),
                     )
                     .col(ColumnDef::new(EcosystemTargets::LastError).text().null())
                     .col(
                         ColumnDef::new(EcosystemTargets::CreatedAt)
-                            .timestamp_with_time_zone()
+                            .custom(timestamp_type(backend))
                             .not_null()
                             .default(Expr::current_timestamp()),
                     )
                     .col(
                         ColumnDef::new(EcosystemTargets::UpdatedAt)
-                            .timestamp_with_time_zone()
+                            .custom(timestamp_type(backend))
                             .not_null()
                             .default(Expr::current_timestamp()),
                     )
-                    .index(
-                        Index::create()
-                            .name("idx_ecosystem_targets_name")
-                            .col(EcosystemTargets::Name),
-                    )
-                    .index(
-                        Index::create()
-                            .name("idx_ecosystem_targets_type")
-                            .col(EcosystemTargets::TargetType),
-                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_ecosystem_targets_name")
+                    .table(EcosystemTargets::Table)
+                    .col(EcosystemTargets::Name)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_ecosystem_targets_type")
+                    .table(EcosystemTargets::Table)
+                    .col(EcosystemTargets::TargetType)
                     .to_owned(),
             )
             .await
