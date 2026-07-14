@@ -939,3 +939,26 @@ fn write_stored_zip(path: &Path, files: &[(String, Vec<u8>)]) -> Result<()> {
 
     write_u32(&mut output, 0x0605_4b50)?;
     write_u16(&mut output, 0)?;
+    write_u16(&mut output, 0)?;
+    write_u16(&mut output, files.len() as u16)?;
+    write_u16(&mut output, files.len() as u16)?;
+    write_u32(&mut output, central_size)?;
+    write_u32(&mut output, central_offset)?;
+    write_u16(&mut output, 0)?;
+
+    fs::write(path, output)?;
+    Ok(())
+}
+
+fn write_u16(output: &mut Vec<u8>, value: u16) -> Result<()> {
+    output.write_all(&value.to_le_bytes())?;
+    Ok(())
+}
+
+fn write_u32(output: &mut Vec<u8>, value: u32) -> Result<()> {
+    output.write_all(&value.to_le_bytes())?;
+    Ok(())
+}
+
+fn crc32(bytes: &[u8]) -> u32 {
+    let mut crc = 0xffff_ffffu32;
