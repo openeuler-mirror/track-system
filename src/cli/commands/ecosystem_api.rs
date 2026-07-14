@@ -46,3 +46,27 @@ struct EcosystemPreset {
     role: String,
     homepage_url: Option<String>,
     api_base_url: Option<String>,
+    owner: Option<String>,
+    repo: Option<String>,
+    default_branch: Option<String>,
+    rule_profile: String,
+}
+
+pub async fn execute(api_client: &ApiClient, action: EcosystemAction) -> Result<()> {
+    match action {
+        EcosystemAction::Create {
+            name,
+            target_type,
+            role,
+            rule_profile,
+            platform,
+            homepage_url,
+            api_base_url,
+            owner,
+            repo,
+            default_branch,
+            status,
+            refresh_interval_hours,
+            metadata,
+        } => {
+            let preset = ecosystem_preset_from_name(&name);
