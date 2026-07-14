@@ -238,3 +238,27 @@ fn sync_cached_mirror(repo_url: &str) -> Result<Repository> {
                             "remove broken cached mirror failed: {}",
                             repo_path.display()
                         )
+                    })?;
+                } else {
+                    fs::remove_file(&repo_path).with_context(|| {
+                        format!(
+                            "remove broken cached mirror file failed: {}",
+                            repo_path.display()
+                        )
+                    })?;
+                }
+            }
+        }
+    }
+
+    create_cached_mirror(&repo_path, repo_url, timeouts)
+}
+
+fn create_cached_mirror(
+    repo_path: &Path,
+    repo_url: &str,
+    timeouts: GenericGitTimeouts,
+) -> Result<Repository> {
+    debug!(
+        repo_url,
+        cache_path = %repo_path.display(),
