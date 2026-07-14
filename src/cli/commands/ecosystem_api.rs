@@ -1085,3 +1085,26 @@ fn value_to_readable_text(value: &Value) -> Option<String> {
                 return None;
             }
             let values = items
+                .iter()
+                .filter_map(value_to_readable_text)
+                .collect::<Vec<_>>();
+            if values.is_empty() {
+                None
+            } else {
+                Some(values.join("；"))
+            }
+        }
+        Value::Object(_) => serde_json::to_string(value).ok(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_metadata_accepts_valid_json() {
+        let value = parse_metadata(Some(
+            r#"{"source_assessment":{"foundation":{"a":1}}}"#.to_string(),
+        ))
+        .unwrap();
