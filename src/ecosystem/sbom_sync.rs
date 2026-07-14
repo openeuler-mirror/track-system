@@ -118,3 +118,26 @@ pub struct CommunityInnerSyncReq {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub summary: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub organization_structure: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub foundation_info: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub operator_info: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub version_lifecycle: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub license_info: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cla_info: Option<String>,
+    pub inner_secret: String,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub struct SbomCommunitySyncResponse {
+    pub code: i32,
+    #[serde(default)]
+    pub msg: String,
+    pub data: Option<SbomCommunitySyncData>,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
