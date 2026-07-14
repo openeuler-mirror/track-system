@@ -102,6 +102,8 @@ enum Commands {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    load_track_system_env();
+
     let raw_args: Vec<String> = std::env::args().collect();
     let arg_lang = detect_lang_from_args(&raw_args);
     let locale = init_i18n(arg_lang.as_deref());
