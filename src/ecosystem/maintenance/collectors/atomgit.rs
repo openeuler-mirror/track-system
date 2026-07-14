@@ -237,3 +237,26 @@ async fn count_commits(
             owner,
             repo,
             branch,
+            since,
+            page,
+            COMMITS_PER_PAGE,
+        )
+        .await?;
+        if commits.is_empty() {
+            return Ok((total, false));
+        }
+
+        total += commits.len() as i64;
+        if commits.len() < COMMITS_PER_PAGE as usize {
+            return Ok((total, false));
+        }
+    }
+
+    warn!(
+        owner,
+        repo, branch, max_pages, "AtomGit commit 计数达到页数上限，返回下界"
+    );
+    Ok((total, true))
+}
+
+async fn collect_recent_activity(
