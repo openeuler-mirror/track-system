@@ -252,3 +252,26 @@ mod tests {
             unreachable!("file content is not used in activity tests")
         }
     }
+
+    fn commit(sha: &str, email: &str, when: DateTime<Utc>) -> Commit {
+        Commit {
+            sha: sha.to_string(),
+            title: sha.to_string(),
+            message: sha.to_string(),
+            author_name: "Author".to_string(),
+            author_email: email.to_string(),
+            author_date: when,
+            committer_name: "Committer".to_string(),
+            committer_email: email.to_string(),
+            committer_date: when,
+            html_url: String::new(),
+            stats: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn collect_commit_activity_counts_total_and_recent_committers() {
+        let now = Utc.with_ymd_and_hms(2026, 4, 23, 10, 0, 0).unwrap();
+        let client = MockGitClient {
+            latest: vec![commit("latest", "latest@example.com", now)],
+            total_pages: vec![
