@@ -434,6 +434,7 @@ impl From<Commit> for CommitMetadata {
     fn from(commit: Commit) -> Self {
         Self {
             sha: commit.sha,
+            api_url: commit.html_url,
             title: commit.title,
             message: commit.message,
             author: commit.author_name,
