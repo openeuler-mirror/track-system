@@ -240,12 +240,20 @@ impl VersionParser {
 
         let minor = parts
             .get(1)
-            .and_then(|s| s.parse::<u32>().ok())
+            .map(|s| {
+                s.parse::<u32>()
+                    .map_err(|_| anyhow!("无法解析次版本号: {}", version_str))
+            })
+            .transpose()?
             .unwrap_or(0);
 
         let patch = parts
             .get(2)
-            .and_then(|s| s.parse::<u32>().ok())
+            .map(|s| {
+                s.parse::<u32>()
+                    .map_err(|_| anyhow!("无法解析修订版本号: {}", version_str))
+            })
+            .transpose()?
             .unwrap_or(0);
 
         Ok(Version {
