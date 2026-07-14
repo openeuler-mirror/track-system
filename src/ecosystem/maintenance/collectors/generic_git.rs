@@ -745,3 +745,26 @@ fn is_non_release_tag(tag: &str) -> bool {
 
 fn is_probable_date_tag_version(version: &str) -> bool {
     let parts = version
+        .split(['.', '-'])
+        .take(3)
+        .filter_map(|part| part.parse::<u32>().ok())
+        .collect::<Vec<_>>();
+
+    matches!(parts.as_slice(), [1900..=2100, 1..=12, 1..=31])
+}
+
+fn latest_version_from_generic_versions(
+    versions: &[GenericGitVersion],
+    stable_only: bool,
+) -> Option<String> {
+    versions
+        .iter()
+        .filter(|version| !stable_only || version.is_stable)
+        .filter_map(|version| {
+            VersionParser::parse(&version.version)
+                .ok()
+                .map(|parsed| (parsed, version.version.clone()))
+        })
+        .max_by(|(left, _), (right, _)| left.cmp(right))
+        .map(|(_, raw)| raw)
+}
