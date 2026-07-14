@@ -214,3 +214,27 @@ fn with_synced_mirror<T>(
     }
 
     result
+}
+
+fn sync_cached_mirror(repo_url: &str) -> Result<Repository> {
+    let timeouts = generic_git_timeouts();
+    let cache_root = cached_mirror_root();
+    fs::create_dir_all(&cache_root).context("create generic git cache root failed")?;
+
+    let repo_path = cached_mirror_path(repo_url);
+    if repo_path.exists() {
+        match open_and_update_cached_mirror(&repo_path, repo_url, timeouts) {
+            Ok(repo) => return Ok(repo),
+            Err(error) => {
+                warn!(
+                    repo_url,
+                    cache_path = %repo_path.display(),
+                    error = %error,
+                    "generic git cached mirror 已损坏，准备重建"
+                );
+                if repo_path.is_dir() {
+                    fs::remove_dir_all(&repo_path).with_context(|| {
+                        format!(
+                            "remove broken cached mirror failed: {}",
+                            repo_path.display()
+                        )
