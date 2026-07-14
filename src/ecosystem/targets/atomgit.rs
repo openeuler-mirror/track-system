@@ -813,3 +813,26 @@ impl AtomGitPlatformCollector {
         })
     }
 
+    fn detect_download_integrity(
+        &self,
+        gpg_page: &PageSnapshot,
+        release_overview_page: &PageSnapshot,
+        release_operations_page: &PageSnapshot,
+    ) -> Value {
+        let gpg_text = gpg_page.plain_text.as_str();
+        let release_text = format!(
+            "{}\n{}",
+            release_overview_page.plain_text, release_operations_page.plain_text
+        );
+        let release_lower = release_text.to_ascii_lowercase();
+        let supports_gpg_commit_tag_verification =
+            gpg_text.contains("提交/Tag 签名") || gpg_text.to_ascii_lowercase().contains("gpg key");
+        let supports_release_attachments =
+            release_text.contains("附件") || release_text.contains("下载源码");
+        let documented_release_checksum = release_lower.contains("sha256")
+            || release_lower.contains("sha-256")
+            || release_lower.contains("checksum")
+            || release_lower.contains("md5");
+        let documented_release_artifact_signature =
+            release_lower.contains("gpg") || release_lower.contains("signature");
+        let hash_verification_supported = documented_release_checksum;
