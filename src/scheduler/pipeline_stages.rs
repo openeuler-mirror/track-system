@@ -2339,17 +2339,19 @@ impl<'a> PipelineExecutor<'a> {
         let mut classified_count = 0;
         let mut cve_count = 0;
         let mut needs_review_count = 0;
+        let mut classified_commits = Vec::new();
 
         for commit in pending_commits {
             // 分类 commit
             match classifier.classify_commit(commit.id).await {
                 Ok(classification) => {
+                    let commit_sha = commit.commit_sha.clone();
+                    let primary_change_type = classification.primary_type.as_str().to_string();
+                    let cve_numbers = classification.cve_numbers.clone();
                     // 更新 commit 记录
                     let mut active_commit: l1_commit_records::ActiveModel = commit.into();
-                    active_commit.primary_change_type =
-                        Set(Some(classification.primary_type.as_str().to_string()));
-                    active_commit.cve_list =
-                        Set(Some(serde_json::to_value(&classification.cve_numbers)?));
+                    active_commit.primary_change_type = Set(Some(primary_change_type.clone()));
+                    active_commit.cve_list = Set(Some(serde_json::to_value(&cve_numbers)?));
                     active_commit.spec_changed = Set(classification.has_spec_change);
                     active_commit.classification_status = Set("done".to_string());
                     active_commit.updated_at = Set(Utc::now());
