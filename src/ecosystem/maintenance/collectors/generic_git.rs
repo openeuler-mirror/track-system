@@ -400,3 +400,26 @@ fn fetch_command_args(repo_path: &Path, refspec: &str, use_partial_filter: bool)
 
 fn cached_head_matches_remote(repo: &Repository, remote_head: &RemoteHead) -> bool {
     let Some(remote_oid) = remote_head.head_oid else {
+        return false;
+    };
+
+    let cached_oid = if let Some(branch) = remote_head.default_branch.as_deref() {
+        repo.find_reference(branch)
+            .ok()
+            .and_then(|reference| reference.target())
+    } else {
+        repo.head().ok().and_then(|head| {
+            head.target()
+                .or_else(|| head.peel_to_commit().ok().map(|commit| commit.id()))
+        })
+    };
+
+    cached_oid == Some(remote_oid)
+}
+
+fn should_retry_fetch_without_filter(error: &anyhow::Error) -> bool {
+    let message = error.to_string().to_ascii_lowercase();
+    message.contains("filter")
+        || message.contains("partial clone")
+        || message.contains("promisor")
+        || message.contains("protocol version")
