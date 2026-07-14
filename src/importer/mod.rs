@@ -19,9 +19,11 @@
 pub mod csv;
 pub mod metadata;
 pub mod metadata_importer;
+pub mod xlsx;
 
 pub use csv::{CsvImporter, ImportResult, ImportStats};
 pub use metadata::{ImportOptions, ImportResult as MetadataImportResult, MetadataImporter};
 pub use metadata_importer::{
     CollectedMetadata, ImportResult as CollectorImportResult, MetadataImporter as CollectorImporter,
 };
+pub use xlsx::{parse_xlsx_packages, XlsxPackageRow, XlsxParseResult};
