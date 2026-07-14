@@ -525,3 +525,26 @@ mod tests {
             .findings
             .iter()
             .map(|finding| finding.title.as_str())
+            .collect::<Vec<_>>();
+        assert!(titles.contains(&"L0 社区安全评估"));
+        assert!(titles.contains(&"L0 社区质量评估"));
+        assert!(response
+            .findings
+            .iter()
+            .any(|finding| finding.evidence.contains("has_security_policy=false")));
+        assert!(response
+            .findings
+            .iter()
+            .any(|finding| finding.evidence.contains("signed_releases=false")));
+    }
+
+    #[tokio::test]
+    async fn local_analysis_reads_ecosystem_report_sections() {
+        let service = AiAnalysisService::new(AiConfig {
+            enabled: false,
+            provider: "openai-compatible".to_string(),
+            base_url: "http://localhost".to_string(),
+            api_key: None,
+            model: "test".to_string(),
+            timeout: std::time::Duration::from_secs(1),
+            max_input_chars: 1000,
