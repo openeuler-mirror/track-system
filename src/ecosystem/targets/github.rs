@@ -238,3 +238,27 @@ impl GitHubPlatformCollector {
             "GitHub 平台生态目标关键信息提取完成"
         );
 
+        vec![
+            json!({
+                "source_type": "github_platform_overview",
+                "source_name": "github_platform_overview",
+                "source_url": GITHUB_ABOUT_URL,
+                "assessment_category": "source",
+                "assessment_subcategory": "platform_overview",
+                "data": {
+                    "platform_intro": basic_info["summary"],
+                    "about_keyword_lines": about_page.keyword_lines,
+                    "about_http_status": about_page.http_status,
+                    "about_error": about_page.error,
+                }
+            }),
+            json!({
+                "source_type": "github_corporate_profile",
+                "source_name": "github_corporate_profile",
+                "source_url": GITHUB_CORPORATE_URL,
+                "assessment_category": "source",
+                "assessment_subcategory": "corporate_profile",
+                "data": {
+                    "organization_structure": corporate_profile["organization_structure"],
+                    "foundation_status": corporate_profile["foundation_status"],
+                    "microsoft_acquisition_completed": corporate_profile["microsoft_acquisition_completed"],
