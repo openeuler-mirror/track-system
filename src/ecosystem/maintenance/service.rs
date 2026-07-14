@@ -67,3 +67,26 @@ impl<'a> MaintenanceService<'a> {
                 raw_payload: Set(payload.clone()),
                 normalized_signals: Set(payload.get("data").cloned()),
                 collected_at: Set(now),
+                created_at: Set(now),
+                updated_at: Set(now),
+                ..Default::default()
+            };
+            evidence.insert(self.db).await?;
+        }
+
+        let evidence_summary = self.build_evidence_summary(&package, &evidence_payloads);
+        let assessment = assess_target(&package, evidence_summary.clone(), &evidence_payloads);
+        let report = self.save_report(package.id, assessment).await?;
+
+        Ok(MaintenanceRefreshResult {
+            package_id,
+            evidence_count: evidence_payloads.len(),
+            report_id: report.id,
+            generated_at: report.generated_at,
+        })
+    }
+
+    pub async fn latest_report(
+        &self,
+        package_id: i32,
+    ) -> Result<Option<maintenance_reports::Model>> {
