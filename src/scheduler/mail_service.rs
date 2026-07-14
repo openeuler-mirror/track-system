@@ -209,3 +209,26 @@ fn build_artifact_message(
     let attachment_bytes = fs::read(attachment_path)
         .with_context(|| format!("读取 xlsx 附件失败: {}", attachment_path.display()))?;
 
+    let mut builder = Message::builder()
+        .from(parse_mailbox(&config.from).context("解析 TRACK_MAIL_FROM 失败")?)
+        .subject(config.subject.clone());
+
+    for recipient in &config.to {
+        builder = builder.to(parse_mailbox(recipient)
+            .with_context(|| format!("解析 TRACK_MAIL_TO 收件人失败: {}", recipient))?);
+    }
+    for recipient in &config.cc {
+        builder = builder.cc(parse_mailbox(recipient)
+            .with_context(|| format!("解析 TRACK_MAIL_CC 收件人失败: {}", recipient))?);
+    }
+
+    let plain_body = build_plain_body(config, artifact);
+    let html_body = build_html_body(config, artifact);
+    let content_type =
+        ContentType::parse("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            .context("解析 xlsx Content-Type 失败")?;
+    let message = builder
+        .multipart(
+            MultiPart::mixed()
+                .multipart(MultiPart::alternative_plain_html(plain_body, html_body))
+                .singlepart(Attachment::new(file_name).body(attachment_bytes, content_type)),
