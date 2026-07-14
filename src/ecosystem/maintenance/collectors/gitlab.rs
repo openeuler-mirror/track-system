@@ -142,3 +142,27 @@ impl GitLabMaintenanceCollector {
 
         Ok(evidence)
     }
+}
+
+fn build_client() -> Result<Client> {
+    Client::builder()
+        .timeout(std::time::Duration::from_secs(DEFAULT_TIMEOUT_SECS))
+        .user_agent("track-system/maintenance-gitlab")
+        .build()
+        .context("build gitlab maintenance client failed")
+}
+
+async fn fetch_project(client: &Client, repo_ref: &GitLabRepoRef) -> Result<GitLabProjectSnapshot> {
+    let encoded = urlencoding::encode(&repo_ref.project_path);
+    let url = format!("{}/projects/{}", repo_ref.api_base, encoded);
+    let mut request = client.get(&url);
+
+    if let Ok(token) = std::env::var("GITLAB_PRIVATE_TOKEN")
+        .or_else(|_| std::env::var("GITLAB_TOKEN"))
+        .or_else(|_| std::env::var("GITLAB_ACCESS_TOKEN"))
+    {
+        if !token.trim().is_empty() {
+            request = request.header("PRIVATE-TOKEN", token);
+        }
+    }
+
