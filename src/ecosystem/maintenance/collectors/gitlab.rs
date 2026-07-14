@@ -166,3 +166,26 @@ async fn fetch_project(client: &Client, repo_ref: &GitLabRepoRef) -> Result<GitL
         }
     }
 
+    let response = request
+        .send()
+        .await
+        .context("send gitlab project request failed")?;
+    let status = response.status();
+    if !status.is_success() {
+        let body = response.text().await.unwrap_or_default();
+        return Err(anyhow!("GitLab API HTTP {}: {}", status.as_u16(), body));
+    }
+
+    response
+        .json::<GitLabProjectSnapshot>()
+        .await
+        .context("parse gitlab project response failed")
+}
+
+fn parse_gitlab_repo(url: &str) -> Option<GitLabRepoRef> {
+    let normalized = normalize_repo_url(url)?;
+    let host = normalized.host_str()?.to_string();
+    if host != "gitlab.com" && !host.starts_with("gitlab.") {
+        return None;
+    }
+
