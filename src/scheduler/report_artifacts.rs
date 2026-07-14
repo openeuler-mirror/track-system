@@ -430,3 +430,27 @@ fn collect_rows_into_volumes(
         }
 
         for identifier in identifiers {
+            if !group.identifiers.contains(&identifier) {
+                group.identifiers.push(identifier);
+            }
+        }
+        if !description_entry.is_empty() && !group.descriptions.contains(&description_entry) {
+            group.descriptions.push(description_entry);
+        }
+        if group.commit_url.is_none() && !commit_url.is_empty() {
+            group.commit_url = Some(commit_url);
+        }
+    }
+}
+
+fn volume_index_for_package(
+    volumes: &mut Vec<Vec<RowGroup>>,
+    package_name: &str,
+    max_packages: usize,
+) -> usize {
+    if let Some(idx) = volumes
+        .iter()
+        .position(|groups| groups.iter().any(|group| group.package == package_name))
+    {
+        return idx;
+    }
