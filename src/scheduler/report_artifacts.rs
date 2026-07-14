@@ -1330,3 +1330,26 @@ mod tests {
             issue_start,
         );
 
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].cve_or_issue, "CVE-2026-1234,ISSUE-12010");
+    }
+
+    #[test]
+    #[serial]
+    fn rows_merge_same_package_and_keep_latest_upstream_version() {
+        let issue_start = 12020;
+        let commits = vec![
+            serde_json::json!({
+                "Description": "Fix CVE-2026-4878",
+                "CVEList": ["CVE-2026-4878"],
+                "Url": "https://example.com/commit/cve",
+                "UpstreamVersion": "2.32",
+                "UpstreamRelease": "10",
+            }),
+            serde_json::json!({
+                "Description": "Fix issue",
+                "CVEList": [],
+                "Url": "https://example.com/commit/issue",
+                "UpstreamVersion": "2.32",
+                "UpstreamRelease": "11",
+            }),
