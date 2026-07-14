@@ -847,3 +847,26 @@ fn sheet_xml(rows: &[CveFixComparisonRow]) -> String {
                 rid += 1;
             }
         }
+        xml.push_str("</hyperlinks>");
+    }
+
+    xml.push_str(
+        r#"<pageMargins left="0.75" right="0.75" top="1" bottom="1" header="0.5" footer="0.5"/></worksheet>"#,
+    );
+    xml
+}
+
+fn sheet_rels_xml(rows: &[CveFixComparisonRow]) -> String {
+    let mut xml = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">"#
+        .to_string();
+    let mut rid = 1;
+    for row in rows {
+        if let Some(url) = row.commit_url.as_deref().filter(|url| !url.is_empty()) {
+            xml.push_str(&format!(
+                r#"<Relationship Id="rId{}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="{}" TargetMode="External"/>"#,
+                rid,
+                xml_escape(url)
+            ));
+            rid += 1;
+        }
