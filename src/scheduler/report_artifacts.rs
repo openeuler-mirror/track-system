@@ -1100,3 +1100,26 @@ fn rpm_like_cmp(left: &str, right: &str) -> Ordering {
                 Some((right_is_num, right_value, next_right)),
             ) => {
                 left_pos = next_left;
+                right_pos = next_right;
+
+                let ord = match (left_is_num, right_is_num) {
+                    (true, false) => Ordering::Greater,
+                    (false, true) => Ordering::Less,
+                    (true, true) => compare_numeric_segment(left_value, right_value),
+                    (false, false) => left_value.cmp(right_value),
+                };
+                if ord != Ordering::Equal {
+                    return ord;
+                }
+            }
+        }
+    }
+}
+
+fn next_version_segment(value: &str, mut pos: usize) -> Option<(bool, &str, usize)> {
+    let bytes = value.as_bytes();
+    while pos < bytes.len() && !bytes[pos].is_ascii_alphanumeric() {
+        pos += 1;
+    }
+    if pos >= bytes.len() {
+        return None;
