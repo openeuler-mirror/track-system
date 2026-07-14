@@ -791,6 +791,15 @@ mod tests_extra {
         };
 
         let db = MockDatabase::new(DatabaseBackend::Postgres)
+            // trigger_manual_sync: get_tracking
+            .append_query_results::<tracking::Model, _, _>(vec![vec![track.clone()]])
+            // queue_sync_job: find_active_sync_job
+            .append_query_results::<sync_jobs::Model, _, _>(vec![vec![]])
+            // queue_sync_job: find_retryable_failed_job
+            .append_query_results::<sync_jobs::Model, _, _>(vec![vec![]])
+            // queue_sync_job: Tracking::find_by_id
+            .append_query_results::<tracking::Model, _, _>(vec![vec![track.clone()]])
+            // queue_sync_job: insert sync_job
             .append_query_results::<sync_jobs::Model, _, _>(vec![vec![job.clone()]])
             .append_query_results::<sync_jobs::Model, _, _>(vec![vec![job.clone()]])
             .append_query_results::<tracking::Model, _, _>(vec![vec![track.clone()]])
