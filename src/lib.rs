@@ -34,6 +34,7 @@ pub mod cli;
 pub mod collectors;
 pub mod component;
 pub mod diff;
+pub mod ecosystem;
 pub mod entities;
 pub mod exporter;
 pub mod i18n;
