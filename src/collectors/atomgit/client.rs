@@ -181,8 +181,10 @@ impl GitClient for AtomGitClient {
         let atomgit_commits: Vec<AtomGitCommit> = self.get(&url).await?;
 
         let mut commit_vec = Vec::new();
-        for commit in &atomgit_commits {
-            let commit_detail = self.get_commit_detail(owner, repo, &commit.sha).await?;
+        for commit in atomgit_commits {
+            let mut commit_detail = self.get_commit_detail(owner, repo, &commit.sha).await?;
+            commit_detail.sha = commit.sha;
+            commit_detail.html_url = commit.html_url;
             debug!("AtomGit API GET commit detail: {:?}", commit_detail);
             commit_vec.push(commit_detail);
         }
