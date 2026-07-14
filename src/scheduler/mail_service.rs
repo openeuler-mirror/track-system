@@ -531,3 +531,26 @@ mod tests {
         assert_eq!(config.smtp_tls, SmtpTlsMode::StartTls);
     }
 
+    #[test]
+    #[serial]
+    fn config_from_env_parses_recipients_and_tls() {
+        let _guard = env_lock().lock().unwrap();
+        let _enabled = EnvVarGuard::set("TRACK_MAIL_ENABLED", "true");
+        let _host = EnvVarGuard::set("TRACK_MAIL_SMTP_HOST", "smtp.example.com");
+        let _port = EnvVarGuard::set("TRACK_MAIL_SMTP_PORT", "465");
+        let _tls = EnvVarGuard::set("TRACK_MAIL_SMTP_TLS", "wrapper");
+        let _from = EnvVarGuard::set("TRACK_MAIL_FROM", "track@example.com");
+        let _to = EnvVarGuard::set("TRACK_MAIL_TO", "a@example.com, b@example.com");
+        let _cc = EnvVarGuard::set("TRACK_MAIL_CC", "c@example.com");
+        let _password = EnvVarGuard::remove("TRACK_MAIL_SMTP_PASSWORD");
+        let _password_encrypted = EnvVarGuard::remove("TRACK_MAIL_SMTP_PASSWORD_ENCRYPTED");
+        let _password_key = EnvVarGuard::remove("TRACK_MAIL_SMTP_PASSWORD_KEY_FILE");
+
+        let config = MailConfig::from_env();
+
+        assert!(config.enabled);
+        assert_eq!(config.smtp_host, "smtp.example.com");
+        assert_eq!(config.smtp_port, 465);
+        assert_eq!(config.smtp_tls, SmtpTlsMode::Wrapper);
+        assert_eq!(config.to, vec!["a@example.com", "b@example.com"]);
+        assert_eq!(config.cc, vec!["c@example.com"]);
