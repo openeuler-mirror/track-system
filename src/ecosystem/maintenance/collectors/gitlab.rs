@@ -70,3 +70,27 @@ impl GitLabMaintenanceCollector {
             repo = repo_ref.repo,
             stars = project.star_count,
             forks = project.forks_count,
+            "GitLab 平台维护元数据采集完成"
+        );
+
+        let mut evidence = vec![json!({
+            "source_type": "gitlab_repository_metadata",
+            "source_name": "gitlab_repository_metadata",
+            "source_url": project.web_url,
+            "http_status": 200,
+            "assessment_category": "maintenance",
+            "assessment_subcategory": "repository_metadata",
+            "data": {
+                "collector": "gitlab_live_api",
+                "platform": "gitlab",
+                "owner": repo_ref.owner,
+                "repo": repo_ref.repo,
+                "repo_html_url": project.web_url,
+                "default_branch": project.default_branch,
+                "stars": project.star_count,
+                "forks": project.forks_count,
+                "social_metrics_supported": true,
+            }
+        })];
+
+        if let Some(branch) = project
