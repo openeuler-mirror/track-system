@@ -916,3 +916,26 @@ fn write_stored_zip(path: &Path, files: &[(String, Vec<u8>)]) -> Result<()> {
         write_u32(&mut central_directory, 0x0201_4b50)?;
         write_u16(&mut central_directory, 20)?;
         write_u16(&mut central_directory, 20)?;
+        write_u16(&mut central_directory, 0)?;
+        write_u16(&mut central_directory, 0)?;
+        write_u16(&mut central_directory, dos_time)?;
+        write_u16(&mut central_directory, dos_date)?;
+        write_u32(&mut central_directory, crc)?;
+        write_u32(&mut central_directory, size)?;
+        write_u32(&mut central_directory, size)?;
+        write_u16(&mut central_directory, name_bytes.len() as u16)?;
+        write_u16(&mut central_directory, 0)?;
+        write_u16(&mut central_directory, 0)?;
+        write_u16(&mut central_directory, 0)?;
+        write_u16(&mut central_directory, 0)?;
+        write_u32(&mut central_directory, 0)?;
+        write_u32(&mut central_directory, offset)?;
+        central_directory.write_all(name_bytes)?;
+    }
+
+    let central_offset = output.len() as u32;
+    let central_size = central_directory.len() as u32;
+    output.extend_from_slice(&central_directory);
+
+    write_u32(&mut output, 0x0605_4b50)?;
+    write_u16(&mut output, 0)?;
