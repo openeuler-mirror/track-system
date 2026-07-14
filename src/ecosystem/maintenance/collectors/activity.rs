@@ -45,3 +45,26 @@ async fn collect_commit_activity_with_limits<C>(
     owner: &str,
     repo: &str,
     branch: &str,
+    max_total_pages: u32,
+    max_recent_pages: u32,
+) -> Result<RepositoryActivityMetrics>
+where
+    C: GitClient + ?Sized,
+{
+    let since = Utc::now() - Duration::days(365);
+    let latest_commit = client
+        .get_commits(owner, repo, CommitsParams::new(branch).page(1).per_page(1))
+        .await
+        .with_context(|| format!("fetch latest commits failed for {owner}/{repo}"))?;
+    let last_commit_at = latest_commit
+        .first()
+        .map(commit_timestamp)
+        .map(|value| value.to_rfc3339());
+
+    let (commit_total, commit_total_is_lower_bound) =
+        count_commits(client, owner, repo, branch, None, max_total_pages).await?;
+    let (recent_commits, commits_last_12_months_is_lower_bound, recent_committers) =
+        collect_recent_activity(client, owner, repo, branch, since, max_recent_pages).await?;
+
+    Ok(RepositoryActivityMetrics {
+        default_branch: Some(branch.to_string()),
