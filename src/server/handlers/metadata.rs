@@ -299,15 +299,15 @@ pub async fn import_l2_metadata(
     tracing::info!(
         "L2 元数据导入完成: snapshot_id={}, files={}, commits={}, issues={}",
         snapshot_id,
-        request.snapshot.files.len(),
-        request.snapshot.commits.len(),
-        request.snapshot.issues.len()
+        snapshot.files.len(),
+        snapshot.commits.len(),
+        snapshot.issues.len()
     );
 
     let response = ImportResponse {
         snapshot_id,
         tracking_id: request.tracking_id,
-        file_count: request.snapshot.files.len(),
+        file_count: snapshot.files.len(),
         imported_at: now,
     };
 
