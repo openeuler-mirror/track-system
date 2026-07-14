@@ -521,6 +521,35 @@ pub enum PackageAction {
         description: Option<String>,
     },
 
+    /// 从配置文件批量导入软件包
+    #[command(about = "Import packages from a repo mapping file")]
+    Import {
+        /// 配置文件路径，格式参考 l1_package_name.txt：name,url
+        #[arg(long)]
+        file: String,
+        /// 默认优先级等级
+        #[arg(long, default_value = "1")]
+        level: i32,
+        /// 默认同步间隔（如 12h, 24h）
+        #[arg(long, default_value = "24h")]
+        sync_interval: String,
+        /// 默认描述（可选）
+        #[arg(long)]
+        description: Option<String>,
+        /// 已存在时更新 L0 仓库和元数据，而不是报错
+        #[arg(long, default_value_t = true)]
+        update_existing: bool,
+        /// 导入 package 后，按约定模板自动创建 tracking
+        #[arg(long, default_value_t = false)]
+        create_tracking: bool,
+        /// 当启用 --create-tracking 时必填，表示 tracking 使用的发行版 ID
+        #[arg(long)]
+        distro: Option<String>,
+        /// 当启用 --create-tracking 时使用的 tracking 状态
+        #[arg(long, default_value = "active")]
+        tracking_status: String,
+    },
+
     /// 列出所有软件包
     #[command(about = "List all packages")]
     List {
