@@ -322,7 +322,6 @@ impl SchedulerManager {
             if pending_count == 0 {
                 break;
             }
-
             let limit = self.config.max_concurrent_jobs.min(pending_count);
             let mut executed_in_round = 0;
 
