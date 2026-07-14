@@ -22,3 +22,26 @@ struct GiteeRepositorySnapshot {
     stargazers_count: Option<i64>,
     forks_count: Option<i64>,
 }
+
+impl GiteeMaintenanceCollector {
+    pub fn new() -> Self {
+        Self
+    }
+
+    pub fn matches_package(package: &packages::Model) -> bool {
+        package
+            .l0_repo_url
+            .as_deref()
+            .and_then(parse_gitee_repo)
+            .is_some()
+    }
+
+    pub async fn collect(&self, package: &packages::Model) -> Result<Vec<Value>> {
+        let repo_url = package
+            .l0_repo_url
+            .as_deref()
+            .ok_or_else(|| anyhow!("package {} missing l0_repo_url", package.name))?;
+        let (owner, repo) = parse_gitee_repo(repo_url)
+            .ok_or_else(|| anyhow!("failed to parse Gitee repo from {}", repo_url))?;
+
+        info!(
