@@ -514,3 +514,26 @@ impl AtomGitPlatformCollector {
                 project_scale
                     .as_ref()
                     .map(|v| format!("、{} Open Source Projects", v))
+                    .unwrap_or_default(),
+                repository_scale
+                    .as_ref()
+                    .map(|v| format!("、{} Code Repository", v))
+                    .unwrap_or_default(),
+            )
+        } else {
+            "AtomGit 是提供代码托管、协作开发、项目管理与发布能力的平台".to_string()
+        };
+
+        json!({
+            "summary": summary,
+            "registered_user_scale": registered_user_scale,
+            "organization_scale": organization_scale,
+            "project_scale": project_scale,
+            "repository_scale": repository_scale,
+        })
+    }
+
+    fn detect_operator_profile(&self, privacy_page: &PageSnapshot) -> Value {
+        let text = privacy_page.plain_text.as_str();
+        let operator_transition_mentioned = text
+            .contains("开放原子开源基金会变更为重庆开源共创科技有限公司")
