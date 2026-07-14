@@ -646,3 +646,27 @@ fn print_report_detail(report: &EcosystemReportDto, verbose: bool) {
         "  生成时间: {}",
         format_datetime_local(&report.generated_at)
     );
+}
+
+fn print_source_focus_details(report_payload: &Value) {
+    let organization = find_source_focus_value(report_payload, "organization_structure");
+    let foundation = find_source_focus_value(report_payload, "foundation_status");
+    let operator_name = find_source_focus_value(report_payload, "operator_name");
+    let operator_supply_risk = find_source_focus_value(report_payload, "operator_supply_risk");
+    let lifecycle = find_source_focus_value(report_payload, "version_lifecycle");
+    let platform_intro = find_source_focus_value(report_payload, "platform_intro");
+    let trade_controls = find_source_focus_value(report_payload, "trade_controls");
+    let ip_policy = find_source_focus_value(report_payload, "ip_policy");
+    let government_takedown = find_source_focus_value(report_payload, "government_takedown_policy");
+    let license = find_source_focus_value(report_payload, "license_policy");
+    let copyright = find_source_focus_value(report_payload, "copyright_info");
+    let cla = find_source_focus_value(report_payload, "cla_policy");
+    let hash_signature = find_quality_focus_value(report_payload, "hash_signature_assessment");
+
+    if organization.is_none()
+        && foundation.is_none()
+        && operator_name.is_none()
+        && operator_supply_risk.is_none()
+        && lifecycle.is_none()
+        && platform_intro.is_none()
+        && trade_controls.is_none()
