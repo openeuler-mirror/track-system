@@ -70,3 +70,27 @@ impl AiAnalysisService {
         let allow_external_research = request.allow_external_research.unwrap_or(true);
         let messages = build_messages(
             context,
+            request.question.as_deref(),
+            language,
+            max_chars,
+            AiPromptOptions {
+                allow_external_research,
+            },
+        );
+        let raw = client.analyze(messages).await?;
+
+        Ok(AiAnalysisResponse {
+            source: context.source,
+            generated_at: Utc::now(),
+            model: client.model().to_string(),
+            used_remote_model: true,
+            external_research_used: bool_field(&raw, "external_research_used"),
+            summary: string_field(&raw, "summary")
+                .unwrap_or_else(|| "AI 模型未返回 summary 字段".to_string()),
+            risk: string_field(&raw, "risk")
+                .map(|value| AiRiskLevel::from_report_value(&value))
+                .unwrap_or_else(|| infer_risk_from_context(context)),
+            confidence: string_field(&raw, "confidence").unwrap_or_else(|| "medium".to_string()),
+            findings: parse_findings(&raw),
+            recommended_actions: parse_string_array(&raw, "recommended_actions"),
+            external_references: parse_string_array(&raw, "external_references"),
