@@ -94,3 +94,27 @@ impl RoundCveFixComparisonWriter {
             inputs: Vec::new(),
             artifacts: Vec::new(),
         }
+    }
+
+    pub fn append_input(&mut self, input: CveFixComparisonInput) -> Result<ReportArtifact> {
+        self.inputs.push(input);
+        self.artifacts = self.rewrite()?;
+        self.artifacts
+            .last()
+            .cloned()
+            .context("生成调度轮次 CVE 漏洞修复对比 xlsx 失败：没有 artifact")
+    }
+
+    pub fn artifacts(&self) -> &[ReportArtifact] {
+        &self.artifacts
+    }
+
+    fn rewrite(&self) -> Result<Vec<ReportArtifact>> {
+        let row_volumes = cve_fix_comparison_row_volumes_for_inputs_with_issue_start(
+            &self.inputs,
+            self.issue_start_number,
+        );
+        let mut artifacts = Vec::new();
+
+        for (idx, rows) in row_volumes.iter().enumerate() {
+            let output_path = cve_fix_comparison_round_volume_output_path(
