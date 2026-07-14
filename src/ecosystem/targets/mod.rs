@@ -41,3 +41,24 @@ mod tests {
             let previous = std::env::var_os(key);
             std::env::remove_var(key);
             Self { key, previous }
+        }
+    }
+
+    impl Drop for EnvGuard {
+        fn drop(&mut self) {
+            if let Some(previous) = &self.previous {
+                std::env::set_var(self.key, previous);
+            } else {
+                std::env::remove_var(self.key);
+            }
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn configured_fetch_timeout_prefers_specific_env() {
+        let _specific = EnvGuard::set("ECOSYSTEM_TEST_TIMEOUT_SECS", "9");
+        let _global = EnvGuard::set("ECOSYSTEM_FETCH_TIMEOUT_SECS", "5");
+
+        assert_eq!(
+            configured_fetch_timeout("ECOSYSTEM_TEST_TIMEOUT_SECS", 3),
