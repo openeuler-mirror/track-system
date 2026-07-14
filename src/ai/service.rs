@@ -238,3 +238,27 @@ fn l0_security_quality_findings(
             ),
             recommendation:
                 "复核 L0 仓库代码 review 机制、专人 review、发布物签名/校验值和 provenance/attestation；证据缺失时补充质量评估元数据或平台采集器。"
+                    .to_string(),
+        });
+    }
+
+    findings
+}
+
+fn l0_community_assessment(context: &AiContext) -> Option<&Value> {
+    context
+        .evidence
+        .get("l0_community_assessment")
+        .or_else(|| {
+            context
+                .evidence
+                .get("diff_summary")
+                .and_then(|value| value.get("l0_community_assessment"))
+        })
+        .or_else(|| {
+            context
+                .evidence
+                .get("report_payload")
+                .and_then(|value| value.get("sections"))
+        })
+        .or_else(|| context.evidence.get("sections"))
