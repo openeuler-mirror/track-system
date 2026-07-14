@@ -1,6 +1,6 @@
 /*
  * Copyright(c) 2024-2026 China Telecom Cloud Technologies Co., Ltd. All rights
- * reserved. ctscat is licensed under Mulan PSL v2. You can use this software
+ * reserved. track-system is licensed under Mulan PSL v2. You can use this software
  * according to the terms and conditions of the Mulan PSL V2. You may obtain a
  * copy of Mulan PSL v2 at: http://license.coscl.org.cn/MulanPSL2.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
@@ -66,40 +66,45 @@ pub async fn execute(api_client: &ApiClient, action: ImportAction) -> Result<()>
     match action {
         ImportAction::Metadata { file, tracking_id } => {
             let path = PathBuf::from(file);
-            import_single_file(api_client, &path, tracking_id).await
+            import_single_file(api_client, &path, Some(tracking_id)).await
         }
-        ImportAction::Batch {
-            files,
-            tracking_id: _tracking_id,
-        } => {
+        ImportAction::Batch { files, tracking_id } => {
             let paths: Vec<PathBuf> = files.into_iter().map(PathBuf::from).collect();
-            import_batch_files(api_client, paths).await
+            import_batch_files(api_client, paths, tracking_id).await
         }
     }
 }
 
-/// 从 JSON 内容中提取 repo 字段（package name）
-fn extract_repo_from_json(content: &str) -> Result<String> {
+/// 从 JSON 内容中提取 repo/branch/level
+fn extract_repo_branch_origin_from_json(content: &str) -> Result<(String, String, SnapshotOrigin)> {
     let root: Value =
         serde_json::from_str(content).map_err(|e| anyhow!("解析 JSON 失败: {}", e))?;
 
-    // 尝试从通用采集格式提取 repo 字段
-    if let Some(repo) = root.get("repo").and_then(|v| v.as_str()) {
-        return Ok(repo.to_string());
-    }
-
-    // 如果是标准 RepositorySnapshot 格式，没有 repo 字段，需要提供 tracking_id
-    Err(anyhow!(
-        "JSON 文件中未找到 'repo' 字段，请使用 --tracking-id 参数明确指定"
-    ))
+    let repo = root
+        .get("repo")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| anyhow!("JSON 文件中未找到 'repo' 字段"))?
+        .to_string();
+    let branch = root
+        .get("branch")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| anyhow!("JSON 文件中未找到 'branch' 字段"))?
+        .to_string();
+    let origin = match root.get("level").and_then(|v| v.as_str()) {
+        Some("l2") => SnapshotOrigin::L2,
+        Some("l1") => SnapshotOrigin::L1,
+        _ => SnapshotOrigin::Unknown,
+    };
+    Ok((repo, branch, origin))
 }
 
-/// 根据 package name 查询对应的 tracking_id
-async fn resolve_tracking_id_from_package(
+/// 根据 repo + branch 解析 tracking_id
+async fn resolve_tracking_id_from_repo_branch(
     api_client: &ApiClient,
-    package_name: &str,
+    repo: &str,
+    branch: &str,
+    origin: SnapshotOrigin,
 ) -> Result<i32> {
-    // 1. 查询 package 列表，找到匹配的 package_id
     let packages: Vec<PackageDto> = api_client
         .get("/packages")
         .await
@@ -107,56 +112,104 @@ async fn resolve_tracking_id_from_package(
 
     let package = packages
         .iter()
-        .find(|p| p.name == package_name)
-        .ok_or_else(|| anyhow!("未找到名称为 '{}' 的 package", package_name))?;
+        .find(|p| p.name == repo)
+        .ok_or_else(|| anyhow!("未找到名称为 '{}' 的 package", repo))?;
 
     let package_id = package.id;
-
-    // 2. 查询该 package 的 tracking 配置
-    let query = format!("?page=1&page_size=100&package_id={}", package_id);
-    let response: ApiResponse<ListResponse<TrackingDto>> = api_client
-        .get(&format!("/tracking{}", query))
-        .await
-        .map_err(|e| anyhow!("查询 tracking 配置失败: {}", e))?;
-
-    let trackings = response.data.ok_or_else(|| anyhow!("空响应"))?.items;
-
+    let trackings = fetch_trackings(api_client, package_id).await?;
     if trackings.is_empty() {
         return Err(anyhow!(
             "package '{}' (ID: {}) 没有关联的 tracking 配置，请先创建",
-            package_name,
+            repo,
             package_id
         ));
     }
 
-    // 3. 优先选择状态为 active 的 tracking
-    let active_tracking = trackings
+    let branch_candidates = build_branch_candidates(branch);
+    let mut candidates: Vec<&TrackingDto> = match origin {
+        SnapshotOrigin::L2 => trackings
+            .iter()
+            .filter(|t| branch_candidates.iter().any(|b| t.l2_branch == *b))
+            .collect(),
+        SnapshotOrigin::L1 => trackings
+            .iter()
+            .filter(|t| branch_candidates.iter().any(|b| t.l1_branch == *b))
+            .collect(),
+        SnapshotOrigin::Unknown => Vec::new(),
+    };
+
+    if candidates.is_empty() {
+        candidates = trackings
+            .iter()
+            .filter(|t| {
+                branch_candidates
+                    .iter()
+                    .any(|b| t.l1_branch == *b || t.l2_branch == *b)
+            })
+            .collect();
+    }
+
+    let tracking = candidates
         .iter()
         .find(|t| t.tracking_status == "active")
-        .or_else(|| trackings.first());
+        .or_else(|| candidates.first())
+        .ok_or_else(|| anyhow!("未找到匹配分支 '{}' 的 tracking", branch))?;
 
-    if let Some(tracking) = active_tracking {
-        if trackings.len() > 1 {
-            println!(
-                "  {} package '{}' 有 {} 个 tracking 配置，使用 tracking_id: {} (状态: {})",
-                "ℹ".cyan(),
-                package_name,
-                trackings.len(),
-                tracking.id,
-                tracking.tracking_status
-            );
+    Ok(tracking.id)
+}
+
+fn build_branch_candidates(branch: &str) -> Vec<String> {
+    let mut candidates = vec![branch.to_string()];
+    let lower = branch.to_lowercase();
+    if let Some(stripped) = lower.strip_prefix("ctyunos-") {
+        if stripped != lower {
+            candidates.push(stripped.to_string());
+            if let Some((prefix, rest)) = stripped.split_once('-') {
+                if !rest.is_empty() && prefix.chars().all(|c| c.is_ascii_digit()) {
+                    candidates.push(rest.to_string());
+                }
+            }
         }
-        Ok(tracking.id)
-    } else {
-        Err(anyhow!("未找到可用的 tracking 配置"))
     }
+    if let Some(stripped) = lower.strip_prefix("ctyunos_") {
+        if stripped != lower {
+            candidates.push(stripped.to_string());
+        }
+    }
+    candidates.sort();
+    candidates.dedup();
+    candidates
+}
+
+async fn fetch_trackings(api_client: &ApiClient, package_id: i32) -> Result<Vec<TrackingDto>> {
+    let mut trackings = Vec::new();
+    let mut page = 1;
+    let page_size = 100;
+    loop {
+        let query = format!(
+            "?page={}&page_size={}&package_id={}",
+            page, page_size, package_id
+        );
+        let response: ApiResponse<ListResponse<TrackingDto>> = api_client
+            .get(&format!("/tracking{}", query))
+            .await
+            .map_err(|e| anyhow!("查询 tracking 配置失败: {}", e))?;
+        let items = response.data.map(|data| data.items).unwrap_or_default();
+        let items_len = items.len();
+        trackings.extend(items);
+        if items_len < page_size as usize {
+            break;
+        }
+        page += 1;
+    }
+    Ok(trackings)
 }
 
 /// 导入单个文件
 async fn import_single_file(
     api_client: &ApiClient,
     file: &PathBuf,
-    tracking_id: i32,
+    tracking_id: Option<i32>,
 ) -> Result<()> {
     println!("正在导入文件: {}", file.display().to_string().cyan());
 
@@ -166,9 +219,27 @@ async fn import_single_file(
         anyhow::bail!("文件不存在");
     }
 
-    // 读取并解析/转换快照文件
     let content = fs::read_to_string(file)?;
-    let snapshot = parse_snapshot_or_convert(&content, tracking_id)?;
+    let (resolved_tracking_id, snapshot) = if let Some(id) = tracking_id {
+        let snapshot = parse_snapshot_or_convert(&content, id)?;
+        (id, snapshot)
+    } else if let Ok(snapshot) = serde_json::from_str::<RepositorySnapshot>(&content) {
+        if snapshot.tracking_id > 0 {
+            (snapshot.tracking_id, snapshot)
+        } else {
+            let (repo, branch, origin) = extract_repo_branch_origin_from_json(&content)?;
+            let resolved =
+                resolve_tracking_id_from_repo_branch(api_client, &repo, &branch, origin).await?;
+            let snapshot = parse_snapshot_or_convert(&content, resolved)?;
+            (resolved, snapshot)
+        }
+    } else {
+        let (repo, branch, origin) = extract_repo_branch_origin_from_json(&content)?;
+        let resolved =
+            resolve_tracking_id_from_repo_branch(api_client, &repo, &branch, origin).await?;
+        let snapshot = parse_snapshot_or_convert(&content, resolved)?;
+        (resolved, snapshot)
+    };
 
     // 确定导入端点（根据快照来源）
     let endpoint = match snapshot.origin {
@@ -189,7 +260,7 @@ async fn import_single_file(
 
     // 构建请求
     let request = ImportRequest {
-        tracking_id,
+        tracking_id: resolved_tracking_id,
         snapshot,
     };
 
@@ -218,7 +289,11 @@ async fn import_single_file(
 
 /// 批量导入文件
 /// tracking_id 将从每个 JSON 文件的 repo 字段自动解析
-async fn import_batch_files(api_client: &ApiClient, files: Vec<PathBuf>) -> Result<()> {
+async fn import_batch_files(
+    api_client: &ApiClient,
+    files: Vec<PathBuf>,
+    tracking_id: Option<i32>,
+) -> Result<()> {
     println!("开始批量导入 {} 个文件", files.len());
     println!();
 
@@ -230,13 +305,22 @@ async fn import_batch_files(api_client: &ApiClient, files: Vec<PathBuf>) -> Resu
         println!("[{}/{}] 导入文件: {}", i + 1, files.len(), file.display());
 
         let content = fs::read_to_string(file)?;
+        let resolved = if let Some(tracking_id) = tracking_id {
+            Some(tracking_id)
+        } else if let Ok(snapshot) = serde_json::from_str::<RepositorySnapshot>(&content) {
+            if snapshot.tracking_id > 0 {
+                Some(snapshot.tracking_id)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
 
-        let package_name = extract_repo_from_json(&content)?;
-        // 从 JSON 文件解析 tracking_id
-        match resolve_tracking_id_from_package(api_client, &package_name).await {
-            Ok(tracking_id) => {
-                println!("  解析到 tracking_id: {}", tracking_id);
-                match import_single_file(api_client, file, tracking_id).await {
+        match resolved {
+            Some(tracking_id) => {
+                println!("  使用 tracking_id: {}", tracking_id);
+                match import_single_file(api_client, file, Some(tracking_id)).await {
                     Ok(_) => {
                         success_count += 1;
                         // 读取文件获取文件数量
@@ -254,9 +338,34 @@ async fn import_batch_files(api_client: &ApiClient, files: Vec<PathBuf>) -> Resu
                     }
                 }
             }
-            Err(e) => {
-                println!("  无法解析 tracking_id: {}", e);
-                failed_count += 1;
+            None => {
+                let (repo, branch, origin) = extract_repo_branch_origin_from_json(&content)?;
+                match resolve_tracking_id_from_repo_branch(api_client, &repo, &branch, origin).await
+                {
+                    Ok(tracking_id) => {
+                        println!("  解析到 tracking_id: {}", tracking_id);
+                        match import_single_file(api_client, file, Some(tracking_id)).await {
+                            Ok(_) => {
+                                success_count += 1;
+                                if let Ok(content) = fs::read_to_string(file) {
+                                    if let Ok(snapshot) =
+                                        serde_json::from_str::<RepositorySnapshot>(&content)
+                                    {
+                                        total_files += snapshot.files.len();
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                println!("  导入失败: {}", e);
+                                failed_count += 1;
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        println!("  无法解析 tracking_id: {}", e);
+                        failed_count += 1;
+                    }
+                }
             }
         }
         println!();
@@ -576,27 +685,6 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_repo_from_json() {
-        let json = r#"{"repo": "test-package", "commits": []}"#;
-        let result = extract_repo_from_json(json);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), "test-package");
-    }
-
-    #[test]
-    fn test_extract_repo_from_json_missing() {
-        let json = r#"{"commits": []}"#;
-        let result = extract_repo_from_json(json);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_extract_repo_from_json_invalid_json() {
-        let result = extract_repo_from_json("not-json");
-        assert!(result.is_err());
-    }
-
-    #[test]
     fn test_parse_snapshot_or_convert_valid_snapshot() {
         let json = create_test_snapshot_json();
         let result = parse_snapshot_or_convert(&json, 1);
@@ -714,7 +802,7 @@ mod tests {
             .create_async()
             .await;
 
-        let result = import_single_file(&client, &temp_file.path().to_path_buf(), 1).await;
+        let result = import_single_file(&client, &temp_file.path().to_path_buf(), Some(1)).await;
         assert!(result.is_ok(), "Result failed: {:?}", result.err());
         mock.assert_async().await;
     }
@@ -758,7 +846,7 @@ mod tests {
             .create_async()
             .await;
 
-        let result = import_single_file(&client, &temp_file.path().to_path_buf(), 1).await;
+        let result = import_single_file(&client, &temp_file.path().to_path_buf(), Some(1)).await;
         assert!(result.is_ok(), "Result failed: {:?}", result.err());
         mock.assert_async().await;
     }
@@ -799,7 +887,7 @@ mod tests {
             .create_async()
             .await;
 
-        let result = import_single_file(&client, &temp_file.path().to_path_buf(), 1).await;
+        let result = import_single_file(&client, &temp_file.path().to_path_buf(), Some(1)).await;
         assert!(result.is_ok(), "Result failed: {:?}", result.err());
         mock.assert_async().await;
     }
@@ -829,7 +917,7 @@ mod tests {
             .create_async()
             .await;
 
-        let result = import_single_file(&client, &temp_file.path().to_path_buf(), 1).await;
+        let result = import_single_file(&client, &temp_file.path().to_path_buf(), Some(1)).await;
         assert!(result.is_err());
         mock.assert_async().await;
     }
@@ -852,7 +940,7 @@ mod tests {
             .create_async()
             .await;
 
-        let result = import_single_file(&client, &temp_file.path().to_path_buf(), 1).await;
+        let result = import_single_file(&client, &temp_file.path().to_path_buf(), Some(1)).await;
         assert!(result.is_err());
         mock.assert_async().await;
     }
@@ -861,12 +949,12 @@ mod tests {
     async fn test_import_single_file_not_exists() {
         let (_server, client) = setup_test_server().await;
         let non_existent = PathBuf::from("/nonexistent/file.json");
-        let result = import_single_file(&client, &non_existent, 1).await;
+        let result = import_single_file(&client, &non_existent, Some(1)).await;
         assert!(result.is_err());
     }
 
     #[tokio::test]
-    async fn test_resolve_tracking_id_from_package() {
+    async fn test_resolve_tracking_id_from_repo_branch() {
         let (mut server, client) = setup_test_server().await;
 
         // Mock packages endpoint
@@ -928,10 +1016,164 @@ mod tests {
             .create_async()
             .await;
 
-        let result = resolve_tracking_id_from_package(&client, "test-package").await;
+        let result = resolve_tracking_id_from_repo_branch(
+            &client,
+            "test-package",
+            "main",
+            SnapshotOrigin::L1,
+        )
+        .await;
         assert!(result.is_ok(), "Result failed: {:?}", result.err());
         assert_eq!(result.unwrap(), 100);
         packages_mock_1.assert_async().await;
+        tracking_mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_resolve_tracking_id_from_repo_branch_ctyunos_prefix() {
+        let (mut server, client) = setup_test_server().await;
+
+        let packages_mock = server
+            .mock("GET", "/api/packages")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!([
+                    {
+                        "id": 11,
+                        "name": "ctyunos-package",
+                        "level": 1,
+                        "sync_interval_hours": 24,
+                        "l0_repo_url": "https://github.com/test/test",
+                        "description": "Test package",
+                        "created_at": "2024-01-01T00:00:00Z",
+                        "updated_at": "2024-01-01T00:00:00Z"
+                    }
+                ])
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let tracking_mock = server
+            .mock("GET", "/api/tracking?page=1&page_size=100&package_id=11")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "code": 200,
+                    "message": "success",
+                    "data": {
+                        "items": [
+                            {
+                                "id": 101,
+                                "package_id": 11,
+                                "distro_id": 1,
+                                "l1_repo_owner": "test-owner",
+                                "l1_repo_name": "test-repo",
+                                "l1_branch": "main",
+                                "l2_branch": "2.0.1",
+                                "l2_repo_path": "/path/to/repo",
+                                "tracking_status": "active",
+                                "last_sync_time": null,
+                                "last_l1_commit_sha": null,
+                                "last_l2_commit_sha": null,
+                                "created_at": "2024-01-01T00:00:00Z",
+                                "updated_at": "2024-01-01T00:00:00Z"
+                            }
+                        ],
+                        "total": 1
+                    }
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = resolve_tracking_id_from_repo_branch(
+            &client,
+            "ctyunos-package",
+            "ctyunos-2.0.1",
+            SnapshotOrigin::L2,
+        )
+        .await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        assert_eq!(result.unwrap(), 101);
+        packages_mock.assert_async().await;
+        tracking_mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_resolve_tracking_id_from_repo_branch_ctyunos_major_prefix() {
+        let (mut server, client) = setup_test_server().await;
+
+        let packages_mock = server
+            .mock("GET", "/api/packages")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!([
+                    {
+                        "id": 12,
+                        "name": "gcc",
+                        "level": 1,
+                        "sync_interval_hours": 24,
+                        "l0_repo_url": "https://github.com/test/test",
+                        "description": "Test package",
+                        "created_at": "2024-01-01T00:00:00Z",
+                        "updated_at": "2024-01-01T00:00:00Z"
+                    }
+                ])
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let tracking_mock = server
+            .mock("GET", "/api/tracking?page=1&page_size=100&package_id=12")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "code": 200,
+                    "message": "success",
+                    "data": {
+                        "items": [
+                            {
+                                "id": 102,
+                                "package_id": 12,
+                                "distro_id": 1,
+                                "l1_repo_owner": "test-owner",
+                                "l1_repo_name": "test-repo",
+                                "l1_branch": "main",
+                                "l2_branch": "25.07",
+                                "l2_repo_path": "/path/to/repo",
+                                "tracking_status": "active",
+                                "last_sync_time": null,
+                                "last_l1_commit_sha": null,
+                                "last_l2_commit_sha": null,
+                                "created_at": "2024-01-01T00:00:00Z",
+                                "updated_at": "2024-01-01T00:00:00Z"
+                            }
+                        ],
+                        "total": 1
+                    }
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = resolve_tracking_id_from_repo_branch(
+            &client,
+            "gcc",
+            "ctyunos-4-25.07",
+            SnapshotOrigin::L2,
+        )
+        .await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        assert_eq!(result.unwrap(), 102);
+        packages_mock.assert_async().await;
         tracking_mock.assert_async().await;
     }
 
@@ -979,9 +1221,14 @@ mod tests {
             .create_async()
             .await;
 
-        let err = resolve_tracking_id_from_package(&client, "test-package")
-            .await
-            .unwrap_err();
+        let err = resolve_tracking_id_from_repo_branch(
+            &client,
+            "test-package",
+            "main",
+            SnapshotOrigin::L1,
+        )
+        .await
+        .unwrap_err();
         let msg = format!("{err}");
         assert!(msg.contains("没有关联的 tracking 配置"));
         packages_mock.assert_async().await;
@@ -1029,11 +1276,16 @@ mod tests {
             .create_async()
             .await;
 
-        let err = resolve_tracking_id_from_package(&client, "test-package")
-            .await
-            .unwrap_err();
+        let err = resolve_tracking_id_from_repo_branch(
+            &client,
+            "test-package",
+            "main",
+            SnapshotOrigin::L1,
+        )
+        .await
+        .unwrap_err();
         let msg = format!("{err}");
-        assert!(msg.contains("空响应"));
+        assert!(msg.contains("没有关联的 tracking 配置"));
         packages_mock.assert_async().await;
         tracking_mock.assert_async().await;
     }
@@ -1050,7 +1302,13 @@ mod tests {
             .create_async()
             .await;
 
-        let result = resolve_tracking_id_from_package(&client, "nonexistent").await;
+        let result = resolve_tracking_id_from_repo_branch(
+            &client,
+            "nonexistent",
+            "main",
+            SnapshotOrigin::L1,
+        )
+        .await;
         assert!(result.is_err());
         packages_mock.assert_async().await;
     }
@@ -1078,7 +1336,9 @@ mod tests {
         file1.flush().unwrap();
 
         let file2_json = serde_json::json!({
-            "repo": "missing",
+            "repo": "test-package",
+            "branch": "missing-branch",
+            "level": "l1",
             "commits": []
         })
         .to_string();
@@ -1089,7 +1349,7 @@ mod tests {
 
         let packages_mock = server
             .mock("GET", "/api/packages")
-            .expect(2)
+            .expect(1)
             .with_status(200)
             .with_header("content-type", "application/json")
             .with_body(
@@ -1168,6 +1428,7 @@ mod tests {
         let result = import_batch_files(
             &client,
             vec![file1.path().to_path_buf(), file2.path().to_path_buf()],
+            None,
         )
         .await;
         assert!(result.is_err());
@@ -1208,7 +1469,7 @@ mod tests {
 
         let action = ImportAction::Metadata {
             file: temp_file.path().to_str().unwrap().to_string(),
-            tracking_id: 1,
+            tracking_id: Some(1),
         };
         let result = execute(&client, action).await;
         assert!(result.is_ok(), "Result failed: {:?}", result.err());
