@@ -70,3 +70,27 @@ pub struct CveFixComparisonRow {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CveFixComparisonInput {
+    pub tracking_id: i32,
+    pub package_name: String,
+    pub system_version: String,
+    pub ctyunos_current_version: String,
+    pub default_upstream_version: String,
+    pub commit_reports: Vec<Value>,
+}
+
+#[derive(Debug, Clone)]
+pub struct RoundCveFixComparisonWriter {
+    output_path_prefix: PathBuf,
+    issue_start_number: u32,
+    inputs: Vec<CveFixComparisonInput>,
+    artifacts: Vec<ReportArtifact>,
+}
+
+impl RoundCveFixComparisonWriter {
+    pub fn new() -> Self {
+        Self {
+            output_path_prefix: cve_fix_comparison_round_output_path_prefix(),
+            issue_start_number: allocate_issue_start_number(),
+            inputs: Vec::new(),
+            artifacts: Vec::new(),
+        }
