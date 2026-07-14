@@ -397,3 +397,26 @@ impl OpenEulerCommunityCollector {
 
         direct_text
     }
+
+    async fn fetch_raw_text(&self, client: &Client, url: &str) -> PageSnapshot {
+        match client.get(url).send().await {
+            Ok(response) => {
+                let status = response.status().as_u16();
+                match response.text().await {
+                    Ok(body) => PageSnapshot {
+                        http_status: Some(status),
+                        keyword_lines: extract_keyword_lines(
+                            &body,
+                            &["Mulan PSL v2", "MulanPSL2", "license", "trademark"],
+                            8,
+                        ),
+                        plain_text: body.clone(),
+                        raw_body: body,
+                        error: None,
+                    },
+                    Err(error) => PageSnapshot {
+                        http_status: Some(status),
+                        keyword_lines: Vec::new(),
+                        plain_text: String::new(),
+                        raw_body: String::new(),
+                        error: Some(error.to_string()),
