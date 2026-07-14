@@ -478,3 +478,27 @@ impl GitHubPlatformCollector {
         if ofac_license_for_iran {
             parts.push("公开说明提及已获得 OFAC 许可为伊朗开发者恢复云服务".to_string());
         }
+        if public_repo_access_in_sanctioned_regions {
+            parts.push("在部分受制裁地区仍努力维持公共仓库和开源协作访问".to_string());
+        }
+        if itar_restriction_mentioned {
+            parts.push("GitHub.com 不适合托管 ITAR 受控数据".to_string());
+        }
+        if restricted_regions_mentioned {
+            parts.push("对受制裁国家或地区以及被拒绝方存在访问限制".to_string());
+        }
+        json!({
+            "summary": parts.join("；"),
+            "ofac_license_for_iran": ofac_license_for_iran,
+            "public_repo_access_in_sanctioned_regions": public_repo_access_in_sanctioned_regions,
+            "itar_restriction_mentioned": itar_restriction_mentioned,
+            "restricted_regions_mentioned": restricted_regions_mentioned,
+        })
+    }
+
+    fn detect_corporate_profile(&self, corporate_page: &PageSnapshot) -> Value {
+        let text = corporate_page.plain_text.as_str();
+        let lower = text.to_ascii_lowercase();
+        let microsoft_acquisition_completed = lower
+            .contains("microsoft acquisition of github is complete")
+            || lower.contains("joining forces with microsoft");
