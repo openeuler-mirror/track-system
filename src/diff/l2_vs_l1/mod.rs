@@ -14,6 +14,7 @@
 //! 用于对比企业发行版（L2）相对于社区发行版（L1）的内容差异
 
 use crate::snapshot::types::{CommitEntry, FileEntry, RepositorySnapshot};
+use crate::spec::parse_spec;
 use crate::utils::spec::{SpecComparison, SpecParser};
 use crate::utils::version::VersionParser;
 use anyhow::{anyhow, Result};
