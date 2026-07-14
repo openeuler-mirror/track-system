@@ -190,3 +190,27 @@ impl GitHubApi {
         );
         let commits: Vec<GitHubCommitListItem> = self.get_json(&url).await?;
         Ok(commits.into_iter().next())
+    }
+
+    async fn count_commits(
+        &self,
+        owner: &str,
+        repo: &str,
+        branch: &str,
+        since: Option<DateTime<Utc>>,
+    ) -> Result<i64> {
+        let mut url = format!(
+            "{}/repos/{}/{}/commits?sha={}&per_page=1&page=1",
+            self.base_url, owner, repo, branch
+        );
+        if let Some(since) = since {
+            url.push_str(&format!("&since={}", since.to_rfc3339()));
+        }
+
+        let response = self.send(&url).await?;
+        match response.status() {
+            StatusCode::OK => {
+                let headers = response.headers().clone();
+                let commits: Vec<GitHubCommitListItem> = response
+                    .json()
+                    .await
