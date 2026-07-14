@@ -233,3 +233,26 @@ fn extract_source_focus(report_payload: &Value) -> SourceFocus {
             &mut focus.version_lifecycle,
             data_string(data, "version_lifecycle"),
         );
+        fill_once(
+            &mut focus.license_info,
+            data_string(data, "license_policy").or_else(|| data_string(data, "license_info")),
+        );
+        fill_once(
+            &mut focus.cla_info,
+            data_string(data, "cla_policy").or_else(|| data_string(data, "cla_info")),
+        );
+    }
+
+    focus
+}
+
+fn repository_contact_info(target: &ecosystem_targets::Model) -> Option<String> {
+    match (&target.platform, &target.owner, &target.repo) {
+        (Some(platform), Some(owner), Some(repo)) if platform.eq_ignore_ascii_case("gitee") => {
+            Some(format!("https://gitee.com/{owner}/{repo}"))
+        }
+        (Some(platform), Some(owner), Some(repo)) if platform.eq_ignore_ascii_case("github") => {
+            Some(format!("https://github.com/{owner}/{repo}"))
+        }
+        (_, Some(owner), Some(repo)) => Some(format!("{owner}/{repo}")),
+        _ => None,
