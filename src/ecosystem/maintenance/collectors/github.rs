@@ -334,3 +334,27 @@ fn normalized_committer_identity(commit: &GitHubCommitListItem) -> Option<String
                 .filter(|name| !name.trim().is_empty())
                 .map(|name| format!("name:{}", name))
         })
+        .or_else(|| {
+            commit
+                .commit
+                .author
+                .as_ref()
+                .and_then(|identity| identity.name.clone())
+                .filter(|name| !name.trim().is_empty())
+                .map(|name| format!("name:{}", name))
+        })
+}
+
+fn parse_github_repo(url: &str) -> Option<(String, String)> {
+    let trimmed = url.trim().trim_end_matches('/').trim_end_matches(".git");
+
+    let path = if trimmed.contains("://") {
+        let parsed = Url::parse(trimmed).ok()?;
+        let host = parsed.host_str()?;
+        if host != "github.com" && host != "www.github.com" {
+            return None;
+        }
+        parsed.path().trim_start_matches('/').to_string()
+    } else if let Some(stripped) = trimmed.strip_prefix("github.com/") {
+        stripped.to_string()
+    } else if let Some(stripped) = trimmed.strip_prefix("www.github.com/") {
