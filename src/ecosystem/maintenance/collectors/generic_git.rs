@@ -538,3 +538,26 @@ fn cached_mirror_lock(repo_url: &str) -> Arc<Mutex<()>> {
         .lock()
         .expect("generic git mirror lock table poisoned");
     guard
+        .entry(key)
+        .or_insert_with(|| Arc::new(Mutex::new(())))
+        .clone()
+}
+
+impl GenericGitTimeouts {
+    fn reference_timeout(self) -> Duration {
+        self.connect_timeout.saturating_add(self.io_timeout)
+    }
+}
+
+fn generic_git_timeouts() -> GenericGitTimeouts {
+    GenericGitTimeouts {
+        fetch_timeout: configured_timeout(
+            GENERIC_GIT_FETCH_TIMEOUT_ENV,
+            DEFAULT_FETCH_TIMEOUT_SECS,
+        ),
+        connect_timeout: configured_timeout(
+            GENERIC_GIT_CONNECT_TIMEOUT_ENV,
+            DEFAULT_CONNECT_TIMEOUT_SECS,
+        ),
+        io_timeout: configured_timeout(GENERIC_GIT_IO_TIMEOUT_ENV, DEFAULT_IO_TIMEOUT_SECS),
+    }
