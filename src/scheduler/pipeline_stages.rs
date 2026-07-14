@@ -4034,6 +4034,7 @@ Summary: Test package
             current_version: "1.0.0".to_string(),
             latest_stable: "1.0.0".to_string(),
             latest_version: "1.0.0".to_string(),
+            mainline_version: Some("1.0.0".to_string()),
             version_behind: 0,
             upgradable_versions: vec![],
             patch_analysis: diff::l1_vs_l0::PatchAnalysis {
