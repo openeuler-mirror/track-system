@@ -218,3 +218,23 @@ impl<'a> EcosystemService<'a> {
 
         Ok(evidence)
     }
+
+    fn build_metadata_record(
+        &self,
+        target: &ecosystem_targets::Model,
+        source_type: &str,
+        source_name: &str,
+        assessment_category: &str,
+        assessment_subcategory: &str,
+        data: Value,
+    ) -> Value {
+        json!({
+            "source_type": source_type,
+            "source_name": source_name,
+            "source_url": target.homepage_url.clone().unwrap_or_default(),
+            "assessment_category": assessment_category,
+            "assessment_subcategory": assessment_subcategory,
+            "data": data,
+        })
+    }
+
