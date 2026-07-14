@@ -14,6 +14,7 @@
 //! 负责根据软件等级和同步间隔管理同步任务
 
 pub mod cron_scheduler;
+pub mod ecosystem_sync_service;
 pub mod pipeline_executor;
 pub mod pipeline_stages;
 pub mod pipeline_state;
@@ -23,6 +24,7 @@ pub mod sync_manager;
 pub mod sync_service;
 
 pub use cron_scheduler::CronScheduler;
+pub use ecosystem_sync_service::EcosystemSyncService;
 pub use pipeline_executor::{
     BackportSuggestionResult, ClassificationResult, DiffComparisonResult, JobProgress,
     L1IngestionResult, L2SnapshotResult, PipelineExecutor, PipelineStage, ReportGenerationResult,
