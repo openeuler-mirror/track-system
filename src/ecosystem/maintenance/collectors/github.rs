@@ -262,3 +262,27 @@ impl GitHubApi {
             );
             let commits: Vec<GitHubCommitListItem> = self.get_json(&url).await?;
             if commits.is_empty() {
+                break;
+            }
+
+            for commit in &commits {
+                if let Some(identity) = normalized_committer_identity(commit) {
+                    unique_committers.insert(identity);
+                } else {
+                    unique_committers.insert(format!("sha:{}", commit.sha));
+                }
+            }
+
+            if commits.len() < 100 {
+                break;
+            }
+            page += 1;
+        }
+
+        Ok(unique_committers.len() as i64)
+    }
+
+    async fn get_json<T: serde::de::DeserializeOwned>(&self, url: &str) -> Result<T> {
+        let response = self.send(url).await?;
+        let status = response.status();
+        if !status.is_success() {
