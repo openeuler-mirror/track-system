@@ -1620,19 +1620,8 @@ impl<'a> PipelineExecutor<'a> {
         let package_name = package.name.clone();
 
         // 查询最新的 L1/L2 快照
-        let l1_record = L2Snapshots::find()
-            .filter(l2_snapshots::Column::TrackingId.eq(tracking.id))
-            .filter(l2_snapshots::Column::SnapshotType.eq("l1"))
-            .order_by_desc(l2_snapshots::Column::CreatedAt)
-            .one(self.db)
-            .await?;
-
-        let l2_record = L2Snapshots::find()
-            .filter(l2_snapshots::Column::TrackingId.eq(tracking.id))
-            .filter(l2_snapshots::Column::SnapshotType.eq("l2"))
-            .order_by_desc(l2_snapshots::Column::CreatedAt)
-            .one(self.db)
-            .await?;
+        let l1_record = latest_snapshot_record(self.db, tracking.id, "l1").await?;
+        let l2_record = latest_l2_snapshot_record_for_tracking(self.db, tracking).await?;
 
         if l1_record.is_none() || l2_record.is_none() {
             warn!(
