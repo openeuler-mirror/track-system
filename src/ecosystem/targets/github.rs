@@ -142,3 +142,27 @@ impl GitHubPlatformCollector {
                     "public gov-takedowns repository",
                     "geographic scope",
                 ],
+            )
+            .await;
+        self.log_page_result("github government takedown", &gov_page);
+        let terms_page = self
+            .fetch_page(
+                &client,
+                GITHUB_TERMS_URL,
+                &[
+                    "user-generated content",
+                    "you own the content you post on github",
+                    "copyright & dmca policy",
+                    "intellectual property notice",
+                    "copyright",
+                    "license grant",
+                ],
+            )
+            .await;
+        self.log_page_result("github terms", &terms_page);
+        let licensing_page = self
+            .fetch_page(
+                &client,
+                GITHUB_LICENSING_URL,
+                &[
+                    "choosealicense.com",
