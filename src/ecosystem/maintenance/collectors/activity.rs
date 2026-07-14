@@ -91,3 +91,26 @@ where
     let mut total = 0_i64;
 
     for page in 1..=max_pages {
+        let mut params = CommitsParams::new(branch)
+            .page(page)
+            .per_page(COMMITS_PER_PAGE);
+        if let Some(since) = since {
+            params = params.since(since);
+        }
+
+        let commits = client
+            .get_commits(owner, repo, params)
+            .await
+            .with_context(|| format!("count commits failed for {owner}/{repo} page {page}"))?;
+        if commits.is_empty() {
+            return Ok((total, false));
+        }
+
+        total += commits.len() as i64;
+
+        if commits.len() < COMMITS_PER_PAGE as usize {
+            return Ok((total, false));
+        }
+    }
+
+    warn!(
