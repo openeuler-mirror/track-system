@@ -229,3 +229,26 @@ mod tests {
 
             if params.since.is_some() {
                 return Ok(self
+                    .recent_pages
+                    .get(page_index)
+                    .cloned()
+                    .unwrap_or_default());
+            }
+
+            Ok(self
+                .total_pages
+                .get(page_index)
+                .cloned()
+                .unwrap_or_default())
+        }
+
+        async fn get_file_content(
+            &self,
+            _owner: &str,
+            _repo: &str,
+            _path: &str,
+            _branch: &str,
+        ) -> ApiResult<FileContent> {
+            unreachable!("file content is not used in activity tests")
+        }
+    }
