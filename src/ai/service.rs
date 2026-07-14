@@ -310,3 +310,27 @@ fn section_evidence_summary(section: &Value, focused_keys: &[&str]) -> String {
     if indicators.is_empty() {
         format!(
             "level={}，confidence={}，score={}；{}",
+            level, confidence, score, reasons
+        )
+    } else {
+        format!(
+            "level={}，confidence={}，score={}；{}；关键指标：{}",
+            level, confidence, score, reasons, indicators
+        )
+    }
+}
+
+fn focused_indicator_summary(section: &Value, focused_keys: &[&str]) -> String {
+    section
+        .get("indicators")
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|item| {
+                    let key = item.get("key").and_then(Value::as_str)?;
+                    if !focused_keys.contains(&key) {
+                        return None;
+                    }
+                    let value = item
+                        .get("value")
