@@ -526,3 +526,27 @@ impl GitHubPlatformCollector {
         json!({
             "organization_structure": organization_structure,
             "foundation_status": foundation_status,
+            "microsoft_acquisition_completed": microsoft_acquisition_completed,
+            "operates_independently_as_business": operates_independently_as_business,
+            "ceo_mentioned": ceo_mentioned,
+        })
+    }
+
+    fn detect_ip_policy(&self, terms_page: &PageSnapshot, dmca_page: &PageSnapshot) -> Value {
+        let terms = terms_page.plain_text.as_str();
+        let terms_lower = terms.to_ascii_lowercase();
+        let users_own_content = terms_lower.contains("you own the content you post on github")
+            || terms_lower.contains("you retain ownership");
+        let github_retains_platform_ip = terms_lower.contains("github and our licensors")
+            && terms_lower.contains("retain ownership");
+        let license_grant_to_host_content =
+            terms_lower.contains("license grant to us") || terms_lower.contains("grant us");
+        let summary = format!(
+            "GitHub 条款明确{}{}{}",
+            if users_own_content {
+                "用户对其发布内容保有所有权"
+            } else {
+                "用户内容所有权边界需要结合条款进一步确认"
+            },
+            if license_grant_to_host_content {
+                "，同时需授予 GitHub 托管、展示与解析内容的必要许可"
