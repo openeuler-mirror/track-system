@@ -782,6 +782,40 @@ impl L2VsL1Comparator {
         db: &DatabaseConnection,
         tracking_id: i32,
     ) -> Result<L2VsL1Report> {
+        self.compare_with_options(l1_snapshot, l2_snapshot, db, tracking_id, false)
+            .await
+    }
+
+    /// 执行内容对比，可按需跳过 commit 差异计算
+    pub async fn compare_with_options(
+        &self,
+        l1_snapshot: &L1Snapshot,
+        l2_snapshot: &L2Snapshot,
+        db: &DatabaseConnection,
+        tracking_id: i32,
+        skip_commit_diff: bool,
+    ) -> Result<L2VsL1Report> {
+        self.compare_with_commit_tracking_ids(
+            l1_snapshot,
+            l2_snapshot,
+            db,
+            tracking_id,
+            tracking_id,
+            skip_commit_diff,
+        )
+        .await
+    }
+
+    /// 执行内容对比，可分别指定 L1/L2 commit 查询使用的 tracking
+    pub async fn compare_with_commit_tracking_ids(
+        &self,
+        l1_snapshot: &L1Snapshot,
+        l2_snapshot: &L2Snapshot,
+        db: &DatabaseConnection,
+        l1_commit_tracking_id: i32,
+        l2_commit_tracking_id: i32,
+        skip_commit_diff: bool,
+    ) -> Result<L2VsL1Report> {
         // 1. 对比 spec 文件
         let spec_diff = self.compare_spec(l1_snapshot, l2_snapshot)?;
 
