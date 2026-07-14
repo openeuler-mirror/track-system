@@ -118,3 +118,27 @@ impl AtomGitPlatformCollector {
                 ],
             )
             .await;
+        self.log_page_result("atomgit terms", &terms_page);
+        let privacy_page = self
+            .fetch_page(
+                &client,
+                ATOMGIT_PRIVACY_URL,
+                &[
+                    "重庆开源共创科技有限公司",
+                    "开放原子开源基金会",
+                    "华为云计算技术有限公司",
+                    "国家安全",
+                    "行政机关",
+                    "司法机关",
+                ],
+            )
+            .await;
+        self.log_page_result("atomgit privacy", &privacy_page);
+        let cla_page = self
+            .fetch_page(
+                &client,
+                ATOMGIT_CLA_URL,
+                &["cla", "贡献者许可协议", "搜索权限", "影响范围", "管理"],
+            )
+            .await;
+        self.log_page_result("atomgit cla", &cla_page);
