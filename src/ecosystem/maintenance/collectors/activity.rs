@@ -22,3 +22,26 @@ pub struct RepositoryActivityMetrics {
 
 pub async fn collect_commit_activity<C>(
     client: &C,
+    owner: &str,
+    repo: &str,
+    branch: &str,
+) -> Result<RepositoryActivityMetrics>
+where
+    C: GitClient + ?Sized,
+{
+    collect_commit_activity_with_limits(
+        client,
+        owner,
+        repo,
+        branch,
+        DEFAULT_MAX_TOTAL_COUNT_PAGES,
+        DEFAULT_MAX_RECENT_ACTIVITY_PAGES,
+    )
+    .await
+}
+
+async fn collect_commit_activity_with_limits<C>(
+    client: &C,
+    owner: &str,
+    repo: &str,
+    branch: &str,
