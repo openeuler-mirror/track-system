@@ -1721,3 +1721,26 @@ mod tests {
                 ctyunos_current_version: "9.5-2".to_string(),
                 default_upstream_version: "9.5-4".to_string(),
                 commit_reports: vec![serde_json::json!({
+                    "Description": "Fix non-CVE bug",
+                    "CVEList": [],
+                })],
+            })
+            .unwrap();
+
+        assert_eq!(first.path, second.path);
+        assert_eq!(first.rows, 1);
+        assert_eq!(second.rows, 2);
+        let bytes = fs::read(&second.path).unwrap();
+        assert_eq!(&bytes[..4], b"PK\x03\x04");
+    }
+
+    #[test]
+    #[serial]
+    fn round_writer_creates_new_xlsx_volume_when_package_limit_is_exceeded() {
+        let dir = tempdir().unwrap();
+        let _artifact_dir_guard =
+            EnvVarGuard::set("TRACK_REPORT_ARTIFACT_DIR", dir.path().to_str().unwrap());
+        let _limit_guard = EnvVarGuard::set("TRACK_XLSX_MAX_PACKAGES", "1");
+        let _state_guard = EnvVarGuard::set(
+            "TRACK_XLSX_ISSUE_NUMBER_STATE_FILE",
+            dir.path().join("issue-state").to_str().unwrap(),
