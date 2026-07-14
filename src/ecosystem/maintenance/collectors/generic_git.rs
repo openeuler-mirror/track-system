@@ -331,3 +331,26 @@ fn resolve_remote_head(
             .head()
             .ok()
             .and_then(|head| head.name().map(|value| value.to_string()));
+    }
+
+    Ok(remote_head)
+}
+
+fn fetch_cached_mirror(
+    repo: &Repository,
+    repo_path: &Path,
+    repo_url: &str,
+    remote_head: &RemoteHead,
+    timeouts: GenericGitTimeouts,
+) -> Result<()> {
+    if cached_head_matches_remote(repo, remote_head) {
+        debug!(
+            repo_url,
+            default_branch = remote_head.default_branch.as_deref(),
+            head_oid = remote_head.head_oid.map(|oid| oid.to_string()),
+            "generic git mirror cache hit, skip fetch"
+        );
+        return Ok(());
+    }
+
+    let spec = remote_head
