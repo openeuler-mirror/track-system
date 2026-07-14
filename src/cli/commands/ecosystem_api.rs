@@ -924,3 +924,26 @@ fn print_download_integrity_details(report_payload: &Value) {
     }
     if quality_focus_bool(report_payload, "documented_release_artifact_signature") == Some(false) {
         details.push("      * 下载物签名: 未检索到公开的 Release 附件数字签名文档".to_string());
+    }
+    if quality_focus_bool(report_payload, "provenance_attestation") == Some(false) {
+        details.push("      * 来源证明: 未检索到公开的 provenance/attestation 文档".to_string());
+    }
+
+    print_structured_details_block("      哈希/签名字段:", details);
+}
+
+fn print_structured_details_block(title: &str, details: Vec<String>) {
+    if details.is_empty() {
+        return;
+    }
+
+    println!("{}", title);
+    for detail in details {
+        println!("{}", detail);
+    }
+}
+
+fn find_source_focus_value(report_payload: &Value, key: &str) -> Option<String> {
+    find_source_indicator_value(report_payload, key)
+        .or_else(|| find_source_raw_evidence_value(report_payload, key))
+}
