@@ -70,3 +70,27 @@ struct RemoteHead {
     head_oid: Option<Oid>,
 }
 
+impl GenericGitMaintenanceCollector {
+    pub fn new() -> Self {
+        Self
+    }
+
+    pub fn matches_package(package: &packages::Model) -> bool {
+        package.l0_repo_url.as_deref().is_some()
+    }
+
+    pub async fn collect(&self, package: &packages::Model) -> Result<Vec<Value>> {
+        let repo_url = package
+            .l0_repo_url
+            .as_deref()
+            .ok_or_else(|| anyhow!("package {} missing l0_repo_url", package.name))?;
+
+        info!(
+            package = package.name,
+            repo_url, "开始采集通用 Git 维护指标"
+        );
+        let repo_url_owned = repo_url.to_string();
+        let mirror_lock = cached_mirror_lock(&repo_url_owned);
+        let metrics = tokio::task::spawn_blocking(move || {
+            let _guard = mirror_lock
+                .lock()
