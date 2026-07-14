@@ -46,3 +46,27 @@ pub fn build_messages(
             "content": format!(
                 "请用{}分析以下生态/维护报告。\n\
                  要求：\n\
+                 1. 输出 JSON 对象，字段为 summary、risk、confidence、findings、recommended_actions、external_research_used、external_references、sources_to_check。\n\
+                 2. risk 只能是 low、medium、high、critical、unknown。\n\
+                 3. findings 数组元素字段为 title、risk、evidence、recommendation，其中 evidence 必须说明来源类型：input_evidence、external_research 或 model_judgement。\n\
+                 4. external_research_used 为布尔值；如果使用公开资料或外部检索判断，必须为 true，并在 external_references 中给出来源名称、URL 或可检索关键词。\n\
+                 5. 证据不足时不要停止在“缺少证据”，应列出 sources_to_check，说明建议检索的官方仓库页面、安全公告、release 页面、review/贡献流程文档或签名校验资料。\n\
+                 6. 如果证据中包含 L0 社区 security/quality 分区或 l0_community_assessment，必须单独评估 L0 社区安全和质量情况。\n\
+                 7. L0 安全重点关注 has_security_policy、cve_fix_commits_last_12_months、cve_linked_issues_last_12_months、median_cve_fix_days、open_cve_backlog、是否定期发布 CVE 修复或安全公告。\n\
+                 8. L0 质量重点关注 dedicated_code_reviewers、required_reviews、signed_releases、documented_release_artifact_signature、hash_verification_supported、provenance_attestation、release_checklist。\n\
+                 9. 如果模型无法直接联网或无法确认外部信息，应明确写入 sources_to_check，而不是编造具体事实。\n\
+                 10. 优先给出可执行的后端处置建议。\n\n\
+                 分析问题：{}\n\n\
+                 上下文：\n\
+                 source={:?}\n\
+                 target_name={:?}\n\
+                 target_type={:?}\n\
+                 platform={:?}\n\
+                 report_type={:?}\n\
+                 rule_risk={:?}\n\
+                 rule_confidence={:?}\n\
+                 rule_summary={:?}\n\n\
+                 证据 JSON：\n{}",
+                language,
+                question,
+                context.source,
