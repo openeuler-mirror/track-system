@@ -262,3 +262,26 @@ fn value_to_readable_text(value: &Value) -> Option<String> {
     match value {
         Value::Null => None,
         Value::String(text) => {
+            let trimmed = text.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            }
+        }
+        Value::Bool(flag) => Some(flag.to_string()),
+        Value::Number(number) => Some(number.to_string()),
+        Value::Array(items) => {
+            let values = items
+                .iter()
+                .filter_map(value_to_readable_text)
+                .collect::<Vec<_>>();
+            if values.is_empty() {
+                None
+            } else {
+                Some(values.join("；"))
+            }
+        }
+        Value::Object(_) => serde_json::to_string(value).ok(),
+    }
+}
