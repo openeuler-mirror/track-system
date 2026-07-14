@@ -46,3 +46,27 @@ const DEFAULT_SYSTEM_VERSION_BLACKLIST: [&str; 2] = ["CTyunOS2.0.1", "CTyunOS25.
 #[derive(Debug, Clone, Serialize)]
 pub struct ReportArtifact {
     pub artifact_type: String,
+    pub path: String,
+    pub format: String,
+    pub rows: usize,
+    pub source: String,
+    pub template: String,
+    pub generated_at: String,
+    #[serde(skip_serializing)]
+    pub preview_rows: Vec<CveFixComparisonRow>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CveFixComparisonRow {
+    pub package: String,
+    pub cve_or_issue: String,
+    pub upstream_fixed_version: String,
+    pub ctyunos_current_version: String,
+    pub system_version: String,
+    pub description: String,
+    pub xingkong_ticket_no: String,
+    pub commit_url: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CveFixComparisonInput {
