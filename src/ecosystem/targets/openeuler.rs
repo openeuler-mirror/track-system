@@ -535,3 +535,26 @@ impl OpenEulerCommunityCollector {
         let text = if fallback_text.is_empty() {
             lifecycle_page.plain_text.as_str()
         } else {
+            fallback_text.as_str()
+        };
+        let lower = text.to_ascii_lowercase();
+        let compact_text = text.replace("**", "").replace([' ', '\n', '\r', '\t'], "");
+        let has_lts_policy = lower.contains("lts version")
+            || text.contains("长期支持版本")
+            || text.contains("LTS版本");
+        let lts_every_four_years =
+            text.contains("发布间隔周期定为4年") || text.contains("偶数年3月发布新一代LTS首版本");
+        let lts_every_two_years = lower.contains("released every two years");
+        let lts_support_four_years = lower.contains("community support for four years")
+            || lower.contains("lifecycle of a full lts version is four years")
+            || text.contains("提供4年社区支持");
+        let lts_lifecycle_six_years = compact_text.contains("LTS版本全版本生命周期6年")
+            || compact_text.contains("全版本生命周期6年");
+        let lts_extendable_to_eight_years =
+            text.contains("延长至8年") || text.contains("申请延长至8年");
+        let innovation_every_twelve_months =
+            text.contains("每隔12个月会发布一个社区创新版本") || text.contains("9月发布创新版本");
+        let innovation_every_six_months = lower.contains("released every six months");
+        let innovation_support_six_months = lower.contains("community support for six months")
+            || text.contains("提供6个月社区支持");
+        let extended_support_mentioned = lower.contains("extended support")
