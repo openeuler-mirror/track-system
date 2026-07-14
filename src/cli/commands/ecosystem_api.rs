@@ -574,3 +574,27 @@ fn print_target_detail(target: &EcosystemTargetDto) {
     println!("  名称: {}", target.name.cyan());
     println!("  类型: {}", target.target_type);
     println!(
+        "  平台: {}",
+        target.platform.clone().unwrap_or_else(|| "-".to_string())
+    );
+    println!("  角色: {}", target.role);
+    println!("  规则画像: {}", target.rule_profile);
+    println!("  状态: {}", target.status);
+    println!("  刷新间隔: {} 小时", target.refresh_interval_hours);
+    if let Some(homepage) = &target.homepage_url {
+        println!("  首页: {}", homepage);
+    }
+    if let Some(api_base) = &target.api_base_url {
+        println!("  API 地址: {}", api_base);
+    }
+    if let Some(owner) = &target.owner {
+        println!("  Owner: {}", owner);
+    }
+    if let Some(repo) = &target.repo {
+        println!("  Repo: {}", repo);
+    }
+    if let Some(branch) = &target.default_branch {
+        println!("  默认分支: {}", branch);
+    }
+    println!(
+        "  最近采集: {}",
