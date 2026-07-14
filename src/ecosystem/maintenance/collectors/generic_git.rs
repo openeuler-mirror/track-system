@@ -285,3 +285,26 @@ fn open_and_update_cached_mirror(
     ensure_origin_remote(&repo, repo_url)?;
 
     let remote_head = resolve_remote_head(&repo, repo_url, timeouts)?;
+    fetch_cached_mirror(&repo, repo_path, repo_url, &remote_head, timeouts)?;
+    update_cached_head(&repo, remote_head.default_branch.as_deref())?;
+
+    Ok(repo)
+}
+
+fn ensure_origin_remote(repo: &Repository, repo_url: &str) -> Result<()> {
+    match repo.find_remote("origin") {
+        Ok(remote) => {
+            if remote.url() != Some(repo_url) {
+                repo.remote_set_url("origin", repo_url)
+                    .with_context(|| format!("update origin url failed: {}", repo_url))?;
+            }
+        }
+        Err(_) => {
+            repo.remote("origin", repo_url)
+                .with_context(|| format!("create origin remote failed: {}", repo_url))?;
+        }
+    }
+
+    Ok(())
+}
+
