@@ -64,10 +64,13 @@ pub fn create_app_with_state(state: AppState) -> Router {
                 .merge(reports_routes())
                 .merge(package_routes())
                 .merge(tracking_routes())
+                .merge(l0_routes())
                 .merge(sync_routes())
                 .merge(backport_routes())
                 .merge(component_routes())
                 .merge(ecosystem_routes())
+                .merge(maintenance_routes())
+                .merge(ai_routes())
                 .merge(crate::server::routes::snapshot_routes()),
         )
         .with_state(state)
