@@ -584,3 +584,26 @@ fn configured_timeout(env_key: &str, default_secs: u64) -> Duration {
         .and_then(|value| value.parse::<u64>().ok())
         .filter(|secs| *secs > 0)
         .unwrap_or(default_secs);
+    Duration::from_secs(secs)
+}
+
+fn parse_default_branch_ref(line: &str) -> Option<String> {
+    let line = line.trim();
+    if !line.starts_with("ref: ") {
+        return None;
+    }
+
+    let (reference, head) = line[5..].split_once('\t')?;
+    if head == "HEAD" && !reference.trim().is_empty() {
+        Some(reference.trim().to_string())
+    } else {
+        None
+    }
+}
+
+fn parse_head_oid(line: &str) -> Option<Oid> {
+    let (oid, reference) = line.trim().split_once('\t')?;
+    if reference == "HEAD" {
+        Oid::from_str(oid.trim()).ok()
+    } else {
+        None
