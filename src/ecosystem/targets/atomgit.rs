@@ -468,3 +468,26 @@ impl AtomGitPlatformCollector {
 
     fn log_page_result(&self, label: &str, page: &PageSnapshot) {
         match &page.error {
+            Some(error) => warn!(
+                page = label,
+                http_status = ?page.http_status,
+                error = %error,
+                "AtomGit 页面抓取失败"
+            ),
+            None => info!(
+                page = label,
+                http_status = ?page.http_status,
+                spa_shell = page.looks_like_spa_shell,
+                keyword_lines = ?page.keyword_lines,
+                "AtomGit 页面抓取成功"
+            ),
+        }
+        debug!(
+            page = label,
+            plain_text_preview = %page.plain_text.chars().take(240).collect::<String>(),
+            "AtomGit 页面文本预览"
+        );
+    }
+
+    fn detect_basic_info(&self, home_page: &PageSnapshot) -> Value {
+        let text = home_page.plain_text.as_str();
