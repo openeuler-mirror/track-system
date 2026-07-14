@@ -46,3 +46,27 @@ struct GenericGitMetrics {
     default_branch: Option<String>,
     last_commit_at: Option<String>,
     commit_total: i64,
+    commits_last_12_months: i64,
+    committers_last_12_months: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct GenericGitVersion {
+    version: String,
+    source_ref: String,
+    is_stable: bool,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct GenericGitTimeouts {
+    fetch_timeout: Duration,
+    connect_timeout: Duration,
+    io_timeout: Duration,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct RemoteHead {
+    default_branch: Option<String>,
+    head_oid: Option<Oid>,
+}
+
