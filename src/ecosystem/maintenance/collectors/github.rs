@@ -118,3 +118,27 @@ impl GitHubMaintenanceCollector {
             .map(|dt| dt.to_rfc3339());
 
         debug!(
+            owner = owner,
+            repo = repo,
+            package = package.name,
+            branch,
+            commit_total,
+            commits_last_12_months,
+            committers_last_12_months,
+            stars = repo_info.stargazers_count,
+            forks = repo_info.forks_count,
+            "GitHub 组件维护指标采集完成"
+        );
+
+        Ok(vec![json!({
+            "source_type": "github_repository_activity_live",
+            "source_name": "github_repository_activity",
+            "source_url": repo_info.html_url,
+            "http_status": 200,
+            "assessment_category": "maintenance",
+            "assessment_subcategory": "repository_activity",
+            "data": {
+                "collector": "github_live_api",
+                "platform": "github",
+                "owner": owner,
+                "repo": repo,
