@@ -525,3 +525,26 @@ struct IssueNumberGenerator {
 }
 
 struct RowGroup {
+    package: String,
+    upstream_fixed_version: String,
+    ctyunos_current_version: String,
+    system_version: String,
+    identifiers: Vec<String>,
+    descriptions: Vec<String>,
+    xingkong_ticket_no: String,
+    commit_url: Option<String>,
+}
+
+impl IssueNumberGenerator {
+    fn new(start: u32) -> Self {
+        Self { next: start }
+    }
+
+    fn next_issue(&mut self) -> String {
+        let issue = format!("ISSUE-{}", self.next);
+        self.next += 1;
+        issue
+    }
+}
+
+fn write_cve_fix_comparison_xlsx(path: &Path, rows: &[CveFixComparisonRow]) -> Result<()> {
