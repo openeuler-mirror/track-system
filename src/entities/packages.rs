@@ -61,4 +61,16 @@ impl Related<super::backport_candidates::Entity> for Entity {
     }
 }
 
+impl Related<super::maintenance_evidence_snapshots::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::MaintenanceEvidenceSnapshots.def()
+    }
+}
+
+impl Related<super::maintenance_reports::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::MaintenanceReports.def()
+    }
+}
+
 impl ActiveModelBehavior for ActiveModel {}
