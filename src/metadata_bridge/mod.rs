@@ -529,32 +529,14 @@ async fn persist_snapshot<P: AsRef<Path>>(
 }
 
 fn extract_spec_version(content: &str) -> Option<String> {
-    let re = Regex::new(r"(?m)^\s*Version\s*:\s*([\w\.\-]+)").ok()?;
-    re.captures(content)
-        .and_then(|caps| caps.get(1))
-        .map(|m| m.as_str().to_string())
+    let info = parse_spec(content);
+    (!info.version.is_empty()).then_some(info.version)
 }
 
 fn extract_spec_release(content: &str) -> Option<String> {
-    let re = Regex::new(r"(?m)^\s*Release\s*:\s*([^\r\n]+)").ok()?;
-    re.captures(content)
-        .and_then(|caps| caps.get(1))
-        .map(|m| {
-            let raw = m.as_str().trim();
-            // 去掉常见的可选宏与尾随右括号
-            let cleaned = raw
-                .replace("%{?dist}", "")
-                .replace("%{?scl:", "")
-                .replace("%{!?scl:", "")
-                .replace("%{?scl_prefix}", "")
-                .replace('}', "")
-                .trim()
-                .to_string();
-            cleaned
-        })
-        .filter(|s| !s.is_empty())
+    let info = parse_spec(content);
+    (!info.release.is_empty()).then_some(info.release)
 }
-
 
 fn normalize_snapshot_spec_version_release(snapshot: &mut RepositorySnapshot) {
     let Some(spec) = snapshot.spec.as_mut() else {
