@@ -238,3 +238,27 @@ fn find_indicator_json_value(report_payload: &Value, key: &str) -> Option<Value>
                     indicator.get("value").cloned()
                 } else {
                     None
+                }
+            })
+        })
+}
+
+fn find_raw_evidence_json_value(report_payload: &Value, key: &str) -> Option<Value> {
+    report_payload
+        .get("raw_evidence")
+        .and_then(Value::as_array)
+        .and_then(|entries| {
+            entries.iter().find_map(|entry| {
+                let category = entry.get("assessment_category").and_then(Value::as_str)?;
+                if category != "maintenance" {
+                    return None;
+                }
+                entry.get("data").and_then(|data| data.get(key)).cloned()
+            })
+        })
+}
+
+fn value_to_readable_text(value: &Value) -> Option<String> {
+    match value {
+        Value::Null => None,
+        Value::String(text) => {
