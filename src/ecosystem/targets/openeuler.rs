@@ -581,3 +581,26 @@ impl OpenEulerCommunityCollector {
         if lts_extendable_to_eight_years {
             parts.push("生命周期结束前可申请延长至 8 年");
         }
+        if innovation_every_twelve_months && innovation_support_six_months {
+            parts.push("自 2025 年 8 月起，创新版本每 12 个月发布一次，并提供 6 个月社区支持");
+        } else if innovation_every_six_months && innovation_support_six_months {
+            parts.push("公开页面提到过往创新版本约每六个月发布一次并提供六个月支持");
+        }
+        if extended_support_mentioned {
+            parts.push("公开页面提及扩展支持");
+        }
+        if sp_policy_mentioned {
+            parts.push("SP 版本生命周期按大小 SP 区分维护周期");
+        }
+
+        json!({
+            "summary": if parts.is_empty() {
+                "暂未从公开页面识别出明确的版本生命周期策略".to_string()
+            } else {
+                parts.join("；")
+            },
+            "source_preview": text.chars().take(240).collect::<String>(),
+            "has_lts_policy": has_lts_policy,
+            "lts_every_four_years": lts_every_four_years,
+            "lts_every_two_years": lts_every_two_years,
+            "lts_support_four_years": lts_support_four_years,
