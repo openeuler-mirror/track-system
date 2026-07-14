@@ -251,3 +251,26 @@ mod tests {
             description: Some("crypto library".to_string()),
             created_at: now,
             updated_at: now,
+        }
+    }
+
+    fn assessment() -> MaintenanceAssessment {
+        let mut dimensions = BTreeMap::new();
+        dimensions.insert(
+            "activity_risk".to_string(),
+            MaintenanceDimension {
+                level: "medium".to_string(),
+                score: 70,
+                reasons: vec!["moderate activity".to_string()],
+            },
+        );
+
+        MaintenanceAssessment {
+            report_type: "maintenance_profile".to_string(),
+            overall_risk: "medium".to_string(),
+            confidence: "high".to_string(),
+            summary: "maintenance summary".to_string(),
+            section: MaintenanceSubAssessment {
+                level: "medium".to_string(),
+                confidence: "high".to_string(),
+                score: 70,
