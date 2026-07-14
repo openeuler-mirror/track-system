@@ -172,3 +172,27 @@ mod tests {
             .append_query_results([[package]])
             .into_connection();
         let service = L0RepoCacheService::new(&db);
+
+        let result = service.warm_package(7).await.unwrap();
+        assert_eq!(result.status, "skipped");
+        assert_eq!(result.message, "package missing l0_repo_url");
+        assert_eq!(result.package_id, 7);
+    }
+
+    #[tokio::test]
+    async fn warm_all_packages_counts_skipped_entries() {
+        let now = Utc::now();
+        let db = MockDatabase::new(DatabaseBackend::Sqlite)
+            .append_query_results([[
+                packages::Model {
+                    id: 1,
+                    name: "pkg-a".to_string(),
+                    level: 1,
+                    sync_interval_hours: 24,
+                    l0_repo_url: None,
+                    description: None,
+                    created_at: now,
+                    updated_at: Utc::now(),
+                },
+                packages::Model {
+                    id: 2,
