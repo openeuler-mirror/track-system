@@ -378,3 +378,42 @@ fn finalize_assessment(
     }
 }
 
+fn build_evidence_catalog(raw_evidence: &[Value]) -> Value {
+    let mut category_counts: BTreeMap<String, usize> = BTreeMap::new();
+    let mut subcategory_counts: BTreeMap<String, usize> = BTreeMap::new();
+    let mut sources = BTreeSet::new();
+
+    for entry in raw_evidence {
+        if let Some(category) = entry.get("assessment_category").and_then(Value::as_str) {
+            *category_counts.entry(category.to_string()).or_default() += 1;
+        }
+        if let Some(subcategory) = entry.get("assessment_subcategory").and_then(Value::as_str) {
+            *subcategory_counts
+                .entry(subcategory.to_string())
+                .or_default() += 1;
+        }
+        if let Some(source_name) = entry.get("source_name").and_then(Value::as_str) {
+            sources.insert(source_name.to_string());
+        }
+    }
+
+    json!({
+        "category_counts": category_counts,
+        "subcategory_counts": subcategory_counts,
+        "sources": sources.into_iter().collect::<Vec<_>>(),
+    })
+}
+
+fn entries_by_category<'a>(raw_evidence: &'a [Value], category: &str) -> Vec<&'a Value> {
+    raw_evidence
+        .iter()
+        .filter(|entry| {
+            entry
+                .get("assessment_category")
+                .and_then(Value::as_str)
+                .map(|value| value == category)
+                .unwrap_or(false)
+        })
+        .collect()
+}
+
