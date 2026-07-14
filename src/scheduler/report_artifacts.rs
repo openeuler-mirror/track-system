@@ -1376,3 +1376,26 @@ mod tests {
             .contains("https://example.com/commit/issue(ISSUE-12020)"));
     }
 
+    #[test]
+    #[serial]
+    fn rows_merge_openssl_intermediate_fix_versions_into_latest_row() {
+        let commits = vec![
+            serde_json::json!({
+                "Description": "fix CVE-2026-34180 CVE-2026-42766",
+                "CVEList": ["CVE-2026-34180", "CVE-2026-42766"],
+                "Url": "https://example.com/openssl/52",
+                "UpstreamVersion": "3.0.12",
+                "UpstreamRelease": "52",
+            }),
+            serde_json::json!({
+                "Description": "fix CVE-2026-45446",
+                "CVEList": ["CVE-2026-45446"],
+                "Url": "https://example.com/openssl/51",
+                "UpstreamVersion": "3.0.12",
+                "UpstreamRelease": "51",
+            }),
+            serde_json::json!({
+                "Description": "fix ISSUE-3022402",
+                "CVEList": [],
+                "Url": "https://example.com/openssl/49",
+                "UpstreamVersion": "3.0.12",
