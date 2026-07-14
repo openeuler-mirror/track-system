@@ -12,6 +12,7 @@
 pub mod backport;
 pub mod compare;
 pub mod component;
+pub mod ecosystem;
 pub mod health;
 pub mod metadata;
 pub mod package;
