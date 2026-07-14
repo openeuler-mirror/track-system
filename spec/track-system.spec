@@ -187,6 +187,18 @@ systemctl daemon-reload >/dev/null 2>&1 || true
 %{pkg_log_dir}/track-server.log
 
 %changelog
+* Mon Jun 22 2026 Si Wang <wangs88@chinatelecom.cn> - 2.0.0-1
+- Resolve L2 spec macros and consolidate CVE fix xlsx rows.
+
+* Mon Jun 22 2026 Si Wang <wangs88@chinatelecom.cn> - 2.0.0-0
+- Support ecosystem and maintenance assessment modules.
+- Support AI-assisted report analysis APIs and report embedding.
+- Generate and email CVE/ISSUE fix comparison xlsx artifacts.
+- Improve L2Newer fallback, release-based baseline matching, and xlsx volume splitting.
+- Resolve L2 spec macros and consolidate CVE fix xlsx rows.
+- Support multi-platform collectors, batch package import, and default tracking creation.
+- Support environment-driven server and CLI endpoint configuration.
+
 * Wed Jan 21 2026 Si Wang <wangs88@chinatelecom.cn> - 1.2.0-2
 -Fix bug #111746 #112451
 
