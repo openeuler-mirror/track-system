@@ -214,3 +214,27 @@ impl GitHubApi {
                 let commits: Vec<GitHubCommitListItem> = response
                     .json()
                     .await
+                    .context("parse github commits response failed")?;
+                if commits.is_empty() {
+                    return Ok(0);
+                }
+                if let Some(link) = headers
+                    .get(header::LINK)
+                    .and_then(|value| value.to_str().ok())
+                {
+                    if let Some(last_page) = parse_last_page_from_link(link) {
+                        return Ok(last_page as i64);
+                    }
+                }
+                Ok(commits.len() as i64)
+            }
+            StatusCode::CONFLICT => Ok(0),
+            status => {
+                let body = response.text().await.unwrap_or_default();
+                Err(anyhow!("GitHub API HTTP {}: {}", status.as_u16(), body))
+            }
+        }
+    }
+
+    async fn count_unique_committers_since(
+        &self,
