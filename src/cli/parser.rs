@@ -1118,4 +1118,207 @@ mod tests {
 
         i18n::init_i18n(Some("en-US"));
     }
+
+    #[test]
+    fn cli_parse_ecosystem_create_command() {
+        let cli = Cli::parse_from([
+            "track-cli",
+            "ecosystem",
+            "create",
+            "--name",
+            "openEuler Community",
+        ]);
+
+        match cli.command {
+            Commands::Ecosystem {
+                action:
+                    EcosystemAction::Create {
+                        name,
+                        target_type,
+                        role,
+                        rule_profile,
+                        ..
+                    },
+            } => {
+                assert_eq!(name, "openEuler Community");
+                assert_eq!(target_type, None);
+                assert_eq!(role, None);
+                assert_eq!(rule_profile, None);
+            }
+            other => panic!("expected ecosystem create command, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn cli_parse_ecosystem_update_command() {
+        let cli = Cli::parse_from([
+            "track-cli",
+            "ecosystem",
+            "update",
+            "openeuler",
+            "--status",
+            "active",
+        ]);
+
+        match cli.command {
+            Commands::Ecosystem {
+                action: EcosystemAction::Update { target, status, .. },
+            } => {
+                assert_eq!(target, "openeuler");
+                assert_eq!(status.as_deref(), Some("active"));
+            }
+            other => panic!("expected ecosystem update command, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn cli_parse_ecosystem_latest_report_verbose_command() {
+        let cli = Cli::parse_from([
+            "track-cli",
+            "ecosystem",
+            "latest-report",
+            "--id",
+            "1",
+            "--verbose",
+        ]);
+
+        match cli.command {
+            Commands::Ecosystem {
+                action: EcosystemAction::LatestReport { id, verbose },
+            } => {
+                assert_eq!(id, 1);
+                assert!(verbose);
+            }
+            other => panic!("expected ecosystem latest-report command, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn cli_parse_ecosystem_report_verbose_command() {
+        let cli = Cli::parse_from(["track-cli", "ecosystem", "report", "7", "--verbose"]);
+
+        match cli.command {
+            Commands::Ecosystem {
+                action: EcosystemAction::Report { id, verbose },
+            } => {
+                assert_eq!(id, 7);
+                assert!(verbose);
+            }
+            other => panic!("expected ecosystem report command, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn cli_parse_maintenance_create_command() {
+        let cli = Cli::parse_from(["track-cli", "maintenance", "refresh", "openssl"]);
+
+        match cli.command {
+            Commands::Maintenance {
+                action: MaintenanceAction::Refresh { package },
+            } => {
+                assert_eq!(package, "openssl");
+            }
+            other => panic!("expected maintenance refresh command, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn cli_parse_maintenance_report_verbose_command() {
+        let cli = Cli::parse_from(["track-cli", "maintenance", "report", "9", "--verbose"]);
+
+        match cli.command {
+            Commands::Maintenance {
+                action: MaintenanceAction::Report { id, verbose },
+            } => {
+                assert_eq!(id, 9);
+                assert!(verbose);
+            }
+            other => panic!("expected maintenance report command, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn cli_parse_l0_warm_cache_command() {
+        let cli = Cli::parse_from(["track-cli", "l0", "warm-cache", "12"]);
+
+        match cli.command {
+            Commands::L0 {
+                action: L0Action::WarmCache { package_id },
+            } => {
+                assert_eq!(package_id, Some(12));
+            }
+            other => panic!("expected l0 warm-cache command, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn cli_parse_package_import_command() {
+        let cli = Cli::parse_from([
+            "track-cli",
+            "package",
+            "import",
+            "--file",
+            "l1_package_name.txt",
+            "--level",
+            "2",
+            "--sync-interval",
+            "12h",
+        ]);
+
+        match cli.command {
+            Commands::Package {
+                action:
+                    PackageAction::Import {
+                        file,
+                        level,
+                        sync_interval,
+                        create_tracking,
+                        distro,
+                        tracking_status,
+                        update_existing,
+                        ..
+                    },
+            } => {
+                assert_eq!(file, "l1_package_name.txt");
+                assert_eq!(level, 2);
+                assert_eq!(sync_interval, "12h");
+                assert!(!create_tracking);
+                assert!(distro.is_none());
+                assert_eq!(tracking_status, "active");
+                assert!(update_existing);
+            }
+            other => panic!("expected package import command, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn cli_parse_tracking_import_command() {
+        let cli = Cli::parse_from([
+            "track-cli",
+            "tracking",
+            "import",
+            "--file",
+            "config/tracking_batch_atomgit_src-openEuler.csv",
+            "--distro",
+            "1",
+            "--status",
+            "active",
+        ]);
+
+        match cli.command {
+            Commands::Tracking {
+                action:
+                    TrackingAction::Import {
+                        file,
+                        distro,
+                        status,
+                    },
+            } => {
+                assert_eq!(file, "config/tracking_batch_atomgit_src-openEuler.csv");
+                assert_eq!(distro, "1");
+                assert_eq!(status, "active");
+            }
+            other => panic!("expected tracking import command, got: {:?}", other),
+        }
+    }
 }
