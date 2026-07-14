@@ -478,17 +478,12 @@ impl LocalClient {
                             hasher.update(content);
                             spec_sha256 = Some(format!("{:x}", hasher.finalize()));
 
-                            // 尝试提取版本号和发行版号
-                            for line in text.lines() {
-                                if line.starts_with("Version:") {
-                                    spec_version = Some(
-                                        line.trim_start_matches("Version:").trim().to_string(),
-                                    );
-                                } else if line.starts_with("Release:") {
-                                    spec_release = Some(
-                                        line.trim_start_matches("Release:").trim().to_string(),
-                                    );
-                                }
+                            let spec_info = parse_spec(&text);
+                            if !spec_info.version.is_empty() {
+                                spec_version = Some(spec_info.version);
+                            }
+                            if !spec_info.release.is_empty() {
+                                spec_release = Some(spec_info.release);
                             }
                         }
                     }
