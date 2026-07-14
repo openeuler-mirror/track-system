@@ -310,3 +310,27 @@ fn cve_fix_comparison_rows_with_issue_start(
 }
 
 pub fn cve_fix_comparison_rows_for_inputs(
+    inputs: &[CveFixComparisonInput],
+) -> Vec<CveFixComparisonRow> {
+    cve_fix_comparison_rows_for_inputs_with_issue_start(inputs, allocate_issue_start_number())
+}
+
+fn cve_fix_comparison_rows_for_inputs_with_issue_start(
+    inputs: &[CveFixComparisonInput],
+    issue_start_number: u32,
+) -> Vec<CveFixComparisonRow> {
+    cve_fix_comparison_row_volumes_for_inputs_with_issue_start(inputs, issue_start_number)
+        .into_iter()
+        .flatten()
+        .collect()
+}
+
+fn cve_fix_comparison_row_volumes_for_inputs_with_issue_start(
+    inputs: &[CveFixComparisonInput],
+    issue_start_number: u32,
+) -> Vec<Vec<CveFixComparisonRow>> {
+    let ticket_no =
+        std::env::var("TRACK_XINGKONG_TICKET_NO").unwrap_or_else(|_| "97883".to_string());
+    let mut issue_generator = IssueNumberGenerator::new(issue_start_number);
+    let mut volumes: Vec<Vec<RowGroup>> = vec![Vec::new()];
+    let max_packages = xlsx_max_packages();
