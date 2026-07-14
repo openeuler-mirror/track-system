@@ -42,8 +42,23 @@ struct ReportDetail {
     package_name: String,
     status: String,
     content: serde_json::Value,
+    maintenance_summary: Option<ReportMaintenanceSummary>,
     created_at: chrono::DateTime<chrono::Utc>,
     updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct ReportMaintenanceSummary {
+    report_id: i64,
+    overall_risk: String,
+    confidence: String,
+    generated_at: chrono::DateTime<chrono::Utc>,
+    commit_total: Option<i64>,
+    commits_last_12_months: Option<i64>,
+    committers_last_12_months: Option<i64>,
+    last_commit_at: Option<String>,
+    stars: Option<i64>,
+    forks: Option<i64>,
 }
 
 /// API 响应包装
