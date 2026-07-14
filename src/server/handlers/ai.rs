@@ -76,3 +76,29 @@ pub async fn analyze_maintenance_report(
         .ok_or_else(|| ApiError::NotFound(format!("maintenance report {} not found", id)))?;
     let package = Packages::find()
         .filter(packages::Column::Id.eq(report.package_id))
+        .one(state.db.as_ref())
+        .await?;
+
+    let context = AiContext {
+        source: AiAnalysisSource::MaintenanceReport,
+        target_name: package.as_ref().map(|item| item.name.clone()),
+        target_type: Some("package".to_string()),
+        platform: None,
+        report_type: Some(report.report_type.clone()),
+        rule_risk: Some(report.overall_risk.clone()),
+        rule_confidence: Some(report.confidence.clone()),
+        rule_summary: Some(report.summary.clone()),
+        evidence: json!({
+            "dimensions": report.dimensions,
+            "evidence_summary": report.evidence_summary,
+            "report_payload": report.report_payload,
+        }),
+    };
+
+    let service = AiAnalysisService::from_env();
+    let response = service
+        .analyze(context, req.into())
+        .await
+        .map_err(|err| ApiError::InternalError(err.to_string()))?;
+    Ok(Json(ApiResponse::success(response)))
+}
