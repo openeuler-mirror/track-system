@@ -213,3 +213,26 @@ impl OpenEulerCommunityCollector {
             lts_every_two_years = ?version_lifecycle["lts_every_two_years"].as_bool(),
             lts_support_four_years = ?version_lifecycle["lts_support_four_years"].as_bool(),
             lts_lifecycle_six_years = ?version_lifecycle["lts_lifecycle_six_years"].as_bool(),
+            lts_extendable_to_eight_years = ?version_lifecycle["lts_extendable_to_eight_years"].as_bool(),
+            innovation_every_twelve_months = ?version_lifecycle["innovation_every_twelve_months"].as_bool(),
+            innovation_every_six_months = ?version_lifecycle["innovation_every_six_months"].as_bool(),
+            innovation_support_six_months = ?version_lifecycle["innovation_support_six_months"].as_bool(),
+            sp_policy_mentioned = ?version_lifecycle["sp_policy_mentioned"].as_bool(),
+            "openEuler 生命周期识别详情"
+        );
+
+        vec![
+            json!({
+                "source_type": "openeuler_community_organization",
+                "source_name": "openeuler_community",
+                "source_url": OPENEULER_ORGANIZATION_URL,
+                "assessment_category": "source",
+                "assessment_subcategory": "community_organization",
+                "data": {
+                    "organization_structure": organization_structure["summary"],
+                    "detected_committees": organization_structure["detected_committees"],
+                    "organization_keyword_lines": organization_page.keyword_lines,
+                    "organization_http_status": organization_page.http_status,
+                    "organization_error": organization_page.error,
+                }
+            }),
