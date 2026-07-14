@@ -34,6 +34,7 @@ pub mod classifier_job;
 pub mod cli;
 pub mod collectors;
 pub mod component;
+pub mod config;
 pub mod diff;
 pub mod ecosystem;
 pub mod entities;
