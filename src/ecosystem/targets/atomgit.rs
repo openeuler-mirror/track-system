@@ -767,3 +767,26 @@ impl AtomGitPlatformCollector {
                 &["开源许可证协议模板", "版权归作者本人所有", "使用许可"],
                 8
             ),
+        })
+    }
+
+    fn detect_cla_policy(&self, cla_page: &PageSnapshot) -> Value {
+        let text = cla_page.plain_text.as_str();
+        let lower = text.to_ascii_lowercase();
+        let cla_supported = lower.contains("cla")
+            && (text.contains("管理")
+                || text.contains("贡献者许可协议")
+                || text.contains("影响范围"));
+        let mut scopes = Vec::new();
+        if text.contains("搜索权限") {
+            scopes.push("搜索权限".to_string());
+        }
+        if text.contains("影响范围") {
+            scopes.push("影响范围".to_string());
+        }
+        if text.contains("任何仓库") {
+            scopes.push("任何仓库".to_string());
+        }
+
+        let summary = if cla_supported {
+            if scopes.is_empty() {
