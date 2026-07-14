@@ -166,3 +166,27 @@ impl GitHubApi {
 
         Ok(Self {
             client,
+            token: std::env::var("GITHUB_TOKEN")
+                .or_else(|_| std::env::var("GITHUB_ACCESS_TOKEN"))
+                .ok(),
+            base_url: base_url.unwrap_or_else(|| GITHUB_API_BASE.to_string()),
+        })
+    }
+
+    async fn fetch_repository(&self, owner: &str, repo: &str) -> Result<GitHubRepositorySnapshot> {
+        let url = format!("{}/repos/{}/{}", self.base_url, owner, repo);
+        self.get_json(&url).await
+    }
+
+    async fn fetch_latest_commit(
+        &self,
+        owner: &str,
+        repo: &str,
+        branch: &str,
+    ) -> Result<Option<GitHubCommitListItem>> {
+        let url = format!(
+            "{}/repos/{}/{}/commits?sha={}&per_page=1&page=1",
+            self.base_url, owner, repo, branch
+        );
+        let commits: Vec<GitHubCommitListItem> = self.get_json(&url).await?;
+        Ok(commits.into_iter().next())
