@@ -1943,16 +1943,202 @@ impl<'a> PipelineExecutor<'a> {
             .take(100)
             .collect::<Vec<_>>();
 
-        if l0_commits.is_empty() {
+        let package = Packages::find_by_id(tracking.package_id)
+            .one(self.db)
+            .await?;
+        let package_name = package
+            .as_ref()
+            .map(|package| package.name.clone())
+            .unwrap_or_else(|| tracking.l1_repo_name.clone());
+
+        let mut seen_versions = HashSet::new();
+        let mut all_versions = Vec::new();
+        let mut changelogs: HashMap<String, Vec<diff::l1_vs_l0::ChangelogEntry>> = HashMap::new();
+        let mut maintenance_notices = Vec::new();
+
+        for commit in &l0_commits {
+            let metadata_text = commit
+                .metadata
+                .as_ref()
+                .and_then(|metadata| serde_json::to_string(metadata).ok())
+                .unwrap_or_default();
+            let evidence_text = format!("{}\n{}", commit.summary, metadata_text);
+
+            for version in diff::l1_vs_l0::extract_versions_from_text(&evidence_text) {
+                if !seen_versions.insert(version.clone()) {
+                    continue;
+                }
+                let parsed =
+                    VersionParser::parse(&version).unwrap_or_else(|_| Version::new(0, 0, 0));
+                all_versions.push(diff::l1_vs_l0::VersionTag {
+                    version: version.clone(),
+                    date: commit.authored_at,
+                    changelog: commit.summary.clone(),
+                    is_stable: parsed.is_stable(),
+                });
+                changelogs
+                    .entry(version)
+                    .or_default()
+                    .push(diff::l1_vs_l0::ChangelogEntry {
+                        entry_type: infer_changelog_entry_type(&evidence_text),
+                        description: commit.summary.clone(),
+                        commit_sha: Some(commit.commit_sha.clone()),
+                    });
+            }
+
+            maintenance_notices.extend(diff::l1_vs_l0::extract_maintenance_notices(
+                &evidence_text,
+                format!("l0_commit:{}", short_sha(&commit.commit_sha)),
+            ));
+        }
+
+        let native_evidence = MaintenanceEvidenceSnapshots::find()
+            .filter(maintenance_evidence_snapshots::Column::PackageId.eq(tracking.package_id))
+            .order_by_desc(maintenance_evidence_snapshots::Column::CollectedAt)
+            .limit(20)
+            .all(self.db)
+            .await?;
+
+        for evidence in &native_evidence {
+            let raw_text = serde_json::to_string(&evidence.raw_payload).unwrap_or_default();
+            let normalized_text = evidence
+                .normalized_signals
+                .as_ref()
+                .and_then(|value| serde_json::to_string(value).ok())
+                .unwrap_or_default();
+            let evidence_text = format!("{}\n{}", raw_text, normalized_text);
+            let source = format!(
+                "native_community:{}:{}",
+                evidence.source_name, evidence.source_url
+            );
+            for catalog in version_catalog_payloads(evidence) {
+                append_version_catalog_entries(
+                    catalog,
+                    &source,
+                    evidence.collected_at,
+                    &mut seen_versions,
+                    &mut all_versions,
+                    &mut changelogs,
+                );
+            }
+            maintenance_notices.extend(diff::l1_vs_l0::extract_maintenance_notices(
+                &evidence_text,
+                source,
+            ));
+        }
+
+        if all_versions.is_empty() {
+            if let Some(package) = package.as_ref() {
+                if GenericGitMaintenanceCollector::matches_package(package)
+                    && should_collect_l0_version_catalog(package)
+                {
+                    let collector = GenericGitMaintenanceCollector::new();
+                    match collector.collect_version_catalog(package).await {
+                        Ok(version_catalog) => {
+                            let source = format!(
+                                "native_community:{}:{}",
+                                version_catalog
+                                    .get("source_name")
+                                    .and_then(Value::as_str)
+                                    .unwrap_or("generic_git_version_catalog"),
+                                version_catalog
+                                    .get("source_url")
+                                    .and_then(Value::as_str)
+                                    .unwrap_or_default()
+                            );
+                            if let Some(catalog) = find_version_catalog_data(&version_catalog) {
+                                append_version_catalog_entries(
+                                    catalog,
+                                    &source,
+                                    Utc::now(),
+                                    &mut seen_versions,
+                                    &mut all_versions,
+                                    &mut changelogs,
+                                );
+                            }
+
+                            let now = Utc::now();
+                            let evidence = maintenance_evidence_snapshots::ActiveModel {
+                                package_id: Set(package.id),
+                                source_type: Set(version_catalog
+                                    .get("source_type")
+                                    .and_then(Value::as_str)
+                                    .unwrap_or("generic_git_version_catalog")
+                                    .to_string()),
+                                source_name: Set(version_catalog
+                                    .get("source_name")
+                                    .and_then(Value::as_str)
+                                    .unwrap_or("generic_git_version_catalog")
+                                    .to_string()),
+                                source_url: Set(version_catalog
+                                    .get("source_url")
+                                    .and_then(Value::as_str)
+                                    .unwrap_or_default()
+                                    .to_string()),
+                                http_status: Set(version_catalog
+                                    .get("http_status")
+                                    .and_then(Value::as_i64)
+                                    .map(|value| value as i32)
+                                    .or(Some(200))),
+                                content_hash: Set(None),
+                                raw_payload: Set(version_catalog.clone()),
+                                normalized_signals: Set(version_catalog.get("data").cloned()),
+                                collected_at: Set(now),
+                                created_at: Set(now),
+                                updated_at: Set(now),
+                                ..Default::default()
+                            };
+                            if let Err(error) = evidence.insert(self.db).await {
+                                warn!(
+                                    tracking_id = tracking.id,
+                                    package_id = package.id,
+                                    error = %error,
+                                    "L0 Git tag 版本目录兜底证据落库失败，仅用于本次报告"
+                                );
+                            }
+                        }
+                        Err(error) => {
+                            warn!(
+                                tracking_id = tracking.id,
+                                package_id = package.id,
+                                repo_url = package.l0_repo_url.as_deref().unwrap_or_default(),
+                                error = %error,
+                                "L0 Git tag 版本目录兜底采集失败"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        all_versions.sort_by(|left, right| {
+            let left =
+                VersionParser::parse(&left.version).unwrap_or_else(|_| Version::new(0, 0, 0));
+            let right =
+                VersionParser::parse(&right.version).unwrap_or_else(|_| Version::new(0, 0, 0));
+            left.cmp(&right)
+        });
+
+        if all_versions.is_empty() && maintenance_notices.is_empty() {
+            warn!(
+                tracking_id = tracking.id,
+                "L0 数据中未识别到版本或停维公告信息"
+            );
             return Ok(None);
         }
 
-        // TODO: 从 l0_commits 构建 L0VersionInfo
-        // 这里需要解析 commit message 和 tags 来提取版本信息
-        // 暂时返回 None，需要进一步实现
-        warn!(tracking_id = tracking.id, "L0 版本信息提取功能待实现");
+        let latest_version = latest_version_from_tags(&all_versions, false).unwrap_or_default();
+        let latest_stable =
+            latest_version_from_tags(&all_versions, true).unwrap_or_else(|| latest_version.clone());
 
-        Ok(None)
+        Ok(Some(diff::l1_vs_l0::L0VersionInfo {
+            package_name,
+            latest_stable,
+            latest_version,
+            all_versions,
+            changelogs,
+            maintenance_notices,
+        }))
     }
 
     /// 获取 L1 版本信息
