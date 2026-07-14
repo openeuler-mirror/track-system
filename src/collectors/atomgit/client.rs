@@ -83,7 +83,7 @@ impl AtomGitClient {
 
     pub fn as_collector(self) -> impl Collector {
         use crate::collectors::{adapters::GitClientCollectorAdapter, traits::Platform};
-        GitClientCollectorAdapter::new(self, Platform::Gitee)
+        GitClientCollectorAdapter::new(self, Platform::AtomGit)
     }
 
     pub async fn get_commit_detail(&self, owner: &str, repo: &str, sha: &str) -> ApiResult<Commit> {

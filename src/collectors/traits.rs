@@ -1,6 +1,6 @@
 /*
  * Copyright(c) 2024-2026 China Telecom Cloud Technologies Co., Ltd. All rights
- * reserved. ctscat is licensed under Mulan PSL v2. You can use this software
+ * reserved. track-system is licensed under Mulan PSL v2. You can use this software
  * according to the terms and conditions of the Mulan PSL V2. You may obtain a
  * copy of Mulan PSL v2 at: http://license.coscl.org.cn/MulanPSL2.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
@@ -282,6 +282,7 @@ use std::path::PathBuf;
 pub enum Platform {
     GitHub,
     GitLab,
+    AtomGit,
     Gitee,
     Gitea,
     Local,
@@ -293,6 +294,7 @@ impl Platform {
         match self {
             Platform::GitHub => "github",
             Platform::GitLab => "gitlab",
+            Platform::AtomGit => "atomgit",
             Platform::Gitee => "gitee",
             Platform::Gitea => "gitea",
             Platform::Local => "local",
@@ -303,6 +305,7 @@ impl Platform {
         match s.to_lowercase().as_str() {
             "github" => Some(Platform::GitHub),
             "gitlab" => Some(Platform::GitLab),
+            "atomgit" => Some(Platform::AtomGit),
             "gitee" => Some(Platform::Gitee),
             "gitea" => Some(Platform::Gitea),
             "local" => Some(Platform::Local),
@@ -577,6 +580,7 @@ mod tests {
         assert_eq!(Platform::from_str("github"), Some(Platform::GitHub));
         assert_eq!(Platform::from_str("Github"), Some(Platform::GitHub));
         assert_eq!(Platform::from_str("gitlab"), Some(Platform::GitLab));
+        assert_eq!(Platform::from_str("atomgit"), Some(Platform::AtomGit));
         assert_eq!(Platform::from_str("gitee"), Some(Platform::Gitee));
         assert_eq!(Platform::from_str("gitea"), Some(Platform::Gitea));
         assert_eq!(Platform::from_str("local"), Some(Platform::Local));
@@ -587,6 +591,7 @@ mod tests {
     fn test_platform_display() {
         assert_eq!(format!("{}", Platform::GitHub), "github");
         assert_eq!(format!("{}", Platform::GitLab), "gitlab");
+        assert_eq!(format!("{}", Platform::AtomGit), "atomgit");
         assert_eq!(format!("{}", Platform::Gitee), "gitee");
         assert_eq!(format!("{}", Platform::Gitea), "gitea");
         assert_eq!(format!("{}", Platform::Local), "local");

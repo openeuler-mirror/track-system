@@ -1,6 +1,6 @@
 /*
  * Copyright(c) 2024-2026 China Telecom Cloud Technologies Co., Ltd. All rights
- * reserved. ctscat is licensed under Mulan PSL v2. You can use this software
+ * reserved. track-system is licensed under Mulan PSL v2. You can use this software
  * according to the terms and conditions of the Mulan PSL V2. You may obtain a
  * copy of Mulan PSL v2 at: http://license.coscl.org.cn/MulanPSL2.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
@@ -16,11 +16,13 @@
 use async_trait::async_trait;
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine};
 use chrono::Utc;
-use regex::Regex;
 use sha2::{Digest, Sha256};
 use tracing::{error, info};
 
+use crate::spec::parse_spec;
+
 use super::{
+    atomgit::AtomGitClient,
     error::ApiResult,
     gitea::GiteaClient,
     gitee::GiteeClient,
@@ -47,6 +49,7 @@ impl<T: GitClient> GitClientCollectorAdapter<T> {
 
 // 类型别名，方便使用
 pub type GitHubAdapter = GitClientCollectorAdapter<GitHubClient>;
+pub type AtomGitAdapter = GitClientCollectorAdapter<AtomGitClient>;
 pub type GiteeAdapter = GitClientCollectorAdapter<GiteeClient>;
 pub type GiteaAdapter = GitClientCollectorAdapter<GiteaClient>;
 pub type GitLabAdapter = GitClientCollectorAdapter<GitLabClient>;
@@ -62,27 +65,14 @@ fn normalize_spec_path(repo: &str) -> String {
 
 /// 从 spec 文件内容中提取版本号
 fn extract_spec_version(content: &str) -> Option<String> {
-    let re = Regex::new(r"(?m)^\s*Version\s*:\s*([\w\.\-]+)").ok()?;
-    re.captures(content)
-        .and_then(|caps| caps.get(1))
-        .map(|m| m.as_str().to_string())
+    let info = parse_spec(content);
+    (!info.version.is_empty()).then_some(info.version)
 }
 
 /// 从 spec 文件内容中提取 release 号
 fn extract_spec_release(content: &str) -> Option<String> {
-    let re = Regex::new(r"(?m)^\s*Release\s*:\s*([^\r\n]+)").ok()?;
-    re.captures(content).and_then(|caps| caps.get(1)).map(|m| {
-        let raw = m.as_str().trim();
-        // 去掉常见的宏定义
-        let cleaned = raw
-            .replace("%{?dist}", "")
-            .replace("%{?scl:", "")
-            .replace("%{!?scl:", "")
-            .replace("}", "")
-            .trim()
-            .to_string();
-        cleaned
-    })
+    let info = parse_spec(content);
+    (!info.release.is_empty()).then_some(info.release)
 }
 
 /// 计算 SHA256 哈希
@@ -120,6 +110,14 @@ impl<T: GitClient> Collector for GitClientCollectorAdapter<T> {
         // 转换为 CommitMetadata
         let commit_metadata: Vec<CommitMetadata> = commits.into_iter().map(|c| c.into()).collect();
 
+        info!(
+            owner = %owner,
+            repo = %repo,
+            branch = %config.branch,
+            commits_count = commit_metadata.len(),
+            "获取到 {} 个 commits",
+            commit_metadata.len()
+        );
         // 确定采集层级
         let level = config.level.as_deref().unwrap_or("l0");
 
@@ -149,6 +147,7 @@ impl<T: GitClient> Collector for GitClientCollectorAdapter<T> {
         match self.platform {
             Platform::GitHub => "GitHubCollector",
             Platform::GitLab => "GitLabCollector",
+            Platform::AtomGit => "AtomGitCollector",
             Platform::Gitee => "GiteeCollector",
             Platform::Gitea => "GiteaCollector",
             Platform::Local => "LocalCollector",
@@ -277,10 +276,6 @@ mod tests {
 
         let content_complex =
             "Name: test\nVersion: 1.2.3\nRelease: 1%{?scl:python}%{!?scl:python}\n";
-        // 修复期望值：实际代码只是简单替换了 %{?scl: 和 %{!?scl: 以及 }，
-        // 所以 1%{?scl:python}%{!?scl:python} -> 1pythonpython
-        // 这里我们修改测试以匹配实际行为，或者接受当前行为
-        // 实际上 adapters.rs 中的逻辑可能不够完善，但我们先让测试通过
         assert_eq!(
             extract_spec_release(content_complex),
             Some("1pythonpython".to_string())
@@ -288,6 +283,24 @@ mod tests {
 
         let content_missing = "Name: test\nVersion: 1.2.3\n";
         assert_eq!(extract_spec_release(content_missing), None);
+    }
+
+    #[test]
+    fn test_extract_spec_ignores_subpackage_version_release() {
+        let content = r#"
+%global openssh_release 13
+
+Name:           openssh
+Version:        9.6p1
+Release:        %{openssh_release}
+
+%package -n pam_ssh_agent_auth
+Version:        0.10.4
+Release:        5.%{openssh_release}
+"#;
+
+        assert_eq!(extract_spec_version(content), Some("9.6p1".to_string()));
+        assert_eq!(extract_spec_release(content), Some("13".to_string()));
     }
 
     #[test]
