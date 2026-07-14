@@ -1928,8 +1928,10 @@ impl<'a> PipelineExecutor<'a> {
         &self,
         tracking: &tracking::Model,
     ) -> Result<Option<diff::l1_vs_l0::L0VersionInfo>> {
-        use crate::entities::{l0_commits, prelude::*};
-        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
+        use crate::ecosystem::maintenance::collectors::GenericGitMaintenanceCollector;
+        use crate::entities::{l0_commits, maintenance_evidence_snapshots, prelude::*};
+        use crate::utils::version::{Version, VersionParser};
+        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
 
         // 从 l0_commits 表获取版本信息
         let l0_commits = L0Commits::find()
