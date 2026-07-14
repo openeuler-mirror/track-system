@@ -190,3 +190,27 @@ pub fn warm_cached_mirror(repo_url: &str) -> Result<GenericGitMirrorCacheSummary
         repo_url: normalize_source_url(repo_url),
         cache_path,
         default_branch,
+        cache_retained,
+    })
+}
+
+pub fn cached_mirror_path(repo_url: &str) -> PathBuf {
+    cached_mirror_root().join(format!("{}.git", cached_mirror_key(repo_url)))
+}
+
+fn with_synced_mirror<T>(
+    repo_url: &str,
+    use_repo: impl FnOnce(&Repository, &Path) -> Result<T>,
+) -> Result<T> {
+    let repo_path = cached_mirror_path(repo_url);
+    let cache_retained = generic_git_cache_retention_enabled();
+    let result = (|| {
+        let repo = sync_cached_mirror(repo_url)?;
+        use_repo(&repo, &repo_path)
+    })();
+
+    if !cache_retained {
+        cleanup_cached_mirror(&repo_path);
+    }
+
+    result
