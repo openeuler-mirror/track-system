@@ -26,6 +26,7 @@ use crate::collectors::{
         FileContent, GitClient, Platform, SnapshotData,
     },
 };
+use crate::spec::parse_spec;
 
 /// 本地 Git 仓库客户端
 pub struct LocalClient {
