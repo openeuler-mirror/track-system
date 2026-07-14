@@ -262,3 +262,26 @@ fn create_cached_mirror(
     debug!(
         repo_url,
         cache_path = %repo_path.display(),
+        "创建 generic git 本地镜像缓存"
+    );
+    let repo = Repository::init_bare(repo_path)
+        .with_context(|| format!("init bare mirror failed: {}", repo_path.display()))?;
+    ensure_origin_remote(&repo, repo_url)?;
+
+    let remote_head = resolve_remote_head(&repo, repo_url, timeouts)?;
+    fetch_cached_mirror(&repo, repo_path, repo_url, &remote_head, timeouts)?;
+    update_cached_head(&repo, remote_head.default_branch.as_deref())?;
+
+    Ok(repo)
+}
+
+fn open_and_update_cached_mirror(
+    repo_path: &Path,
+    repo_url: &str,
+    timeouts: GenericGitTimeouts,
+) -> Result<Repository> {
+    let repo = Repository::open_bare(repo_path)
+        .with_context(|| format!("open cached mirror failed: {}", repo_path.display()))?;
+    ensure_origin_remote(&repo, repo_url)?;
+
+    let remote_head = resolve_remote_head(&repo, repo_url, timeouts)?;
