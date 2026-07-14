@@ -24,3 +24,29 @@ impl<'a> MaintenanceSyncService<'a> {
     }
 
     pub async fn refresh_due_packages(&self) -> Result<MaintenanceSyncSummary> {
+        let maintenance_service = MaintenanceService::new(self.db);
+        let packages = Packages::find().all(self.db).await?;
+        let now = Utc::now();
+
+        let mut summary = MaintenanceSyncSummary {
+            scanned_packages: packages.len(),
+            ..Default::default()
+        };
+
+        for package in packages {
+            if package
+                .l0_repo_url
+                .as_deref()
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .is_none()
+            {
+                summary.skipped_no_repo += 1;
+                continue;
+            }
+
+            let latest = maintenance_service.latest_report(package.id).await?;
+            if !should_refresh_package(
+                now,
+                package.sync_interval_hours,
+                latest.as_ref().map(|report| report.generated_at),
