@@ -1077,3 +1077,26 @@ fn split_version_release_display(value: &str) -> (String, String) {
     if let Some((version, release)) = trimmed.rsplit_once('-') {
         if !version.trim().is_empty() && !release.trim().is_empty() {
             return (version.trim().to_string(), release.trim().to_string());
+        }
+    }
+
+    (trimmed.to_string(), String::new())
+}
+
+fn rpm_like_cmp(left: &str, right: &str) -> Ordering {
+    let mut left_pos = 0;
+    let mut right_pos = 0;
+
+    loop {
+        let left_segment = next_version_segment(left, left_pos);
+        let right_segment = next_version_segment(right, right_pos);
+
+        match (left_segment, right_segment) {
+            (None, None) => return Ordering::Equal,
+            (None, Some(_)) => return Ordering::Less,
+            (Some(_), None) => return Ordering::Greater,
+            (
+                Some((left_is_num, left_value, next_left)),
+                Some((right_is_num, right_value, next_right)),
+            ) => {
+                left_pos = next_left;
