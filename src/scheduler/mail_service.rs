@@ -324,3 +324,26 @@ fn append_preview_tables_html(html: &mut String, rows: &[&CveFixComparisonRow]) 
     let mut table_open = false;
     for row in rows {
         if row.system_version != current_system_version {
+            if table_open {
+                html.push_str("</tbody></table>");
+            }
+            current_system_version = &row.system_version;
+            html.push_str(&format!(
+                "<h3 style=\"font-size:15px;margin:16px 0 8px;\">{}</h3>",
+                html_escape(current_system_version)
+            ));
+            html.push_str(
+                r#"<table cellpadding="6" cellspacing="0" style="border-collapse:collapse;width:100%;max-width:1200px;">
+<thead><tr style="background:#f3f4f6;">
+<th style="border:1px solid #d1d5db;text-align:left;">软件包</th>
+<th style="border:1px solid #d1d5db;text-align:left;">CVE/ISSUE编号</th>
+<th style="border:1px solid #d1d5db;text-align:left;">上游修复版本</th>
+<th style="border:1px solid #d1d5db;text-align:left;">CTyunOS当前版本</th>
+<th style="border:1px solid #d1d5db;text-align:left;">描述摘要</th>
+</tr></thead><tbody>"#,
+            );
+            table_open = true;
+        }
+
+        html.push_str(&format!(
+            r#"<tr>
