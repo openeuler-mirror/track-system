@@ -187,3 +187,26 @@ pub fn parse_community_inner_sync_response(body: &str) -> Result<SbomCommunitySy
     if response.code != 0 {
         return Err(anyhow!(
             "SBOM community sync failed: code={}, msg={}",
+            response.code,
+            response.msg
+        ));
+    }
+
+    Ok(response)
+}
+
+#[derive(Debug, Default, PartialEq, Eq)]
+struct SourceFocus {
+    organization_structure: Option<String>,
+    foundation_info: Option<String>,
+    operator_info: Option<String>,
+    version_lifecycle: Option<String>,
+    license_info: Option<String>,
+    cla_info: Option<String>,
+}
+
+fn extract_source_focus(report_payload: &Value) -> SourceFocus {
+    let mut focus = SourceFocus::default();
+    let Some(raw_evidence) = report_payload.get("raw_evidence").and_then(Value::as_array) else {
+        return focus;
+    };
