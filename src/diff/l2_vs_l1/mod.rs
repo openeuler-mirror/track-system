@@ -3227,6 +3227,277 @@ Release: 5.%{openssh_release}
     }
 
     #[tokio::test]
+    async fn test_compare_commit_db_replaces_unexpanded_l2_record_release_with_spec_release() {
+        use crate::entities::{l1_commit_records, l2_commit_records};
+        use sea_orm::MockDatabase;
+
+        let now = Utc::now();
+        let l2_model = l2_commit_records::Model {
+            id: 1,
+            tracking_id: 1,
+            commit_sha: "l2sha".to_string(),
+            commit_message: "msg".to_string(),
+            author_name: "a".to_string(),
+            author_email: "a@a".to_string(),
+            committed_at: now,
+            change_type: None,
+            primary_change_type: None,
+            cve_list: None,
+            spec_changed: true,
+            patch_stats: None,
+            classification_status: "done".to_string(),
+            classification_notes: None,
+            sync_status: "idle".to_string(),
+            synced_to_l2_commit: None,
+            synced_at: None,
+            api_url: "http://example".to_string(),
+            fetched_at: now,
+            files_changed_count: 0,
+            additions: 0,
+            deletions: 0,
+            created_at: now,
+            updated_at: now,
+            spec_version: Some("9.6p1".to_string()),
+            spec_release: Some("%{openssh_release}".to_string()),
+        };
+
+        let l1_model = l1_commit_records::Model {
+            id: 1,
+            tracking_id: 1,
+            commit_sha: "l1sha".to_string(),
+            commit_message: "base release".to_string(),
+            author_name: "a".to_string(),
+            author_email: "a@a".to_string(),
+            committed_at: now,
+            change_type: None,
+            primary_change_type: None,
+            cve_list: None,
+            spec_changed: true,
+            patch_stats: None,
+            classification_status: "done".to_string(),
+            classification_notes: None,
+            sync_status: "idle".to_string(),
+            synced_to_l2_commit: None,
+            synced_at: None,
+            api_url: "http://example".to_string(),
+            fetched_at: now,
+            files_changed_count: 0,
+            additions: 0,
+            deletions: 0,
+            created_at: now,
+            updated_at: now,
+            spec_version: Some("9.6p1".to_string()),
+            spec_release: Some("16".to_string()),
+        };
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<l2_commit_records::Model, _, _>(vec![vec![l2_model]])
+            .append_query_results::<l1_commit_records::Model, _, _>(vec![vec![l1_model]])
+            .into_connection();
+
+        let comparator = L2VsL1Comparator::new();
+        let l1_snapshot = L1Snapshot {
+            package_name: "openssh".to_string(),
+            version: "9.6p1".to_string(),
+            spec_content: "Name: openssh\nVersion: 9.6p1\nRelease: 16\n".to_string(),
+            spec_sha256: "a".to_string(),
+            patches: vec![],
+            source_files: vec![],
+            commits: vec![],
+            snapshot_at: now,
+        };
+        let l2_snapshot = L2Snapshot {
+            package_name: "openssh".to_string(),
+            version: "9.6p1".to_string(),
+            spec_content: "%global openssh_release 16\nName: openssh\nVersion: 9.6p1\nRelease: %{openssh_release}\n".to_string(),
+            spec_sha256: "b".to_string(),
+            patches: vec![],
+            source_files: vec![],
+            customizations: vec![],
+            commits: vec![],
+            snapshot_at: now,
+        };
+
+        let diff = comparator
+            .compare_commit_db(&l1_snapshot, &l2_snapshot, &db, 1)
+            .await
+            .unwrap();
+        assert_eq!(diff.base_commit.as_ref().unwrap().sha, "l1sha");
+        assert_eq!(
+            diff.base_version_release,
+            Some(("9.6p1".to_string(), Some("16".to_string())))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_compare_commit_db_uses_l2_release_base_before_local_decimal_suffix() {
+        use crate::entities::{l1_commit_records, l2_commit_records};
+        use sea_orm::MockDatabase;
+
+        let now = Utc::now();
+        let l2_model = l2_commit_records::Model {
+            id: 1,
+            tracking_id: 1,
+            commit_sha: "l2sha".to_string(),
+            commit_message: "msg".to_string(),
+            author_name: "a".to_string(),
+            author_email: "a@a".to_string(),
+            committed_at: now,
+            change_type: None,
+            primary_change_type: None,
+            cve_list: None,
+            spec_changed: true,
+            patch_stats: None,
+            classification_status: "done".to_string(),
+            classification_notes: None,
+            sync_status: "idle".to_string(),
+            synced_to_l2_commit: None,
+            synced_at: None,
+            api_url: "http://example/l2".to_string(),
+            fetched_at: now,
+            files_changed_count: 0,
+            additions: 0,
+            deletions: 0,
+            created_at: now,
+            updated_at: now,
+            spec_version: Some("5.2.15".to_string()),
+            spec_release: Some("15.1".to_string()),
+        };
+
+        let l1_newer = l1_commit_records::Model {
+            id: 1,
+            tracking_id: 1,
+            commit_sha: "l1-19".to_string(),
+            commit_message: "sync patches".to_string(),
+            author_name: "a".to_string(),
+            author_email: "a@a".to_string(),
+            committed_at: now + chrono::Duration::seconds(2),
+            change_type: None,
+            primary_change_type: None,
+            cve_list: None,
+            spec_changed: true,
+            patch_stats: None,
+            classification_status: "done".to_string(),
+            classification_notes: None,
+            sync_status: "idle".to_string(),
+            synced_to_l2_commit: None,
+            synced_at: None,
+            api_url: "http://example/l1-19".to_string(),
+            fetched_at: now,
+            files_changed_count: 0,
+            additions: 0,
+            deletions: 0,
+            created_at: now,
+            updated_at: now,
+            spec_version: Some("5.2.15".to_string()),
+            spec_release: Some("19".to_string()),
+        };
+        let l1_mid = l1_commit_records::Model {
+            id: 2,
+            tracking_id: 1,
+            commit_sha: "l1-16".to_string(),
+            commit_message: "backport patches".to_string(),
+            author_name: "a".to_string(),
+            author_email: "a@a".to_string(),
+            committed_at: now + chrono::Duration::seconds(1),
+            change_type: None,
+            primary_change_type: None,
+            cve_list: None,
+            spec_changed: true,
+            patch_stats: None,
+            classification_status: "done".to_string(),
+            classification_notes: None,
+            sync_status: "idle".to_string(),
+            synced_to_l2_commit: None,
+            synced_at: None,
+            api_url: "http://example/l1-16".to_string(),
+            fetched_at: now,
+            files_changed_count: 0,
+            additions: 0,
+            deletions: 0,
+            created_at: now,
+            updated_at: now,
+            spec_version: Some("5.2.15".to_string()),
+            spec_release: Some("16".to_string()),
+        };
+        let l1_base = l1_commit_records::Model {
+            id: 3,
+            tracking_id: 1,
+            commit_sha: "l1-15".to_string(),
+            commit_message: "base release".to_string(),
+            author_name: "a".to_string(),
+            author_email: "a@a".to_string(),
+            committed_at: now,
+            change_type: None,
+            primary_change_type: None,
+            cve_list: None,
+            spec_changed: true,
+            patch_stats: None,
+            classification_status: "done".to_string(),
+            classification_notes: None,
+            sync_status: "idle".to_string(),
+            synced_to_l2_commit: None,
+            synced_at: None,
+            api_url: "http://example/l1-15".to_string(),
+            fetched_at: now,
+            files_changed_count: 0,
+            additions: 0,
+            deletions: 0,
+            created_at: now,
+            updated_at: now,
+            spec_version: Some("5.2.15".to_string()),
+            spec_release: Some("15".to_string()),
+        };
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<l2_commit_records::Model, _, _>(vec![vec![l2_model]])
+            .append_query_results::<l1_commit_records::Model, _, _>(vec![vec![
+                l1_newer, l1_mid, l1_base,
+            ]])
+            .into_connection();
+
+        let comparator = L2VsL1Comparator::new();
+        let l1_snapshot = L1Snapshot {
+            package_name: "bash".to_string(),
+            version: "5.2.15".to_string(),
+            spec_content: "Name: bash\nVersion: 5.2.15\nRelease: 19\n".to_string(),
+            spec_sha256: "a".to_string(),
+            patches: vec![],
+            source_files: vec![],
+            commits: vec![],
+            snapshot_at: now,
+        };
+        let l2_snapshot = L2Snapshot {
+            package_name: "bash".to_string(),
+            version: "5.2.15".to_string(),
+            spec_content: "Name: bash\nVersion: 5.2.15\nRelease: 15.1\n".to_string(),
+            spec_sha256: "b".to_string(),
+            patches: vec![],
+            source_files: vec![],
+            customizations: vec![],
+            commits: vec![],
+            snapshot_at: now,
+        };
+
+        let diff = comparator
+            .compare_commit_db(&l1_snapshot, &l2_snapshot, &db, 1)
+            .await
+            .unwrap();
+        assert_eq!(diff.base_commit.as_ref().unwrap().sha, "l1-15");
+        assert_eq!(
+            diff.base_version_release,
+            Some(("5.2.15".to_string(), Some("15.1".to_string())))
+        );
+        assert_eq!(
+            diff.behind_commits
+                .iter()
+                .map(|commit| commit.sha.as_str())
+                .collect::<Vec<_>>(),
+            vec!["l1-19", "l1-16"]
+        );
+    }
+
+    #[tokio::test]
     async fn test_compare_commit_db_no_base_commit_means_all_behind() {
         use crate::entities::{l1_commit_records, l2_commit_records};
         use sea_orm::MockDatabase;
