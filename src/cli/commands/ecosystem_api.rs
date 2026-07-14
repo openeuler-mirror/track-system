@@ -22,3 +22,27 @@ use crate::cli::dto::{
     EcosystemTargetDto, UpdateEcosystemTargetRequest,
 };
 use crate::cli::formatter::format_datetime_local;
+use crate::cli::parser::EcosystemAction;
+
+#[derive(Debug, Serialize, Deserialize)]
+struct ApiResponse<T> {
+    data: Option<T>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct PaginatedResponse<T> {
+    items: Vec<T>,
+    total: u64,
+    page: u64,
+    page_size: u64,
+    total_pages: u64,
+}
+
+#[derive(Debug, Clone)]
+struct EcosystemPreset {
+    canonical_name: String,
+    target_type: String,
+    platform: Option<String>,
+    role: String,
+    homepage_url: Option<String>,
+    api_base_url: Option<String>,
