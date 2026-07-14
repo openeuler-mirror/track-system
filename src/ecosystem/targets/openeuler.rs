@@ -190,3 +190,26 @@ impl OpenEulerCommunityCollector {
         license_text: PageSnapshot,
     ) -> Vec<Value> {
         let organization_structure = self.detect_organization_structure(&organization_page);
+        let foundation_status = self.detect_foundation_status(&about_page, &foundation_page);
+        let version_lifecycle = self.detect_version_lifecycle(&lifecycle_page);
+        let license_policy =
+            self.detect_license_policy(&license_text, &docs_terms_page, &contribution_page);
+        let cla_policy = self.detect_cla_policy(&contribution_page);
+
+        debug!(
+            organization_structure = %organization_structure["summary"].as_str().unwrap_or(""),
+            foundation_status = %foundation_status["summary"].as_str().unwrap_or(""),
+            version_lifecycle = %version_lifecycle["summary"].as_str().unwrap_or(""),
+            license_policy = %license_policy["summary"].as_str().unwrap_or(""),
+            cla_policy = %cla_policy["summary"].as_str().unwrap_or(""),
+            "openEuler 社区来源评估关键信息提取完成"
+        );
+        debug!(
+            lifecycle_http_status = ?lifecycle_page.http_status,
+            lifecycle_keyword_lines = ?lifecycle_page.keyword_lines,
+            lifecycle_summary = %version_lifecycle["summary"].as_str().unwrap_or(""),
+            has_lts_policy = ?version_lifecycle["has_lts_policy"].as_bool(),
+            lts_every_four_years = ?version_lifecycle["lts_every_four_years"].as_bool(),
+            lts_every_two_years = ?version_lifecycle["lts_every_two_years"].as_bool(),
+            lts_support_four_years = ?version_lifecycle["lts_support_four_years"].as_bool(),
+            lts_lifecycle_six_years = ?version_lifecycle["lts_lifecycle_six_years"].as_bool(),
