@@ -74,18 +74,18 @@ impl MigrationTrait for Migration {
                     )
                     .col(
                         ColumnDef::new(EcosystemReports::GeneratedAt)
-                            .timestamp_with_time_zone()
+                            .custom(timestamp_type(backend))
                             .not_null(),
                     )
                     .col(
                         ColumnDef::new(EcosystemReports::CreatedAt)
-                            .timestamp_with_time_zone()
+                            .custom(timestamp_type(backend))
                             .not_null()
                             .default(Expr::current_timestamp()),
                     )
                     .col(
                         ColumnDef::new(EcosystemReports::UpdatedAt)
-                            .timestamp_with_time_zone()
+                            .custom(timestamp_type(backend))
                             .not_null()
                             .default(Expr::current_timestamp()),
                     )
