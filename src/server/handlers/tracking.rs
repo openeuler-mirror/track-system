@@ -317,7 +317,8 @@ pub async fn update_tracking(
 
     let result = active.update(state.db.as_ref()).await?;
 
-    Ok(Json(ApiResponse::success(result.into())))
+    let response = build_tracking_response(state.db.as_ref(), result).await?;
+    Ok(Json(ApiResponse::success(response)))
 }
 
 /// DELETE /api/tracking/:id
