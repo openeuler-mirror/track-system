@@ -70,3 +70,27 @@ impl GitHubPlatformCollector {
             && is_platform_target
     }
 
+    pub async fn collect(&self, target: &ecosystem_targets::Model) -> Result<Vec<Value>> {
+        if !Self::matches_target(target) {
+            return Ok(Vec::new());
+        }
+
+        info!("开始采集 GitHub 平台生态目标信息");
+        let github_token = std::env::var("GITHUB_TOKEN")
+            .or_else(|_| std::env::var("GITHUB_ACCESS_TOKEN"))
+            .ok();
+        let client = Client::builder()
+            .timeout(configured_fetch_timeout(
+                "ECOSYSTEM_GITHUB_FETCH_TIMEOUT_SECS",
+                DEFAULT_TIMEOUT_SECS,
+            ))
+            .user_agent("track-system/ecosystem-github")
+            .build()?;
+
+        let about_page = self
+            .fetch_page(
+                &client,
+                GITHUB_ABOUT_URL,
+                &[
+                    "about github",
+                    "cloud-based platform",
