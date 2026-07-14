@@ -550,3 +550,27 @@ async fn list_reports(
     }
     println!(
         "\n共 {} 条，当前第 {}/{} 页",
+        data.total, data.page, data.total_pages
+    );
+    Ok(())
+}
+
+async fn show_report(api_client: &ApiClient, id: i64, verbose: bool) -> Result<()> {
+    println!("正在获取生态报告详情: {}", id.to_string().cyan());
+    let response = api_client
+        .get::<ApiResponse<EcosystemReportDto>>(&format!("/ecosystem/reports/{}", id))
+        .await?;
+    let report = response
+        .data
+        .ok_or_else(|| anyhow!("服务端未返回生态报告详情"))?;
+    print_report_detail(&report, verbose);
+    Ok(())
+}
+
+fn print_target_detail(target: &EcosystemTargetDto) {
+    println!();
+    println!("{}", "生态目标详情:".bold());
+    println!("  ID: {}", target.id);
+    println!("  名称: {}", target.name.cyan());
+    println!("  类型: {}", target.target_type);
+    println!(
