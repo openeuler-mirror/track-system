@@ -85,6 +85,7 @@ tokio-cron-scheduler = "0.9"
 
 # 密码学（hash）
 sha2 = "0.10"
+aes-gcm = "0.10"
 
 # JWT 认证
 jsonwebtoken = "9.2"
