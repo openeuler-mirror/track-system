@@ -262,3 +262,27 @@ fn time_based_issue_start_number(unix_secs: i64) -> u32 {
 fn round_artifact_for_path(path: &Path, rows: &[CveFixComparisonRow]) -> ReportArtifact {
     ReportArtifact {
         artifact_type: "cve_fix_comparison_xlsx".to_string(),
+        path: path.to_string_lossy().to_string(),
+        format: "xlsx".to_string(),
+        rows: rows.len(),
+        source: "scheduler_round".to_string(),
+        template: XLSX_TEMPLATE_NAME.to_string(),
+        generated_at: Utc::now().to_rfc3339(),
+        preview_rows: rows.to_vec(),
+    }
+}
+
+#[allow(unused)]
+fn cve_fix_comparison_rows(
+    package_name: &str,
+    system_version: &str,
+    ctyunos_current_version: &str,
+    default_upstream_version: &str,
+    commit_reports: &[Value],
+) -> Vec<CveFixComparisonRow> {
+    cve_fix_comparison_rows_with_issue_start(
+        package_name,
+        system_version,
+        ctyunos_current_version,
+        default_upstream_version,
+        commit_reports,
