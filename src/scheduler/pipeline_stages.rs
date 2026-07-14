@@ -2396,7 +2396,7 @@ impl<'a> PipelineExecutor<'a> {
             classified_count,
             cve_count,
             needs_review_count,
-            commits: Vec::new(),
+            commits: classified_commits,
         })
     }
 
