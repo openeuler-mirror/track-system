@@ -3599,6 +3599,143 @@ Release: 5.%{openssh_release}
     }
 
     #[tokio::test]
+    async fn test_compare_commit_db_can_split_l1_and_l2_tracking_ids() {
+        use crate::entities::{l1_commit_records, l2_commit_records};
+        use sea_orm::MockDatabase;
+
+        let now = Utc::now();
+        let l2_model = l2_commit_records::Model {
+            id: 1,
+            tracking_id: 10,
+            commit_sha: "l2sha".to_string(),
+            commit_message: "msg".to_string(),
+            author_name: "a".to_string(),
+            author_email: "a@a".to_string(),
+            committed_at: now,
+            change_type: None,
+            primary_change_type: None,
+            cve_list: None,
+            spec_changed: true,
+            patch_stats: None,
+            classification_status: "done".to_string(),
+            classification_notes: None,
+            sync_status: "idle".to_string(),
+            synced_to_l2_commit: None,
+            synced_at: None,
+            api_url: "http://example/l2".to_string(),
+            fetched_at: now,
+            files_changed_count: 0,
+            additions: 0,
+            deletions: 0,
+            created_at: now,
+            updated_at: now,
+            spec_version: Some("1.30".to_string()),
+            spec_release: Some("1".to_string()),
+        };
+
+        let fallback_l1_newer = l1_commit_records::Model {
+            id: 1,
+            tracking_id: 20,
+            commit_sha: "l1-newer".to_string(),
+            commit_message: "newer".to_string(),
+            author_name: "a".to_string(),
+            author_email: "a@a".to_string(),
+            committed_at: now + chrono::Duration::seconds(1),
+            change_type: None,
+            primary_change_type: None,
+            cve_list: None,
+            spec_changed: true,
+            patch_stats: None,
+            classification_status: "done".to_string(),
+            classification_notes: None,
+            sync_status: "idle".to_string(),
+            synced_to_l2_commit: None,
+            synced_at: None,
+            api_url: "http://example/l1-newer".to_string(),
+            fetched_at: now,
+            files_changed_count: 0,
+            additions: 0,
+            deletions: 0,
+            created_at: now,
+            updated_at: now,
+            spec_version: Some("1.31".to_string()),
+            spec_release: Some("1".to_string()),
+        };
+        let fallback_l1_base = l1_commit_records::Model {
+            id: 2,
+            tracking_id: 20,
+            commit_sha: "l1-base".to_string(),
+            commit_message: "base".to_string(),
+            author_name: "a".to_string(),
+            author_email: "a@a".to_string(),
+            committed_at: now,
+            change_type: None,
+            primary_change_type: None,
+            cve_list: None,
+            spec_changed: true,
+            patch_stats: None,
+            classification_status: "done".to_string(),
+            classification_notes: None,
+            sync_status: "idle".to_string(),
+            synced_to_l2_commit: None,
+            synced_at: None,
+            api_url: "http://example/l1-base".to_string(),
+            fetched_at: now,
+            files_changed_count: 0,
+            additions: 0,
+            deletions: 0,
+            created_at: now,
+            updated_at: now,
+            spec_version: Some("1.30".to_string()),
+            spec_release: Some("1".to_string()),
+        };
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<l2_commit_records::Model, _, _>(vec![vec![l2_model]])
+            .append_query_results::<l1_commit_records::Model, _, _>(vec![vec![
+                fallback_l1_newer,
+                fallback_l1_base,
+            ]])
+            .into_connection();
+
+        let comparator = L2VsL1Comparator::new();
+        let l1_snapshot = L1Snapshot {
+            package_name: "p".to_string(),
+            version: "1.31".to_string(),
+            spec_content: "Name: p\nVersion: 1.31\nRelease: 1\n".to_string(),
+            spec_sha256: "a".to_string(),
+            patches: vec![],
+            source_files: vec![],
+            commits: vec![],
+            snapshot_at: now,
+        };
+        let l2_snapshot = L2Snapshot {
+            package_name: "p".to_string(),
+            version: "1.30".to_string(),
+            spec_content: "Name: p\nVersion: 1.30\nRelease: 1\n".to_string(),
+            spec_sha256: "b".to_string(),
+            patches: vec![],
+            source_files: vec![],
+            customizations: vec![],
+            commits: vec![],
+            snapshot_at: now,
+        };
+
+        let diff = comparator
+            .compare_commit_db_with_tracking_ids(&l1_snapshot, &l2_snapshot, &db, 20, 10)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            diff.base_version_release,
+            Some(("1.30".to_string(), Some("1".to_string())))
+        );
+        assert_eq!(diff.base_commit.as_ref().unwrap().sha, "l1-base");
+        assert_eq!(diff.behind_commits.len(), 1);
+        assert_eq!(diff.behind_commits[0].sha, "l1-newer");
+    }
+
+    #[tokio::test]
     async fn test_compare_builds_report_without_panicking() {
         let comparator = L2VsL1Comparator::new();
         let now = Utc::now();
