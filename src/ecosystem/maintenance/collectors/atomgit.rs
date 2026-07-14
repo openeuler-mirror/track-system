@@ -166,3 +166,27 @@ async fn fetch_repository(
         let body = response.text().await.unwrap_or_default();
         return Err(anyhow!("AtomGit API HTTP {}: {}", status.as_u16(), body));
     }
+
+    response
+        .json::<AtomGitRepositorySnapshot>()
+        .await
+        .context("parse atomgit repository response failed")
+}
+
+async fn collect_activity(
+    client: &Client,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    branch: &str,
+) -> Result<RepositoryActivityMetrics> {
+    let latest = fetch_commit_page(client, token, owner, repo, branch, None, 1, 1).await?;
+    let last_commit_at = latest
+        .first()
+        .map(commit_timestamp)
+        .map(|value| value.to_rfc3339());
+    let (commit_total, commit_total_is_lower_bound) = count_commits(
+        client,
+        token,
+        owner,
+        repo,
