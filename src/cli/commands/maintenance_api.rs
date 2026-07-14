@@ -94,3 +94,27 @@ async fn show_latest_report(api_client: &ApiClient, package_id: i32, verbose: bo
         ))
         .await?;
     let report = response
+        .data
+        .ok_or_else(|| anyhow!("服务端未返回维护评估报告"))?;
+    print_report_detail(&report, verbose);
+    Ok(())
+}
+
+async fn list_reports(
+    api_client: &ApiClient,
+    page: u64,
+    page_size: u64,
+    package_id: Option<i32>,
+    report_type: Option<String>,
+) -> Result<()> {
+    let mut query = format!("?page={}&page_size={}", page, page_size);
+    if let Some(package_id) = package_id {
+        query.push_str(&format!("&package_id={}", package_id));
+    }
+    if let Some(report_type) = report_type {
+        query.push_str(&format!("&report_type={}", report_type));
+    }
+
+    let response = api_client
+        .get::<ApiResponse<PaginatedResponse<MaintenanceReportDto>>>(&format!(
+            "/maintenance/reports{}",
