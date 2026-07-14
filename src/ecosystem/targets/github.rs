@@ -828,3 +828,26 @@ fn extract_keyword_lines(text: &str, keywords: &[&str], max_lines: usize) -> Vec
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn page(text: &str) -> PageSnapshot {
+        PageSnapshot {
+            http_status: Some(200),
+            keyword_lines: extract_keyword_lines(
+                text,
+                &[
+                    "GitHub",
+                    "Microsoft",
+                    "OFAC",
+                    "government",
+                    "license",
+                    "DMCA",
+                ],
+                12,
+            ),
+            plain_text: text.to_string(),
+            error: None,
+        }
+    }
+
+    #[test]
+    fn matches_target_accepts_github_aliases() {
