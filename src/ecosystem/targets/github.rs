@@ -502,3 +502,27 @@ impl GitHubPlatformCollector {
         let microsoft_acquisition_completed = lower
             .contains("microsoft acquisition of github is complete")
             || lower.contains("joining forces with microsoft");
+        let operates_independently_as_business = lower
+            .contains("github will operate independently")
+            && lower.contains("community, platform, and business");
+        let ceo_mentioned = lower.contains("first day as ceo") || lower.contains("role as ceo");
+
+        let organization_structure = if microsoft_acquisition_completed
+            && operates_independently_as_business
+        {
+            "GitHub 采用商业公司治理结构，2018 年微软完成收购后作为其子公司继续独立运营，由 CEO 与管理团队负责公司经营和平台发展".to_string()
+        } else if microsoft_acquisition_completed {
+            "GitHub 在微软收购后按公司化方式运营，由管理层负责平台经营与业务发展".to_string()
+        } else {
+            "GitHub 以企业化平台运营为主，治理结构由公司管理层和业务团队驱动".to_string()
+        };
+
+        let foundation_status = if operates_independently_as_business {
+            "未见基金会治理安排；GitHub 官方表述其以 community、platform、business 形态独立运营，属于商业化平台而非基金会项目".to_string()
+        } else {
+            "未见基金会归属信息，整体更接近商业公司运营模式".to_string()
+        };
+
+        json!({
+            "organization_structure": organization_structure,
+            "foundation_status": foundation_status,
