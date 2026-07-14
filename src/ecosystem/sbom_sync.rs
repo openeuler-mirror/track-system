@@ -348,3 +348,26 @@ mod tests {
             if let Some(previous) = &self.previous {
                 std::env::set_var(self.key, previous);
             } else {
+                std::env::remove_var(self.key);
+            }
+        }
+    }
+
+    fn target(metadata: Option<Value>) -> ecosystem_targets::Model {
+        let now = Utc::now();
+        ecosystem_targets::Model {
+            id: 1,
+            name: "openEuler Community".to_string(),
+            target_type: "community".to_string(),
+            platform: Some("gitee".to_string()),
+            role: "governance".to_string(),
+            homepage_url: Some("https://www.openeuler.org".to_string()),
+            api_base_url: Some("https://gitee.com/api/v5".to_string()),
+            owner: Some("openeuler".to_string()),
+            repo: Some("community".to_string()),
+            default_branch: Some("master".to_string()),
+            status: "active".to_string(),
+            refresh_interval_hours: 24,
+            rule_profile: "openeuler_community".to_string(),
+            metadata,
+            last_collected_at: None,
