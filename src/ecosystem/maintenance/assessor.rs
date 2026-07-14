@@ -284,3 +284,26 @@ fn indicator_i64(indicators: &[MaintenanceIndicator], key: &str) -> Option<i64> 
         .find(|indicator| indicator.key == key)
         .and_then(|indicator| match &indicator.value {
             Value::Number(number) => number.as_i64(),
+            Value::String(value) => value.parse::<i64>().ok(),
+            _ => None,
+        })
+}
+
+fn indicator_bool(indicators: &[MaintenanceIndicator], key: &str) -> Option<bool> {
+    indicators
+        .iter()
+        .find(|indicator| indicator.key == key)
+        .and_then(|indicator| match &indicator.value {
+            Value::Bool(value) => Some(*value),
+            Value::String(value) => match value.to_ascii_lowercase().as_str() {
+                "true" | "yes" | "1" => Some(true),
+                "false" | "no" | "0" => Some(false),
+                _ => None,
+            },
+            _ => None,
+        })
+}
+
+fn indicator_datetime(indicators: &[MaintenanceIndicator], key: &str) -> Option<DateTime<Utc>> {
+    indicators
+        .iter()
