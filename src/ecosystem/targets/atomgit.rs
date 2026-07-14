@@ -951,3 +951,26 @@ fn is_same_shell_as_random_probe(page: &PageSnapshot, random_probe: &PageSnapsho
     }
 }
 
+fn looks_like_spa_shell(body: &str) -> bool {
+    let lower = body.to_ascii_lowercase();
+    lower.contains("<div id=\"app\"></div>")
+        && (lower.contains("cdn-static.gitcode.com/assets/index-")
+            || lower.contains("atomgit | gitcode"))
+}
+
+fn extract_metric_with_phrase(text: &str, phrase: &str) -> Option<String> {
+    let re = Regex::new(&format!(
+        r"(?i)(\d+(?:\.\d+)?\s*(?:million|thousand)?\+?)\s+{}",
+        regex::escape(phrase)
+    ))
+    .ok()?;
+    re.captures(text)
+        .and_then(|captures| captures.get(1).map(|m| m.as_str().trim().to_string()))
+}
+
+fn normalize_lookup_key(input: &str) -> String {
+    input
+        .chars()
+        .filter(|ch| ch.is_ascii_alphanumeric())
+        .flat_map(|ch| ch.to_lowercase())
+        .collect()
