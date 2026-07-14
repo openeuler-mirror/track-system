@@ -1031,3 +1031,26 @@ fn description_entry_for_commit(
     };
 
     match (description.trim().is_empty(), suffix.is_empty()) {
+        (true, true) => String::new(),
+        (true, false) => suffix,
+        (false, true) => description.trim().to_string(),
+        (false, false) if description.contains(commit_url) => {
+            description.replace(commit_url, suffix.trim_start_matches("commit_url: "))
+        }
+        (false, false) => format!("{}\n{}", description.trim(), suffix),
+    }
+}
+
+fn upstream_fixed_version(commit: &Value, default_upstream_version: &str) -> String {
+    first_non_empty(&[
+        version_release_display(
+            &text_field(commit, "UpstreamVersion"),
+            &text_field(commit, "UpstreamRelease"),
+        ),
+        text_field(commit, "UpstreamVersionRelease"),
+        default_upstream_version.to_string(),
+    ])
+}
+
+fn is_newer_version_release(candidate: &str, current: &str) -> bool {
+    if candidate.trim().is_empty() {
