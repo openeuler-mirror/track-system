@@ -860,3 +860,26 @@ fn command_output_message(output: &Output) -> String {
         .code()
         .map(|code| format!("git exited with status {}", code))
         .unwrap_or_else(|| "git exited without a status code".to_string())
+}
+
+fn compute_metrics(repo: &Repository) -> Result<GenericGitMetrics> {
+    let head = repo.head().context("read repository HEAD failed")?;
+    let head_oid = head
+        .target()
+        .or_else(|| head.peel_to_commit().ok().map(|commit| commit.id()))
+        .ok_or_else(|| anyhow!("resolve HEAD target failed"))?;
+    let default_branch = head.shorthand().map(|s| s.to_string());
+
+    let mut walk = repo.revwalk().context("create revwalk failed")?;
+    walk.set_sorting(Sort::TIME)
+        .context("set revwalk sorting failed")?;
+    walk.push(head_oid).context("push HEAD to revwalk failed")?;
+
+    let since_ts = (Utc::now() - chrono::Duration::days(365)).timestamp();
+    let mut commit_total = 0_i64;
+    let mut commits_last_12_months = 0_i64;
+    let mut unique_committers = std::collections::BTreeSet::new();
+    let mut last_commit_at = None;
+
+    for oid in walk {
+        let oid = oid.context("iterate revwalk failed")?;
