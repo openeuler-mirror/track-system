@@ -929,3 +929,26 @@ fn normalize_source_url(repo_url: &str) -> String {
 mod tests {
     use super::*;
     use git2::{Oid, Signature};
+    use serial_test::serial;
+    use std::ffi::OsString;
+    use tempfile::tempdir;
+
+    struct EnvGuard {
+        key: &'static str,
+        previous: Option<OsString>,
+    }
+
+    impl EnvGuard {
+        fn set(key: &'static str, value: impl AsRef<std::ffi::OsStr>) -> Self {
+            let previous = std::env::var_os(key);
+            std::env::set_var(key, value);
+            Self { key, previous }
+        }
+
+        fn remove(key: &'static str) -> Self {
+            let previous = std::env::var_os(key);
+            std::env::remove_var(key);
+            Self { key, previous }
+        }
+    }
+
