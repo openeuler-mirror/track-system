@@ -382,3 +382,27 @@ fn parse_last_page_from_link(link: &str) -> Option<u32> {
         let query = url.split('?').nth(1)?;
         for pair in query.split('&') {
             let mut iter = pair.splitn(2, '=');
+            let key = iter.next()?;
+            let value = iter.next().unwrap_or_default();
+            if key == "page" {
+                return value.parse::<u32>().ok();
+            }
+        }
+    }
+    None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use httpmock::prelude::*;
+
+    fn package(repo_url: &str) -> packages::Model {
+        let now = Utc::now();
+        packages::Model {
+            id: 1,
+            name: "openssl".to_string(),
+            level: 1,
+            sync_interval_hours: 24,
+            l0_repo_url: Some(repo_url.to_string()),
+            description: None,
