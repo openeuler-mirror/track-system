@@ -1422,3 +1422,26 @@ mod tests {
         );
         assert!(rows[0]
             .description
+            .contains("https://example.com/openssl/52"));
+        assert!(rows[0]
+            .description
+            .contains("https://example.com/openssl/51"));
+        assert!(rows[0]
+            .description
+            .contains("https://example.com/openssl/49"));
+    }
+
+    #[test]
+    fn compare_version_release_orders_release_numbers_numerically() {
+        assert_eq!(
+            compare_version_release("3.0.12-52", "3.0.12-9"),
+            Ordering::Greater
+        );
+        assert_eq!(
+            compare_version_release("3.0.13-1", "3.0.12-99"),
+            Ordering::Greater
+        );
+        assert_eq!(
+            compare_version_release("1.1.1f-43", "1.1.1f-40"),
+            Ordering::Greater
+        );
