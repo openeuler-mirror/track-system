@@ -142,3 +142,27 @@ impl AiAnalysisService {
 
         let recommended_actions = vec![
             "优先复核 high/critical 风险目标的原始证据和采集时间。".to_string(),
+            "对证据缺失的目标重新执行 refresh，并检查外部平台 token、网络和限流配置。".to_string(),
+            "将 AI 结论作为辅助建议，最终处置仍以规则评估、人工复核和审计记录为准。".to_string(),
+        ];
+        let sources_to_check = sources_to_check(&context);
+
+        AiAnalysisResponse {
+            source: context.source,
+            generated_at: Utc::now(),
+            model: "local-heuristic".to_string(),
+            used_remote_model: false,
+            external_research_used: false,
+            summary,
+            risk,
+            confidence,
+            findings,
+            recommended_actions,
+            external_references: Vec::new(),
+            sources_to_check,
+            raw_model_output: None,
+        }
+    }
+}
+
+fn sources_to_check(context: &AiContext) -> Vec<String> {
