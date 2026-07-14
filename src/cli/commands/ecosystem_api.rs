@@ -1246,3 +1246,26 @@ mod tests {
                     ]
                 }
             }
+        });
+
+        assert_eq!(
+            source_focus_bool(&payload, "lts_every_four_years"),
+            Some(true)
+        );
+        assert_eq!(
+            source_focus_bool(&payload, "innovation_every_twelve_months"),
+            Some(true)
+        );
+        assert_eq!(
+            source_focus_bool(&payload, "sp_policy_mentioned"),
+            Some(true)
+        );
+        assert_eq!(
+            source_focus_bool(&payload, "extended_support_mentioned"),
+            Some(true)
+        );
+    }
+
+    #[test]
+    fn github_structured_flags_can_be_extracted() {
+        let payload = serde_json::json!({
