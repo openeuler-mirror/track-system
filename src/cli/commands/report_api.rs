@@ -909,7 +909,7 @@ mod tests {
             .create_async()
             .await;
 
-        let result = show_report(&client, 123).await;
+        let result = show_report(&client, 123, false).await;
         assert!(result.is_ok(), "Result failed: {:?}", result.err());
         mock.assert_async().await;
     }
