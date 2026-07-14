@@ -1490,16 +1490,9 @@ impl<'a> PipelineExecutor<'a> {
                 "不存在，尝试使用数据库中的历史快照"
             );
 
-            // 查询数据库中最新的 L2 快照
-            use crate::entities::l2_snapshots;
-            use crate::entities::prelude::L2Snapshots;
-
-            let l2_record = L2Snapshots::find()
-                .filter(l2_snapshots::Column::TrackingId.eq(tracking.id))
-                .filter(l2_snapshots::Column::SnapshotType.eq("l2"))
-                .order_by_desc(l2_snapshots::Column::CreatedAt)
-                .one(self.db)
-                .await?;
+            // 查询数据库中最新的 L2 快照。openEuler-24.09 fallback tracking
+            // 不单独采集 L2，复用同 L2 分支 openEuler-24.03 tracking 的 L2 快照。
+            let l2_record = latest_l2_snapshot_record_for_tracking(self.db, tracking).await?;
 
             if let Some(snapshot) = l2_record {
                 // 反序列化快照以获取文件数量
