@@ -334,3 +334,27 @@ fn focused_indicator_summary(section: &Value, focused_keys: &[&str]) -> String {
                     }
                     let value = item
                         .get("value")
+                        .map(indicator_value_to_string)
+                        .unwrap_or_else(|| "-".to_string());
+                    Some(format!("{}={}", key, value))
+                })
+                .take(8)
+                .collect::<Vec<_>>()
+                .join("，")
+        })
+        .unwrap_or_default()
+}
+
+fn indicator_value_to_string(value: &Value) -> String {
+    match value {
+        Value::String(value) => value.clone(),
+        Value::Bool(value) => value.to_string(),
+        Value::Number(value) => value.to_string(),
+        Value::Null => "null".to_string(),
+        other => serde_json::to_string(other).unwrap_or_else(|_| "-".to_string()),
+    }
+}
+
+fn infer_risk_from_context(context: &AiContext) -> AiRiskLevel {
+    context
+        .rule_risk
