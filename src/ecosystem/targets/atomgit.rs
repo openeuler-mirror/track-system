@@ -790,3 +790,26 @@ impl AtomGitPlatformCollector {
 
         let summary = if cla_supported {
             if scopes.is_empty() {
+                "AtomGit 提供组织级 CLA 管理能力，可将贡献者许可协议接入仓库贡献流程".to_string()
+            } else {
+                format!(
+                    "AtomGit 提供组织级 CLA 管理能力，可围绕 {} 等维度配置贡献者许可协议",
+                    scopes.join("、")
+                )
+            }
+        } else {
+            "暂未从公开页面识别出明确的 AtomGit CLA 管理能力".to_string()
+        };
+
+        json!({
+            "summary": summary,
+            "cla_supported": cla_supported,
+            "cla_management_scope": scopes,
+            "cla_keyword_lines": extract_keyword_lines(
+                text,
+                &["CLA", "贡献者许可协议", "搜索权限", "影响范围", "任何仓库"],
+                10
+            ),
+        })
+    }
+
