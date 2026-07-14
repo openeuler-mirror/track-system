@@ -698,3 +698,26 @@ impl AtomGitPlatformCollector {
         let machine_readable_policy_text = route_reachable
             && !gov_policy_page.looks_like_spa_shell
             && !gov_policy_page.keyword_lines.is_empty();
+
+        let summary = format!(
+            "AtomGit 平台{}{}{}{}",
+            if content_removal_reserved {
+                "保留对违法违规内容进行删除、编辑、屏蔽或下架的权利"
+            } else {
+                "会依据条款和适用法律处理内容"
+            },
+            if public_authority_disclosure {
+                "，并可在行政机关、司法机关或公共权力机构要求下披露或移交信息"
+            } else {
+                ""
+            },
+            if national_security_disclosure {
+                "；隐私政策还明确涉及国家安全等场景的数据配合义务"
+            } else {
+                ""
+            },
+            if route_reachable && !machine_readable_policy_text {
+                "；政府下架专门路由可达，但当前未检索到可读正文"
+            } else {
+                ""
+            }
