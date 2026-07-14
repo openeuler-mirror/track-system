@@ -446,3 +446,26 @@ fn parse_remote_head(output: &str) -> RemoteHead {
 fn update_cached_head(repo: &Repository, default_branch: Option<&str>) -> Result<()> {
     if let Some(default_branch) = default_branch {
         repo.set_head(default_branch)
+            .with_context(|| format!("set cached mirror HEAD failed: {}", default_branch))?;
+        return Ok(());
+    }
+
+    let mut branches = repo
+        .branches(Some(BranchType::Local))
+        .context("list cached mirror branches failed")?;
+    if let Some(branch) = branches.next() {
+        let (branch, _) = branch.context("read cached mirror branch failed")?;
+        if let Some(name) = branch.get().name() {
+            repo.set_head(name)
+                .with_context(|| format!("set fallback cached HEAD failed: {}", name))?;
+        }
+    }
+
+    Ok(())
+}
+
+fn cached_mirror_root() -> PathBuf {
+    if let Some(path) = std::env::var_os(GENERIC_GIT_CACHE_ENV).filter(|value| !value.is_empty()) {
+        return PathBuf::from(path);
+    }
+
