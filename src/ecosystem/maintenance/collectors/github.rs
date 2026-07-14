@@ -94,3 +94,27 @@ impl GitHubMaintenanceCollector {
         api: GitHubApi,
     ) -> Result<Vec<Value>> {
         let repo_info = api.fetch_repository(&owner, &repo).await?;
+        let branch = repo_info.default_branch.clone();
+        let since = Utc::now() - Duration::days(365);
+
+        let commit_total = api.count_commits(&owner, &repo, &branch, None).await?;
+        let commits_last_12_months = api
+            .count_commits(&owner, &repo, &branch, Some(since))
+            .await?;
+        let committers_last_12_months = api
+            .count_unique_committers_since(&owner, &repo, &branch, since)
+            .await?;
+        let last_commit = api.fetch_latest_commit(&owner, &repo, &branch).await?;
+        let last_commit_at = last_commit
+            .as_ref()
+            .and_then(|commit| commit.commit.committer.as_ref())
+            .and_then(|identity| identity.date)
+            .or_else(|| {
+                last_commit
+                    .as_ref()
+                    .and_then(|commit| commit.commit.author.as_ref())
+                    .and_then(|identity| identity.date)
+            })
+            .map(|dt| dt.to_rfc3339());
+
+        debug!(
