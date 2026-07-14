@@ -1020,3 +1020,26 @@ fn extract_keyword_lines(text: &str, keywords: &[&str], max_lines: usize) -> Vec
                 break;
             }
         }
+    }
+    lines
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn page(text: &str) -> PageSnapshot {
+        PageSnapshot {
+            http_status: Some(200),
+            keyword_lines: extract_keyword_lines(
+                text,
+                &[
+                    "Registered Users",
+                    "重庆开源共创科技有限公司",
+                    "开源许可证协议模板",
+                    "CLA",
+                    "GPG",
+                    "附件",
+                    "行政机关",
+                ],
+                12,
