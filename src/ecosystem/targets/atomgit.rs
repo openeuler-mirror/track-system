@@ -1227,3 +1227,26 @@ mod tests {
             "AtomGit上的用户信息和内容的版权归作者本人所有。用户可选择开源许可证协议模板。AtomGit可以自行决定以全部或任何方式使用和分享用户信息与内容，并保留与服务相关的所有权与知识产权。平台可以在任何时候将本协议项下的全部或部分义务进行转让，也可委托第三方运营，并保留对违规内容进行删除、编辑、屏蔽或下架的权利。",
         );
         let privacy_page = page(
+            "自 2025 年 9 月 9 日起，AtomGit 平台运营者由开放原子开源基金会变更为重庆开源共创科技有限公司。由华为云计算技术有限公司提供代码托管服务。根据法律法规、国家安全、行政机关、司法机关、公共权力机构要求披露信息。GitCode 平台用户体系、产品体系、运营体系和客服体系已融合。",
+        );
+        let cla_page = page("CLA 贡献者许可协议支持管理，可配置搜索权限、影响范围和任何仓库。");
+        let gpg_page = page("添加 GPG key 后，可以对提交/Tag 签名和验签。");
+        let release_overview_page = page("Releases 是软件发布列表和里程碑。");
+        let release_operations_page =
+            page("可以下载源码和附件，并可发布 signature 附件和 provenance 来源证明。");
+        let random_policy_probe = spa_shell("shell");
+        let trade_policy_page = spa_shell("shell");
+        let ip_policy_page = spa_shell("shell");
+        let gov_policy_page = spa_shell("shell");
+
+        let evidence = collector.build_evidence_records(
+            home_page,
+            terms_page,
+            privacy_page,
+            cla_page,
+            gpg_page,
+            release_overview_page,
+            release_operations_page,
+            random_policy_probe,
+            trade_policy_page,
+            ip_policy_page,
