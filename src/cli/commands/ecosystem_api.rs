@@ -334,3 +334,27 @@ async fn list_targets(
         println!("{}", "没有找到生态目标".yellow());
         return Ok(());
     }
+
+    println!();
+    println!("{}", "生态目标列表:".bold());
+    println!(
+        "{:<5} {:<24} {:<14} {:<12} {:<14} {:<12}",
+        "ID", "名称", "类型", "平台", "规则画像", "状态"
+    );
+    println!("{}", "-".repeat(90));
+    for item in data.items {
+        println!(
+            "{:<5} {:<24} {:<14} {:<12} {:<14} {:<12}",
+            item.id,
+            item.name.cyan(),
+            item.target_type,
+            item.platform.unwrap_or_else(|| "-".to_string()),
+            item.rule_profile,
+            item.status
+        );
+    }
+    println!(
+        "\n共 {} 条，当前第 {}/{} 页",
+        data.total, data.page, data.total_pages
+    );
+    Ok(())
