@@ -952,3 +952,26 @@ mod tests {
         }
     }
 
+    impl Drop for EnvGuard {
+        fn drop(&mut self) {
+            if let Some(previous) = &self.previous {
+                std::env::set_var(self.key, previous);
+            } else {
+                std::env::remove_var(self.key);
+            }
+        }
+    }
+
+    fn commit_file(
+        repo: &Repository,
+        path: &std::path::Path,
+        message: &str,
+        sig: &Signature<'_>,
+        parent: Option<Oid>,
+    ) -> Oid {
+        std::fs::write(path, message).unwrap();
+        let mut index = repo.index().unwrap();
+        index.add_path(std::path::Path::new("file.txt")).unwrap();
+        index.write().unwrap();
+        let tree_id = index.write_tree().unwrap();
+        let tree = repo.find_tree(tree_id).unwrap();
