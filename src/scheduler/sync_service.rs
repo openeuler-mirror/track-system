@@ -654,6 +654,40 @@ mod tests {
     }
 
     #[test]
+    fn test_build_commit_url_prefers_upstream_url() {
+        let url = crate::utils::commit_url::build_commit_url(
+            Platform::AtomGit,
+            " https://atomgit.com/src-openeuler/openssl/commits/detail/branch-sha ",
+            "src-openeuler",
+            "openssl",
+            "fallback-sha",
+            "openEuler-20.03-LTS-SP4",
+        );
+
+        assert_eq!(
+            url,
+            "https://atomgit.com/src-openeuler/openssl/commits/detail/branch-sha?ref=openEuler-20.03-LTS-SP4"
+        );
+    }
+
+    #[test]
+    fn test_build_commit_url_fallback_uses_tracking_owner_repo() {
+        let url = crate::utils::commit_url::build_commit_url(
+            Platform::Gitee,
+            "",
+            "src-custom",
+            "openssl",
+            "branch-sha",
+            "openEuler-20.03-LTS-SP4",
+        );
+
+        assert_eq!(
+            url,
+            "https://gitee.com/src-custom/openssl/commit/branch-sha"
+        );
+    }
+
+    #[test]
     fn test_sync_status_enum() {
         let success = SyncStatus::Success;
         let skipped = SyncStatus::Skipped;
