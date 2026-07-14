@@ -275,3 +275,27 @@ impl<'a> EcosystemService<'a> {
         })
     }
 
+    async fn save_report(
+        &self,
+        target_id: i32,
+        assessment: EcosystemAssessment,
+    ) -> Result<ecosystem_reports::Model> {
+        let now = Utc::now();
+        let report = ecosystem_reports::ActiveModel {
+            target_id: Set(target_id),
+            report_type: Set(assessment.report_type),
+            status: Set("completed".to_string()),
+            overall_risk: Set(assessment.overall_risk),
+            confidence: Set(assessment.confidence),
+            summary: Set(assessment.summary),
+            dimensions: Set(serde_json::to_value(assessment.dimensions)?),
+            evidence_summary: Set(Some(assessment.evidence_summary)),
+            report_payload: Set(assessment.report_payload),
+            generated_at: Set(assessment.generated_at),
+            created_at: Set(now),
+            updated_at: Set(now),
+            ..Default::default()
+        };
+        Ok(report.insert(self.db).await?)
+    }
+}
