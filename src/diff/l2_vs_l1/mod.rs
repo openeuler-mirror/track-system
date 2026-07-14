@@ -1842,17 +1842,18 @@ impl L2VsL1Comparator {
             let release = commit
                 .spec_release
                 .clone()
-                .or_else(|| Self::extract_release_from_spec(&l2_snapshot.spec_content));
+                .filter(|release| !Self::has_unexpanded_macro(release))
+                .or_else(|| parsed_l2_release.clone());
             (version, release)
         } else {
             let version = l2_snapshot.version.clone();
-            let release = Self::extract_release_from_spec(&l2_snapshot.spec_content);
+            let release = parsed_l2_release;
             (version, release)
         };
 
         // 查询 L1 commits（时间降序）
         let l1_models = L1CommitRecords::find()
-            .filter(l1_commit_records::Column::TrackingId.eq(tracking_id))
+            .filter(l1_commit_records::Column::TrackingId.eq(l1_commit_tracking_id))
             .order_by_desc(l1_commit_records::Column::CommittedAt)
             .all(db)
             .await?;
