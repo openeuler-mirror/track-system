@@ -166,3 +166,27 @@ impl GitHubPlatformCollector {
                 GITHUB_LICENSING_URL,
                 &[
                     "choosealicense.com",
+                    "without a license",
+                    "licensee",
+                    "licenses api",
+                    "spdx",
+                    "default copyright laws apply",
+                ],
+            )
+            .await;
+        self.log_page_result("github licensing", &licensing_page);
+        let dmca_page = self
+            .fetch_page(
+                &client,
+                GITHUB_DMCA_URL,
+                &[
+                    "dmca",
+                    "safe harbor",
+                    "counter notice",
+                    "public repository",
+                    "takedown notice",
+                    "copyright infringement",
+                ],
+            )
+            .await;
+        self.log_page_result("github dmca", &dmca_page);
