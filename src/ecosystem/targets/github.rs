@@ -94,3 +94,27 @@ impl GitHubPlatformCollector {
                 &[
                     "about github",
                     "cloud-based platform",
+                    "store, share, and work together",
+                    "repository",
+                    "pull requests",
+                ],
+            )
+            .await;
+        self.log_page_result("github about", &about_page);
+        let corporate_page = self
+            .fetch_page(
+                &client,
+                GITHUB_CORPORATE_URL,
+                &[
+                    "microsoft acquisition of github is complete",
+                    "github will operate independently",
+                    "community, platform, and business",
+                    "first day as ceo",
+                    "future of github",
+                ],
+            )
+            .await;
+        self.log_page_result("github corporate profile", &corporate_page);
+        let trade_page = self
+            .fetch_page(
+                &client,
