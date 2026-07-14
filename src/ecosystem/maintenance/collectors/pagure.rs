@@ -187,3 +187,26 @@ fn parse_pagure_repo(url: &str) -> Option<PagureRepoRef> {
             })
         }
         "src.fedoraproject.org" => {
+            if segments.len() < 2 {
+                return None;
+            }
+            let repo = segments.last()?.to_string();
+            let owner = segments[..segments.len() - 1].join("/");
+            Some(PagureRepoRef {
+                api_url: format!(
+                    "{}://{}/api/0/{}",
+                    normalized.scheme(),
+                    host,
+                    segments.join("/")
+                ),
+                owner,
+                repo,
+                platform: "fedora-dist-git",
+            })
+        }
+        _ => None,
+    }
+}
+
+fn normalize_url(url: &str) -> Option<Url> {
+    if let Ok(parsed) = Url::parse(url) {
