@@ -28,6 +28,8 @@ pub use super::l0_commits::Entity as L0Commits;
 pub use super::l1_commit_records::Entity as L1CommitRecords;
 pub use super::l2_commit_records::Entity as L2CommitRecords;
 pub use super::l2_snapshots::Entity as L2Snapshots;
+pub use super::maintenance_evidence_snapshots::Entity as MaintenanceEvidenceSnapshots;
+pub use super::maintenance_reports::Entity as MaintenanceReports;
 pub use super::packages::Entity as Packages;
 pub use super::spec_changes::Entity as SpecChanges;
 pub use super::spec_snapshots::Entity as SpecSnapshots;
