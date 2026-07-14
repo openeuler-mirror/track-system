@@ -190,3 +190,27 @@ impl GitHubPlatformCollector {
             )
             .await;
         self.log_page_result("github dmca", &dmca_page);
+
+        let gov_takedown_stats = self
+            .collect_gov_takedown_stats(&client, github_token.as_deref())
+            .await;
+
+        Ok(self.build_evidence_records(
+            about_page,
+            corporate_page,
+            trade_page,
+            gov_page,
+            terms_page,
+            licensing_page,
+            dmca_page,
+            gov_takedown_stats,
+        ))
+    }
+
+    fn build_evidence_records(
+        &self,
+        about_page: PageSnapshot,
+        corporate_page: PageSnapshot,
+        trade_page: PageSnapshot,
+        gov_page: PageSnapshot,
+        terms_page: PageSnapshot,
