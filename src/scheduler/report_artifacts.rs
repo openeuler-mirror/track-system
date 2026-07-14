@@ -640,3 +640,26 @@ fn sanitize_sheet_name(name: &str) -> String {
 
 fn dedupe_sheet_names(sheets: &mut [SheetRows]) {
     let mut seen = HashSet::new();
+    for sheet in sheets {
+        if seen.insert(sheet.name.clone()) {
+            continue;
+        }
+
+        let base = sheet.name.chars().take(28).collect::<String>();
+        let mut idx = 2;
+        loop {
+            let candidate = format!("{base}_{idx}");
+            if seen.insert(candidate.clone()) {
+                sheet.name = candidate;
+                break;
+            }
+            idx += 1;
+        }
+    }
+}
+
+fn content_types_xml(sheet_count: usize) -> String {
+    let mut xml = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
