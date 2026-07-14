@@ -522,3 +522,26 @@ mod tests {
     async fn collect_with_api_maps_live_github_activity() {
         let server = MockServer::start();
         let repo_url = "https://github.com/openssl/openssl";
+        let package = package(repo_url);
+        let now = Utc::now().to_rfc3339();
+
+        let _repo_mock = server.mock(|when, then| {
+            when.method(GET).path("/repos/openssl/openssl");
+            then.status(200).json_body(json!({
+                "html_url": repo_url,
+                "default_branch": "master",
+                "stargazers_count": 1234,
+                "forks_count": 567
+            }));
+        });
+        let _total_mock = server.mock(|when, then| {
+            when.method(GET)
+                .path("/repos/openssl/openssl/commits")
+                .query_param("sha", "master")
+                .query_param("per_page", "1")
+                .query_param("page", "1")
+                .query_param_missing("since");
+            then.status(200)
+                .header(
+                    "link",
+                    "<http://example.test/commits?per_page=1&page=42>; rel=\"last\"",
