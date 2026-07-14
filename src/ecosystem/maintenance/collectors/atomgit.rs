@@ -375,3 +375,26 @@ fn normalize_source_url(repo_url: &str) -> String {
     if Url::parse(repo_url).is_ok() {
         repo_url
             .trim_end_matches(".git")
+            .trim_end_matches('/')
+            .to_string()
+    } else {
+        repo_url.to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_atomgit_repo_accepts_standard_variants() {
+        assert_eq!(
+            parse_atomgit_repo("https://atomgit.com/src-openeuler/elfutils.git"),
+            Some(("src-openeuler".to_string(), "elfutils".to_string()))
+        );
+        assert_eq!(
+            parse_atomgit_repo("atomgit.com/src-openeuler/nginx"),
+            Some(("src-openeuler".to_string(), "nginx".to_string()))
+        );
+    }
+}
