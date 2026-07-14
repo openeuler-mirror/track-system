@@ -133,3 +133,61 @@ impl<'a> EcosystemService<'a> {
 
         Ok(evidence)
     }
+
+    fn collect_metadata_evidence(&self, target: &ecosystem_targets::Model) -> Vec<Value> {
+        let mut evidence = Vec::new();
+        let Some(metadata) = target.metadata.as_ref() else {
+            return evidence;
+        };
+
+        if let Some(source_assessment) =
+            metadata.get("source_assessment").and_then(Value::as_object)
+        {
+            for (subcategory, data) in source_assessment {
+                evidence.push(self.build_metadata_record(
+                    target,
+                    "metadata_source_assessment",
+                    "metadata_source",
+                    "source",
+                    subcategory,
+                    data.clone(),
+                ));
+            }
+        }
+
+        if let Some(data) = metadata.get("maintenance_assessment") {
+            evidence.push(self.build_metadata_record(
+                target,
+                "metadata_maintenance_assessment",
+                "metadata_maintenance",
+                "maintenance",
+                "repository_activity",
+                data.clone(),
+            ));
+        }
+
+        if let Some(data) = metadata.get("security_assessment") {
+            evidence.push(self.build_metadata_record(
+                target,
+                "metadata_security_assessment",
+                "metadata_security",
+                "security",
+                "cve_process",
+                data.clone(),
+            ));
+        }
+
+        if let Some(data) = metadata.get("quality_assessment") {
+            evidence.push(self.build_metadata_record(
+                target,
+                "metadata_quality_assessment",
+                "metadata_quality",
+                "quality",
+                "release_quality",
+                data.clone(),
+            ));
+        }
+
+        evidence
+    }
+
