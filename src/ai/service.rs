@@ -454,3 +454,27 @@ mod tests {
                     allow_external_research: None,
                 },
             )
+            .await
+            .unwrap();
+        assert!(!response.used_remote_model);
+        assert_eq!(response.risk, AiRiskLevel::High);
+    }
+
+    #[tokio::test]
+    async fn local_analysis_reports_l0_security_and_quality() {
+        let service = AiAnalysisService::new(AiConfig {
+            enabled: false,
+            provider: "openai-compatible".to_string(),
+            base_url: "http://localhost".to_string(),
+            api_key: None,
+            model: "test".to_string(),
+            timeout: std::time::Duration::from_secs(1),
+            max_input_chars: 1000,
+        });
+        let context = AiContext {
+            source: AiAnalysisSource::TrackingReport,
+            target_name: Some("bash".to_string()),
+            target_type: Some("package".to_string()),
+            platform: Some("github".to_string()),
+            report_type: Some("pipeline".to_string()),
+            rule_risk: Some("medium".to_string()),
