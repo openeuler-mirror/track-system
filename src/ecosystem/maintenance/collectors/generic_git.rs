@@ -1090,3 +1090,26 @@ mod tests {
 1123456789abcdef0123456789abcdef01234567\trefs/tags/v1.10.0
 2123456789abcdef0123456789abcdef01234567\trefs/tags/2.0.0.rc1
 3123456789abcdef0123456789abcdef01234567\trefs/tags/nightly-3.0.0
+4123456789abcdef0123456789abcdef01234567\trefs/tags/2024.05.10
+";
+
+        let versions = parse_remote_tag_versions(output);
+        let parsed = versions
+            .iter()
+            .map(|version| version.version.as_str())
+            .collect::<Vec<_>>();
+
+        assert_eq!(parsed, vec!["1.2.0", "1.10.0", "2.0.0-rc1"]);
+        assert_eq!(
+            latest_version_from_generic_versions(&versions, false).as_deref(),
+            Some("2.0.0-rc1")
+        );
+        assert_eq!(
+            latest_version_from_generic_versions(&versions, true).as_deref(),
+            Some("1.10.0")
+        );
+    }
+
+    #[tokio::test]
+    async fn collect_version_catalog_reads_local_repo_tags() {
+        let source_dir = tempdir().unwrap();
