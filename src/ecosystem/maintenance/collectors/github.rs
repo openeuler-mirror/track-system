@@ -142,3 +142,27 @@ impl GitHubMaintenanceCollector {
                 "platform": "github",
                 "owner": owner,
                 "repo": repo,
+                "repo_html_url": repo_info.html_url,
+                "input_repo_url": repo_url,
+                "default_branch": branch,
+                "commit_total": commit_total,
+                "commits_last_12_months": commits_last_12_months,
+                "committers_last_12_months": committers_last_12_months,
+                "last_commit_at": last_commit_at,
+                "stars": repo_info.stargazers_count,
+                "forks": repo_info.forks_count,
+            }
+        })])
+    }
+}
+
+impl GitHubApi {
+    fn new(base_url: Option<String>) -> Result<Self> {
+        let client = Client::builder()
+            .timeout(std::time::Duration::from_secs(DEFAULT_TIMEOUT_SECS))
+            .user_agent("track-system/maintenance-github")
+            .build()
+            .context("build github maintenance client failed")?;
+
+        Ok(Self {
+            client,
