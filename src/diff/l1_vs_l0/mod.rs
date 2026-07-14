@@ -274,26 +274,90 @@ impl L1VsL0Comparator {
         let cve_analysis = self.analyze_cve_patches(&l1_info.cve_patches, &l0_info.changelogs)?;
 
         // 5. 生成升级建议
+        let maintenance_status =
+            self.assess_maintenance_status(&component_version, &l0_info.maintenance_notices);
+        let outdated_version =
+            self.assess_outdated_version(l1_info, Some(l0_info.latest_version.clone()));
+        let lts = self.assess_lts(l1_info);
         let recommendations = self.generate_recommendations(
             &version_comparison,
             &patch_analysis,
             &cve_analysis,
             &upgradable_versions,
+            &maintenance_status,
+            &outdated_version,
+            &lts,
         )?;
 
         Ok(L1VsL0Report {
             id: None,
             package_name: l1_info.package_name.clone(),
-            current_version: l1_info.current_version.clone(),
-            latest_stable: l0_info.latest_stable.clone(),
-            latest_version: l0_info.latest_version.clone(),
+            current_version: component_version,
+            latest_stable: l1_latest_version.clone(),
+            latest_version: l1_latest_version,
+            mainline_version: Some(l0_info.latest_version.clone()),
             version_behind: version_comparison.behind_count,
             upgradable_versions,
             patch_analysis,
             cve_analysis,
+            maintenance_status,
+            outdated_version,
+            lts,
             recommendations,
             created_at: Utc::now(),
         })
+    }
+
+    /// 在缺少 L0 版本/生命周期证据时生成部分 L1 vs L0 报告。
+    ///
+    /// LTS 仍可基于 L1 信息判断；过时版本可基于 L2 当前组件版本与
+    /// L1 最新版本判断。停维生命周期依赖 L0/原生社区公告，缺失时保持
+    /// UNKNOWN，避免把证据不足误判为安全。
+    pub fn compare_without_l0(&self, l1_info: &L1VersionInfo) -> L1VsL0Report {
+        let component_version = resolved_component_version(l1_info);
+        let l1_latest_version = resolved_l1_latest_version(l1_info);
+        let version_behind = self
+            .compare_component_to_l1(l1_info)
+            .map(|comparison| comparison.behind_count)
+            .unwrap_or(0);
+        let outdated_version = self.assess_outdated_version(l1_info, None);
+        let lts = self.assess_lts(l1_info);
+        let maintenance_status = MaintenanceStatus {
+            status: "UNKNOWN".to_string(),
+            stop_maintenance_detected: false,
+            matched_notice: None,
+            evidence: vec![],
+            confidence: "LOW".to_string(),
+        };
+        let recommendations =
+            self.generate_partial_recommendations(&maintenance_status, &outdated_version, &lts);
+
+        L1VsL0Report {
+            id: None,
+            package_name: l1_info.package_name.clone(),
+            current_version: component_version,
+            latest_stable: l1_latest_version.clone(),
+            latest_version: l1_latest_version,
+            mainline_version: None,
+            version_behind,
+            upgradable_versions: vec![],
+            patch_analysis: PatchAnalysis {
+                total_patches: l1_info.patches.len(),
+                merged_in_upstream: vec![],
+                still_needed: l1_info.patches.clone(),
+                can_be_removed_after_upgrade: 0,
+            },
+            cve_analysis: CveAnalysis {
+                total_cves: l1_info.cve_patches.len(),
+                fixed_in_upstream: vec![],
+                not_fixed_in_upstream: l1_info.cve_patches.clone(),
+            },
+            maintenance_status,
+            outdated_version,
+            lts,
+            recommendations,
+            created_at: Utc::now(),
+        }
     }
 
     /// 对比版本
