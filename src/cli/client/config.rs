@@ -177,7 +177,7 @@ impl ClientConfig {
         let mut config = Self::load()?;
 
         // 环境变量覆盖配置文件
-        if let Ok(url) = std::env::var("TRACK_SERVER_URL") {
+        if let Some(url) = resolve_server_url_from_env() {
             config.server_url = url;
         }
 
