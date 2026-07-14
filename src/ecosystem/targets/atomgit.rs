@@ -307,3 +307,26 @@ impl AtomGitPlatformCollector {
                 "source_name": "atomgit_trade_controls",
                 "source_url": ATOMGIT_TRADE_CONTROLS_URL,
                 "assessment_category": "source",
+                "assessment_subcategory": "trade_controls",
+                "data": {
+                    "trade_controls": trade_controls["summary"],
+                    "trade_policy_route_reachable": trade_controls["route_reachable"],
+                    "trade_policy_machine_readable": trade_controls["machine_readable_policy_text"],
+                    "trade_policy_same_as_generic_spa": trade_controls["same_as_random_probe"],
+                    "legal_compliance_required": trade_controls["legal_compliance_required"],
+                    "trade_keyword_lines": trade_policy_page.keyword_lines,
+                    "trade_http_status": trade_policy_page.http_status,
+                    "trade_error": trade_policy_page.error,
+                }
+            }),
+            json!({
+                "source_type": "atomgit_ip_policy",
+                "source_name": "atomgit_ip_policy",
+                "source_url": ATOMGIT_TERMS_URL,
+                "assessment_category": "source",
+                "assessment_subcategory": "ip_policy",
+                "data": {
+                    "ip_policy": ip_policy["summary"],
+                    "users_own_content": ip_policy["users_own_content"],
+                    "license_grant_to_host_content": ip_policy["license_grant_to_host_content"],
+                    "platform_retains_own_ip": ip_policy["platform_retains_own_ip"],
