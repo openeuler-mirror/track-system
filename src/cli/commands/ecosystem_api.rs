@@ -1177,3 +1177,26 @@ mod tests {
             Some("LTS 两年一发，四年支持")
         );
         assert_eq!(
+            find_source_focus_value(&payload, "license_policy").as_deref(),
+            Some("Mulan PSL v2")
+        );
+    }
+
+    #[test]
+    fn ecosystem_preset_recognizes_github_aliases() {
+        for input in ["github", "GitHub", "github platform"] {
+            let preset = ecosystem_preset_from_name(input).expect("preset should exist");
+            assert_eq!(preset.canonical_name, "GitHub Platform");
+            assert_eq!(preset.platform.as_deref(), Some("github"));
+            assert_eq!(preset.rule_profile, "github_platform");
+        }
+    }
+
+    #[test]
+    fn ecosystem_preset_recognizes_atomgit_aliases() {
+        for input in ["atomgit", "AtomGit", "gitcode", "atomgit platform"] {
+            let preset = ecosystem_preset_from_name(input).expect("preset should exist");
+            assert_eq!(preset.canonical_name, "AtomGit Platform");
+            assert_eq!(preset.platform.as_deref(), Some("atomgit"));
+            assert_eq!(preset.rule_profile, "atomgit_platform");
+        }
