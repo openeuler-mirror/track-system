@@ -94,3 +94,27 @@ impl AtomGitMaintenanceCollector {
             "data": {
                 "collector": "atomgit_live_api",
                 "platform": "atomgit",
+                "owner": owner,
+                "repo": repo,
+                "repo_html_url": html_url,
+                "default_branch": repo_info.default_branch,
+                "stars": repo_info.stargazers_count,
+                "forks": repo_info.forks_count,
+                "social_metrics_supported": true,
+            }
+        })];
+
+        if let Some(branch) = repo_info
+            .default_branch
+            .as_deref()
+            .filter(|value| !value.trim().is_empty())
+        {
+            match collect_activity(&client, &token, &owner, &repo, branch).await {
+                Ok(activity) => evidence.push(json!({
+                    "source_type": "atomgit_repository_activity_live",
+                    "source_name": "atomgit_repository_activity",
+                    "source_url": html_url,
+                    "http_status": 200,
+                    "assessment_category": "maintenance",
+                    "assessment_subcategory": "repository_activity",
+                    "data": {
