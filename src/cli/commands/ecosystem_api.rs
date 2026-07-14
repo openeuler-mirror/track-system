@@ -526,3 +526,27 @@ async fn list_reports(
         .ok_or_else(|| anyhow!("服务端未返回生态报告列表"))?;
 
     if data.items.is_empty() {
+        println!("{}", "没有找到生态报告".yellow());
+        return Ok(());
+    }
+
+    println!();
+    println!("{}", "生态报告列表:".bold());
+    println!(
+        "{:<8} {:<8} {:<20} {:<12} {:<12} {:<20}",
+        "ID", "目标ID", "类型", "风险", "置信度", "生成时间"
+    );
+    println!("{}", "-".repeat(90));
+    for item in data.items {
+        println!(
+            "{:<8} {:<8} {:<20} {:<12} {:<12} {:<20}",
+            item.id,
+            item.target_id,
+            item.report_type,
+            item.overall_risk,
+            item.confidence,
+            format_datetime_local(&item.generated_at)
+        );
+    }
+    println!(
+        "\n共 {} 条，当前第 {}/{} 页",
