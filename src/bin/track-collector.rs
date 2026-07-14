@@ -273,6 +273,7 @@ async fn resolve_branches_from_client(
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    load_track_system_env();
 
     let raw_args: Vec<String> = std::env::args().collect();
     let arg_lang = detect_lang_from_args(&raw_args);
