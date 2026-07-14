@@ -95,6 +95,13 @@ impl MigrationTrait for Migration {
     }
 }
 
+fn timestamp_type(backend: DatabaseBackend) -> Alias {
+    match backend {
+        DatabaseBackend::Postgres => Alias::new("timestamp with time zone"),
+        _ => Alias::new("timestamp"),
+    }
+}
+
 #[derive(DeriveIden)]
 enum EcosystemBindings {
     Table,
