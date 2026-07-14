@@ -568,3 +568,26 @@ mod tests {
             )]));
         });
         let _recent_committers_mock = server.mock(|when, then| {
+            when.method(GET)
+                .path("/repos/openssl/openssl/commits")
+                .query_param("sha", "master")
+                .query_param("per_page", "100")
+                .query_param("page", "1")
+                .query_param_exists("since");
+            then.status(200).json_body(json!([
+                commit_json("a", Some("alice@example.com"), Some("Alice"), &now),
+                commit_json("b", Some("alice@example.com"), Some("Alice"), &now),
+                commit_json("c", None, Some("Bob"), &now),
+                commit_json("d", None, None, &now)
+            ]));
+        });
+
+        let api = GitHubApi::new(Some(server.base_url())).unwrap();
+        let evidence = GitHubMaintenanceCollector::new()
+            .collect_with_api(
+                &package,
+                repo_url,
+                "openssl".to_string(),
+                "openssl".to_string(),
+                api,
+            )
