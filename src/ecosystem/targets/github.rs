@@ -214,3 +214,27 @@ impl GitHubPlatformCollector {
         trade_page: PageSnapshot,
         gov_page: PageSnapshot,
         terms_page: PageSnapshot,
+        licensing_page: PageSnapshot,
+        dmca_page: PageSnapshot,
+        gov_takedown_stats: Value,
+    ) -> Vec<Value> {
+        let basic_info = self.detect_basic_info(&about_page);
+        let corporate_profile = self.detect_corporate_profile(&corporate_page);
+        let trade_controls = self.detect_trade_controls(&trade_page);
+        let ip_policy = self.detect_ip_policy(&terms_page, &dmca_page);
+        let government_takedown = self.detect_government_takedown(&gov_page);
+        let license_policy = self.detect_license_policy(&licensing_page, &terms_page);
+        let copyright_info = self.detect_copyright_info(&terms_page, &dmca_page);
+
+        debug!(
+            basic_info = %basic_info["summary"].as_str().unwrap_or(""),
+            organization_structure = %corporate_profile["organization_structure"].as_str().unwrap_or(""),
+            foundation_status = %corporate_profile["foundation_status"].as_str().unwrap_or(""),
+            trade_controls = %trade_controls["summary"].as_str().unwrap_or(""),
+            ip_policy = %ip_policy["summary"].as_str().unwrap_or(""),
+            government_takedown = %government_takedown["summary"].as_str().unwrap_or(""),
+            license_policy = %license_policy["summary"].as_str().unwrap_or(""),
+            copyright_info = %copyright_info["summary"].as_str().unwrap_or(""),
+            "GitHub 平台生态目标关键信息提取完成"
+        );
+
