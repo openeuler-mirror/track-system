@@ -21,6 +21,7 @@ use crate::cli::client::ApiClient;
 use crate::cli::dto::{CreateTrackingRequest, PackageDto, TrackingDto, UpdateTrackingRequest};
 use crate::cli::formatter::format_datetime_local;
 use crate::cli::parser::TrackingAction;
+use crate::collectors::traits::Platform;
 
 /// API 响应包装
 #[derive(Debug, Serialize, Deserialize)]
@@ -103,6 +104,46 @@ async fn resolve_package_id(api_client: &ApiClient, input: &str) -> Result<i32> 
     }
 }
 
+async fn find_duplicate_tracking(
+    api_client: &ApiClient,
+    package_id: i32,
+    l1_owner: &str,
+    l1_name: &str,
+    l1_branch: &str,
+    l2_branch: &str,
+) -> Result<Option<TrackingDto>> {
+    let mut page = 1u64;
+    let page_size = 100u64;
+    loop {
+        let query = format!(
+            "?page={}&page_size={}&package_id={}",
+            page, page_size, package_id
+        );
+        let response = api_client
+            .get::<ApiResponse<ListResponse<TrackingDto>>>(&format!("/tracking{}", query))
+            .await?;
+        let total = response.data.total;
+        let items = response.data.items;
+        if items.is_empty() {
+            return Ok(None);
+        }
+        if let Some(found) = items.into_iter().find(|t| {
+            t.l1_repo_owner == l1_owner
+                && t.l1_repo_name == l1_name
+                && t.l1_branch == l1_branch
+                && t.l2_branch == l2_branch
+                && t.package_id == package_id
+        }) {
+            return Ok(Some(found));
+        }
+        let fetched = (page * page_size) as usize;
+        if fetched >= total {
+            return Ok(None);
+        }
+        page += 1;
+    }
+}
+
 /// 执行跟踪配置管理命令
 pub async fn execute(api_client: &ApiClient, action: TrackingAction) -> Result<()> {
     match action {
@@ -149,41 +190,85 @@ async fn add_tracking(
     let package_id = resolve_package_id(api_client, &package).await?;
     let distro_id = parse_distro_id(&distro)?;
     let (l1_owner, l1_name) = parse_owner_repo(&l1_repo)?;
-
-    let request = CreateTrackingRequest {
-        package_id,
-        distro_id,
-        l1_repo_owner: l1_owner,
-        l1_repo_name: l1_name,
-        l1_branch,
-        l2_branch,
-        l2_repo_path,
-        tracking_status: Some(status),
+    let platform = if l1_repo.contains("github") {
+        Platform::GitHub
+    } else if l1_repo.contains("gitea") {
+        Platform::Gitea
+    } else if l1_repo.contains("atomgit") {
+        Platform::AtomGit
+    } else {
+        // 默认使用 Gitee（当前系统主要使用的平台）
+        Platform::Gitee
     };
 
-    match api_client
-        .post::<_, ApiResponse<TrackingDto>>("/tracking", &request)
-        .await
-    {
-        Ok(response) => {
-            println!("{} 跟踪配置添加成功", "✓".green().bold());
-            println!("  ID: {}", response.data.id);
+
+    let mappings = vec![(l1_branch, l2_branch)];
+    let mut created = 0;
+    let mut skipped = 0;
+
+    for (l1_branch, l2_branch) in mappings {
+        if let Some(existing) = find_duplicate_tracking(
+            api_client, package_id, &l1_owner, &l1_name, &l1_branch, &l2_branch,
+        )
+        .await?
+        {
             println!(
-                "  L1 仓库: {}/{} ({})",
-                response.data.l1_repo_owner, response.data.l1_repo_name, response.data.l1_branch
+                "{} 已存在相同包名和 L1 仓库的 tracking，跳过创建",
+                "ℹ".cyan()
             );
             println!(
-                "  L2 路径: {} ({})",
-                response.data.l2_repo_path, response.data.l2_branch
+                "  ID: {}  L1: {}/{}  分支: {}",
+                existing.id, existing.l1_repo_owner, existing.l1_repo_name, existing.l1_branch
             );
-            println!("  状态: {}", response.data.tracking_status);
-            Ok(())
+            skipped += 1;
+            continue;
         }
-        Err(e) => {
-            println!("{} 添加跟踪配置失败: {}", "✗".red().bold(), e);
-            Err(e.into())
+
+        let request = CreateTrackingRequest {
+            package_id,
+            distro_id,
+            l1_repo_owner: l1_owner.clone(),
+            l1_repo_name: l1_name.clone(),
+            l1_branch: l1_branch.clone(),
+            l2_branch: l2_branch.clone(),
+            l2_repo_path: l2_repo_path.clone(),
+            tracking_status: Some(status.clone()),
+        };
+
+        match api_client
+            .post::<_, ApiResponse<TrackingDto>>("/tracking", &request)
+            .await
+        {
+            Ok(response) => {
+                println!("{} 跟踪配置添加成功", "✓".green().bold());
+                println!("  ID: {}", response.data.id);
+                println!(
+                    "  L1 仓库: {}/{} ({})",
+                    response.data.l1_repo_owner,
+                    response.data.l1_repo_name,
+                    response.data.l1_branch
+                );
+                println!(
+                    "  L2 路径: {} ({})",
+                    response.data.l2_repo_path, response.data.l2_branch
+                );
+                println!("  状态: {}", response.data.tracking_status);
+                created += 1;
+            }
+            Err(e) => {
+                println!("{} 添加跟踪配置失败: {}", "✗".red().bold(), e);
+                return Err(e.into());
+            }
         }
     }
+
+    println!(
+        "完成: 新增 {} 个，跳过 {} 个",
+        created.to_string().green(),
+        skipped.to_string().yellow()
+    );
+    Ok(())
+
 }
 
 /// 列出跟踪配置
