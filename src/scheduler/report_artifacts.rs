@@ -778,3 +778,26 @@ fn styles_xml() -> String {
 
 fn sheet_xml(rows: &[CveFixComparisonRow]) -> String {
     let row_count = rows.len() + 1;
+    let mut xml = format!(
+        r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <dimension ref="A1:G{row_count}"/>
+  <sheetViews><sheetView workbookViewId="0"/></sheetViews>
+  <sheetFormatPr defaultRowHeight="16"/>
+  <cols>
+    <col min="1" max="1" width="28" customWidth="1"/>
+    <col min="2" max="2" width="48" customWidth="1"/>
+    <col min="3" max="3" width="22" customWidth="1"/>
+    <col min="4" max="4" width="24" customWidth="1"/>
+    <col min="5" max="5" width="24" customWidth="1"/>
+    <col min="6" max="6" width="76" customWidth="1"/>
+    <col min="7" max="7" width="18" customWidth="1"/>
+  </cols>
+  <sheetData>"#
+    );
+
+    xml.push_str(r#"<row r="1" ht="22">"#);
+    for (idx, header) in SHEET_HEADERS.iter().enumerate() {
+        xml.push_str(&inline_str_cell(&cell_ref(idx, 1), header, 1));
+    }
+    xml.push_str("</row>");
