@@ -382,3 +382,27 @@ fn collect_rows_into_volumes(
         return;
     }
 
+    for commit in commit_reports {
+        let description = text_field(commit, "Description");
+        let commit_url = text_field(commit, "Url");
+        let mut identifiers = cve_list_field(commit, "CVEList");
+        identifiers.extend(extract_cve_identifiers(&description));
+        identifiers.sort();
+        identifiers.dedup();
+
+        if identifiers.is_empty() {
+            identifiers.push(issue_generator.next_issue());
+        }
+
+        let upstream_fixed_version = upstream_fixed_version(commit, default_upstream_version);
+        let description_entry =
+            description_entry_for_commit(&description, &commit_url, identifiers.as_slice());
+        let volume_index = volume_index_for_package(volumes, package_name, max_packages);
+        let groups = volumes
+            .get_mut(volume_index)
+            .expect("volume index should exist");
+
+        let group = groups.iter_mut().find(|group| {
+            group.package == package_name
+                && group.ctyunos_current_version == ctyunos_current_version
+                && group.system_version == system_version
