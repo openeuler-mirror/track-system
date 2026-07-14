@@ -100,6 +100,7 @@ pub struct TrackingResponse {
     pub last_sync_time: Option<chrono::DateTime<chrono::Utc>>,
     pub last_l1_commit_sha: Option<String>,
     pub last_l2_commit_sha: Option<String>,
+    pub maintenance_summary: Option<TrackingMaintenanceSummary>,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
 }
@@ -122,10 +123,25 @@ impl From<tracking::Model> for TrackingResponse {
             last_sync_time: model.last_sync_time,
             last_l1_commit_sha: model.last_l1_commit_sha,
             last_l2_commit_sha: model.last_l2_commit_sha,
+            maintenance_summary: None,
             created_at: model.created_at,
             updated_at: model.updated_at,
         }
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrackingMaintenanceSummary {
+    pub report_id: i64,
+    pub overall_risk: String,
+    pub confidence: String,
+    pub generated_at: chrono::DateTime<chrono::Utc>,
+    pub commit_total: Option<i64>,
+    pub commits_last_12_months: Option<i64>,
+    pub committers_last_12_months: Option<i64>,
+    pub last_commit_at: Option<String>,
+    pub stars: Option<i64>,
+    pub forks: Option<i64>,
 }
 
 /// GET /api/tracking
