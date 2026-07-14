@@ -1112,3 +1112,26 @@ mod tests {
             updated_at: chrono::Utc::now(),
         };
         assert!(!AtomGitPlatformCollector::matches_target(&target));
+    }
+
+    #[test]
+    fn detect_ip_policy_from_text() {
+        let collector = AtomGitPlatformCollector::new();
+        let terms_page = PageSnapshot {
+            http_status: Some(200),
+            keyword_lines: Vec::new(),
+            plain_text: "AtomGit上的用户信息和内容的版权归作者本人所有。AtomGit可以自行决定以全部或任何方式使用和分享用户信息与内容。与AtomGit服务相关的知识产权均受版权法保护。AtomGit知识产权声明和权利通知。".to_string(),
+            body_fingerprint: Some("a".to_string()),
+            looks_like_spa_shell: false,
+            error: None,
+        };
+        let route_page = PageSnapshot {
+            http_status: Some(200),
+            keyword_lines: Vec::new(),
+            plain_text: "AtomGit | GitCode".to_string(),
+            body_fingerprint: Some("shell".to_string()),
+            looks_like_spa_shell: true,
+            error: None,
+        };
+        let random_page = PageSnapshot {
+            http_status: Some(200),
