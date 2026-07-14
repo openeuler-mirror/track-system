@@ -1537,3 +1537,26 @@ mod tests {
         assert_eq!(rows[0].package, "grep");
         assert_eq!(rows[0].system_version, "CTyunOS25.07");
     }
+
+    #[test]
+    #[serial]
+    fn rows_for_inputs_allow_overriding_system_version_blacklist() {
+        let _blacklist_guard = EnvVarGuard::set("TRACK_XLSX_SYSTEM_VERSION_BLACKLIST", "");
+        let inputs = vec![CveFixComparisonInput {
+            tracking_id: 1,
+            package_name: "bash".to_string(),
+            system_version: "ctyunos-2.0.1".to_string(),
+            ctyunos_current_version: "5.2-1".to_string(),
+            default_upstream_version: "5.2-3".to_string(),
+            commit_reports: vec![serde_json::json!({
+                "Description": "Fix CVE-2026-1111",
+                "CVEList": ["CVE-2026-1111"],
+            })],
+        }];
+
+        let rows = cve_fix_comparison_rows_for_inputs(&inputs);
+
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].system_version, "CTyunOS2.0.1");
+    }
+
