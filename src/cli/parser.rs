@@ -1092,7 +1092,14 @@ mod tests {
         }
 
         for visible in [
-            "sync", "snapshot", "import", "package", "tracking", "report",
+            "sync",
+            "snapshot",
+            "import",
+            "package",
+            "tracking",
+            "report",
+            "ecosystem",
+            "maintenance",
         ] {
             assert!(
                 root_commands.contains(&visible.to_string()),
