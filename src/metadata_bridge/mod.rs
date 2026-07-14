@@ -100,7 +100,7 @@ pub async fn import_snapshot<P: AsRef<Path>>(
         .context("tracking configuration not found")?;
 
     let json = fs::read_to_string(input_path.as_ref())?;
-    let snapshot: RepositorySnapshot = serde_json::from_str(&json)?;
+    let mut snapshot: RepositorySnapshot = serde_json::from_str(&json)?;
 
     if snapshot.tracking_id != tracking.id {
         bail!(
