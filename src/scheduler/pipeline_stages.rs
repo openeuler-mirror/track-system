@@ -3134,6 +3134,42 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_stage_l2_snapshot_fallback_reuses_primary_l2_snapshot() {
+        use crate::snapshot::types::SnapshotOrigin;
+
+        let source_tracking = test_tracking_model(1, 1, "openEuler-24.03-LTS-SP3", "CTyunOS25.07");
+        let fallback_tracking = test_tracking_model(2, 1, "openEuler-24.09", "CTyunOS25.07");
+        let source_l2_snapshot = test_repository_snapshot(
+            source_tracking.id,
+            SnapshotOrigin::L2,
+            "pkg",
+            "1.30",
+            "1",
+            "source-l2",
+        );
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<tracking::Model, _, _>(vec![vec![source_tracking]])
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![test_snapshot_model(
+                99,
+                1,
+                "l2",
+                &source_l2_snapshot,
+            )]])
+            .into_connection();
+
+        let executor = PipelineExecutor::new(&db, None);
+        let result = executor
+            .stage_l2_snapshot(&fallback_tracking)
+            .await
+            .unwrap();
+
+        assert_eq!(result.snapshot_id, Some(99));
+        assert_eq!(result.files_count, source_l2_snapshot.files.len());
+        assert!(result.has_new_data);
+    }
+
+    #[tokio::test]
     async fn test_stage_l2_snapshot_repo_exists() {
         use crate::entities::tracking;
         use chrono::Utc;
