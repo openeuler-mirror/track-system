@@ -3017,6 +3017,8 @@ mod tests {
             report_id: Some(789),
             files_changed: 0,
             has_spec_changes: false,
+            l2_vs_l1_diff: None,
+            l1_vs_l0_diff: None,
         };
 
         assert_eq!(result.report_id, Some(789));
