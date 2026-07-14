@@ -3493,7 +3493,295 @@ Summary: Test package
     }
 
     #[tokio::test]
+    async fn test_compare_l2_vs_l1_fallback_2409_skips_commit_diff_when_l2_still_newer() {
+        use crate::snapshot::types::SnapshotOrigin;
+
+        let tracking_model = test_tracking_model(1, 1, "openEuler-24.03-LTS-SP3", "CTyunOS25.05");
+        let fallback_tracking = test_tracking_model(2, 1, "openEuler-24.09", "CTyunOS25.05");
+        let package_model = test_package_model(1, "pkg");
+
+        let l1_snapshot = test_repository_snapshot(
+            tracking_model.id,
+            SnapshotOrigin::L1,
+            "pkg",
+            "1.0.0",
+            "1",
+            "l1-2403",
+        );
+        let l2_snapshot = test_repository_snapshot(
+            tracking_model.id,
+            SnapshotOrigin::L2,
+            "pkg",
+            "2.1.0",
+            "1",
+            "l2-newer",
+        );
+        let fallback_l1_snapshot = test_repository_snapshot(
+            fallback_tracking.id,
+            SnapshotOrigin::L1,
+            "pkg",
+            "2.0.0",
+            "1",
+            "l1-2409",
+        );
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<packages::Model, _, _>(vec![vec![package_model]])
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![test_snapshot_model(
+                1,
+                tracking_model.id,
+                "l1",
+                &l1_snapshot,
+            )]])
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![test_snapshot_model(
+                2,
+                tracking_model.id,
+                "l2",
+                &l2_snapshot,
+            )]])
+            .append_query_results::<tracking::Model, _, _>(vec![vec![fallback_tracking.clone()]])
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![test_snapshot_model(
+                3,
+                fallback_tracking.id,
+                "l1",
+                &fallback_l1_snapshot,
+            )]])
+            .into_connection();
+
+        let executor = PipelineExecutor::new(&db, None);
+        let report = executor
+            .compare_l2_vs_l1(&tracking_model)
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert!(l2_newer_than_l1(&report));
+        assert_eq!(report.spec_diff.version_diff.unwrap().l1_version, "2.0.0");
+        assert_eq!(report.commit_diff.l1_commits_count, 1);
+        assert_eq!(report.commit_diff.l2_commits_count, 1);
+        assert!(report.commit_diff.behind_commits.is_empty());
+        assert!(report.commit_diff.base_commit.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_compare_l2_vs_l1_non_fallback_l2_newer_skips_commit_diff() {
+        use crate::snapshot::types::SnapshotOrigin;
+
+        let tracking_model = test_tracking_model(1, 1, "openEuler-20.03-LTS-SP4", "CTyunOS22.06");
+        let package_model = test_package_model(1, "chrony");
+        let l1_snapshot = test_repository_snapshot(
+            tracking_model.id,
+            SnapshotOrigin::L1,
+            "chrony",
+            "3.5",
+            "4",
+            "l1-older",
+        );
+        let l2_snapshot = test_repository_snapshot(
+            tracking_model.id,
+            SnapshotOrigin::L2,
+            "chrony",
+            "4.1",
+            "3",
+            "l2-newer",
+        );
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<packages::Model, _, _>(vec![vec![package_model]])
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![test_snapshot_model(
+                1,
+                tracking_model.id,
+                "l1",
+                &l1_snapshot,
+            )]])
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![test_snapshot_model(
+                2,
+                tracking_model.id,
+                "l2",
+                &l2_snapshot,
+            )]])
+            .into_connection();
+
+        let executor = PipelineExecutor::new(&db, None);
+        let report = executor
+            .compare_l2_vs_l1(&tracking_model)
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert!(l2_newer_than_l1(&report));
+        let version_diff = report.spec_diff.version_diff.unwrap();
+        assert_eq!(version_diff.l1_version, "3.5");
+        assert_eq!(version_diff.l2_version, "4.1");
+        assert_eq!(report.commit_diff.l1_commits_count, 1);
+        assert_eq!(report.commit_diff.l2_commits_count, 1);
+        assert!(report.commit_diff.behind_commits.is_empty());
+        assert!(report.commit_diff.base_commit.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_compare_l2_vs_l1_missing_fallback_snapshot_skips_commit_diff() {
+        use crate::snapshot::types::SnapshotOrigin;
+
+        let tracking_model = test_tracking_model(1, 1, "openEuler-24.03-LTS-SP3", "CTyunOS25.07");
+        let fallback_tracking = test_tracking_model(2, 1, "openEuler-24.09", "CTyunOS25.07");
+        let package_model = test_package_model(1, "pkg");
+        let l1_snapshot = test_repository_snapshot(
+            tracking_model.id,
+            SnapshotOrigin::L1,
+            "pkg",
+            "1.0.0",
+            "1",
+            "l1-2403",
+        );
+        let l2_snapshot = test_repository_snapshot(
+            tracking_model.id,
+            SnapshotOrigin::L2,
+            "pkg",
+            "2.1.0",
+            "1",
+            "l2-newer",
+        );
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<packages::Model, _, _>(vec![vec![package_model]])
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![test_snapshot_model(
+                1,
+                tracking_model.id,
+                "l1",
+                &l1_snapshot,
+            )]])
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![test_snapshot_model(
+                2,
+                tracking_model.id,
+                "l2",
+                &l2_snapshot,
+            )]])
+            .append_query_results::<tracking::Model, _, _>(vec![vec![fallback_tracking.clone()]])
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![]])
+            .append_query_errors([sea_orm::DbErr::Custom(
+                "fallback sync unavailable in test".to_string(),
+            )])
+            .into_connection();
+
+        let executor = PipelineExecutor::new(&db, None);
+        let report = executor
+            .compare_l2_vs_l1(&tracking_model)
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert!(l2_newer_than_l1(&report));
+        assert_eq!(report.spec_diff.version_diff.unwrap().l1_version, "1.0.0");
+        assert!(report.commit_diff.behind_commits.is_empty());
+        assert!(report.commit_diff.base_commit.is_none());
+    }
+
+    #[tokio::test]
     async fn test_compare_l1_vs_l0_no_l0_info() {
+        let tracking_model = tracking::Model {
+            id: 1,
+            package_id: 1,
+            distro_id: 1,
+            l1_branch: "openEuler-20.03-LTS-SP4".to_string(),
+            l1_repo_owner: "owner".to_string(),
+            l1_repo_name: "repo".to_string(),
+            l2_branch: "local".to_string(),
+            l2_repo_path: "/path".to_string(),
+            tracking_status: "idle".to_string(),
+            last_sync_time: Some(Utc::now()),
+            last_l1_commit_sha: None,
+            last_l2_commit_sha: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            last_error: None,
+            platform: Some("Gitee".to_string()),
+        };
+
+        let commit_model = l1_commit_records::Model {
+            id: 1,
+            tracking_id: tracking_model.id,
+            commit_sha: "sha-001".to_string(),
+            commit_message: "initial import".to_string(),
+            author_name: "dev".to_string(),
+            author_email: "dev@example.com".to_string(),
+            committed_at: Utc::now(),
+            change_type: None,
+            primary_change_type: None,
+            cve_list: None,
+            spec_changed: false,
+            patch_stats: None,
+            classification_status: "done".to_string(),
+            classification_notes: None,
+            sync_status: "done".to_string(),
+            synced_to_l2_commit: None,
+            synced_at: None,
+            api_url: "https://example.com/sha-001".to_string(),
+            fetched_at: Utc::now(),
+            files_changed_count: 0,
+            additions: 0,
+            deletions: 0,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            spec_version: Some("1.0.0".to_string()),
+            spec_release: Some("1".to_string()),
+        };
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<l0_commits::Model, _, _>(vec![vec![]])
+            .append_query_results::<packages::Model, _, _>(vec![vec![]])
+            .append_query_results::<maintenance_evidence_snapshots::Model, _, _>(vec![vec![]])
+            .append_query_results::<packages::Model, _, _>(vec![vec![]])
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![]])
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![]])
+            .append_query_results::<l1_commit_records::Model, _, _>(vec![vec![commit_model]])
+            .into_connection();
+
+        let executor = PipelineExecutor::new(&db, None);
+        let result = executor.compare_l1_vs_l0(&tracking_model).await.unwrap();
+        let report = result.expect("missing L0 should still produce partial L1 vs L0 report");
+        assert_eq!(report.maintenance_status.status, "UNKNOWN");
+        assert_eq!(report.lts.is_lts, Some(true));
+        assert!(report
+            .recommendations
+            .iter()
+            .any(|item| item.contains("缺少 L0 版本/生命周期证据")));
+    }
+
+    #[tokio::test]
+    async fn test_get_l0_version_info_empty() {
+        let tracking_model = tracking::Model {
+            id: 1,
+            package_id: 1,
+            distro_id: 1,
+            l1_branch: "main".to_string(),
+            l1_repo_owner: "owner".to_string(),
+            l1_repo_name: "repo".to_string(),
+            l2_branch: "local".to_string(),
+            l2_repo_path: "/path".to_string(),
+            tracking_status: "idle".to_string(),
+            last_sync_time: Some(Utc::now()),
+            last_l1_commit_sha: None,
+            last_l2_commit_sha: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            last_error: None,
+            platform: Some("Gitee".to_string()),
+        };
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<l0_commits::Model, _, _>(vec![vec![]])
+            .append_query_results::<packages::Model, _, _>(vec![vec![]])
+            .append_query_results::<maintenance_evidence_snapshots::Model, _, _>(vec![vec![]])
+            .into_connection();
+
+        let executor = PipelineExecutor::new(&db, None);
+        let result = executor.get_l0_version_info(&tracking_model).await.unwrap();
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_get_l0_version_info_reads_native_maintenance_evidence() {
         let tracking_model = tracking::Model {
             id: 1,
             package_id: 1,
