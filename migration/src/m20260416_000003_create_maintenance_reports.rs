@@ -43,3 +43,25 @@ impl MigrationTrait for Migration {
                         ColumnDef::new(MaintenanceReports::Status)
                             .string()
                             .not_null()
+                            .default("completed"),
+                    )
+                    .col(
+                        ColumnDef::new(MaintenanceReports::OverallRisk)
+                            .string()
+                            .not_null()
+                            .default("UNKNOWN"),
+                    )
+                    .col(
+                        ColumnDef::new(MaintenanceReports::Confidence)
+                            .string()
+                            .not_null()
+                            .default("LOW"),
+                    )
+                    .col(
+                        ColumnDef::new(MaintenanceReports::Summary)
+                            .text()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(MaintenanceReports::Dimensions)
+                            .json()
