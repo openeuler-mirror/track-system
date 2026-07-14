@@ -70,3 +70,27 @@ pub fn assess_target(
         summary,
         section: section.clone(),
         dimensions,
+        evidence_summary,
+        report_payload: json!({
+            "context": context,
+            "section": section,
+            "evidence_catalog": build_evidence_catalog(raw_evidence),
+            "raw_evidence": raw_evidence,
+        }),
+        generated_at: refreshed_at,
+    }
+}
+
+fn build_maintenance_assessment(raw_evidence: &[Value]) -> MaintenanceSubAssessment {
+    let entries = entries_by_category(raw_evidence, "maintenance");
+    let indicators = collect_indicators(&entries);
+    let social_metrics_supported =
+        indicator_bool(&indicators, "social_metrics_supported").unwrap_or(true);
+    let mut required_keys = vec![
+        "commit_total",
+        "commits_last_12_months",
+        "committers_last_12_months",
+        "last_commit_at",
+    ];
+    if social_metrics_supported {
+        required_keys.extend(["stars", "forks"]);
