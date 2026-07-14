@@ -429,7 +429,6 @@ impl<'a> PipelineExecutor<'a> {
 
         Ok(result)
     }
-
     /// 执行单个阶段
     async fn execute_stage(
         &self,
