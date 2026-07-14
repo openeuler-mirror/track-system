@@ -1560,3 +1560,26 @@ mod tests {
         assert_eq!(rows[0].system_version, "CTyunOS2.0.1");
     }
 
+    #[test]
+    #[serial]
+    fn row_volumes_for_inputs_split_after_default_thirty_packages() {
+        let _blacklist_guard = EnvVarGuard::set("TRACK_XLSX_SYSTEM_VERSION_BLACKLIST", "");
+        let _limit_guard = EnvVarGuard::set("TRACK_XLSX_MAX_PACKAGES", "30");
+        let inputs = (0..31)
+            .map(|idx| CveFixComparisonInput {
+                tracking_id: idx,
+                package_name: format!("pkg{idx:02}"),
+                system_version: "ctyunos-25.07".to_string(),
+                ctyunos_current_version: "1.0-1".to_string(),
+                default_upstream_version: "1.0-2".to_string(),
+                commit_reports: vec![serde_json::json!({
+                    "Description": format!("Fix issue {idx}"),
+                    "CVEList": [],
+                })],
+            })
+            .collect::<Vec<_>>();
+
+        let volumes = cve_fix_comparison_row_volumes_for_inputs_with_issue_start(&inputs, 12040);
+        let first_packages = volumes[0]
+            .iter()
+            .map(|row| row.package.as_str())
