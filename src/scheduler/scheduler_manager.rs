@@ -227,7 +227,12 @@ impl SchedulerManager {
                     "手动同步失败"
                 );
 
-                sync_manager.complete_sync_task(tracking_id, false).await?;
+                sync_manager
+                    .complete_sync_task_with_result(
+                        tracking_id,
+                        &failed_sync_result(err.to_string()),
+                    )
+                    .await?;
 
                 return Err(err);
             }
