@@ -1652,3 +1652,26 @@ mod tests {
         assert_eq!(volumes[1].len(), 1);
         assert_eq!(volumes[1][0].package, "coreutils");
     }
+
+    #[test]
+    fn time_based_issue_start_number_is_bounded_and_time_progressive() {
+        assert_eq!(
+            time_based_issue_start_number(ISSUE_NUMBER_EPOCH_UNIX_SECS),
+            ISSUE_START_NUMBER
+        );
+        assert_eq!(
+            time_based_issue_start_number(ISSUE_NUMBER_EPOCH_UNIX_SECS + 60),
+            ISSUE_START_NUMBER + 1
+        );
+        assert_eq!(
+            time_based_issue_start_number(ISSUE_NUMBER_EPOCH_UNIX_SECS - 3600),
+            ISSUE_START_NUMBER
+        );
+        assert_eq!(time_based_issue_start_number(i64::MAX), ISSUE_MAX_NUMBER);
+    }
+
+    #[test]
+    #[serial]
+    fn issue_number_reservation_uses_state_file_without_repeating() {
+        let dir = tempdir().unwrap();
+        let state_path = dir.path().join("issue-number-state");
