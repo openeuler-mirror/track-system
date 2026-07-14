@@ -985,3 +985,26 @@ fn cve_list_field(value: &Value, field: &str) -> Vec<String> {
     value
         .get(field)
         .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(Value::as_str)
+                .map(str::trim)
+                .filter(|item| !item.is_empty())
+                .map(normalize_identifier)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn extract_cve_identifiers(text: &str) -> Vec<String> {
+    let mut identifiers = Vec::new();
+    if let Ok(re) = Regex::new(r"(?i)CVE-\d{4}-\d{4,}") {
+        identifiers.extend(
+            re.find_iter(text)
+                .map(|matched| matched.as_str().to_ascii_uppercase()),
+        );
+    }
+    identifiers
+}
+
