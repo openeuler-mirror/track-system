@@ -1916,28 +1916,36 @@ impl L2VsL1Comparator {
 
     /// 从 spec 文件内容中提取 Release 字段
     fn extract_release_from_spec(spec_content: &str) -> Option<String> {
-        for line in spec_content.lines() {
-            let trimmed = line.trim();
-            if trimmed.starts_with("Release:") {
-                // 提取 Release 值，可能包含宏如 %{?dist}
-                let release_value = trimmed
-                    .strip_prefix("Release:")
-                    .map(|s| s.trim())
-                    .unwrap_or("");
+        let release = parse_spec(spec_content).release;
+        (!release.is_empty()).then_some(release)
+    }
 
-                // 移除常见的宏如 %{?dist}
-                let cleaned = release_value
-                    .replace("%{?dist}", "")
-                    .replace("%{dist}", "")
-                    .trim()
-                    .to_string();
+    fn has_unexpanded_macro(value: &str) -> bool {
+        value.contains("%{") || value.contains("%(")
+    }
 
-                if !cleaned.is_empty() {
-                    return Some(cleaned);
-                }
+    /// L2 release 形如 15.1 时，小数部分表示 CTyunOS 本地修改序号。
+    /// 基线 commit 匹配只使用上游 release 主号，例如 15.1 -> 15。
+    fn normalize_l2_release_for_baseline(release: &str) -> String {
+        let cleaned = release
+            .trim()
+            .replace("%{?dist}", "")
+            .replace("%{dist}", "")
+            .trim()
+            .to_string();
+
+        if let Some((base, local_suffix)) = cleaned.split_once('.') {
+            if !base.is_empty()
+                && !local_suffix.is_empty()
+                && base.chars().all(|c| c.is_ascii_digit())
+                && local_suffix.chars().all(|c| c.is_ascii_digit() || c == '.')
+                && local_suffix.chars().any(|c| c.is_ascii_digit())
+            {
+                return base.to_string();
             }
         }
-        None
+
+        cleaned
     }
 
     /// 在数据库记录中查找匹配 version-release 的基线 commit（精确匹配）
