@@ -947,3 +947,26 @@ fn find_source_focus_value(report_payload: &Value, key: &str) -> Option<String> 
     find_source_indicator_value(report_payload, key)
         .or_else(|| find_source_raw_evidence_value(report_payload, key))
 }
+
+fn find_quality_focus_value(report_payload: &Value, key: &str) -> Option<String> {
+    find_quality_indicator_value(report_payload, key)
+        .or_else(|| find_quality_raw_evidence_value(report_payload, key))
+}
+
+fn source_focus_bool(report_payload: &Value, key: &str) -> Option<bool> {
+    find_source_indicator_json_value(report_payload, key)
+        .or_else(|| find_source_raw_evidence_json_value(report_payload, key))
+        .and_then(|value| match value {
+            Value::Bool(flag) => Some(flag),
+            Value::String(text) => match text.to_ascii_lowercase().as_str() {
+                "true" | "yes" | "1" => Some(true),
+                "false" | "no" | "0" => Some(false),
+                _ => None,
+            },
+            _ => None,
+        })
+}
+
+fn quality_focus_bool(report_payload: &Value, key: &str) -> Option<bool> {
+    find_quality_indicator_json_value(report_payload, key)
+        .or_else(|| find_quality_raw_evidence_json_value(report_payload, key))
