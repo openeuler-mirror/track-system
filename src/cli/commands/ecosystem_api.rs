@@ -878,3 +878,26 @@ fn print_github_gov_takedown_archive_details(report_payload: &Value) {
     }
 }
 
+fn print_github_license_policy_details(report_payload: &Value) {
+    let mut details = Vec::new();
+
+    if source_focus_bool(report_payload, "supports_choosealicense") == Some(true) {
+        details.push("      * 许可证选型: 提供 Choose a License 指引".to_string());
+    }
+    if source_focus_bool(report_payload, "supports_license_detection") == Some(true) {
+        details.push("      * 许可证识别: 支持 Licensee / Licenses API 等识别能力".to_string());
+    }
+    if source_focus_bool(report_payload, "mentions_default_copyright_rule") == Some(true) {
+        details.push("      * 默认规则: 未声明许可证时默认版权法仍然适用".to_string());
+    }
+
+    print_structured_details_block("      许可证字段:", details);
+}
+
+fn print_github_copyright_details(report_payload: &Value) {
+    let mut details = Vec::new();
+
+    if source_focus_bool(report_payload, "dmca_safe_harbor_mentioned") == Some(true) {
+        details.push("      * DMCA Safe Harbor: 平台明确维持 DMCA 安全港合规".to_string());
+    }
+    if source_focus_bool(report_payload, "counter_notice_supported") == Some(true) {
