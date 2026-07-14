@@ -147,13 +147,13 @@ pub enum Commands {
         action: ReportAction,
     },
 
-    /// 生态目标管理命令
+    /// 生态评估目标管理命令
     Ecosystem {
         #[command(subcommand)]
         action: EcosystemAction,
     },
 
-    /// 维护评估命令
+    /// 组件维护评估目标管理命令
     Maintenance {
         #[command(subcommand)]
         action: MaintenanceAction,
