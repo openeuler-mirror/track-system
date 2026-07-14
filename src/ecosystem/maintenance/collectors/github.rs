@@ -22,3 +22,27 @@ struct GitHubRepositorySnapshot {
     stargazers_count: i64,
     forks_count: i64,
 }
+
+#[derive(Debug, Deserialize)]
+struct GitHubCommitListItem {
+    sha: String,
+    commit: GitHubCommitInfo,
+}
+
+#[derive(Debug, Deserialize)]
+struct GitHubCommitInfo {
+    author: Option<GitHubCommitIdentity>,
+    committer: Option<GitHubCommitIdentity>,
+}
+
+#[derive(Debug, Deserialize)]
+struct GitHubCommitIdentity {
+    name: Option<String>,
+    email: Option<String>,
+    date: Option<DateTime<Utc>>,
+}
+
+struct GitHubApi {
+    client: Client,
+    token: Option<String>,
+    base_url: String,
