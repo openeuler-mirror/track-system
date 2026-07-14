@@ -801,3 +801,26 @@ fn sheet_xml(rows: &[CveFixComparisonRow]) -> String {
         xml.push_str(&inline_str_cell(&cell_ref(idx, 1), header, 1));
     }
     xml.push_str("</row>");
+
+    for (row_idx, row) in rows.iter().enumerate() {
+        let excel_row = row_idx + 2;
+        xml.push_str(&format!(r#"<row r="{excel_row}" ht="46">"#));
+        let values = [
+            row.package.as_str(),
+            row.cve_or_issue.as_str(),
+            row.upstream_fixed_version.as_str(),
+            row.ctyunos_current_version.as_str(),
+            row.system_version.as_str(),
+            row.description.as_str(),
+            row.xingkong_ticket_no.as_str(),
+        ];
+        for (col_idx, value) in values.iter().enumerate() {
+            let style = if col_idx == 5 && row.commit_url.is_some() {
+                3
+            } else {
+                2
+            };
+            xml.push_str(&inline_str_cell(
+                &cell_ref(col_idx, excel_row),
+                value,
+                style,
