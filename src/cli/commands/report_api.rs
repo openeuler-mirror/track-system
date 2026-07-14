@@ -156,7 +156,7 @@ pub async fn list_reports(
 }
 
 /// 显示报告详情
-pub async fn show_report(api_client: &ApiClient, id: i64, _show_all: bool) -> Result<()> {
+pub async fn show_report(api_client: &ApiClient, id: i64, show_all: bool) -> Result<()> {
     println!("正在获取报告详情...");
     println!("  报告 ID: {}", id);
     println!();
