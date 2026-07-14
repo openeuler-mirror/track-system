@@ -454,3 +454,27 @@ async fn fetch_all_targets(api_client: &ApiClient) -> Result<Vec<EcosystemTarget
     Ok(targets)
 }
 
+async fn delete_target(api_client: &ApiClient, id: i32, confirm: bool) -> Result<()> {
+    if !confirm {
+        bail!("危险操作：删除生态目标需要 --confirm 参数");
+    }
+    println!("正在删除生态目标: {}", id.to_string().cyan());
+    api_client
+        .delete_no_content(&format!("/ecosystem/targets/{}", id))
+        .await?;
+    println!("{} 生态目标删除成功", "✓".green().bold());
+    Ok(())
+}
+
+async fn refresh_target(api_client: &ApiClient, id: i32) -> Result<()> {
+    println!("正在刷新生态目标: {}", id.to_string().cyan());
+    let response = api_client
+        .post::<_, ApiResponse<EcosystemRefreshResultDto>>(
+            &format!("/ecosystem/targets/{}/refresh", id),
+            &serde_json::json!({}),
+        )
+        .await?;
+    let result = response
+        .data
+        .ok_or_else(|| anyhow!("服务端未返回刷新结果"))?;
+    println!("{} 生态目标刷新成功", "✓".green().bold());
