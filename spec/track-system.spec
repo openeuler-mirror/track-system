@@ -1,7 +1,7 @@
 %global debug_package %{nil}
 %define pkg_name track-system
-%define pkg_version 1.2.0
-%define pkg_release 2
+%define pkg_version 2.0.0
+%define pkg_release 1
 %define pkg_user track
 %define pkg_group track
 %define pkg_home /opt/track-system
