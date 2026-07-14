@@ -188,7 +188,10 @@ pub async fn list_tracking(
         .all(state.db.as_ref())
         .await?;
 
-    let responses: Vec<TrackingResponse> = tracking_list.into_iter().map(Into::into).collect();
+    let mut responses = Vec::with_capacity(tracking_list.len());
+    for item in tracking_list {
+        responses.push(build_tracking_response(state.db.as_ref(), item).await?);
+    }
     let paginated = PaginatedResponse::new(responses, total, page, page_size);
 
     Ok(Json(ApiResponse::success(paginated)))
