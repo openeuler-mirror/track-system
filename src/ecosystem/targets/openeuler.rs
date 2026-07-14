@@ -236,3 +236,26 @@ impl OpenEulerCommunityCollector {
                     "organization_error": organization_page.error,
                 }
             }),
+            json!({
+                "source_type": "openeuler_foundation_profile",
+                "source_name": "openeuler_foundation",
+                "source_url": OPENEULER_FOUNDATION_URL,
+                "assessment_category": "source",
+                "assessment_subcategory": "foundation",
+                "data": {
+                    "foundation_status": foundation_status["summary"],
+                    "about_mentions_openatom": foundation_status["about_mentions_openatom"],
+                    "foundation_page_mentions_openatom": foundation_status["foundation_page_mentions_openatom"],
+                    "foundation_consistency": foundation_status["consistency"],
+                    "about_keyword_lines": about_page.keyword_lines,
+                    "foundation_keyword_lines": foundation_page.keyword_lines,
+                    "about_http_status": about_page.http_status,
+                    "foundation_http_status": foundation_page.http_status,
+                    "foundation_errors": [about_page.error, foundation_page.error],
+                }
+            }),
+            json!({
+                "source_type": "openeuler_lifecycle_policy",
+                "source_name": "openeuler_lifecycle",
+                "source_url": OPENEULER_LIFECYCLE_URL,
+                "assessment_category": "source",
