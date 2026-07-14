@@ -260,3 +260,26 @@ async fn count_commits(
 }
 
 async fn collect_recent_activity(
+    client: &Client,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    branch: &str,
+    since: chrono::DateTime<Utc>,
+    max_pages: u32,
+) -> Result<(i64, bool, i64)> {
+    let mut total = 0_i64;
+    let mut identities = std::collections::BTreeSet::new();
+
+    for page in 1..=max_pages {
+        let commits = fetch_commit_page(
+            client,
+            token,
+            owner,
+            repo,
+            branch,
+            Some(since),
+            page,
+            COMMITS_PER_PAGE,
+        )
+        .await?;
