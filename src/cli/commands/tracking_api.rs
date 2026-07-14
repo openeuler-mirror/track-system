@@ -697,6 +697,8 @@ mod tests {
     use super::*;
     use crate::cli::client::ClientConfig;
     use mockito::Server;
+    use std::io::Write;
+    use tempfile::NamedTempFile;
 
     async fn setup_test_server() -> (mockito::ServerGuard, ApiClient) {
         let server = Server::new_async().await;
