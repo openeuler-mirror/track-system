@@ -394,3 +394,26 @@ mod tests {
             generated_at: now,
             created_at: now,
             updated_at: now,
+        }
+    }
+
+    fn config() -> SbomCommunitySyncConfig {
+        SbomCommunitySyncConfig {
+            endpoint_url: "http://sbom.internal/airspm/community/inner-sync".to_string(),
+            inner_secret: "secret".to_string(),
+            timeout: Duration::from_secs(5),
+            status: None,
+        }
+    }
+
+    #[test]
+    fn build_request_maps_report_payload_and_metadata() {
+        let target = target(Some(json!({
+            "build_date": "2020-03-27",
+            "contact_info": "https://gitee.com/openeuler",
+            "operator_info": "由开放原子开源基金会托管运营。",
+            "introduction_department": "基础架构部",
+            "necessity_introduction": "基础底座"
+        })));
+        let report = report(json!({
+            "raw_evidence": [
