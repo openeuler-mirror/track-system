@@ -499,3 +499,26 @@ mod tests {
                     name: Some("Author Name".to_string()),
                     email: Some("".to_string()),
                     date: None,
+                }),
+                committer: None,
+            },
+        };
+        assert_eq!(
+            normalized_committer_identity(&with_author_name).as_deref(),
+            Some("name:Author Name")
+        );
+
+        let anonymous = GitHubCommitListItem {
+            sha: "c".to_string(),
+            commit: GitHubCommitInfo {
+                author: None,
+                committer: None,
+            },
+        };
+        assert_eq!(normalized_committer_identity(&anonymous), None);
+    }
+
+    #[tokio::test]
+    async fn collect_with_api_maps_live_github_activity() {
+        let server = MockServer::start();
+        let repo_url = "https://github.com/openssl/openssl";
