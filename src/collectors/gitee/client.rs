@@ -141,6 +141,15 @@ impl GiteeClient {
     }
 }
 
+fn normalize_token(token: impl Into<String>) -> Option<String> {
+    let token = token.into();
+    if token.trim().is_empty() {
+        None
+    } else {
+        Some(token)
+    }
+}
+
 #[async_trait]
 impl GitClient for GiteeClient {
     async fn get_repository(&self, owner: &str, repo: &str) -> ApiResult<Repository> {
