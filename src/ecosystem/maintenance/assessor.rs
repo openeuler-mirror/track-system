@@ -307,3 +307,26 @@ fn indicator_bool(indicators: &[MaintenanceIndicator], key: &str) -> Option<bool
 fn indicator_datetime(indicators: &[MaintenanceIndicator], key: &str) -> Option<DateTime<Utc>> {
     indicators
         .iter()
+        .find(|indicator| indicator.key == key)
+        .and_then(|indicator| indicator.value.as_str())
+        .and_then(|value| DateTime::parse_from_rfc3339(value).ok())
+        .map(|value| value.with_timezone(&Utc))
+}
+
+fn indicator_status(value: &Value) -> &'static str {
+    match value {
+        Value::Null => "missing",
+        Value::Bool(true) => "present",
+        Value::Bool(false) => "absent",
+        Value::String(text) if text.trim().is_empty() => "missing",
+        Value::Array(items) if items.is_empty() => "missing",
+        Value::Object(items) if items.is_empty() => "missing",
+        _ => "present",
+    }
+}
+
+fn indicator_label(key: &str) -> &str {
+    match key {
+        "commit_total" => "Commit 总数",
+        "commits_last_12_months" => "近 12 月 Commit 数",
+        "committers_last_12_months" => "近 12 月 Committer 数",
