@@ -513,6 +513,7 @@ mod tests {
             package_name: "redis".to_string(),
             status: "completed".to_string(),
             content: content.clone(),
+            maintenance_summary: None,
             created_at: now,
             updated_at: now,
         };
