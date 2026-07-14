@@ -436,3 +436,45 @@ make install DESTDIR=%{buildroot}
 
         assert_eq!(spec.name, Some("nginx".to_string()));
         assert_eq!(spec.version, Some("1.22.0".to_string()));
+        assert_eq!(spec.release, Some("1%{?dist}".to_string()));
+        assert_eq!(spec.license, Some("BSD".to_string()));
+        assert_eq!(spec.sources.len(), 1);
+        assert_eq!(spec.patches.len(), 1);
+        assert_eq!(spec.build_requires.len(), 2);
+        assert!(spec.build_requires.contains(&"gcc".to_string()));
+        assert!(spec.build_requires.contains(&"make".to_string()));
+        assert_eq!(spec.requires.len(), 1);
+        assert_eq!(spec.configure_options.len(), 2);
+        assert!(spec
+            .configure_options
+            .contains(&"--with-http_ssl_module".to_string()));
+        assert!(spec
+            .configure_options
+            .contains(&"--enable-threads".to_string()));
+    }
+
+    #[test]
+    fn test_extract_version() {
+        let spec = ParsedSpec {
+            name: Some("nginx".to_string()),
+            version: Some("1.22.0".to_string()),
+            release: None,
+            summary: None,
+            license: None,
+            url: None,
+            sources: Vec::new(),
+            patches: Vec::new(),
+            build_requires: Vec::new(),
+            requires: Vec::new(),
+            configure_options: Vec::new(),
+            build_section: None,
+            install_section: None,
+            macros: HashMap::new(),
+        };
+
+        let version = SpecParser::extract_version(&spec).unwrap();
+        assert_eq!(version, "1.22.0");
+    }
+
+    #[test]
+    fn test_compare_specs() {
