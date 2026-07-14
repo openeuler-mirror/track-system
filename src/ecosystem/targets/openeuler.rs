@@ -558,3 +558,26 @@ impl OpenEulerCommunityCollector {
         let innovation_support_six_months = lower.contains("community support for six months")
             || text.contains("提供6个月社区支持");
         let extended_support_mentioned = lower.contains("extended support")
+            || text.contains("扩展支持")
+            || text.contains("维护支持");
+        let sp_policy_mentioned = text.contains("SP版本生命周期")
+            || text.contains("SP0")
+            || text.contains("SP7")
+            || text.contains("小 SP")
+            || text.contains("大 SP");
+
+        let mut parts = Vec::new();
+        if has_lts_policy {
+            parts.push("社区版本区分 LTS 版本和创新版本");
+        }
+        if lts_every_four_years && lts_support_four_years {
+            parts.push("自 2025 年 8 月起，LTS 版本发布间隔调整为 4 年，并提供 4 年社区支持");
+        } else if lts_every_two_years && lts_support_four_years {
+            parts.push("公开页面提到过往 LTS 版本约每两年发布一次并提供四年社区支持");
+        }
+        if lts_lifecycle_six_years {
+            parts.push("LTS 全版本生命周期为 6 年（4+2）");
+        }
+        if lts_extendable_to_eight_years {
+            parts.push("生命周期结束前可申请延长至 8 年");
+        }
