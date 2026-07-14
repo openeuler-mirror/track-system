@@ -571,3 +571,26 @@ fn write_cve_fix_comparison_xlsx(path: &Path, rows: &[CveFixComparisonRow]) -> R
             workbook_rels_xml(sheets.len()).into_bytes(),
         ),
         ("xl/styles.xml".to_string(), styles_xml().into_bytes()),
+    ];
+
+    for (idx, sheet) in sheets.iter().enumerate() {
+        let sheet_id = idx + 1;
+        files.push((
+            format!("xl/worksheets/sheet{sheet_id}.xml"),
+            sheet_xml(&sheet.rows).into_bytes(),
+        ));
+        files.push((
+            format!("xl/worksheets/_rels/sheet{sheet_id}.xml.rels"),
+            sheet_rels_xml(&sheet.rows).into_bytes(),
+        ));
+    }
+
+    write_stored_zip(path, &files)
+        .with_context(|| format!("写入 xlsx 报告附件失败: {}", path.display()))
+}
+
+#[derive(Debug, Clone)]
+struct SheetRows {
+    name: String,
+    rows: Vec<CveFixComparisonRow>,
+}
