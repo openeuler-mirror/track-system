@@ -46,3 +46,27 @@ impl AtomGitMaintenanceCollector {
 
     pub async fn collect(&self, package: &packages::Model) -> Result<Vec<Value>> {
         let repo_url = package
+            .l0_repo_url
+            .as_deref()
+            .ok_or_else(|| anyhow!("package {} missing l0_repo_url", package.name))?;
+        let (owner, repo) = parse_atomgit_repo(repo_url)
+            .ok_or_else(|| anyhow!("failed to parse AtomGit repo from {}", repo_url))?;
+        let token = std::env::var("ATOMGIT_TOKEN")
+            .or_else(|_| std::env::var("GITCODE_TOKEN"))
+            .or_else(|_| std::env::var("GITCODE_ACCESS_TOKEN"))
+            .ok()
+            .filter(|token| !token.trim().is_empty())
+            .ok_or_else(|| anyhow!("ATOMGIT_TOKEN is required for AtomGit maintenance metadata"))?;
+
+        info!(
+            owner,
+            repo,
+            package = package.name,
+            "开始采集 AtomGit 平台维护元数据"
+        );
+
+        let client = Client::builder()
+            .timeout(std::time::Duration::from_secs(DEFAULT_TIMEOUT_SECS))
+            .user_agent("track-system/maintenance-atomgit")
+            .build()
+            .context("build atomgit maintenance client failed")?;
