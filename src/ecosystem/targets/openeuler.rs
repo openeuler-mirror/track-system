@@ -70,3 +70,27 @@ impl OpenEulerCommunityCollector {
                 "ECOSYSTEM_OPENEULER_FETCH_TIMEOUT_SECS",
                 DEFAULT_TIMEOUT_SECS,
             ))
+            .user_agent("track-system/ecosystem-openeuler")
+            .build()?;
+
+        let about_page = self
+            .fetch_page(
+                &client,
+                OPENEULER_ABOUT_URL,
+                &[
+                    "OpenAtom",
+                    "incubated",
+                    "operated",
+                    "Security Committee",
+                    "Special Interest Groups",
+                    "Governance",
+                ],
+            )
+            .await;
+        self.log_page_result("openEuler about", &about_page);
+        let organization_page = self
+            .fetch_page(
+                &client,
+                OPENEULER_ORGANIZATION_URL,
+                &[
+                    "openEuler Committee",
