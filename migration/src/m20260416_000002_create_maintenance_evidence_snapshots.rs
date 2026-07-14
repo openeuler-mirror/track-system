@@ -76,3 +76,28 @@ impl MigrationTrait for Migration {
                     )
                     .col(
                         ColumnDef::new(MaintenanceEvidenceSnapshots::CreatedAt)
+                            .custom(timestamp_type(backend))
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(MaintenanceEvidenceSnapshots::UpdatedAt)
+                            .custom(timestamp_type(backend))
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk_maintenance_evidence_target")
+                            .from(
+                                MaintenanceEvidenceSnapshots::Table,
+                                MaintenanceEvidenceSnapshots::PackageId,
+                            )
+                            .to(Packages::Table, Packages::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
