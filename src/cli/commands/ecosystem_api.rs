@@ -358,3 +358,27 @@ async fn list_targets(
         data.total, data.page, data.total_pages
     );
     Ok(())
+}
+
+async fn show_target(api_client: &ApiClient, id: i32) -> Result<()> {
+    println!("正在获取生态目标详情: {}", id.to_string().cyan());
+    let response = api_client
+        .get::<ApiResponse<EcosystemTargetDto>>(&format!("/ecosystem/targets/{}", id))
+        .await?;
+    let target = response
+        .data
+        .ok_or_else(|| anyhow!("服务端未返回生态目标详情"))?;
+    print_target_detail(&target);
+    Ok(())
+}
+
+async fn update_target(
+    api_client: &ApiClient,
+    target: String,
+    request: UpdateEcosystemTargetRequest,
+) -> Result<()> {
+    let id = resolve_target_id(api_client, &target).await?;
+    println!("正在更新生态目标: {}", target.cyan());
+    let response = api_client
+        .put::<_, ApiResponse<EcosystemTargetDto>>(&format!("/ecosystem/targets/{}", id), &request)
+        .await?;
