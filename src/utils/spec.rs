@@ -520,3 +520,46 @@ make install DESTDIR=%{buildroot}
         };
 
         let comparison = SpecParser::compare(&spec1, &spec2);
+
+        assert!(comparison.version_changed);
+        assert_eq!(
+            comparison.version_diff,
+            Some(("1.22.0".to_string(), "1.23.0".to_string()))
+        );
+        assert_eq!(comparison.build_requires_added.len(), 1);
+        assert!(comparison
+            .build_requires_added
+            .contains(&"pcre-devel".to_string()));
+        assert_eq!(comparison.requires_added.len(), 1);
+        assert!(comparison.requires_added.contains(&"zlib".to_string()));
+        assert_eq!(comparison.configure_options_added.len(), 1);
+        assert!(comparison
+            .configure_options_added
+            .contains(&"--with-http_v2_module".to_string()));
+        assert!(comparison.sources_changed);
+        assert!(comparison.has_significant_changes());
+    }
+
+    #[test]
+    fn test_comparison_summary() {
+        let comparison = SpecComparison {
+            version_changed: true,
+            version_diff: Some(("1.22.0".to_string(), "1.23.0".to_string())),
+            build_requires_added: vec!["pcre-devel".to_string()],
+            build_requires_removed: Vec::new(),
+            requires_added: vec!["zlib".to_string()],
+            requires_removed: Vec::new(),
+            configure_options_added: vec!["--with-http_v2_module".to_string()],
+            configure_options_removed: Vec::new(),
+            sources_changed: true,
+            patches_changed: false,
+        };
+
+        let summary = comparison.summary();
+        assert!(summary.contains("版本从 1.22.0 变更为 1.23.0"));
+        assert!(summary.contains("新增 1 个 BuildRequires"));
+        assert!(summary.contains("新增 1 个 Requires"));
+        assert!(summary.contains("新增 1 个 configure 选项"));
+        assert!(summary.contains("Source 文件列表变化"));
+    }
+}
