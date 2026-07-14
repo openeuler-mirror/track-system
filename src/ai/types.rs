@@ -46,3 +46,27 @@ impl AiRiskLevel {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AiContext {
+    pub source: AiAnalysisSource,
+    pub target_name: Option<String>,
+    pub target_type: Option<String>,
+    pub platform: Option<String>,
+    pub report_type: Option<String>,
+    pub rule_risk: Option<String>,
+    pub rule_confidence: Option<String>,
+    pub rule_summary: Option<String>,
+    pub evidence: Value,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct AiAnalysisRequest {
+    #[serde(default)]
+    pub question: Option<String>,
+    #[serde(default)]
+    pub language: Option<String>,
+    #[serde(default)]
+    pub max_evidence_chars: Option<usize>,
+    #[serde(default)]
+    pub allow_external_research: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
