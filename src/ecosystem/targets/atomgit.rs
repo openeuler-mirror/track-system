@@ -1066,3 +1066,26 @@ mod tests {
     fn matches_target_accepts_atomgit_aliases() {
         let target = ecosystem_targets::Model {
             id: 1,
+            name: "AtomGit Platform".to_string(),
+            target_type: "platform".to_string(),
+            platform: Some("atomgit".to_string()),
+            role: "hosting".to_string(),
+            homepage_url: Some("https://atomgit.com".to_string()),
+            api_base_url: Some("https://api.atomgit.com/api/v5".to_string()),
+            owner: None,
+            repo: None,
+            default_branch: None,
+            status: "active".to_string(),
+            refresh_interval_hours: 24,
+            rule_profile: "atomgit_platform".to_string(),
+            metadata: None,
+            last_collected_at: None,
+            last_report_at: None,
+            last_error: None,
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        };
+        assert!(AtomGitPlatformCollector::matches_target(&target));
+    }
+
+    #[test]
