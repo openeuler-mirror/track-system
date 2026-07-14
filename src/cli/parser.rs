@@ -146,6 +146,18 @@ pub enum Commands {
         #[command(subcommand)]
         action: ReportAction,
     },
+
+    /// 生态目标管理命令
+    Ecosystem {
+        #[command(subcommand)]
+        action: EcosystemAction,
+    },
+
+    /// 维护评估命令
+    Maintenance {
+        #[command(subcommand)]
+        action: MaintenanceAction,
+    },
 }
 
 // ============== Sync Commands ==============
@@ -765,7 +777,10 @@ pub enum ReportAction {
     Show {
         /// 报告 ID
         id: i64,
-    },
+
+        /// 显示完整报告内容（包含 l1_vs_l0）
+        #[arg(long)]
+        all: bool,    },
 
     /// 导出报告
     #[command(about = "Export report")]

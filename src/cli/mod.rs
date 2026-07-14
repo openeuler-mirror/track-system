@@ -123,13 +123,19 @@ impl CliExecutor {
                     )
                     .await
                 }
-                parser::ReportAction::Show { id } => {
-                    commands::report_api::show_report(&self.api_client, id).await
+                parser::ReportAction::Show { id, all } => {
+                    commands::report_api::show_report(&self.api_client, id, all).await
                 }
                 parser::ReportAction::Export { id, format, output } => {
                     commands::report_api::export_report(&self.api_client, id, format, output).await
                 }
             },
+            parser::Commands::Ecosystem { action } => {
+                commands::ecosystem_api::execute(&self.api_client, action).await
+            }
+            parser::Commands::Maintenance { action } => {
+                commands::maintenance_api::execute(&self.api_client, action).await
+            }
         }
     }
 }
