@@ -48,3 +48,28 @@ impl AiClient for OpenAiCompatibleClient {
             .context("AI_API_KEY/OPENAI_API_KEY 未配置")?;
         let payload = json!({
             "model": self.config.model,
+            "messages": messages,
+            "temperature": 0.2,
+            "response_format": {"type": "json_object"}
+        });
+
+        let response = self
+            .http
+            .post(self.config.chat_completions_url())
+            .bearer_auth(api_key)
+            .json(&payload)
+            .send()
+            .await
+            .context("调用 AI 服务失败")?;
+
+        let status = response.status();
+        let body = response.text().await.context("读取 AI 响应失败")?;
+        if !status.is_success() {
+            anyhow::bail!("AI 服务返回错误 {}: {}", status, body);
+        }
+
+        let completion: ChatCompletionResponse =
+            serde_json::from_str(&body).context("解析 AI 响应失败")?;
+        let content = completion
+            .choices
+            .first()
