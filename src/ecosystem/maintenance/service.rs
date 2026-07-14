@@ -136,3 +136,26 @@ impl<'a> MaintenanceService<'a> {
                 Err(error) => warn!(
                     package = package.name,
                     error = %error,
+                    "AtomGit 平台维护指标采集失败，跳过平台证据补充"
+                ),
+            }
+        } else if PagureMaintenanceCollector::matches_package(package) {
+            evidence.extend(PagureMaintenanceCollector::new().collect(package).await?);
+        } else if GenericGitMaintenanceCollector::matches_package(package) {
+            evidence.extend(
+                GenericGitMaintenanceCollector::new()
+                    .collect(package)
+                    .await?,
+            );
+        }
+
+        if GenericGitMaintenanceCollector::matches_package(package) {
+            match GenericGitMaintenanceCollector::new()
+                .collect_version_catalog(package)
+                .await
+            {
+                Ok(version_catalog) => evidence.push(version_catalog),
+                Err(error) => warn!(
+                    package = package.name,
+                    repo_url = package.l0_repo_url.as_deref().unwrap_or_default(),
+                    error = %error,
