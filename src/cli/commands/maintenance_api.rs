@@ -142,3 +142,27 @@ async fn list_reports(
         );
     }
     Ok(())
+}
+
+async fn show_report(api_client: &ApiClient, id: i64, verbose: bool) -> Result<()> {
+    let response = api_client
+        .get::<ApiResponse<MaintenanceReportDto>>(&format!("/maintenance/reports/{}", id))
+        .await?;
+    let report = response
+        .data
+        .ok_or_else(|| anyhow!("服务端未返回维护评估报告"))?;
+    print_report_detail(&report, verbose);
+    Ok(())
+}
+
+fn print_report_detail(report: &MaintenanceReportDto, verbose: bool) {
+    println!();
+    println!("{}", "维护评估报告详情:".bold());
+    println!("  ID: {}", report.id);
+    println!("  软件包 ID: {}", report.package_id);
+    println!("  报告类型: {}", report.report_type);
+    println!("  状态: {}", report.status);
+    println!("  综合风险: {}", report.overall_risk);
+    println!("  置信度: {}", report.confidence);
+    println!("  摘要: {}", report.summary);
+    print_maintenance_focus_details(&report.report_payload);
