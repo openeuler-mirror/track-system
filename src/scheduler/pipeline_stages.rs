@@ -4781,6 +4781,7 @@ Summary: Test package
         let _risk_url_guard = EnvVarGuard::set("RISK_CREATE_URL", &risk_create_url);
         let _risk_enabled_guard = EnvVarGuard::set("RISK_CREATE_ENABLED", "true");
         let _risk_timeout_guard = EnvVarGuard::set("RISK_HTTP_TIMEOUT_SECS", "2");
+        let _ai_enabled_guard = EnvVarGuard::set("AI_ANALYSIS_ENABLED", "false");
 
         let fixed_time = Utc.timestamp_opt(1_700_000_000, 0).unwrap();
 
