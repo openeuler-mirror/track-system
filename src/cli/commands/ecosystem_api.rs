@@ -382,3 +382,27 @@ async fn update_target(
     let response = api_client
         .put::<_, ApiResponse<EcosystemTargetDto>>(&format!("/ecosystem/targets/{}", id), &request)
         .await?;
+    let target = response
+        .data
+        .ok_or_else(|| anyhow!("服务端未返回更新后的生态目标"))?;
+    println!("{} 生态目标更新成功", "✓".green().bold());
+    print_target_detail(&target);
+    Ok(())
+}
+
+async fn resolve_target_id(api_client: &ApiClient, input: &str) -> Result<i32> {
+    if let Ok(id) = input.parse::<i32>() {
+        return Ok(id);
+    }
+
+    let targets = fetch_all_targets(api_client).await?;
+    let input_key = normalize_lookup_key(input);
+
+    if let Some(target) = targets
+        .iter()
+        .find(|target| normalize_lookup_key(&target.name) == input_key)
+    {
+        return Ok(target.id);
+    }
+
+    let matches = targets
