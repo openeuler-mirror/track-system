@@ -267,3 +267,42 @@ tasks:
   - name: task1
     task_type: sync
     parameters: {}
+    depends_on: []
+  - name: task2
+    task_type: classify
+    parameters: {}
+    depends_on:
+      - task1
+"#;
+        let workflow = WorkflowConfig::from_yaml(yaml).unwrap();
+        assert!(workflow.validate().is_ok());
+    }
+
+    #[test]
+    fn test_topological_sort() {
+        let yaml = r#"
+name: test_workflow
+tasks:
+  - name: task1
+    task_type: sync
+    parameters: {}
+    depends_on: []
+  - name: task2
+    task_type: classify
+    parameters: {}
+    depends_on:
+      - task1
+  - name: task3
+    task_type: compare
+    parameters: {}
+    depends_on:
+      - task2
+"#;
+        let workflow = WorkflowConfig::from_yaml(yaml).unwrap();
+        let sorted = workflow.topological_sort().unwrap();
+        assert_eq!(sorted.len(), 3);
+        assert_eq!(sorted[0].name, "task1");
+        assert_eq!(sorted[1].name, "task2");
+        assert_eq!(sorted[2].name, "task3");
+    }
+}
