@@ -114,3 +114,26 @@ impl GiteeMaintenanceCollector {
                         "commits_last_12_months": activity.commits_last_12_months,
                         "commits_last_12_months_is_lower_bound": activity.commits_last_12_months_is_lower_bound,
                         "committers_last_12_months": activity.committers_last_12_months,
+                        "last_commit_at": activity.last_commit_at,
+                        "stars": repo_info.stargazers_count,
+                        "forks": repo_info.forks_count,
+                    }
+                })),
+                Err(error) => warn!(
+                    owner = owner,
+                    repo = repo,
+                    package = package.name,
+                    error = %error,
+                    "Gitee 活跃度指标采集失败，仅返回平台元数据"
+                ),
+            }
+        }
+
+        Ok(evidence)
+    }
+}
+
+async fn fetch_repository(
+    client: &Client,
+    owner: &str,
+    repo: &str,
