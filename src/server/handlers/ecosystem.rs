@@ -209,3 +209,47 @@ pub async fn get_latest_report(
         .ok_or_else(|| ApiError::NotFound(format!("latest report for target {} not found", id)))?;
     Ok(Json(ApiResponse::success(report.into())))
 }
+
+pub async fn list_reports(
+    State(state): State<AppState>,
+    Query(query): Query<EcosystemReportListQuery>,
+) -> ApiResult<Json<ApiResponse<PaginatedResponse<EcosystemReportResponse>>>> {
+    let page = query.page.unwrap_or(1);
+    let page_size = query.page_size.unwrap_or(10);
+    if page < 1 || !(1..=100).contains(&page_size) {
+        return Err(ApiError::BadRequest(
+            "invalid pagination parameters".to_string(),
+        ));
+    }
+
+    let mut builder = EcosystemReports::find();
+    if let Some(target_id) = query.target_id {
+        builder = builder.filter(ecosystem_reports::Column::TargetId.eq(target_id));
+    }
+    if let Some(report_type) = query.report_type {
+        builder = builder.filter(ecosystem_reports::Column::ReportType.eq(report_type));
+    }
+
+    let total = builder.clone().count(state.db.as_ref()).await?;
+    let items = builder
+        .order_by_desc(ecosystem_reports::Column::GeneratedAt)
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all(state.db.as_ref())
+        .await?;
+    let resp = items.into_iter().map(Into::into).collect();
+    Ok(Json(ApiResponse::success(PaginatedResponse::new(
+        resp, total, page, page_size,
+    ))))
+}
+
+pub async fn get_report(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+) -> ApiResult<Json<ApiResponse<EcosystemReportResponse>>> {
+    let report = EcosystemReports::find_by_id(id)
+        .one(state.db.as_ref())
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("ecosystem report {} not found", id)))?;
+    Ok(Json(ApiResponse::success(report.into())))
+}
