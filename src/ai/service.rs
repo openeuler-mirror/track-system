@@ -214,3 +214,27 @@ fn l0_security_quality_findings(
                     "open_cve_backlog",
                 ],
             ),
+            recommendation:
+                "复核 L0 仓库安全策略、CVE 修复发布记录、未关闭 CVE 积压和修复时效；证据缺失时刷新 ecosystem report 或补充 metadata.security_assessment。"
+                    .to_string(),
+        });
+    }
+
+    if let Some(section) = assessment.get("quality") {
+        findings.push(AiAnalysisFinding {
+            title: "L0 社区质量评估".to_string(),
+            risk: section_risk(section, fallback_risk),
+            evidence: section_evidence_summary(
+                section,
+                &[
+                    "dedicated_code_reviewers",
+                    "required_reviews",
+                    "signed_releases",
+                    "documented_release_artifact_signature",
+                    "hash_verification_supported",
+                    "provenance_attestation",
+                    "release_checklist",
+                ],
+            ),
+            recommendation:
+                "复核 L0 仓库代码 review 机制、专人 review、发布物签名/校验值和 provenance/attestation；证据缺失时补充质量评估元数据或平台采集器。"
