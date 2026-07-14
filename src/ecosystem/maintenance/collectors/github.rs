@@ -406,3 +406,27 @@ mod tests {
             sync_interval_hours: 24,
             l0_repo_url: Some(repo_url.to_string()),
             description: None,
+            created_at: now,
+            updated_at: now,
+        }
+    }
+
+    fn commit_json(sha: &str, email: Option<&str>, name: Option<&str>, date: &str) -> Value {
+        json!({
+            "sha": sha,
+            "commit": {
+                "author": {
+                    "name": name,
+                    "email": email,
+                    "date": date
+                },
+                "committer": {
+                    "name": name,
+                    "email": email,
+                    "date": date
+                }
+            }
+        })
+    }
+
+    #[test]
