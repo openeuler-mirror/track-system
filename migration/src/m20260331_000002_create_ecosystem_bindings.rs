@@ -62,17 +62,27 @@ impl MigrationTrait for Migration {
                             .to(EcosystemTargets::Table, EcosystemTargets::Id)
                             .on_delete(ForeignKeyAction::Cascade),
                     )
-                    .index(
-                        Index::create()
-                            .name("idx_ecosystem_bindings_target")
-                            .col(EcosystemBindings::TargetId),
-                    )
-                    .index(
-                        Index::create()
-                            .name("idx_ecosystem_bindings_bind")
-                            .col(EcosystemBindings::BindType)
-                            .col(EcosystemBindings::BindId),
-                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_ecosystem_bindings_target")
+                    .table(EcosystemBindings::Table)
+                    .col(EcosystemBindings::TargetId)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_ecosystem_bindings_bind")
+                    .table(EcosystemBindings::Table)
+                    .col(EcosystemBindings::BindType)
+                    .col(EcosystemBindings::BindId)
                     .to_owned(),
             )
             .await
