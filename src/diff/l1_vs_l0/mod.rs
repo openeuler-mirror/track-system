@@ -176,12 +176,14 @@ pub struct L1VsL0Report {
     pub id: Option<i64>,
     /// 软件包名称
     pub package_name: String,
-    /// 当前版本
+    /// 当前组件版本（L2）
     pub current_version: String,
-    /// 最新稳定版本
+    /// 最新稳定版本（兼容字段，当前表示 L1 最新版本）
     pub latest_stable: String,
-    /// 最新版本
+    /// 最新版本（L1）
     pub latest_version: String,
+    /// 主线版本（L0），仅用于展示参考
+    pub mainline_version: Option<String>,
     /// 落后版本数
     pub version_behind: u32,
     /// 可升级版本列表
