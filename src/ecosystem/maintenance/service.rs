@@ -90,3 +90,26 @@ impl<'a> MaintenanceService<'a> {
         &self,
         package_id: i32,
     ) -> Result<Option<maintenance_reports::Model>> {
+        let report = MaintenanceReports::find()
+            .filter(maintenance_reports::Column::PackageId.eq(package_id))
+            .order_by_desc(maintenance_reports::Column::GeneratedAt)
+            .one(self.db)
+            .await?;
+        Ok(report)
+    }
+
+    async fn collect_evidence(&self, package: &packages::Model) -> Result<Vec<Value>> {
+        let mut evidence = vec![json!({
+            "source_type": "package_definition",
+            "source_name": "package",
+            "source_url": package.l0_repo_url.clone().unwrap_or_default(),
+            "http_status": 200,
+            "assessment_category": "maintenance",
+            "assessment_subcategory": "package_definition",
+            "package_id": package.id,
+            "data": {
+                "basic_info": package.name,
+                "package_name": package.name,
+                "package_level": package.level,
+                "l0_repo_url": package.l0_repo_url,
+                "description": package.description,
