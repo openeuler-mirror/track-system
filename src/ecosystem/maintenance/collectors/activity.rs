@@ -275,3 +275,26 @@ mod tests {
         let client = MockGitClient {
             latest: vec![commit("latest", "latest@example.com", now)],
             total_pages: vec![
+                vec![commit("a", "a@example.com", now); 100],
+                vec![commit("b", "b@example.com", now); 3],
+            ],
+            recent_pages: vec![vec![
+                commit("r1", "alice@example.com", now),
+                commit("r2", "bob@example.com", now),
+                commit("r3", "alice@example.com", now),
+            ]],
+        };
+
+        let metrics = collect_commit_activity_with_limits(&client, "owner", "repo", "main", 10, 10)
+            .await
+            .unwrap();
+
+        assert_eq!(metrics.default_branch.as_deref(), Some("main"));
+        assert_eq!(metrics.commit_total, 103);
+        assert!(!metrics.commit_total_is_lower_bound);
+        assert_eq!(metrics.commits_last_12_months, 3);
+        assert!(!metrics.commits_last_12_months_is_lower_bound);
+        assert_eq!(metrics.committers_last_12_months, 2);
+        assert_eq!(
+            metrics.last_commit_at.as_deref(),
+            Some("2026-04-23T10:00:00+00:00")
