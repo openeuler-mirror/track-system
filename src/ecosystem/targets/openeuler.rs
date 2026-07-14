@@ -650,3 +650,26 @@ impl OpenEulerCommunityCollector {
             ),
             (Some(repo_license), _, _) => format!("社区治理仓许可证识别为 {}", repo_license),
             _ => "暂未从公开页面稳定识别出社区治理仓许可证口径".to_string(),
+        };
+
+        json!({
+            "summary": summary,
+            "community_repo_license_detected": community_repo_license_detected,
+            "docs_license_detected": docs_license_detected,
+            "site_footer_license_detected": site_footer_license_detected,
+            "license_keyword_lines": license_text.keyword_lines,
+        })
+    }
+
+    fn detect_cla_policy(&self, contribution_page: &PageSnapshot) -> Value {
+        let lower = contribution_page.plain_text.to_ascii_lowercase();
+        let cla_required =
+            lower.contains("contributor license agreement") || lower.contains("sign the cla");
+        let mut cla_types = Vec::new();
+        if lower.contains("individual cla") {
+            cla_types.push("Individual CLA".to_string());
+        }
+        if lower.contains("corporate cla") || lower.contains("corporation cla") {
+            cla_types.push("Corporate CLA".to_string());
+        }
+        if lower.contains("employee cla") {
