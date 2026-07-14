@@ -498,6 +498,50 @@ fn validate_import_request(tracking_id: i32, snapshot: &RepositorySnapshot) -> A
     Ok(())
 }
 
+fn normalize_imported_snapshot_spec_version_release(snapshot: &mut RepositorySnapshot) {
+    let Some(spec) = snapshot.spec.as_mut() else {
+        return;
+    };
+    let normalized = spec.content_base64.replace('\n', "");
+    if normalized.trim().is_empty() {
+        return;
+    }
+
+    let bytes = match BASE64_STANDARD.decode(normalized.as_bytes()) {
+        Ok(bytes) => bytes,
+        Err(err) => {
+            tracing::warn!(
+                tracking_id = snapshot.tracking_id,
+                spec_path = %spec.path,
+                error = %err,
+                "导入 L2 元数据 spec 内容 Base64 解码失败，保留请求中的版本信息"
+            );
+            return;
+        }
+    };
+
+    let content = match String::from_utf8(bytes) {
+        Ok(content) => content,
+        Err(err) => {
+            tracing::warn!(
+                tracking_id = snapshot.tracking_id,
+                spec_path = %spec.path,
+                error = %err,
+                "导入 L2 元数据 spec 内容不是 UTF-8，保留请求中的版本信息"
+            );
+            return;
+        }
+    };
+
+    let parsed = parse_spec(&content);
+    if !parsed.version.is_empty() {
+        spec.version = Some(parsed.version);
+    }
+    if !parsed.release.is_empty() {
+        spec.release = Some(parsed.release);
+    }
+}
+
 /// 导入 L0 commit 到数据库
 async fn import_l0_commit(
     db: &sea_orm::DatabaseConnection,
