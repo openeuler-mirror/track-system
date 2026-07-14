@@ -1491,3 +1491,26 @@ mod tests {
         assert_eq!(rows[1].cve_or_issue, "ISSUE-12030");
         assert_eq!(rows[1].system_version, "CTyunOS25.07");
     }
+
+    #[test]
+    #[serial]
+    fn rows_for_inputs_skip_default_blacklisted_system_versions() {
+        let inputs = vec![
+            CveFixComparisonInput {
+                tracking_id: 1,
+                package_name: "bash".to_string(),
+                system_version: "ctyunos-2.0.1".to_string(),
+                ctyunos_current_version: "5.2-1".to_string(),
+                default_upstream_version: "5.2-3".to_string(),
+                commit_reports: vec![serde_json::json!({
+                    "Description": "Fix CVE-2026-1111",
+                    "CVEList": ["CVE-2026-1111"],
+                })],
+            },
+            CveFixComparisonInput {
+                tracking_id: 2,
+                package_name: "coreutils".to_string(),
+                system_version: "CTyunOS25.05".to_string(),
+                ctyunos_current_version: "9.5-2".to_string(),
+                default_upstream_version: "9.5-4".to_string(),
+                commit_reports: vec![serde_json::json!({
