@@ -145,7 +145,7 @@ impl<'a> SyncService<'a> {
             }
             Platform::AtomGit => {
                 let token = token.ok_or_else(|| anyhow::anyhow!("AtomGit 需要 token"))?;
-                let client = AtomGitClient::new(token, "master")?;
+                let client = AtomGitClient::new(token, default_branch)?;
                 let collector = client.as_collector();
                 Ok(Box::new(collector))
             }
