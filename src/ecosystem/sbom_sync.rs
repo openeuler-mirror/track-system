@@ -486,3 +486,26 @@ mod tests {
         );
         assert_eq!(
             req.function_description.as_deref(),
+            Some("openEuler Community 开源社区生态评估目标")
+        );
+    }
+
+    #[test]
+    fn response_parser_rejects_business_failure_even_when_http_is_success() {
+        let err = parse_community_inner_sync_response(r#"{"code":1,"msg":"无权访问"}"#)
+            .expect_err("business failure must be an error");
+
+        assert!(err.to_string().contains("无权访问"));
+    }
+
+    #[test]
+    fn response_parser_accepts_success_payload() {
+        let response = parse_community_inner_sync_response(
+            r#"{"code":0,"msg":"同步社区信息成功","data":{"community_id":"1","name":"openEuler Community","action":"updated"}}"#,
+        )
+        .unwrap();
+
+        assert_eq!(response.code, 0);
+        assert_eq!(
+            response.data.and_then(|data| data.action),
+            Some("updated".to_string())
