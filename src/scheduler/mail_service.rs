@@ -623,3 +623,26 @@ mod tests {
             rows: 3,
             source: "scheduler_round".to_string(),
             template: "template".to_string(),
+            generated_at: "2026-06-02T00:00:00Z".to_string(),
+            preview_rows: vec![CveFixComparisonRow {
+                package: "bash".to_string(),
+                cve_or_issue: "CVE-2026-1234".to_string(),
+                upstream_fixed_version: "5.2-3".to_string(),
+                ctyunos_current_version: "5.2-1".to_string(),
+                system_version: "CTyunOS22.06".to_string(),
+                description: "Fix CVE-2026-1234".to_string(),
+                xingkong_ticket_no: "97883".to_string(),
+                commit_url: Some("https://example.com/commit/abc".to_string()),
+            }],
+        };
+
+        let message = build_artifact_message(&config, &artifact, &path).unwrap();
+        let formatted = String::from_utf8(message.formatted()).unwrap();
+
+        assert!(formatted.contains("ops@example.com"));
+        assert!(formatted.contains("report.xlsx"));
+        assert!(formatted.contains("Content-Type: text/html"));
+        assert!(formatted.contains("CTyunOS22.06"));
+        assert!(formatted.contains("CVE-2026-1234"));
+        assert!(
+            formatted.contains("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
