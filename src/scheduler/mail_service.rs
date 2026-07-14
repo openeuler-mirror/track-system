@@ -508,3 +508,26 @@ fn env_usize(key: &str, default: usize) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use aes_gcm::aead::OsRng;
+    use aes_gcm::AeadCore;
+    use serial_test::serial;
+    use std::sync::{Mutex, OnceLock};
+    use tempfile::tempdir;
+
+    fn env_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
+
+    #[test]
+    #[serial]
+    fn config_from_env_defaults_to_disabled() {
+        let _guard = env_lock().lock().unwrap();
+        let _enabled = EnvVarGuard::remove("TRACK_MAIL_ENABLED");
+        let config = MailConfig::from_env();
+
+        assert!(!config.enabled);
+        assert_eq!(config.smtp_port, 25);
+        assert_eq!(config.smtp_tls, SmtpTlsMode::StartTls);
+    }
+
