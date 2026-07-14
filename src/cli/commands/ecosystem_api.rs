@@ -1062,3 +1062,26 @@ fn find_quality_raw_evidence_json_value(report_payload: &Value, key: &str) -> Op
                 if category != "quality" {
                     return None;
                 }
+                entry.get("data").and_then(|data| data.get(key)).cloned()
+            })
+        })
+}
+
+fn value_to_readable_text(value: &Value) -> Option<String> {
+    match value {
+        Value::Null => None,
+        Value::String(text) => {
+            let trimmed = text.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            }
+        }
+        Value::Bool(flag) => Some(flag.to_string()),
+        Value::Number(number) => Some(number.to_string()),
+        Value::Array(items) => {
+            if items.is_empty() {
+                return None;
+            }
+            let values = items
