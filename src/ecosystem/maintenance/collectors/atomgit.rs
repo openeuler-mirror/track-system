@@ -329,3 +329,26 @@ async fn fetch_commit_page(
     let response = request
         .send()
         .await
+        .context("send atomgit commits request failed")?;
+    let status = response.status();
+    if !status.is_success() {
+        let body = response.text().await.unwrap_or_default();
+        return Err(anyhow!("AtomGit API HTTP {}: {}", status.as_u16(), body));
+    }
+
+    let commits = response
+        .json::<Vec<AtomGitCommit>>()
+        .await
+        .context("parse atomgit commits response failed")?;
+    Ok(commits.into_iter().map(Into::into).collect())
+}
+
+fn parse_atomgit_repo(url: &str) -> Option<(String, String)> {
+    let normalized = normalize_url(url)?;
+    let host = normalized.host_str()?;
+    if host != "atomgit.com" {
+        return None;
+    }
+
+    let segments = normalized
+        .path_segments()?
