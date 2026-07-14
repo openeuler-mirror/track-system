@@ -591,3 +591,26 @@ mod tests {
                 "openssl".to_string(),
                 api,
             )
+            .await
+            .unwrap();
+
+        assert_eq!(evidence.len(), 1);
+        assert_eq!(evidence[0]["source_name"], "github_repository_activity");
+        assert_eq!(evidence[0]["data"]["owner"], "openssl");
+        assert_eq!(evidence[0]["data"]["repo"], "openssl");
+        assert_eq!(evidence[0]["data"]["input_repo_url"], repo_url);
+        assert_eq!(evidence[0]["data"]["commit_total"], 42);
+        assert_eq!(evidence[0]["data"]["commits_last_12_months"], 1);
+        assert_eq!(evidence[0]["data"]["committers_last_12_months"], 3);
+        assert_eq!(evidence[0]["data"]["last_commit_at"], now);
+        assert_eq!(evidence[0]["data"]["stars"], 1234);
+        assert_eq!(evidence[0]["data"]["forks"], 567);
+    }
+
+    #[tokio::test]
+    async fn github_api_reports_http_and_conflict_branches() {
+        let server = MockServer::start();
+        let _conflict = server.mock(|when, then| {
+            when.method(GET)
+                .path("/repos/openssl/empty/commits")
+                .query_param("sha", "main")
