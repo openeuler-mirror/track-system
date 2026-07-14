@@ -238,3 +238,27 @@ fn reserve_issue_number_block() -> Result<u32> {
         .and_then(|value| value.trim().parse::<u32>().ok());
     let reserved = previous
         .map(|previous| previous.saturating_add(ISSUE_RESERVATION_BLOCK_SIZE))
+        .unwrap_or(time_candidate)
+        .max(time_candidate)
+        .clamp(ISSUE_START_NUMBER, ISSUE_MAX_NUMBER);
+
+    fs::write(&state_path, format!("{reserved}\n"))
+        .with_context(|| format!("写入 ISSUE 号状态文件失败: {}", state_path.display()))?;
+    Ok(reserved)
+}
+
+fn issue_number_state_path() -> PathBuf {
+    std::env::var("TRACK_XLSX_ISSUE_NUMBER_STATE_FILE")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| report_artifact_base_dir().join(ISSUE_NUMBER_STATE_FILE))
+}
+
+fn time_based_issue_start_number(unix_secs: i64) -> u32 {
+    let elapsed_minutes = unix_secs.saturating_sub(ISSUE_NUMBER_EPOCH_UNIX_SECS) / 60;
+    let candidate = ISSUE_START_NUMBER as i64 + elapsed_minutes;
+    candidate.clamp(ISSUE_START_NUMBER as i64, ISSUE_MAX_NUMBER as i64) as u32
+}
+
+fn round_artifact_for_path(path: &Path, rows: &[CveFixComparisonRow]) -> ReportArtifact {
+    ReportArtifact {
+        artifact_type: "cve_fix_comparison_xlsx".to_string(),
