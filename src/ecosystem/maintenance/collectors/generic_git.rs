@@ -699,3 +699,26 @@ fn normalize_tag_version(reference: &str) -> Option<String> {
     let version_re = VERSION_RE.get_or_init(|| {
         Regex::new(
             r"(?ix)
+            (?:^|[^0-9])
+            v?
+            (?P<core>\d+(?:[._]\d+){1,3})
+            (?:
+                [-._]?
+                (?P<pre>alpha|beta|rc|pre)
+                [-._]?
+                (?P<pre_num>\d*)
+            )?
+            ",
+        )
+        .expect("generic git tag version regex")
+    });
+
+    let captures = version_re.captures(tag)?;
+    let mut candidate = captures
+        .name("core")
+        .map(|matched| matched.as_str().replace('_', "."))?;
+    if let Some(pre) = captures.name("pre") {
+        candidate.push('-');
+        candidate.push_str(&pre.as_str().to_ascii_lowercase());
+        if let Some(num) = captures
+            .name("pre_num")
