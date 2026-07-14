@@ -50,3 +50,29 @@ pub async fn analyze_ecosystem_report(
         rule_risk: Some(report.overall_risk.clone()),
         rule_confidence: Some(report.confidence.clone()),
         rule_summary: Some(report.summary.clone()),
+        evidence: json!({
+            "dimensions": report.dimensions,
+            "evidence_summary": report.evidence_summary,
+            "report_payload": report.report_payload,
+        }),
+    };
+
+    let service = AiAnalysisService::from_env();
+    let response = service
+        .analyze(context, req.into())
+        .await
+        .map_err(|err| ApiError::InternalError(err.to_string()))?;
+    Ok(Json(ApiResponse::success(response)))
+}
+
+pub async fn analyze_maintenance_report(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+    Json(req): Json<AiAnalyzeRequest>,
+) -> ApiResult<Json<ApiResponse<crate::ai::AiAnalysisResponse>>> {
+    let report = MaintenanceReports::find_by_id(id)
+        .one(state.db.as_ref())
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("maintenance report {} not found", id)))?;
+    let package = Packages::find()
+        .filter(packages::Column::Id.eq(report.package_id))
