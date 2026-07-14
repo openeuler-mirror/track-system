@@ -9,10 +9,14 @@
  * more details.
  */
 
+pub mod ai;
 pub mod backport;
 pub mod component;
 pub mod ecosystem;
+pub mod maintenance;
 pub mod package;
 
+pub use ai::*;
 pub use ecosystem::*;
+pub use maintenance::*;
 pub use package::*;

@@ -27,6 +27,7 @@ rust_i18n::i18n!("src/bin/locales", fallback = "en-US");
 // - utils: 工具函数
 
 // 已实现的模块
+pub mod ai;
 pub mod analyzer;
 pub mod backport_advisor;
 pub mod classifier_job;
