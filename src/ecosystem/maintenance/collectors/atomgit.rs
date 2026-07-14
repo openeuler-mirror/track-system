@@ -70,3 +70,27 @@ impl AtomGitMaintenanceCollector {
             .user_agent("track-system/maintenance-atomgit")
             .build()
             .context("build atomgit maintenance client failed")?;
+
+        let repo_info = fetch_repository(&client, &token, &owner, &repo).await?;
+        let html_url = repo_info
+            .html_url
+            .unwrap_or_else(|| normalize_source_url(repo_url));
+
+        debug!(
+            owner = owner,
+            repo = repo,
+            stars = repo_info.stargazers_count,
+            forks = repo_info.forks_count,
+            "AtomGit 平台维护元数据采集完成"
+        );
+
+        let mut evidence = vec![json!({
+            "source_type": "atomgit_repository_metadata",
+            "source_name": "atomgit_repository_metadata",
+            "source_url": html_url,
+            "http_status": 200,
+            "assessment_category": "maintenance",
+            "assessment_subcategory": "repository_metadata",
+            "data": {
+                "collector": "atomgit_live_api",
+                "platform": "atomgit",
