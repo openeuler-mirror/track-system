@@ -57,6 +57,60 @@ impl Default for ClientConfig {
     }
 }
 
+fn default_server_url() -> String {
+    resolve_server_url_from_env().unwrap_or_else(|| "http://localhost:8080".to_string())
+}
+
+fn resolve_server_url_from_env() -> Option<String> {
+    if let Ok(url) = std::env::var("TRACK_SERVER_URL") {
+        let trimmed = url.trim();
+        if !trimmed.is_empty() {
+            return Some(trimmed.to_string());
+        }
+    }
+
+    if let Ok(addr) = std::env::var("SERVER_ADDR") {
+        let trimmed = addr.trim();
+        if !trimmed.is_empty() {
+            return Some(server_url_from_addr(trimmed));
+        }
+    }
+
+    let host = std::env::var("SERVER_HOST")
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty());
+    let port = std::env::var("SERVER_PORT")
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty());
+
+    match (host, port) {
+        (Some(host), Some(port)) => Some(format!("http://{}:{}", normalize_cli_host(&host), port)),
+        (Some(host), None) => Some(format!("http://{}:3000", normalize_cli_host(&host))),
+        (None, Some(port)) => Some(format!("http://localhost:{}", port)),
+        (None, None) => None,
+    }
+}
+
+fn server_url_from_addr(addr: &str) -> String {
+    if addr.starts_with("http://") || addr.starts_with("https://") {
+        return addr.trim_end_matches('/').to_string();
+    }
+
+    let mut parts = addr.rsplitn(2, ':');
+    let port = parts.next().unwrap_or("3000");
+    let host = parts.next().unwrap_or("localhost");
+    format!("http://{}:{}", normalize_cli_host(host), port)
+}
+
+fn normalize_cli_host(host: &str) -> String {
+    match host {
+        "0.0.0.0" | "::" | "[::]" => "localhost".to_string(),
+        other => other.trim_matches(['[', ']']).to_string(),
+    }
+}
+
 impl ClientConfig {
     /// 获取配置文件路径
     pub fn config_path() -> ApiResult<PathBuf> {
