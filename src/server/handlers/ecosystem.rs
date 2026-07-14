@@ -185,3 +185,27 @@ pub async fn delete_target(
     Ok(StatusCode::NO_CONTENT)
 }
 
+pub async fn refresh_target(
+    State(state): State<AppState>,
+    Path(id): Path<i32>,
+) -> ApiResult<Json<ApiResponse<crate::ecosystem::EcosystemRefreshResult>>> {
+    let service = EcosystemService::new(state.db.as_ref());
+    let result = service
+        .refresh_target(id)
+        .await
+        .map_err(|e| ApiError::InternalError(e.to_string()))?;
+    Ok(Json(ApiResponse::success(result)))
+}
+
+pub async fn get_latest_report(
+    State(state): State<AppState>,
+    Path(id): Path<i32>,
+) -> ApiResult<Json<ApiResponse<EcosystemReportResponse>>> {
+    let service = EcosystemService::new(state.db.as_ref());
+    let report = service
+        .latest_report(id)
+        .await
+        .map_err(|e| ApiError::InternalError(e.to_string()))?
+        .ok_or_else(|| ApiError::NotFound(format!("latest report for target {} not found", id)))?;
+    Ok(Json(ApiResponse::success(report.into())))
+}
