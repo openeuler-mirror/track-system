@@ -228,11 +228,31 @@ impl ClientConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{Mutex, OnceLock};
+
+    fn env_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
+
+    fn lock_env() -> std::sync::MutexGuard<'static, ()> {
+        env_lock().lock().unwrap_or_else(|err| err.into_inner())
+    }
+
+    fn clear_server_env() {
+        std::env::remove_var("TRACK_SERVER_URL");
+        std::env::remove_var("SERVER_ADDR");
+        std::env::remove_var("SERVER_HOST");
+        std::env::remove_var("SERVER_PORT");
+    }
 
     #[test]
     fn test_default_config() {
+        let _guard = lock_env();
+        clear_server_env();
+
         let config = ClientConfig::default();
-        assert_eq!(config.server_url, "http://localhost:3000");
+        assert_eq!(config.server_url, "http://localhost:8080");
         assert_eq!(config.timeout, 30);
         assert!(config.verify_ssl);
     }
