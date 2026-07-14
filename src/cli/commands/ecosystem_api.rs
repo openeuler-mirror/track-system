@@ -310,3 +310,27 @@ async fn list_targets(
 ) -> Result<()> {
     println!("{}", "正在获取生态目标列表...".cyan());
     let mut query = format!("?page={}&page_size={}", page, page_size);
+    if let Some(target_type) = target_type {
+        query.push_str(&format!("&target_type={}", target_type));
+    }
+    if let Some(platform) = platform {
+        query.push_str(&format!("&platform={}", platform));
+    }
+    if let Some(status) = status {
+        query.push_str(&format!("&status={}", status));
+    }
+
+    let response = api_client
+        .get::<ApiResponse<PaginatedResponse<EcosystemTargetDto>>>(&format!(
+            "/ecosystem/targets{}",
+            query
+        ))
+        .await?;
+    let data = response
+        .data
+        .ok_or_else(|| anyhow!("服务端未返回生态目标列表"))?;
+
+    if data.items.is_empty() {
+        println!("{}", "没有找到生态目标".yellow());
+        return Ok(());
+    }
