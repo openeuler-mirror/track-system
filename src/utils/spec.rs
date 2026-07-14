@@ -478,3 +478,45 @@ make install DESTDIR=%{buildroot}
 
     #[test]
     fn test_compare_specs() {
+        let spec1 = ParsedSpec {
+            name: Some("nginx".to_string()),
+            version: Some("1.22.0".to_string()),
+            release: None,
+            summary: None,
+            license: None,
+            url: None,
+            sources: vec!["nginx-1.22.0.tar.gz".to_string()],
+            patches: vec!["0001-fix.patch".to_string()],
+            build_requires: vec!["gcc".to_string(), "make".to_string()],
+            requires: vec!["openssl".to_string()],
+            configure_options: vec!["--with-http_ssl_module".to_string()],
+            build_section: None,
+            install_section: None,
+            macros: HashMap::new(),
+        };
+
+        let spec2 = ParsedSpec {
+            name: Some("nginx".to_string()),
+            version: Some("1.23.0".to_string()),
+            release: None,
+            summary: None,
+            license: None,
+            url: None,
+            sources: vec!["nginx-1.23.0.tar.gz".to_string()],
+            patches: vec!["0001-fix.patch".to_string()],
+            build_requires: vec![
+                "gcc".to_string(),
+                "make".to_string(),
+                "pcre-devel".to_string(),
+            ],
+            requires: vec!["openssl".to_string(), "zlib".to_string()],
+            configure_options: vec![
+                "--with-http_ssl_module".to_string(),
+                "--with-http_v2_module".to_string(),
+            ],
+            build_section: None,
+            install_section: None,
+            macros: HashMap::new(),
+        };
+
+        let comparison = SpecParser::compare(&spec1, &spec2);
