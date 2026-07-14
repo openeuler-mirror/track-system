@@ -98,3 +98,90 @@ pub async fn create_target(
         Json(ApiResponse::created(inserted.into())),
     ))
 }
+
+pub async fn get_target(
+    State(state): State<AppState>,
+    Path(id): Path<i32>,
+) -> ApiResult<Json<ApiResponse<EcosystemTargetResponse>>> {
+    let target = EcosystemTargets::find_by_id(id)
+        .one(state.db.as_ref())
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("ecosystem target {} not found", id)))?;
+    Ok(Json(ApiResponse::success(target.into())))
+}
+
+pub async fn update_target(
+    State(state): State<AppState>,
+    Path(id): Path<i32>,
+    Json(req): Json<UpdateEcosystemTargetRequest>,
+) -> ApiResult<Json<ApiResponse<EcosystemTargetResponse>>> {
+    let target = EcosystemTargets::find_by_id(id)
+        .one(state.db.as_ref())
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("ecosystem target {} not found", id)))?;
+    let mut target: ecosystem_targets::ActiveModel = target.into();
+
+    if let Some(name) = req.name {
+        target.name = Set(name);
+    }
+    if let Some(target_type) = req.target_type {
+        target.target_type = Set(target_type);
+    }
+    if let Some(platform) = req.platform {
+        target.platform = Set(Some(platform));
+    }
+    if let Some(role) = req.role {
+        target.role = Set(role);
+    }
+    if let Some(homepage_url) = req.homepage_url {
+        target.homepage_url = Set(Some(homepage_url));
+    }
+    if let Some(api_base_url) = req.api_base_url {
+        target.api_base_url = Set(Some(api_base_url));
+    }
+    if let Some(owner) = req.owner {
+        target.owner = Set(Some(owner));
+    }
+    if let Some(repo) = req.repo {
+        target.repo = Set(Some(repo));
+    }
+    if let Some(default_branch) = req.default_branch {
+        target.default_branch = Set(Some(default_branch));
+    }
+    if let Some(status) = req.status {
+        target.status = Set(status);
+    }
+    if let Some(refresh_interval_hours) = req.refresh_interval_hours {
+        target.refresh_interval_hours = Set(refresh_interval_hours);
+    }
+    if let Some(rule_profile) = req.rule_profile {
+        target.rule_profile = Set(rule_profile);
+    }
+    if let Some(metadata) = req.metadata {
+        target.metadata = Set(Some(metadata));
+    }
+    if let Some(last_error) = req.last_error {
+        target.last_error = Set(Some(last_error));
+    }
+    target.updated_at = Set(Utc::now());
+
+    let updated = target.update(state.db.as_ref()).await?;
+    Ok(Json(ApiResponse::success(updated.into())))
+}
+
+pub async fn delete_target(
+    State(state): State<AppState>,
+    Path(id): Path<i32>,
+) -> ApiResult<StatusCode> {
+    let result = EcosystemTargets::delete_by_id(id)
+        .exec(state.db.as_ref())
+        .await?;
+    if result.rows_affected == 0 {
+        return Err(ApiError::NotFound(format!(
+            "ecosystem target {} not found",
+            id
+        )));
+    }
+    Ok(StatusCode::NO_CONTENT)
+}
+
