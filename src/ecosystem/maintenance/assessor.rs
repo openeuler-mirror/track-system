@@ -46,3 +46,27 @@ pub fn assess_target(
             reasons: vec![format!("证据覆盖度: {}%", section.coverage)],
         },
     );
+    dimensions.insert(
+        "freshness_risk".to_string(),
+        MaintenanceDimension {
+            level: freshness_level(package.sync_interval_hours).to_string(),
+            score: freshness_score(package.sync_interval_hours),
+            reasons: vec![format!(
+                "刷新间隔配置为 {} 小时",
+                package.sync_interval_hours
+            )],
+        },
+    );
+
+    let summary = format!(
+        "组件“{}”完成发行和维护状态评估，综合风险等级为 {}，证据置信度为 {}。",
+        package.name, overall_risk, confidence
+    );
+
+    MaintenanceAssessment {
+        report_type: "maintenance_profile".to_string(),
+        overall_risk,
+        confidence,
+        summary,
+        section: section.clone(),
+        dimensions,
