@@ -12,6 +12,10 @@ use crate::collectors::{
 };
 use crate::ecosystem::assessor::assess_target;
 use crate::ecosystem::report::{EcosystemAssessment, EcosystemRefreshResult};
+use crate::ecosystem::sbom_sync::SbomCommunitySyncClient;
+use crate::ecosystem::targets::{
+    AtomGitPlatformCollector, GitHubPlatformCollector, OpenEulerCommunityCollector,
+};
 use crate::entities::{
     ecosystem_evidence_snapshots, ecosystem_reports, ecosystem_targets, prelude::*,
 };
