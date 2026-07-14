@@ -44,3 +44,26 @@ impl<'a> MaintenanceService<'a> {
             let source_name = payload
                 .get("source_name")
                 .and_then(Value::as_str)
+                .unwrap_or("placeholder")
+                .to_string();
+            let source_url = payload
+                .get("source_url")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .to_string();
+            let http_status = payload
+                .get("http_status")
+                .and_then(Value::as_i64)
+                .map(|value| value as i32)
+                .or(Some(200));
+
+            let evidence = maintenance_evidence_snapshots::ActiveModel {
+                package_id: Set(package.id),
+                source_type: Set(source_type),
+                source_name: Set(source_name),
+                source_url: Set(source_url),
+                http_status: Set(http_status),
+                content_hash: Set(None),
+                raw_payload: Set(payload.clone()),
+                normalized_signals: Set(payload.get("data").cloned()),
+                collected_at: Set(now),
