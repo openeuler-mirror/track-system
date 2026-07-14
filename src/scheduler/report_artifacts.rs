@@ -617,3 +617,26 @@ fn sheet_rows_by_system_version(rows: &[CveFixComparisonRow]) -> Vec<SheetRows> 
     }
 
     dedupe_sheet_names(&mut sheets);
+    sheets
+}
+
+fn sanitize_sheet_name(name: &str) -> String {
+    let sanitized = name
+        .chars()
+        .map(|ch| match ch {
+            ':' | '\\' | '/' | '?' | '*' | '[' | ']' => '_',
+            _ => ch,
+        })
+        .collect::<String>()
+        .trim()
+        .to_string();
+    let name = if sanitized.is_empty() {
+        "Sheet".to_string()
+    } else {
+        sanitized
+    };
+    name.chars().take(31).collect()
+}
+
+fn dedupe_sheet_names(sheets: &mut [SheetRows]) {
+    let mut seen = HashSet::new();
