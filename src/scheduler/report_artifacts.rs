@@ -454,3 +454,27 @@ fn volume_index_for_package(
     {
         return idx;
     }
+
+    if max_packages == 0 {
+        return 0;
+    }
+
+    let last_idx = volumes.len().saturating_sub(1);
+    if unique_package_count(&volumes[last_idx]) >= max_packages {
+        volumes.push(Vec::new());
+        volumes.len() - 1
+    } else {
+        last_idx
+    }
+}
+
+fn xlsx_max_packages() -> usize {
+    std::env::var("TRACK_XLSX_MAX_PACKAGES")
+        .ok()
+        .and_then(|value| value.trim().parse::<usize>().ok())
+        .unwrap_or(DEFAULT_XLSX_MAX_PACKAGES)
+}
+
+fn unique_package_count(groups: &[RowGroup]) -> usize {
+    groups
+        .iter()
