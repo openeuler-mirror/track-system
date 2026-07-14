@@ -943,3 +943,26 @@ mod tests {
     fn detect_government_takedown_from_text() {
         let collector = GitHubPlatformCollector::new();
         let page = PageSnapshot {
+            http_status: Some(200),
+            keyword_lines: Vec::new(),
+            plain_text: "GitHub may block content after a complete government request, allows the affected users to appeal, limits the geographic scope where possible, and posts the official request in the public gov-takedowns repository.".to_string(),
+            error: None,
+        };
+        let result = collector.detect_government_takedown(&page);
+        assert_eq!(result["supports_geographic_limit"], true);
+        assert_eq!(result["supports_user_appeal"], true);
+        assert_eq!(result["publishes_public_requests"], true);
+    }
+
+    #[test]
+    fn detect_license_policy_from_text() {
+        let collector = GitHubPlatformCollector::new();
+        let licensing_page = PageSnapshot {
+            http_status: Some(200),
+            keyword_lines: Vec::new(),
+            plain_text: "Choosealicense.com helps you understand how to license your code. Without a license, the default copyright laws apply. Licensee also provides the Licenses API.".to_string(),
+            error: None,
+        };
+        let terms_page = PageSnapshot {
+            http_status: Some(200),
+            keyword_lines: Vec::new(),
