@@ -118,3 +118,27 @@ impl AiAnalysisService {
 
         let mut findings = Vec::new();
         if let Some(rule_summary) = &context.rule_summary {
+            findings.push(AiAnalysisFinding {
+                title: "规则评估摘要".to_string(),
+                risk,
+                evidence: rule_summary.clone(),
+                recommendation: "结合 evidence_summary 和 report_payload 核查关键证据来源是否完整。".to_string(),
+            });
+        }
+
+        findings.extend(l0_security_quality_findings(&context, risk));
+
+        if context.evidence.get("raw_evidence").is_none()
+            && context.evidence.get("evidence_summary").is_none()
+            && l0_community_assessment(&context).is_none()
+        {
+            findings.push(AiAnalysisFinding {
+                title: "证据完整性不足".to_string(),
+                risk: AiRiskLevel::Medium,
+                evidence: "报告中未发现 raw_evidence/evidence_summary 字段。".to_string(),
+                recommendation: "刷新生态或维护报告，确认采集器是否成功获取上游活跃度、版本、维护公告和仓库元数据。".to_string(),
+            });
+        }
+
+        let recommended_actions = vec![
+            "优先复核 high/critical 风险目标的原始证据和采集时间。".to_string(),
