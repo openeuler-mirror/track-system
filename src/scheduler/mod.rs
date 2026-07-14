@@ -15,9 +15,12 @@
 
 pub mod cron_scheduler;
 pub mod ecosystem_sync_service;
+pub mod mail_service;
+pub mod maintenance_sync_service;
 pub mod pipeline_executor;
 pub mod pipeline_stages;
 pub mod pipeline_state;
+pub mod report_artifacts;
 pub mod scheduler_manager;
 pub mod sync_executor;
 pub mod sync_manager;
