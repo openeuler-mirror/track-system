@@ -166,3 +166,27 @@ pub async fn execute(api_client: &ApiClient, action: EcosystemAction) -> Result<
                 }),
                 status,
                 refresh_interval_hours,
+                rule_profile: rule_profile
+                    .or_else(|| preset.as_ref().map(|preset| preset.rule_profile.clone())),
+                metadata: parse_metadata(metadata)?,
+                last_error,
+            };
+            update_target(api_client, target, request).await
+        }
+        EcosystemAction::Delete { id, confirm } => delete_target(api_client, id, confirm).await,
+        EcosystemAction::Refresh { id } => refresh_target(api_client, id).await,
+        EcosystemAction::LatestReport { id, verbose } => {
+            latest_report(api_client, id, verbose).await
+        }
+        EcosystemAction::Reports {
+            page,
+            page_size,
+            target_id,
+            report_type,
+        } => list_reports(api_client, page, page_size, target_id, report_type).await,
+        EcosystemAction::Report { id, verbose } => show_report(api_client, id, verbose).await,
+    }
+}
+
+fn parse_metadata(input: Option<String>) -> Result<Option<Value>> {
+    match input {
