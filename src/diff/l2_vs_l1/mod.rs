@@ -847,9 +847,18 @@ impl L2VsL1Comparator {
         let conflicts = self.detect_conflicts(&spec_diff, &patch_diff, &source_diff)?;
 
         // 7. 对比 commit（从数据库获取 L2 最新版本并在 L1 中匹配）
-        let commit_diff = self
-            .compare_commit_db(l1_snapshot, l2_snapshot, db, tracking_id)
-            .await?;
+        let commit_diff = if skip_commit_diff {
+            Self::empty_commit_diff(l1_snapshot, l2_snapshot)
+        } else {
+            self.compare_commit_db_with_tracking_ids(
+                l1_snapshot,
+                l2_snapshot,
+                db,
+                l1_commit_tracking_id,
+                l2_commit_tracking_id,
+            )
+            .await?
+        };
 
         Ok(L2VsL1Report {
             id: None,
