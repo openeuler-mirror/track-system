@@ -286,3 +286,27 @@ fn cve_fix_comparison_rows(
         ctyunos_current_version,
         default_upstream_version,
         commit_reports,
+        allocate_issue_start_number(),
+    )
+}
+
+fn cve_fix_comparison_rows_with_issue_start(
+    package_name: &str,
+    system_version: &str,
+    ctyunos_current_version: &str,
+    default_upstream_version: &str,
+    commit_reports: &[Value],
+    issue_start_number: u32,
+) -> Vec<CveFixComparisonRow> {
+    let input = CveFixComparisonInput {
+        tracking_id: 0,
+        package_name: package_name.to_string(),
+        system_version: system_version.to_string(),
+        ctyunos_current_version: ctyunos_current_version.to_string(),
+        default_upstream_version: default_upstream_version.to_string(),
+        commit_reports: commit_reports.to_vec(),
+    };
+    cve_fix_comparison_rows_for_inputs_with_issue_start(&[input], issue_start_number)
+}
+
+pub fn cve_fix_comparison_rows_for_inputs(
