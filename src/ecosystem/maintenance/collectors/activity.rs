@@ -137,3 +137,26 @@ where
     for page in 1..=max_pages {
         let params = CommitsParams::new(branch)
             .since(since)
+            .page(page)
+            .per_page(COMMITS_PER_PAGE);
+        let commits = client
+            .get_commits(owner, repo, params)
+            .await
+            .with_context(|| {
+                format!("collect recent activity failed for {owner}/{repo} page {page}")
+            })?;
+
+        if commits.is_empty() {
+            return Ok((total, false, identities.len() as i64));
+        }
+
+        total += commits.len() as i64;
+        for commit in &commits {
+            identities.insert(normalized_commit_identity(commit));
+        }
+
+        if commits.len() < COMMITS_PER_PAGE as usize {
+            return Ok((total, false, identities.len() as i64));
+        }
+    }
+
