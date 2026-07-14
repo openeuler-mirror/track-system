@@ -1606,3 +1606,26 @@ mod tests {
             CveFixComparisonInput {
                 tracking_id: 1,
                 package_name: "bash".to_string(),
+                system_version: "ctyunos-22.06".to_string(),
+                ctyunos_current_version: "5.2-1".to_string(),
+                default_upstream_version: "5.2-2".to_string(),
+                commit_reports: vec![serde_json::json!({
+                    "Description": "Fix bash issue 1",
+                    "CVEList": [],
+                })],
+            },
+            CveFixComparisonInput {
+                tracking_id: 2,
+                package_name: "coreutils".to_string(),
+                system_version: "ctyunos-22.06".to_string(),
+                ctyunos_current_version: "9.5-1".to_string(),
+                default_upstream_version: "9.5-2".to_string(),
+                commit_reports: vec![serde_json::json!({
+                    "Description": "Fix coreutils issue",
+                    "CVEList": [],
+                })],
+            },
+            CveFixComparisonInput {
+                tracking_id: 3,
+                package_name: "bash".to_string(),
+                system_version: "ctyunos-25.07".to_string(),
