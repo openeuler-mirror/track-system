@@ -190,3 +190,27 @@ fn build_evidence_catalog(raw_evidence: &[Value]) -> Value {
             sources.insert(source_name.to_string());
         }
     }
+
+    json!({
+        "category_counts": category_counts,
+        "subcategory_counts": subcategory_counts,
+        "sources": sources.into_iter().collect::<Vec<_>>(),
+    })
+}
+
+fn entries_by_category<'a>(raw_evidence: &'a [Value], category: &str) -> Vec<&'a Value> {
+    raw_evidence
+        .iter()
+        .filter(|entry| {
+            entry
+                .get("assessment_category")
+                .and_then(Value::as_str)
+                .map(|value| value == category)
+                .unwrap_or(false)
+        })
+        .collect()
+}
+
+fn collect_indicators(entries: &[&Value]) -> Vec<MaintenanceIndicator> {
+    let mut indicators = Vec::new();
+    for entry in entries {
