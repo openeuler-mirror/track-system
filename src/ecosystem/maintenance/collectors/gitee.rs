@@ -91,3 +91,26 @@ impl GiteeMaintenanceCollector {
 
         if let Some(branch) = repo_info
             .default_branch
+            .as_deref()
+            .filter(|value| !value.trim().is_empty())
+        {
+            match collect_commit_activity(&activity_client, &owner, &repo, branch).await {
+                Ok(activity) => evidence.push(json!({
+                    "source_type": "gitee_repository_activity_live",
+                    "source_name": "gitee_repository_activity",
+                    "source_url": repo_info.html_url,
+                    "http_status": 200,
+                    "assessment_category": "maintenance",
+                    "assessment_subcategory": "repository_activity",
+                    "data": {
+                        "collector": "gitee_live_api",
+                        "platform": "gitee",
+                        "owner": owner,
+                        "repo": repo,
+                        "repo_html_url": repo_info.html_url,
+                        "default_branch": activity.default_branch,
+                        "commit_total": activity.commit_total,
+                        "commit_total_is_lower_bound": activity.commit_total_is_lower_bound,
+                        "commits_last_12_months": activity.commits_last_12_months,
+                        "commits_last_12_months_is_lower_bound": activity.commits_last_12_months_is_lower_bound,
+                        "committers_last_12_months": activity.committers_last_12_months,
