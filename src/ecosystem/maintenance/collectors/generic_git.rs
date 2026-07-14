@@ -1113,3 +1113,26 @@ mod tests {
     #[tokio::test]
     async fn collect_version_catalog_reads_local_repo_tags() {
         let source_dir = tempdir().unwrap();
+        let source_repo = Repository::init(source_dir.path()).unwrap();
+        let sig = Signature::now("Test User", "test@example.com").unwrap();
+        let file_path = source_dir.path().join("file.txt");
+        let oid = commit_file(&source_repo, &file_path, "first", &sig, None);
+        let commit = source_repo.find_commit(oid).unwrap();
+        source_repo
+            .tag("v1.0.0", commit.as_object(), &sig, "release", false)
+            .unwrap();
+        source_repo
+            .tag("v1.1.0-rc1", commit.as_object(), &sig, "rc", false)
+            .unwrap();
+        source_repo
+            .tag("nightly-2.0.0", commit.as_object(), &sig, "nightly", false)
+            .unwrap();
+
+        let package = packages::Model {
+            id: 1,
+            name: "openssl".to_string(),
+            level: 1,
+            sync_interval_hours: 24,
+            l0_repo_url: Some(source_dir.path().display().to_string()),
+            description: None,
+            created_at: Utc::now(),
