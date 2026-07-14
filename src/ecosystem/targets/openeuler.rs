@@ -46,3 +46,27 @@ impl OpenEulerCommunityCollector {
             text.push(platform.to_ascii_lowercase());
         }
         if let Some(homepage) = &target.homepage_url {
+            text.push(homepage.to_ascii_lowercase());
+        }
+        text.iter()
+            .any(|item| item.contains("openeuler") || item.contains("openEuler"))
+    }
+
+    pub async fn collect(&self, target: &ecosystem_targets::Model) -> Result<Vec<Value>> {
+        if Self::matches_target(target) {
+            return self.collect_openeuler_community(target).await;
+        }
+
+        Ok(Vec::new())
+    }
+
+    async fn collect_openeuler_community(
+        &self,
+        _target: &ecosystem_targets::Model,
+    ) -> Result<Vec<Value>> {
+        info!("开始采集 openEuler 社区来源评估信息");
+        let client = Client::builder()
+            .timeout(configured_fetch_timeout(
+                "ECOSYSTEM_OPENEULER_FETCH_TIMEOUT_SECS",
+                DEFAULT_TIMEOUT_SECS,
+            ))
