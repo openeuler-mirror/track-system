@@ -1517,6 +1517,48 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_lifecycle_outdated_and_lts_assessment() {
+        let comparator = L1VsL0Comparator::new();
+        let notices = extract_maintenance_notices(
+            "Version 1.0 will be no longer supported after 2030-01-01",
+            "official_page:https://example.com/lifecycle",
+        );
+
+        let l0_info = L0VersionInfo {
+            package_name: "demo".to_string(),
+            latest_stable: "5.0.0".to_string(),
+            latest_version: "5.0.0".to_string(),
+            all_versions: vec![VersionTag {
+                version: "5.0.0".to_string(),
+                date: Utc::now(),
+                changelog: "release".to_string(),
+                is_stable: true,
+            }],
+            changelogs: HashMap::new(),
+            maintenance_notices: notices,
+        };
+
+        let l1_info = L1VersionInfo {
+            package_name: "demo".to_string(),
+            current_version: "1.0.0".to_string(),
+            component_version: None,
+            latest_version: Some("4.0.0".to_string()),
+            known_versions: vec!["1.0.0".to_string(), "4.0.0".to_string()],
+            is_lts: Some(true),
+            lts_evidence: vec!["L1 分支包含 LTS: openEuler-22.03-LTS".to_string()],
+            patches: vec![],
+            cve_patches: vec![],
+        };
+
+        let report = comparator.compare(&l0_info, &l1_info).await.unwrap();
+        assert!(report.maintenance_status.stop_maintenance_detected);
+        assert_eq!(report.maintenance_status.status, "SCHEDULED_EOL");
+        assert!(report.outdated_version.is_outdated);
+        assert_eq!(report.outdated_version.major_version_gap, Some(3));
+        assert_eq!(report.lts.is_lts, Some(true));
+    }
+
+    #[tokio::test]
     async fn test_cve_analysis_fixed_in_upstream() {
         let comparator = L1VsL0Comparator::new();
 
