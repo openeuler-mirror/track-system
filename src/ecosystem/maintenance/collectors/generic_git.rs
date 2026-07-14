@@ -515,3 +515,26 @@ fn cached_mirror_key(repo_url: &str) -> String {
             } else {
                 '-'
             }
+        })
+        .collect::<String>()
+        .trim_matches('-')
+        .chars()
+        .take(48)
+        .collect::<String>();
+    let hint = if hint.is_empty() {
+        "repo"
+    } else {
+        hint.as_str()
+    };
+    format!("{}-{}", &digest[..16], hint)
+}
+
+fn cached_mirror_lock(repo_url: &str) -> Arc<Mutex<()>> {
+    static MIRROR_LOCKS: OnceLock<Mutex<HashMap<String, Arc<Mutex<()>>>>> = OnceLock::new();
+
+    let key = cached_mirror_key(repo_url);
+    let locks = MIRROR_LOCKS.get_or_init(|| Mutex::new(HashMap::new()));
+    let mut guard = locks
+        .lock()
+        .expect("generic git mirror lock table poisoned");
+    guard
