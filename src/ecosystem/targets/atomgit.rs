@@ -606,3 +606,26 @@ impl AtomGitPlatformCollector {
 
         json!({
             "summary": summary,
+            "route_reachable": route_reachable,
+            "machine_readable_policy_text": machine_readable_policy_text,
+            "same_as_random_probe": same_as_random_probe,
+            "legal_compliance_required": legal_compliance_required,
+        })
+    }
+
+    fn detect_ip_policy(
+        &self,
+        terms_page: &PageSnapshot,
+        ip_policy_page: &PageSnapshot,
+        random_policy_probe: &PageSnapshot,
+    ) -> Value {
+        let text = terms_page.plain_text.as_str();
+        let users_own_content = text.contains("版权归作者本人所有");
+        let license_grant_to_host_content = text.contains("AtomGit可以自行决定以全部或任何方式")
+            || text.contains("非独占性使用许可");
+        let platform_retains_own_ip = text.contains("与AtomGit服务相关的知识产权")
+            || text.contains("所有的程序及页面内容均受版权法保护");
+        let ip_notice_process_mentioned =
+            text.contains("权利通知") && text.contains("知识产权声明");
+        let route_reachable = is_reachable(ip_policy_page);
+        let same_as_random_probe =
