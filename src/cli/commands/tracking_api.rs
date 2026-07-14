@@ -47,6 +47,23 @@ struct ListResponse<T> {
     total: usize,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+struct TrackingImportRecord {
+    package: String,
+    l2_repo: String,
+    l1_repo: String,
+}
+
+fn build_default_tracking_repos(package: &str) -> (String, String) {
+    (
+        format!(
+            "src-openEuler:https://atomgit.com/src-openeuler/{}.git",
+            package
+        ),
+        format!("https://work.ctyun.cn/git/sources-CTyunOS/{}.git", package),
+    )
+}
+
 /// 解析 "owner/repo"、"owner:repo"、"owner&repo" 或完整 URL
 fn parse_owner_repo(input: &str) -> Result<(String, String)> {
     let trimmed = input.trim().trim_matches(|c| c == '\'' || c == '"');
