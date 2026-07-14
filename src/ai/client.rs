@@ -23,3 +23,28 @@ pub trait AiClient: Send + Sync {
     fn model(&self) -> &str;
 }
 
+pub struct OpenAiCompatibleClient {
+    http: Client,
+    config: AiConfig,
+}
+
+impl OpenAiCompatibleClient {
+    pub fn new(config: AiConfig) -> Result<Self> {
+        let http = Client::builder()
+            .timeout(config.timeout)
+            .build()
+            .context("创建 AI HTTP 客户端失败")?;
+        Ok(Self { http, config })
+    }
+}
+
+#[async_trait]
+impl AiClient for OpenAiCompatibleClient {
+    async fn analyze(&self, messages: Vec<Value>) -> Result<Value> {
+        let api_key = self
+            .config
+            .api_key
+            .as_deref()
+            .context("AI_API_KEY/OPENAI_API_KEY 未配置")?;
+        let payload = json!({
+            "model": self.config.model,
