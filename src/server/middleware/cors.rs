@@ -253,3 +253,39 @@ mod tests {
     fn test_cors_config_from_env() {
         // 设置环境变量
         std::env::set_var(
+            "CORS_ALLOWED_ORIGINS",
+            "https://example.com,https://app.example.com",
+        );
+        std::env::set_var("CORS_ALLOW_CREDENTIALS", "false");
+        std::env::set_var("CORS_MAX_AGE", "7200");
+
+        let config = CorsConfig::from_env();
+
+        assert_eq!(config.allowed_origins.len(), 2);
+        assert!(config
+            .allowed_origins
+            .contains(&"https://example.com".to_string()));
+        assert!(!config.allow_credentials);
+        assert_eq!(config.max_age, 7200);
+
+        // 清理环境变量
+        std::env::remove_var("CORS_ALLOWED_ORIGINS");
+        std::env::remove_var("CORS_ALLOW_CREDENTIALS");
+        std::env::remove_var("CORS_MAX_AGE");
+    }
+
+    #[test]
+    #[serial]
+    fn test_cors_config_from_env_defaults() {
+        // 确保环境变量未设置
+        std::env::remove_var("CORS_ALLOWED_ORIGINS");
+        std::env::remove_var("CORS_ALLOW_CREDENTIALS");
+        std::env::remove_var("CORS_MAX_AGE");
+
+        let config = CorsConfig::from_env();
+
+        assert_eq!(config.allowed_origins, vec!["*"]);
+        assert!(config.allow_credentials);
+        assert_eq!(config.max_age, 3600);
+    }
+}
