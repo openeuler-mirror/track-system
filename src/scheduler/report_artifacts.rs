@@ -334,3 +334,27 @@ fn cve_fix_comparison_row_volumes_for_inputs_with_issue_start(
     let mut issue_generator = IssueNumberGenerator::new(issue_start_number);
     let mut volumes: Vec<Vec<RowGroup>> = vec![Vec::new()];
     let max_packages = xlsx_max_packages();
+
+    for input in inputs {
+        collect_rows_into_volumes(
+            &input.package_name,
+            &input.system_version,
+            &input.ctyunos_current_version,
+            &input.default_upstream_version,
+            &input.commit_reports,
+            &ticket_no,
+            &mut issue_generator,
+            &mut volumes,
+            max_packages,
+        );
+    }
+
+    let mut rows = volumes
+        .into_iter()
+        .map(row_groups_to_rows)
+        .filter(|rows| !rows.is_empty())
+        .collect::<Vec<_>>();
+    if rows.is_empty() {
+        rows.push(Vec::new());
+    }
+    rows
