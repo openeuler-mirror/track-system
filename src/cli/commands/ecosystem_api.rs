@@ -670,3 +670,27 @@ fn print_source_focus_details(report_payload: &Value) {
         && lifecycle.is_none()
         && platform_intro.is_none()
         && trade_controls.is_none()
+        && ip_policy.is_none()
+        && government_takedown.is_none()
+        && license.is_none()
+        && copyright.is_none()
+        && cla.is_none()
+        && hash_signature.is_none()
+    {
+        return;
+    }
+
+    println!("  来源重点信息:");
+    if let Some(platform_intro) = platform_intro {
+        println!("    - 平台简介: {}", platform_intro);
+    }
+    println!(
+        "    - 组织架构: {}",
+        organization.unwrap_or_else(|| "-".to_string())
+    );
+    println!(
+        "    - 基金会信息: {}",
+        foundation.unwrap_or_else(|| "-".to_string())
+    );
+    println!(
+        "    - 运营方: {}",
