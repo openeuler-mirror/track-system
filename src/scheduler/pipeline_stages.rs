@@ -4384,9 +4384,393 @@ Summary: Test package
 
     #[tokio::test]
     #[serial]
+    async fn test_stage_report_generation_prepares_xlsx_input_from_pipeline_context() {
+        use crate::entities::{
+            ecosystem_targets, l1_commit_records, l2_snapshots, packages, tracking,
+            tracking_reports,
+        };
+        use chrono::Utc;
+        use sea_orm::{DatabaseBackend, MockDatabase};
+
+        let _risk_enabled_guard = EnvVarGuard::set("RISK_CREATE_ENABLED", "false");
+        let _ai_enabled_guard = EnvVarGuard::set("AI_ANALYSIS_ENABLED", "false");
+
+        let tracking_model = tracking::Model {
+            id: 21,
+            package_id: 3,
+            distro_id: 1,
+            l1_branch: "openEuler-20.03-LTS-SP4".to_string(),
+            l1_repo_owner: "src-openeuler".to_string(),
+            l1_repo_name: "bash".to_string(),
+            l2_branch: "ctyunos-22.06".to_string(),
+            l2_repo_path: "/path".to_string(),
+            tracking_status: "idle".to_string(),
+            last_sync_time: Some(Utc::now()),
+            last_l1_commit_sha: None,
+            last_l2_commit_sha: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            last_error: None,
+            platform: Some("atomgit".to_string()),
+        };
+
+        let package_model = packages::Model {
+            id: 3,
+            name: "bash".to_string(),
+            level: 1,
+            sync_interval_hours: 24,
+            l0_repo_url: None,
+            description: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let inserted_report = tracking_reports::Model {
+            id: 100,
+            tracking_id: tracking_model.id,
+            generated_at: Utc::now(),
+            diff_summary: serde_json::json!({}),
+            representative_changes: None,
+            source: "pipeline".to_string(),
+            status: "success".to_string(),
+            failure_reason: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let l1_snapshot = l2_snapshots::Model {
+            id: 11,
+            tracking_id: tracking_model.id,
+            snapshot_type: "l1".to_string(),
+            payload: serde_json::json!({
+                "tracking_id": tracking_model.id,
+                "generated_at": Utc::now().to_rfc3339(),
+                "origin": "L1",
+                "files": [],
+                "spec": {
+                    "path": "bash.spec",
+                    "sha256": "l1-spec",
+                    "version": "5.2",
+                    "release": "3",
+                    "content_base64": ""
+                },
+                "commits": [],
+                "issues": []
+            }),
+            created_at: Utc::now(),
+            checksum: "l1-checksum".to_string(),
+        };
+
+        let commit_model = l1_commit_records::Model {
+            id: 7,
+            tracking_id: tracking_model.id,
+            commit_sha: "sha-001".to_string(),
+            commit_message: "Fix CVE-2026-1234 in parser".to_string(),
+            author_name: "dev".to_string(),
+            author_email: "dev@example.com".to_string(),
+            committed_at: Utc::now(),
+            created_at: Utc::now(),
+            change_type: None,
+            primary_change_type: Some("CVE".to_string()),
+            cve_list: Some(serde_json::json!(["CVE-2026-1234"])),
+            spec_changed: true,
+            patch_stats: None,
+            classification_status: "done".to_string(),
+            classification_notes: None,
+            sync_status: "synced".to_string(),
+            synced_to_l2_commit: None,
+            synced_at: None,
+            api_url: "https://atomgit.com/src-openeuler/bash/commits/detail/sha-001".to_string(),
+            fetched_at: Utc::now(),
+            files_changed_count: 1,
+            additions: 10,
+            deletions: 2,
+            updated_at: Utc::now(),
+            spec_version: Some("5.2".to_string()),
+            spec_release: Some("4".to_string()),
+        };
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<packages::Model, _, _>(vec![vec![package_model.clone()]])
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![l1_snapshot]])
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![]])
+            .append_query_results::<l1_commit_records::Model, _, _>(vec![vec![commit_model]])
+            .append_query_results::<ecosystem_targets::Model, _, _>(vec![vec![]])
+            .append_query_results::<tracking_reports::Model, _, _>(vec![vec![
+                inserted_report.clone()
+            ]])
+            .into_connection();
+
+        let executor = PipelineExecutor::new(&db, None);
+        let mut prev = std::collections::HashMap::new();
+        let diff_details = serde_json::json!({
+            "report_id": 42,
+            "l2_vs_l1_diff": {
+                "commit_diff": {
+                    "base_version_release": ["5.2", "1"],
+                    "behind_commits": [{
+                        "sha": "sha-001",
+                        "title": "Fix CVE-2026-1234",
+                        "message": "Fix CVE-2026-1234 in parser",
+                        "author": "dev",
+                        "authored_at": "2026-01-01T00:00:00Z",
+                        "url": "https://atomgit.com/src-openeuler/bash/commits/detail/sha-001",
+                        "primary_change_type": "Unknown",
+                        "cve_list": []
+                    }]
+                },
+                "spec_diff": {
+                    "version_diff": {
+                        "l1_version": "5.2"
+                    }
+                }
+            },
+            "l1_vs_l0_diff": {
+                "latest_version": "5.2-3"
+            }
+        });
+        let stage = StageResult::success(
+            PipelineStage::DiffComparison,
+            "ok".to_string(),
+            Utc::now(),
+            diff_details,
+        );
+        prev.insert(PipelineStage::DiffComparison, stage);
+        let classification_stage = StageResult::success(
+            PipelineStage::Classification,
+            "classified".to_string(),
+            Utc::now(),
+            serde_json::json!({
+                "classified_count": 1,
+                "cve_count": 1,
+                "needs_review_count": 0,
+                "commits": [{
+                    "commit_sha": "sha-001",
+                    "primary_change_type": "CVE",
+                    "cve_list": ["CVE-2026-1234"]
+                }]
+            }),
+        );
+        prev.insert(PipelineStage::Classification, classification_stage);
+
+        let result = executor
+            .stage_report_generation(&tracking_model, &prev)
+            .await
+            .unwrap();
+
+        assert!(result.cve_fix_comparison_xlsx.is_none());
+        let input = result.cve_fix_comparison_input.unwrap();
+        assert_eq!(input.tracking_id, tracking_model.id);
+        assert_eq!(input.package_name, "bash");
+        assert_eq!(input.system_version, "ctyunos-22.06");
+        assert_eq!(input.ctyunos_current_version, "5.2-1");
+        assert_eq!(input.default_upstream_version, "5.2-3");
+        assert_eq!(input.commit_reports.len(), 1);
+        assert_eq!(
+            input.commit_reports[0]["UpstreamVersionRelease"],
+            serde_json::json!("5.2-4")
+        );
+        assert_eq!(
+            input.commit_reports[0]["Url"],
+            serde_json::json!(
+                "https://atomgit.com/src-openeuler/bash/commits/detail/sha-001?ref=openEuler-20.03-LTS-SP4"
+            )
+        );
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_stage_report_generation_prefers_behind_commit_spec_for_upstream_fix_version() {
+        use crate::entities::{
+            ecosystem_targets, l1_commit_records, l2_snapshots, packages, tracking,
+            tracking_reports,
+        };
+        use chrono::Utc;
+        use sea_orm::{DatabaseBackend, MockDatabase};
+
+        let _risk_enabled_guard = EnvVarGuard::set("RISK_CREATE_ENABLED", "false");
+        let _ai_enabled_guard = EnvVarGuard::set("AI_ANALYSIS_ENABLED", "false");
+
+        let tracking_model = tracking::Model {
+            id: 407,
+            package_id: 82,
+            distro_id: 1,
+            l1_branch: "openEuler-20.03-LTS-SP4".to_string(),
+            l1_repo_owner: "src-openeuler".to_string(),
+            l1_repo_name: "openssl".to_string(),
+            l2_branch: "22.06".to_string(),
+            l2_repo_path: "https://work.ctyun.cn/git/sources-CTyunOS/openssl.git".to_string(),
+            tracking_status: "active".to_string(),
+            last_sync_time: Some(Utc::now()),
+            last_l1_commit_sha: None,
+            last_l2_commit_sha: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            last_error: None,
+            platform: Some("atomgit".to_string()),
+        };
+
+        let package_model = packages::Model {
+            id: 82,
+            name: "openssl".to_string(),
+            level: 1,
+            sync_interval_hours: 24,
+            l0_repo_url: None,
+            description: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let stale_l1_snapshot = l2_snapshots::Model {
+            id: 1908,
+            tracking_id: tracking_model.id,
+            snapshot_type: "l1".to_string(),
+            payload: serde_json::json!({
+                "tracking_id": tracking_model.id,
+                "generated_at": Utc::now().to_rfc3339(),
+                "origin": "L1",
+                "files": [],
+                "spec": {
+                    "path": "openssl.spec",
+                    "sha256": "l1-spec",
+                    "version": "1.1.1f",
+                    "release": "40",
+                    "content_base64": ""
+                },
+                "commits": [],
+                "issues": []
+            }),
+            created_at: Utc::now(),
+            checksum: "l1-checksum".to_string(),
+        };
+
+        let l2_snapshot = l2_snapshots::Model {
+            id: 369,
+            tracking_id: tracking_model.id,
+            snapshot_type: "l2".to_string(),
+            payload: serde_json::json!({
+                "tracking_id": tracking_model.id,
+                "generated_at": Utc::now().to_rfc3339(),
+                "origin": "L2",
+                "files": [],
+                "spec": {
+                    "path": "openssl.spec",
+                    "sha256": "l2-spec",
+                    "version": "1.1.1f",
+                    "release": "42",
+                    "content_base64": ""
+                },
+                "commits": [],
+                "issues": []
+            }),
+            created_at: Utc::now(),
+            checksum: "l2-checksum".to_string(),
+        };
+
+        let commit_model = l1_commit_records::Model {
+            id: 13053,
+            tracking_id: tracking_model.id,
+            commit_sha: "ae8715e85b8774c9af059c8dce72ba164f3078fc".to_string(),
+            commit_message:
+                "fix CVE-2026-42766 CVE-2026-34180 CVE-2026-45447 CVE-2026-7383 CVE-2026-9076"
+                    .to_string(),
+            author_name: "yixiangzhike".to_string(),
+            author_email: "dev@example.com".to_string(),
+            committed_at: Utc::now(),
+            created_at: Utc::now(),
+            change_type: None,
+            primary_change_type: Some("CVE".to_string()),
+            cve_list: Some(serde_json::json!([
+                "CVE-2026-34180",
+                "CVE-2026-42766",
+                "CVE-2026-45447",
+                "CVE-2026-7383",
+                "CVE-2026-9076"
+            ])),
+            spec_changed: true,
+            patch_stats: None,
+            classification_status: "done".to_string(),
+            classification_notes: None,
+            sync_status: "synced".to_string(),
+            synced_to_l2_commit: None,
+            synced_at: None,
+            api_url: "https://atomgit.com/src-openeuler/openssl/commit/ae8715e85b8774c9af059c8dce72ba164f3078fc".to_string(),
+            fetched_at: Utc::now(),
+            files_changed_count: 1,
+            additions: 10,
+            deletions: 2,
+            updated_at: Utc::now(),
+            spec_version: Some("1.1.1f".to_string()),
+            spec_release: Some("43".to_string()),
+        };
+
+        let inserted_report = tracking_reports::Model {
+            id: 1728,
+            tracking_id: tracking_model.id,
+            generated_at: Utc::now(),
+            diff_summary: serde_json::json!({}),
+            representative_changes: None,
+            source: "pipeline".to_string(),
+            status: "success".to_string(),
+            failure_reason: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<packages::Model, _, _>(vec![vec![package_model.clone()]])
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![stale_l1_snapshot]])
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![l2_snapshot]])
+            .append_query_results::<l1_commit_records::Model, _, _>(vec![vec![commit_model]])
+            .append_query_results::<ecosystem_targets::Model, _, _>(vec![vec![]])
+            .append_query_results::<tracking_reports::Model, _, _>(vec![vec![
+                inserted_report.clone()
+            ]])
+            .into_connection();
+
+        let executor = PipelineExecutor::new(&db, None);
+        let mut prev = std::collections::HashMap::new();
+        let diff_details = serde_json::json!({
+            "l2_vs_l1_diff": {
+                "commit_diff": {
+                    "base_version_release": ["1.1.1f", "42"],
+                    "behind_commits": [{
+                        "sha": "ae8715e85b8774c9af059c8dce72ba164f3078fc",
+                        "title": "fix CVE-2026-42766 CVE-2026-34180 CVE-2026-45447 CVE-2026-7383 CVE-2026-9076"
+                    }]
+                }
+            }
+        });
+        prev.insert(
+            PipelineStage::DiffComparison,
+            StageResult::success(
+                PipelineStage::DiffComparison,
+                "ok".to_string(),
+                Utc::now(),
+                diff_details,
+            ),
+        );
+
+        let result = executor
+            .stage_report_generation(&tracking_model, &prev)
+            .await
+            .unwrap();
+
+        let input = result.cve_fix_comparison_input.unwrap();
+        assert_eq!(input.ctyunos_current_version, "1.1.1f-42");
+        assert_eq!(input.default_upstream_version, "1.1.1f-40");
+        assert_eq!(
+            input.commit_reports[0]["UpstreamVersionRelease"],
+            serde_json::json!("1.1.1f-43")
+        );
+    }
+
+    #[tokio::test]
+    #[serial]
     async fn test_stage_report_generation_calls_risk_create() {
         use crate::entities::{
-            compare_reports, l1_commit_records, l2_snapshots, packages, tracking, tracking_reports,
+            compare_reports, ecosystem_targets, l1_commit_records, l2_snapshots, packages,
+            tracking, tracking_reports,
         };
         use chrono::{TimeZone, Utc};
         use httpmock::prelude::*;
