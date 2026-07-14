@@ -45,3 +45,26 @@ impl GiteeMaintenanceCollector {
             .ok_or_else(|| anyhow!("failed to parse Gitee repo from {}", repo_url))?;
 
         info!(
+            owner,
+            repo,
+            package = package.name,
+            "开始采集 Gitee 平台维护元数据"
+        );
+
+        let client = Client::builder()
+            .timeout(std::time::Duration::from_secs(DEFAULT_TIMEOUT_SECS))
+            .user_agent("track-system/maintenance-gitee")
+            .build()
+            .context("build gitee maintenance client failed")?;
+
+        let repo_info = fetch_repository(&client, &owner, &repo).await?;
+        let activity_client =
+            GiteeClient::new(std::env::var("GITEE_ACCESS_TOKEN").unwrap_or_default())?;
+
+        debug!(
+            owner = owner,
+            repo = repo,
+            stars = repo_info.stargazers_count,
+            forks = repo_info.forks_count,
+            "Gitee 平台维护元数据采集完成"
+        );
