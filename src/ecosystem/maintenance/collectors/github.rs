@@ -286,3 +286,27 @@ impl GitHubApi {
         let response = self.send(url).await?;
         let status = response.status();
         if !status.is_success() {
+            let body = response.text().await.unwrap_or_default();
+            return Err(anyhow!("GitHub API HTTP {}: {}", status.as_u16(), body));
+        }
+        response
+            .json()
+            .await
+            .context("parse github response failed")
+    }
+
+    async fn send(&self, url: &str) -> Result<Response> {
+        let mut request = self
+            .client
+            .get(url)
+            .header(header::ACCEPT, "application/vnd.github+json")
+            .header("X-GitHub-Api-Version", "2022-11-28");
+        if let Some(token) = &self.token {
+            request = request.bearer_auth(token);
+        }
+        request.send().await.context("send github request failed")
+    }
+}
+
+fn normalized_committer_identity(commit: &GitHubCommitListItem) -> Option<String> {
+    commit
