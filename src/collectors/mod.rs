@@ -10,6 +10,7 @@
  */
 
 pub mod adapters;
+pub mod atomgit;
 pub mod error;
 pub mod gitea;
 pub mod gitee;
@@ -17,8 +18,10 @@ pub mod github;
 pub mod gitlab;
 pub mod local;
 pub mod traits;
+pub mod web;
 
 pub use adapters::GitClientCollectorAdapter;
+pub use atomgit::AtomGitClient;
 pub use error::{ApiError, ApiResult};
 pub use gitea::GiteaClient;
 pub use gitee::GiteeClient;

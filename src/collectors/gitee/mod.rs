@@ -10,6 +10,8 @@
  */
 
 pub mod client;
+pub mod ecosystem;
 pub mod models;
 
 pub use client::GiteeClient;
+pub use ecosystem::GiteeEcosystemCollector;
