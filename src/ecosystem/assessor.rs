@@ -587,3 +587,75 @@ fn indicator_label(key: &str) -> &str {
     }
 }
 
+fn level_from_score(score: i32) -> &'static str {
+    if score >= 80 {
+        "LOW"
+    } else if score >= 60 {
+        "MEDIUM"
+    } else {
+        "HIGH"
+    }
+}
+
+fn confidence_from_coverage(coverage: i32) -> &'static str {
+    if coverage >= 85 {
+        "HIGH"
+    } else if coverage >= 60 {
+        "MEDIUM"
+    } else {
+        "LOW"
+    }
+}
+
+fn worst_level<'a>(levels: impl IntoIterator<Item = &'a str>) -> String {
+    levels
+        .into_iter()
+        .max_by_key(|level| level_weight(level))
+        .unwrap_or("UNKNOWN")
+        .to_string()
+}
+
+fn aggregate_confidence<'a>(levels: impl IntoIterator<Item = &'a str>) -> String {
+    let min_level = levels
+        .into_iter()
+        .min_by_key(|level| confidence_weight(level))
+        .unwrap_or("LOW");
+    min_level.to_string()
+}
+
+fn level_weight(level: &str) -> i32 {
+    match level {
+        "HIGH" => 3,
+        "MEDIUM" => 2,
+        "LOW" => 1,
+        _ => 0,
+    }
+}
+
+fn confidence_weight(level: &str) -> i32 {
+    match level {
+        "LOW" => 1,
+        "MEDIUM" => 2,
+        "HIGH" => 3,
+        _ => 0,
+    }
+}
+
+fn freshness_level(refresh_interval_hours: i32) -> &'static str {
+    if refresh_interval_hours <= 24 {
+        "LOW"
+    } else if refresh_interval_hours <= 72 {
+        "MEDIUM"
+    } else {
+        "HIGH"
+    }
+}
+
+fn freshness_score(refresh_interval_hours: i32) -> i32 {
+    match freshness_level(refresh_interval_hours) {
+        "LOW" => 90,
+        "MEDIUM" => 70,
+        _ => 50,
+    }
+}
+
