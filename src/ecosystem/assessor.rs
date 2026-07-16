@@ -250,3 +250,56 @@ fn build_maintenance_assessment(raw_evidence: &[Value]) -> EcosystemSubAssessmen
     )
 }
 
+fn build_security_assessment(raw_evidence: &[Value]) -> EcosystemSubAssessment {
+    let entries = entries_by_category(raw_evidence, "security");
+    let indicators = collect_indicators(&entries);
+    let required_keys = [
+        "has_security_policy",
+        "cve_fix_commits_last_12_months",
+        "cve_linked_issues_last_12_months",
+        "median_cve_fix_days",
+        "open_cve_backlog",
+    ];
+    let (coverage, missing) = coverage_for_keys(&indicators, &required_keys);
+    let mut score = 100 - (missing.len() as i32 * 8);
+    let mut reasons = vec![format!("安全评估已纳入 {} 个证据条目", entries.len())];
+
+    let has_security_policy = indicator_bool(&indicators, "has_security_policy").unwrap_or(false);
+    let cve_fix_commits = indicator_i64(&indicators, "cve_fix_commits_last_12_months").unwrap_or(0);
+    let cve_linked_issues =
+        indicator_i64(&indicators, "cve_linked_issues_last_12_months").unwrap_or(0);
+    let median_fix_days = indicator_i64(&indicators, "median_cve_fix_days").unwrap_or(120);
+    let open_cve_backlog = indicator_i64(&indicators, "open_cve_backlog").unwrap_or(10);
+
+    if !has_security_policy {
+        score -= 20;
+        reasons.push("未发现明确的安全披露或响应策略".to_string());
+    }
+    if cve_fix_commits == 0 || cve_linked_issues == 0 {
+        score -= 18;
+        reasons.push("近 12 个月 CVE 与 commit/issue 的联动证据不足".to_string());
+    }
+    if median_fix_days > 30 {
+        score -= 18;
+        reasons.push(format!(
+            "CVE 修复中位时长为 {} 天，响应偏慢",
+            median_fix_days
+        ));
+    }
+    if open_cve_backlog > 5 {
+        score -= 16;
+        reasons.push(format!("当前待处理 CVE 积压数量为 {}", open_cve_backlog));
+    }
+    if has_security_policy && median_fix_days <= 14 && open_cve_backlog <= 2 {
+        reasons.push("安全流程较稳定，具备持续修复能力".to_string());
+    }
+    reasons.extend(missing.iter().map(|key| format!("缺少安全指标: {}", key)));
+    finalize_assessment(
+        score,
+        coverage,
+        reasons,
+        indicators,
+        collect_evidence_refs(&entries),
+    )
+}
+
