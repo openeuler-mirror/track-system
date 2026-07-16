@@ -659,3 +659,125 @@ fn freshness_score(refresh_interval_hours: i32) -> i32 {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Duration;
+    use serde_json::json;
+
+    fn sample_target() -> ecosystem_targets::Model {
+        let now = Utc::now();
+        ecosystem_targets::Model {
+            id: 1,
+            name: "openssl".to_string(),
+            target_type: "component".to_string(),
+            platform: Some("github".to_string()),
+            role: "l0".to_string(),
+            homepage_url: Some("https://github.com/openssl/openssl".to_string()),
+            api_base_url: Some("https://api.github.com".to_string()),
+            owner: Some("openssl".to_string()),
+            repo: Some("openssl".to_string()),
+            default_branch: Some("master".to_string()),
+            status: "active".to_string(),
+            refresh_interval_hours: 24,
+            rule_profile: "default".to_string(),
+            metadata: None,
+            last_collected_at: None,
+            last_report_at: None,
+            last_error: None,
+            created_at: now,
+            updated_at: now,
+        }
+    }
+
+    #[test]
+    fn assess_target_builds_four_sections() {
+        let target = sample_target();
+        let raw_evidence = vec![
+            json!({
+                "source_name": "github_platform",
+                "assessment_category": "source",
+                "assessment_subcategory": "hosting_platform",
+                "data": {
+                    "basic_info": "GitHub/openssl/openssl",
+                    "trade_controls": "存在出口管制评估要求",
+                    "ip_policy": "平台提供 DMCA 处理流程",
+                    "government_takedown_policy": "支持政府下架请求",
+                    "license_policy": "支持 SPDX",
+                    "cla_policy": "仓库可配置 CLA"
+                }
+            }),
+            json!({
+                "source_name": "component_community",
+                "assessment_category": "source",
+                "assessment_subcategory": "component_community",
+                "data": {
+                    "top_contributors": [{"login": "maintainer", "commits": 120}],
+                    "foundation_list": ["OpenSSF"],
+                    "donor_countries": ["US", "DE"]
+                }
+            }),
+            json!({
+                "source_name": "community_governance",
+                "assessment_category": "source",
+                "assessment_subcategory": "community_organization",
+                "data": {
+                    "organization_structure": "委员会+SIG",
+                    "foundation_status": "OpenSSF",
+                    "version_lifecycle": "LTS + monthly patch"
+                }
+            }),
+            json!({
+                "source_name": "repo_activity",
+                "assessment_category": "maintenance",
+                "assessment_subcategory": "repository_activity",
+                "data": {
+                    "commit_total": 2000,
+                    "commits_last_12_months": 180,
+                    "committers_last_12_months": 20,
+                    "last_commit_at": (Utc::now() - Duration::days(3)).to_rfc3339(),
+                    "stars": 26000,
+                    "forks": 10000
+                }
+            }),
+            json!({
+                "source_name": "security_process",
+                "assessment_category": "security",
+                "assessment_subcategory": "cve_process",
+                "data": {
+                    "has_security_policy": true,
+                    "cve_fix_commits_last_12_months": 8,
+                    "cve_linked_issues_last_12_months": 7,
+                    "median_cve_fix_days": 7,
+                    "open_cve_backlog": 1
+                }
+            }),
+            json!({
+                "source_name": "quality_process",
+                "assessment_category": "quality",
+                "assessment_subcategory": "release_quality",
+                "data": {
+                    "dedicated_code_reviewers": 3,
+                    "required_reviews": 2,
+                    "signed_releases": true,
+                    "provenance_attestation": true,
+                    "release_checklist": true
+                }
+            }),
+        ];
+
+        let assessment = assess_target(
+            &target,
+            json!({"evidence_count": raw_evidence.len()}),
+            &raw_evidence,
+        );
+
+        assert_eq!(assessment.report_type, "ecosystem_profile");
+        assert_eq!(assessment.sections.security.level, "LOW");
+        assert!(!assessment.sections.source.indicators.is_empty());
+        assert_eq!(
+            assessment.report_payload["sections"]["quality"]["score"].as_i64(),
+            Some(100)
+        );
+    }
+}
