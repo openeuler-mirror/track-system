@@ -11,6 +11,8 @@
 
 pub mod backport;
 pub mod component;
+pub mod ecosystem;
 pub mod package;
 
+pub use ecosystem::*;
 pub use package::*;
