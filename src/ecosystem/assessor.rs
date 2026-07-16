@@ -358,3 +358,23 @@ fn build_quality_assessment(raw_evidence: &[Value]) -> EcosystemSubAssessment {
     )
 }
 
+fn finalize_assessment(
+    raw_score: i32,
+    coverage: i32,
+    mut reasons: Vec<String>,
+    indicators: Vec<EcosystemIndicator>,
+    evidence_refs: Vec<String>,
+) -> EcosystemSubAssessment {
+    let score = raw_score.clamp(0, 100);
+    reasons.truncate(8);
+    EcosystemSubAssessment {
+        level: level_from_score(score).to_string(),
+        confidence: confidence_from_coverage(coverage).to_string(),
+        score,
+        coverage,
+        reasons,
+        evidence_refs,
+        indicators,
+    }
+}
+
