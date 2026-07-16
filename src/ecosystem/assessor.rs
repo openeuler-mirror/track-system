@@ -132,3 +132,60 @@ pub fn assess_target(
     }
 }
 
+fn build_source_assessment(raw_evidence: &[Value]) -> EcosystemSubAssessment {
+    let entries = entries_by_category(raw_evidence, "source");
+    let indicators = collect_indicators(&entries);
+    let required_keys = [
+        "organization_structure",
+        "foundation_status",
+        "version_lifecycle",
+        "license_policy",
+        "cla_policy",
+        "basic_info",
+        "trade_controls",
+        "ip_policy",
+        "government_takedown_policy",
+        "top_contributors",
+        "foundation_list",
+        "donor_countries",
+    ];
+    let (coverage, missing) = coverage_for_keys(&indicators, &required_keys);
+    let mut score = 100 - (missing.len() as i32 * 6);
+    let mut reasons = vec![format!("来源评估已覆盖 {} 个证据条目", entries.len())];
+
+    if contains_risk_phrase(&entries, &["trade_controls", "government_takedown_policy"]) {
+        score -= 12;
+        reasons.push("平台侧存在贸易管制或政府下架等外部治理约束".to_string());
+    }
+    if missing.iter().any(|key| key == "foundation_status") {
+        score -= 10;
+        reasons.push("缺少基金会归属信息，难以判断治理稳定性".to_string());
+    }
+    if missing.iter().any(|key| key == "top_contributors") {
+        score -= 10;
+        reasons.push("缺少组件社区核心贡献者列表".to_string());
+    }
+    if missing
+        .iter()
+        .any(|key| key == "license_policy" || key == "cla_policy")
+    {
+        score -= 8;
+        reasons.push("许可证或 CLA 信息不完整".to_string());
+    }
+    if missing.is_empty() {
+        reasons.push("社区组织、平台治理与组件社区画像信息较完整".to_string());
+    }
+    reasons.extend(
+        missing
+            .iter()
+            .map(|key| format!("缺少关键来源指标: {}", key)),
+    );
+    finalize_assessment(
+        score,
+        coverage,
+        reasons,
+        indicators,
+        collect_evidence_refs(&entries),
+    )
+}
+
