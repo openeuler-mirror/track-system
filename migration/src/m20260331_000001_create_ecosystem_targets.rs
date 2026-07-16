@@ -84,3 +84,44 @@ impl MigrationTrait for Migration {
                         Index::create()
                             .name("idx_ecosystem_targets_name")
                             .col(EcosystemTargets::Name),
+                    )
+                    .index(
+                        Index::create()
+                            .name("idx_ecosystem_targets_type")
+                            .col(EcosystemTargets::TargetType),
+                    )
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(EcosystemTargets::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+enum EcosystemTargets {
+    Table,
+    Id,
+    Name,
+    TargetType,
+    Platform,
+    Role,
+    HomepageUrl,
+    ApiBaseUrl,
+    Owner,
+    Repo,
+    DefaultBranch,
+    Status,
+    RefreshIntervalHours,
+    RuleProfile,
+    Metadata,
+    LastCollectedAt,
+    LastReportAt,
+    LastError,
+    CreatedAt,
+    UpdatedAt,
+}
