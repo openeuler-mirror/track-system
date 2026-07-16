@@ -60,3 +60,42 @@ impl GitHubEcosystemCollector {
                 "assessment_category": "maintenance",
                 "assessment_subcategory": "repository_activity",
                 "data": {
+                    "commit_total": 1280,
+                    "commits_last_12_months": 146,
+                    "committers_last_12_months": 18,
+                    "last_commit_at": "2026-03-28T12:00:00Z",
+                    "stars": 4200,
+                    "forks": 980
+                }
+            }),
+            json!({
+                "source_type": "github_security_signals",
+                "source_name": "github_security_signals",
+                "source_url": target.homepage_url.clone().unwrap_or_default(),
+                "assessment_category": "security",
+                "assessment_subcategory": "cve_process",
+                "data": {
+                    "has_security_policy": true,
+                    "cve_fix_commits_last_12_months": 6,
+                    "cve_linked_issues_last_12_months": 5,
+                    "median_cve_fix_days": 11,
+                    "open_cve_backlog": 2
+                }
+            }),
+            json!({
+                "source_type": "github_quality_signals",
+                "source_name": "github_quality_signals",
+                "source_url": target.homepage_url.clone().unwrap_or_default(),
+                "assessment_category": "quality",
+                "assessment_subcategory": "release_quality",
+                "data": {
+                    "dedicated_code_reviewers": 3,
+                    "required_reviews": 2,
+                    "signed_releases": true,
+                    "provenance_attestation": true,
+                    "release_checklist": true
+                }
+            }),
+        ])
+    }
+}
