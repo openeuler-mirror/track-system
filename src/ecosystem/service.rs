@@ -191,3 +191,30 @@ impl<'a> EcosystemService<'a> {
         evidence
     }
 
+    async fn collect_platform_evidence(
+        &self,
+        target: &ecosystem_targets::Model,
+    ) -> Result<Vec<Value>> {
+        let platform = target
+            .platform
+            .as_deref()
+            .unwrap_or_default()
+            .to_ascii_lowercase();
+
+        let mut evidence = Vec::new();
+
+        if platform.contains("gitee")
+            || platform.contains("openeuler")
+            || target.target_type.contains("community")
+        {
+            evidence.extend(GiteeEcosystemCollector::new().collect(target).await?);
+        }
+        if platform.contains("github") {
+            evidence.extend(GitHubEcosystemCollector::new().collect(target).await?);
+        }
+        if platform.contains("atomgit") {
+            evidence.extend(AtomGitEcosystemCollector::new().collect(target).await?);
+        }
+
+        Ok(evidence)
+    }
