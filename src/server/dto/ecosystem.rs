@@ -105,3 +105,39 @@ impl From<ecosystem_targets::Model> for EcosystemTargetResponse {
     }
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct EcosystemReportResponse {
+    pub id: i64,
+    pub target_id: i32,
+    pub report_type: String,
+    pub status: String,
+    pub overall_risk: String,
+    pub confidence: String,
+    pub summary: String,
+    pub dimensions: Value,
+    pub evidence_summary: Option<Value>,
+    pub report_payload: Value,
+    pub generated_at: DateTime<Utc>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+impl From<ecosystem_reports::Model> for EcosystemReportResponse {
+    fn from(model: ecosystem_reports::Model) -> Self {
+        Self {
+            id: model.id,
+            target_id: model.target_id,
+            report_type: model.report_type,
+            status: model.status,
+            overall_risk: model.overall_risk,
+            confidence: model.confidence,
+            summary: model.summary,
+            dimensions: model.dimensions,
+            evidence_summary: model.evidence_summary,
+            report_payload: model.report_payload,
+            generated_at: model.generated_at,
+            created_at: model.created_at,
+            updated_at: model.updated_at,
+        }
+    }
+}
