@@ -189,3 +189,64 @@ fn build_source_assessment(raw_evidence: &[Value]) -> EcosystemSubAssessment {
     )
 }
 
+fn build_maintenance_assessment(raw_evidence: &[Value]) -> EcosystemSubAssessment {
+    let entries = entries_by_category(raw_evidence, "maintenance");
+    let indicators = collect_indicators(&entries);
+    let required_keys = [
+        "commit_total",
+        "commits_last_12_months",
+        "committers_last_12_months",
+        "last_commit_at",
+        "stars",
+        "forks",
+    ];
+    let (coverage, missing) = coverage_for_keys(&indicators, &required_keys);
+    let mut score = 100 - (missing.len() as i32 * 8);
+    let mut reasons = vec![format!("维护态势纳入 {} 个证据条目", entries.len())];
+
+    let commits_last_12_months = indicator_i64(&indicators, "commits_last_12_months").unwrap_or(0);
+    let committers_last_12_months =
+        indicator_i64(&indicators, "committers_last_12_months").unwrap_or(0);
+    let commit_total = indicator_i64(&indicators, "commit_total").unwrap_or(0);
+    let stars = indicator_i64(&indicators, "stars").unwrap_or(0);
+    let last_commit_age_days = indicator_datetime(&indicators, "last_commit_at")
+        .map(|value| (Utc::now() - value).num_days())
+        .unwrap_or(365);
+
+    if commit_total < 100 {
+        score -= 8;
+        reasons.push("L0 社区历史提交总量偏低".to_string());
+    }
+    if commits_last_12_months < 24 {
+        score -= 18;
+        reasons.push("近 12 个月提交频次不足".to_string());
+    }
+    if committers_last_12_months < 5 {
+        score -= 16;
+        reasons.push("近 12 个月活跃提交者数量偏少".to_string());
+    }
+    if last_commit_age_days > 90 {
+        score -= 20;
+        reasons.push(format!("最近一次提交距今已 {} 天", last_commit_age_days));
+    }
+    if stars + indicator_i64(&indicators, "forks").unwrap_or(0) < 50 {
+        score -= 8;
+        reasons.push("社区关注度与分叉规模偏低".to_string());
+    }
+    if stars >= 500 {
+        reasons.push("仓库具备一定社区关注度".to_string());
+    }
+    reasons.extend(
+        missing
+            .iter()
+            .map(|key| format!("缺少维护状态指标: {}", key)),
+    );
+    finalize_assessment(
+        score,
+        coverage,
+        reasons,
+        indicators,
+        collect_evidence_refs(&entries),
+    )
+}
+
