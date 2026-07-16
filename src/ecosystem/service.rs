@@ -88,3 +88,48 @@ impl<'a> EcosystemService<'a> {
         })
     }
 
+    pub async fn latest_report(&self, target_id: i32) -> Result<Option<ecosystem_reports::Model>> {
+        let report = EcosystemReports::find()
+            .filter(ecosystem_reports::Column::TargetId.eq(target_id))
+            .order_by_desc(ecosystem_reports::Column::GeneratedAt)
+            .one(self.db)
+            .await?;
+        Ok(report)
+    }
+
+    async fn collect_evidence(&self, target: &ecosystem_targets::Model) -> Result<Vec<Value>> {
+        let mut evidence = vec![
+            json!({
+                "source_type": "target_definition",
+                "source_name": "ecosystem_target",
+                "source_url": target.homepage_url.clone().unwrap_or_default(),
+                "assessment_category": "source",
+                "assessment_subcategory": "target_definition",
+                "target_id": target.id,
+                "data": {
+                    "basic_info": target.name,
+                    "target_type": target.target_type,
+                    "platform": target.platform,
+                    "rule_profile": target.rule_profile,
+                }
+            }),
+            json!({
+                "source_type": "rule_profile",
+                "source_name": "assessment_profile",
+                "source_url": target.api_base_url.clone().unwrap_or_default(),
+                "assessment_category": "quality",
+                "assessment_subcategory": "assessment_profile",
+                "data": {
+                    "release_checklist": true,
+                    "required_reviews": 1,
+                    "refresh_interval_hours": target.refresh_interval_hours,
+                    "status": target.status,
+                }
+            }),
+        ];
+
+        evidence.extend(self.collect_metadata_evidence(target));
+        evidence.extend(self.collect_platform_evidence(target).await?);
+
+        Ok(evidence)
+    }
