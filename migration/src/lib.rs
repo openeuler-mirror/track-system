@@ -28,6 +28,11 @@ mod m20251125_000001_add_spec_fields_to_commit_records;
 mod m20251125_060001_rename_commit_records_to_l1;
 mod m20251125_060002_create_l2_commit_records;
 mod m20251127_000001_create_compare_reports;
+mod m20260202_000001_add_platform_to_tracking;
+mod m20260331_000001_create_ecosystem_targets;
+mod m20260331_000002_create_ecosystem_bindings;
+mod m20260331_000003_create_ecosystem_evidence_snapshots;
+mod m20260331_000004_create_ecosystem_reports;
 
 pub struct Migrator;
 
@@ -52,6 +57,11 @@ impl MigratorTrait for Migrator {
             Box::new(m20251125_060001_rename_commit_records_to_l1::Migration),
             Box::new(m20251125_060002_create_l2_commit_records::Migration),
             Box::new(m20251127_000001_create_compare_reports::Migration),
+            Box::new(m20260202_000001_add_platform_to_tracking::Migration),
+            Box::new(m20260331_000001_create_ecosystem_targets::Migration),
+            Box::new(m20260331_000002_create_ecosystem_bindings::Migration),
+            Box::new(m20260331_000003_create_ecosystem_evidence_snapshots::Migration),
+            Box::new(m20260331_000004_create_ecosystem_reports::Migration),
         ]
     }
 }
