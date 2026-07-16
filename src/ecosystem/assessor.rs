@@ -506,3 +506,84 @@ fn contains_risk_phrase(entries: &[&Value], keys: &[&str]) -> bool {
     })
 }
 
+fn indicator_i64(indicators: &[EcosystemIndicator], key: &str) -> Option<i64> {
+    indicators
+        .iter()
+        .find(|indicator| indicator.key == key)
+        .and_then(|indicator| match &indicator.value {
+            Value::Number(number) => number.as_i64(),
+            Value::String(value) => value.parse::<i64>().ok(),
+            _ => None,
+        })
+}
+
+fn indicator_bool(indicators: &[EcosystemIndicator], key: &str) -> Option<bool> {
+    indicators
+        .iter()
+        .find(|indicator| indicator.key == key)
+        .and_then(|indicator| match &indicator.value {
+            Value::Bool(value) => Some(*value),
+            Value::String(value) => match value.to_ascii_lowercase().as_str() {
+                "true" | "yes" | "1" => Some(true),
+                "false" | "no" | "0" => Some(false),
+                _ => None,
+            },
+            _ => None,
+        })
+}
+
+fn indicator_datetime(indicators: &[EcosystemIndicator], key: &str) -> Option<DateTime<Utc>> {
+    indicators
+        .iter()
+        .find(|indicator| indicator.key == key)
+        .and_then(|indicator| indicator.value.as_str())
+        .and_then(|value| DateTime::parse_from_rfc3339(value).ok())
+        .map(|value| value.with_timezone(&Utc))
+}
+
+fn indicator_status(value: &Value) -> &'static str {
+    match value {
+        Value::Null => "missing",
+        Value::Bool(true) => "present",
+        Value::Bool(false) => "absent",
+        Value::String(text) if text.trim().is_empty() => "missing",
+        Value::Array(items) if items.is_empty() => "missing",
+        Value::Object(items) if items.is_empty() => "missing",
+        _ => "present",
+    }
+}
+
+fn indicator_label(key: &str) -> &str {
+    match key {
+        "organization_structure" => "组织架构",
+        "foundation_status" => "基金会情况",
+        "version_lifecycle" => "版本生命周期",
+        "license_policy" => "许可证情况",
+        "cla_policy" => "CLA 协议",
+        "basic_info" => "基础信息",
+        "trade_controls" => "贸易管制情况",
+        "ip_policy" => "知识产权情况",
+        "government_takedown_policy" => "政府下架情况",
+        "top_contributors" => "主要贡献者及贡献次数",
+        "foundation_list" => "基金会列表",
+        "donor_countries" => "捐献者所属国家",
+        "commit_total" => "Commit 总数",
+        "commits_last_12_months" => "近 12 月 Commit 数",
+        "committers_last_12_months" => "近 12 月 Committer 数",
+        "last_commit_at" => "最近一次 Commit 时间",
+        "stars" => "标星数",
+        "forks" => "Fork 数",
+        "has_security_policy" => "安全策略",
+        "cve_fix_commits_last_12_months" => "近 12 月 CVE 修复 Commit 数",
+        "cve_linked_issues_last_12_months" => "近 12 月 CVE 关联 Issue 数",
+        "median_cve_fix_days" => "CVE 修复中位时长",
+        "open_cve_backlog" => "待处理 CVE 积压",
+        "dedicated_code_reviewers" => "专职审查人员数",
+        "required_reviews" => "合并前必需审查数",
+        "signed_releases" => "发布物数字签名",
+        "provenance_attestation" => "发布来源证明",
+        "release_checklist" => "发布检查清单",
+        _ => key,
+    }
+}
+
