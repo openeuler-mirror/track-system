@@ -1,6 +1,6 @@
 /*
  * Copyright(c) 2024-2026 China Telecom Cloud Technologies Co., Ltd. All rights
- * reserved. ctscat is licensed under Mulan PSL v2. You can use this software
+ * reserved. track-system is licensed under Mulan PSL v2. You can use this software
  * according to the terms and conditions of the Mulan PSL V2. You may obtain a
  * copy of Mulan PSL v2 at: http://license.coscl.org.cn/MulanPSL2.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
@@ -17,12 +17,14 @@
 use anyhow::{Context, Result};
 use clap::CommandFactory;
 use clap::{Parser, Subcommand, ValueEnum};
+use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;
-use tracing::{error, info};
-use track_system::collectors::traits::{CollectConfig, Collector, Platform};
+use tracing::{error, info, warn};
+use track_system::collectors::traits::{CollectConfig, Collector, GitClient, Platform};
 use track_system::collectors::{
-    adapters::{GitHubAdapter, GitLabAdapter, GiteaAdapter, GiteeAdapter},
+    adapters::{AtomGitAdapter, GitHubAdapter, GitLabAdapter, GiteaAdapter, GiteeAdapter},
+    atomgit::AtomGitClient,
     gitea::GiteaClient,
     gitee::GiteeClient,
     github::GitHubClient,
@@ -52,12 +54,15 @@ impl Level {
     }
 }
 
+const DEFAULT_BRANCH_FILTERS: [&str; 5] = ["2.0.1", "22.06", "23.01", "25.05", "25.07"];
+
 /// 平台类型（用于 CLI）
 #[derive(Debug, Clone, Copy, ValueEnum)]
 #[clap(rename_all = "lowercase")]
 enum PlatformArg {
     GitHub,
     GitLab,
+    AtomGit,
     Gitee,
     Gitea,
     Local,
@@ -68,6 +73,7 @@ impl From<PlatformArg> for Platform {
         match arg {
             PlatformArg::GitHub => Platform::GitHub,
             PlatformArg::GitLab => Platform::GitLab,
+            PlatformArg::AtomGit => Platform::AtomGit,
             PlatformArg::Gitee => Platform::Gitee,
             PlatformArg::Gitea => Platform::Gitea,
             PlatformArg::Local => Platform::Local,
@@ -115,8 +121,8 @@ enum Commands {
         repo_path: Option<PathBuf>,
 
         /// 分支名称
-        #[arg(long, default_value = "master")]
-        branch: String,
+        #[arg(long)]
+        branch: Option<String>,
 
         /// API 地址（自建平台需要，如 Gitea）
         #[arg(long)]
@@ -147,8 +153,126 @@ enum Commands {
     },
 }
 
+fn sanitize_branch_name(branch: &str) -> String {
+    branch.replace('/', "_")
+}
+
+fn sanitize_repo_name(repo: &str) -> String {
+    repo.replace('/', "_")
+}
+
+fn build_output_path(
+    base: &PathBuf,
+    repo: &str,
+    branch: &str,
+    multi_branch: bool,
+) -> Result<PathBuf> {
+    let base_str = base.to_string_lossy();
+    let is_dir = base_str.ends_with(std::path::MAIN_SEPARATOR)
+        || base_str.ends_with('/')
+        || base.file_name().is_none()
+        || fs::metadata(base).map(|m| m.is_dir()).unwrap_or(false);
+    let sanitized = sanitize_branch_name(branch);
+    let sanitized_repo = if repo.is_empty() {
+        "unknown".to_string()
+    } else {
+        sanitize_repo_name(repo)
+    };
+
+    if is_dir {
+        fs::create_dir_all(base).context("Failed to create output directory")?;
+        let file_name = if multi_branch {
+            format!("{}-metadata-{}.json", sanitized_repo, sanitized)
+        } else {
+            format!("{}-metadata.json", sanitized_repo)
+        };
+        return Ok(base.join(file_name));
+    }
+
+    let file_name = base
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("metadata.json");
+    let stem = base
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or(file_name);
+    let ext = base
+        .extension()
+        .and_then(|s| s.to_str())
+        .filter(|e| !e.is_empty())
+        .unwrap_or("json");
+    let name = if multi_branch {
+        format!("{}-{}-{}", sanitized_repo, stem, sanitized)
+    } else {
+        format!("{}-{}", sanitized_repo, stem)
+    };
+    let final_name = if ext.eq_ignore_ascii_case("json") {
+        format!("{}.json", name)
+    } else {
+        format!("{}.json", name)
+    };
+    Ok(base.with_file_name(final_name))
+}
+
+async fn resolve_branches_from_client(
+    client: &dyn GitClient,
+    owner: Option<&str>,
+    repo: Option<&str>,
+    explicit_branch: Option<String>,
+    custom_branches: Option<&[String]>,
+    branch_filters: Option<&[String]>,
+) -> Result<Vec<String>> {
+    if let Some(branch) = explicit_branch {
+        return Ok(vec![branch]);
+    }
+
+    let branches = client
+        .get_branches(owner.unwrap_or_default(), repo.unwrap_or_default())
+        .await?;
+    let branch_names: Vec<String> = branches.into_iter().map(|b| b.name).collect();
+
+    if let Some(custom) = custom_branches {
+        let available: HashSet<String> = branch_names.iter().cloned().collect();
+        let mut matched = Vec::new();
+        for branch in custom {
+            if available.contains(branch) {
+                matched.push(branch.clone());
+            } else {
+                warn!("   自定义分支未找到: {}", branch);
+            }
+        }
+        if matched.is_empty() {
+            anyhow::bail!("未找到配置中指定的分支");
+        }
+        return Ok(matched);
+    }
+
+    let mut filters: Vec<String> = DEFAULT_BRANCH_FILTERS
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+    if let Some(extra) = branch_filters {
+        filters.extend(extra.iter().cloned());
+    }
+    let filters: HashSet<String> = filters.into_iter().collect();
+
+    let mut filtered: Vec<String> = branch_names
+        .into_iter()
+        .filter(|name| filters.iter().any(|token| name.contains(token)))
+        .collect();
+
+    if filtered.is_empty() {
+        anyhow::bail!("未找到匹配的分支");
+    }
+
+    filtered.sort();
+    Ok(filtered)
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
+
     let raw_args: Vec<String> = std::env::args().collect();
     let arg_lang = detect_lang_from_args(&raw_args);
     let locale = init_i18n(arg_lang.as_deref());
@@ -206,7 +330,7 @@ async fn collect_single(
     owner: Option<String>,
     repo: Option<String>,
     repo_path: Option<PathBuf>,
-    branch: String,
+    branch: Option<String>,
     api_url: Option<String>,
     token: Option<String>,
     limit: Option<u32>,
@@ -216,130 +340,147 @@ async fn collect_single(
     info!("   层级: {}", level.as_str());
     info!("   平台: {:?}", platform);
 
-    // 构建配置
     let platform: Platform = platform.into();
-    let mut config = CollectConfig::new(platform, branch.clone());
-
-    // 设置远端或本地仓库
-    match platform {
-        Platform::Local => {
-            let path = repo_path.context("Local platform requires --repo-path")?;
-            config = config.with_local_path(path);
-            info!("   仓库路径: {:?}", config.repo_path);
-        }
-        _ => {
-            let owner = owner.context("Remote platform requires --owner")?;
-            let repo = repo.context("Remote platform requires --repo")?;
-            config = config.with_remote(owner.clone(), repo.clone());
-            info!("   仓库: {}/{}", owner, repo);
-        }
+    let owner = owner.as_ref().map(|s| s.as_str());
+    let repo = repo.as_ref().map(|s| s.as_str());
+    if !matches!(platform, Platform::Local) {
+        owner.context("Remote platform requires --owner")?;
+        repo.context("Remote platform requires --repo")?;
     }
 
-    // 设置可选参数
-    if let Some(url) = api_url {
-        config = config.with_api_url(url);
-    }
-    if let Some(t) = token {
-        config = config.with_token(t);
-    }
-    if let Some(l) = limit {
-        config = config.with_limit(l);
-    }
-    config = config.with_level(level.as_str());
-
-    info!("   分支: {}", branch);
-
-    // 创建采集器
-    let collector: Box<dyn Collector> = match platform {
+    let (collector, branches) = match platform {
         Platform::GitHub => {
-            let token = config
-                .token
-                .as_ref()
-                .context("GitHub requires token")?
-                .clone();
+            let token = token.clone().context("GitHub requires token")?;
             let client = GitHubClient::new(token).context("Failed to create GitHub client")?;
-            Box::new(GitHubAdapter::new(client, Platform::GitHub))
+            let branches =
+                resolve_branches_from_client(&client, owner, repo, branch, None, None).await?;
+            (
+                Box::new(GitHubAdapter::new(client, Platform::GitHub)) as Box<dyn Collector>,
+                branches,
+            )
+        }
+        Platform::AtomGit => {
+            let token = token.clone().context("AtomGit requires token")?;
+            let default_branch = branch.clone().unwrap_or_else(|| "master".to_string());
+            let client = AtomGitClient::new(token, default_branch)
+                .context("Failed to create AtomGit client")?;
+            let branches =
+                resolve_branches_from_client(&client, owner, repo, branch, None, None).await?;
+            (
+                Box::new(AtomGitAdapter::new(client, Platform::AtomGit)) as Box<dyn Collector>,
+                branches,
+            )
         }
         Platform::Gitee => {
-            let token = config
-                .token
-                .as_ref()
-                .context("Gitee requires token")?
-                .clone();
+            let token = token.clone().context("Gitee requires token")?;
             let client = GiteeClient::new(token).context("Failed to create Gitee client")?;
-            Box::new(GiteeAdapter::new(client, Platform::Gitee))
+            let branches =
+                resolve_branches_from_client(&client, owner, repo, branch, None, None).await?;
+            (
+                Box::new(GiteeAdapter::new(client, Platform::Gitee)) as Box<dyn Collector>,
+                branches,
+            )
         }
         Platform::Gitea => {
-            let token = config
-                .token
-                .as_ref()
-                .context("Gitea requires token")?
-                .clone();
-            let api_url = config
-                .api_url
-                .as_ref()
-                .context("Gitea requires --api-url")?
-                .clone();
+            let token = token.clone().context("Gitea requires token")?;
+            let api_url = api_url.clone().context("Gitea requires --api-url")?;
             let client =
                 GiteaClient::new(token, api_url).context("Failed to create Gitea client")?;
-            Box::new(GiteaAdapter::new(client, Platform::Gitea))
+            let branches =
+                resolve_branches_from_client(&client, owner, repo, branch, None, None).await?;
+            (
+                Box::new(GiteaAdapter::new(client, Platform::Gitea)) as Box<dyn Collector>,
+                branches,
+            )
         }
         Platform::GitLab => {
-            let token = config
-                .token
-                .as_ref()
-                .context("GitLab requires token")?
-                .clone();
-
-            // 如果提供了 api_url，使用自定义 GitLab 实例
-            let client = if let Some(api_url) = &config.api_url {
+            let token = token.clone().context("GitLab requires token")?;
+            let client = if let Some(api_url) = &api_url {
                 GitLabClient::with_base_url(api_url, token)
             } else {
                 GitLabClient::new(token)
             }
             .context("Failed to create GitLab client")?;
-
-            Box::new(GitLabAdapter::new(client, Platform::GitLab))
+            let branches =
+                resolve_branches_from_client(&client, owner, repo, branch, None, None).await?;
+            (
+                Box::new(GitLabAdapter::new(client, Platform::GitLab)) as Box<dyn Collector>,
+                branches,
+            )
         }
         Platform::Local => {
-            let path = config
-                .repo_path
+            let path = repo_path
                 .as_ref()
-                .context("Local requires --repo-path")?
+                .context("Local platform requires --repo-path")?
                 .clone();
             let client = LocalClient::new(path).context("Failed to create Local client")?;
-            Box::new(client)
+            let branches =
+                resolve_branches_from_client(&client, None, None, branch, None, None).await?;
+            (Box::new(client) as Box<dyn Collector>, branches)
         }
     };
 
-    // 验证配置
-    collector
-        .validate_config(&config)
-        .context("Invalid configuration")?;
+    let multi_branch = branches.len() > 1;
+    info!("   分支数: {}", branches.len());
 
-    // 执行采集
-    info!(" 正在采集...");
-    let mut result = collector
-        .collect(&config)
-        .await
-        .context("Failed to collect metadata")?;
+    for branch_name in branches {
+        let mut config = CollectConfig::new(platform, branch_name.clone());
+        match platform {
+            Platform::Local => {
+                let path = repo_path
+                    .as_ref()
+                    .context("Local platform requires --repo-path")?
+                    .clone();
+                config = config.with_local_path(path);
+                info!("   仓库路径: {:?}", config.repo_path);
+            }
+            _ => {
+                let owner = owner.context("Remote platform requires --owner")?;
+                let repo = repo.context("Remote platform requires --repo")?;
+                config = config.with_remote(owner, repo);
+                info!("   仓库: {}/{}", owner, repo);
+            }
+        }
 
-    // 设置正确的层级
-    result.level = level.as_str().to_string();
+        if let Some(url) = api_url.clone() {
+            config = config.with_api_url(url);
+        }
+        if let Some(t) = token.clone() {
+            config = config.with_token(t);
+        }
+        if let Some(l) = limit {
+            config = config.with_limit(l);
+        }
+        config = config.with_level(level.as_str());
 
-    info!("采集完成");
-    info!("   Commits: {}", result.commits.len());
-    if let Some(snapshot) = &result.snapshot {
-        info!("   Spec 版本: {:?}", snapshot.spec_version);
-        info!("   Patches: {}", snapshot.patches.len());
-        info!("   文件数: {}", snapshot.file_count);
+        info!("   分支: {}", branch_name);
+
+        collector
+            .validate_config(&config)
+            .context("Invalid configuration")?;
+
+        info!(" 正在采集...");
+        let mut result = collector
+            .collect(&config)
+            .await
+            .context("Failed to collect metadata")?;
+
+        result.level = level.as_str().to_string();
+
+        info!("采集完成");
+        info!("   Commits: {}", result.commits.len());
+        if let Some(snapshot) = &result.snapshot {
+            info!("   Spec 版本: {:?}", snapshot.spec_version);
+            info!("   Patches: {}", snapshot.patches.len());
+            info!("   文件数: {}", snapshot.file_count);
+        }
+
+        let output_path = build_output_path(&output, &result.repo, &branch_name, multi_branch)?;
+        let json = serde_json::to_string_pretty(&result).context("Failed to serialize result")?;
+        fs::write(&output_path, json).context("Failed to write output file")?;
+
+        info!(" 已保存到: {}", output_path.display());
     }
-
-    // 保存到文件
-    let json = serde_json::to_string_pretty(&result).context("Failed to serialize result")?;
-    fs::write(&output, json).context("Failed to write output file")?;
-
-    info!(" 已保存到: {}", output.display());
 
     Ok(())
 }
@@ -360,7 +501,9 @@ struct BatchTask {
     owner: Option<String>,
     repo: Option<String>,
     repo_path: Option<String>,
-    branch: String,
+    branch: Option<String>,
+    branches: Option<Vec<String>>,
+    branch_filters: Option<Vec<String>>,
     api_url: Option<String>,
     token: Option<String>,
     limit: Option<u32>,
@@ -415,149 +558,211 @@ async fn collect_batch(config_path: &PathBuf, output_dir: &PathBuf) -> Result<()
                 continue;
             }
         };
-
-        // 构建输出文件名
-        let output_filename = format!("{}.json", task.name);
-        let output = output_dir.join(output_filename);
-
-        // 构建配置
-        let mut config = CollectConfig::new(platform, task.branch.clone());
-
-        match platform {
-            Platform::Local => {
-                if let Some(path) = &task.repo_path {
-                    config = config.with_local_path(PathBuf::from(path));
-                } else {
-                    error!("    Local platform requires repo_path");
-                    failed_count += 1;
-                    continue;
-                }
-            }
-            _ => {
-                if let (Some(owner), Some(repo)) = (&task.owner, &task.repo) {
-                    config = config.with_remote(owner.clone(), repo.clone());
-                } else {
-                    error!("    Remote platform requires owner and repo");
-                    failed_count += 1;
-                    continue;
-                }
-            }
+        if !matches!(platform, Platform::Local) && (task.owner.is_none() || task.repo.is_none()) {
+            error!("    Remote platform requires owner and repo");
+            failed_count += 1;
+            continue;
+        }
+        if matches!(platform, Platform::Local) && task.repo_path.is_none() {
+            error!("    Local platform requires repo_path");
+            failed_count += 1;
+            continue;
         }
 
-        if let Some(url) = &task.api_url {
-            config = config.with_api_url(url.clone());
-        }
-        if let Some(token) = &task.token {
-            config = config.with_token(token.clone());
-        }
-        if let Some(limit) = task.limit {
-            config = config.with_limit(limit);
-            config = config.with_level(level.as_str());
-        }
+        let owner = task.owner.as_ref().map(|s| s.as_str());
+        let repo = task.repo.as_ref().map(|s| s.as_str());
 
-        // 创建采集器
-        let collector_result: Result<Box<dyn Collector>> = match platform {
+        let collector_result: Result<(Box<dyn Collector>, Vec<String>)> = match platform {
             Platform::GitHub => {
-                let token = config
-                    .token
-                    .as_ref()
-                    .context("GitHub requires token")?
-                    .clone();
+                let token = task.token.clone().context("GitHub requires token")?;
                 let client = GitHubClient::new(token).context("Failed to create GitHub client")?;
-                Ok(Box::new(GitHubAdapter::new(client, Platform::GitHub)))
+                let branches = resolve_branches_from_client(
+                    &client,
+                    owner,
+                    repo,
+                    task.branch.clone(),
+                    task.branches.as_deref(),
+                    task.branch_filters.as_deref(),
+                )
+                .await?;
+                Ok((
+                    Box::new(GitHubAdapter::new(client, Platform::GitHub)) as Box<dyn Collector>,
+                    branches,
+                ))
+            }
+            Platform::AtomGit => {
+                let token = task.token.clone().context("AtomGit requires token")?;
+                let default_branch = task.branch.clone().unwrap_or_else(|| "master".to_string());
+                let client = AtomGitClient::new(token, default_branch)
+                    .context("Failed to create AtomGit client")?;
+                let branches = resolve_branches_from_client(
+                    &client,
+                    owner,
+                    repo,
+                    task.branch.clone(),
+                    task.branches.as_deref(),
+                    task.branch_filters.as_deref(),
+                )
+                .await?;
+                Ok((
+                    Box::new(AtomGitAdapter::new(client, Platform::AtomGit)) as Box<dyn Collector>,
+                    branches,
+                ))
             }
             Platform::Gitee => {
-                let token = config
-                    .token
-                    .as_ref()
-                    .context("Gitee requires token")?
-                    .clone();
+                let token = task.token.clone().context("Gitee requires token")?;
                 let client = GiteeClient::new(token).context("Failed to create Gitee client")?;
-                Ok(Box::new(GiteeAdapter::new(client, Platform::Gitee)))
+                let branches = resolve_branches_from_client(
+                    &client,
+                    owner,
+                    repo,
+                    task.branch.clone(),
+                    task.branches.as_deref(),
+                    task.branch_filters.as_deref(),
+                )
+                .await?;
+                Ok((
+                    Box::new(GiteeAdapter::new(client, Platform::Gitee)) as Box<dyn Collector>,
+                    branches,
+                ))
             }
             Platform::Gitea => {
-                let token = config
-                    .token
-                    .as_ref()
-                    .context("Gitea requires token")?
-                    .clone();
-                let api_url = config
-                    .api_url
-                    .as_ref()
-                    .context("Gitea requires api_url")?
-                    .clone();
+                let token = task.token.clone().context("Gitea requires token")?;
+                let api_url = task.api_url.clone().context("Gitea requires api_url")?;
                 let client =
                     GiteaClient::new(api_url, token).context("Failed to create Gitea client")?;
-                Ok(Box::new(GiteaAdapter::new(client, Platform::Gitea)))
+                let branches = resolve_branches_from_client(
+                    &client,
+                    owner,
+                    repo,
+                    task.branch.clone(),
+                    task.branches.as_deref(),
+                    task.branch_filters.as_deref(),
+                )
+                .await?;
+                Ok((
+                    Box::new(GiteaAdapter::new(client, Platform::Gitea)) as Box<dyn Collector>,
+                    branches,
+                ))
             }
             Platform::GitLab => {
-                let token = config
-                    .token
-                    .as_ref()
-                    .context("GitLab requires token")?
-                    .clone();
-
-                // 如果提供了 api_url，使用自定义 GitLab 实例
-                let client = if let Some(api_url) = &config.api_url {
+                let token = task.token.clone().context("GitLab requires token")?;
+                let client = if let Some(api_url) = &task.api_url {
                     GitLabClient::with_base_url(api_url, token)
                 } else {
                     GitLabClient::new(token)
                 }
                 .context("Failed to create GitLab client")?;
-
-                Ok(Box::new(GitLabAdapter::new(client, Platform::GitLab)))
+                let branches = resolve_branches_from_client(
+                    &client,
+                    owner,
+                    repo,
+                    task.branch.clone(),
+                    task.branches.as_deref(),
+                    task.branch_filters.as_deref(),
+                )
+                .await?;
+                Ok((
+                    Box::new(GitLabAdapter::new(client, Platform::GitLab)) as Box<dyn Collector>,
+                    branches,
+                ))
             }
             Platform::Local => {
-                let path = config
-                    .repo_path
-                    .as_ref()
-                    .context("Local requires repo_path")?
-                    .clone();
+                let path = task.repo_path.clone().context("Local requires repo_path")?;
                 let client = LocalClient::new(path).context("Failed to create Local client")?;
-                Ok(Box::new(client))
+                let branches = resolve_branches_from_client(
+                    &client,
+                    None,
+                    None,
+                    task.branch.clone(),
+                    task.branches.as_deref(),
+                    task.branch_filters.as_deref(),
+                )
+                .await?;
+                Ok((Box::new(client) as Box<dyn Collector>, branches))
             }
         };
-
-        let collector = match collector_result {
-            Ok(c) => c,
+        let (collector, branches) = match collector_result {
+            Ok(value) => value,
             Err(e) => {
                 error!("    创建采集器失败: {}", e);
                 failed_count += 1;
                 continue;
             }
         };
+        let multi_branch = branches.len() > 1;
+        info!("    分支数: {}", branches.len());
 
-        // 执行采集
-        match collector.collect(&config).await {
-            Ok(mut result) => {
-                // 设置正确的层级
-                result.level = level.as_str().to_string();
+        for branch_name in branches {
+            let output_filename = if multi_branch {
+                format!("{}-{}.json", task.name, sanitize_branch_name(&branch_name))
+            } else {
+                format!("{}.json", task.name)
+            };
+            let output = output_dir.join(output_filename);
 
-                // 保存结果
-                match serde_json::to_string_pretty(&result) {
-                    Ok(json) => match fs::write(&output, json) {
-                        Ok(_) => {
-                            info!(
-                                "   成功: {} commits, 保存到 {}",
-                                result.commits.len(),
-                                output.display()
-                            );
-                            success_count += 1;
-                        }
-                        Err(e) => {
-                            error!("    写入文件失败: {}", e);
-                            failed_count += 1;
-                        }
-                    },
-                    Err(e) => {
-                        error!("    序列化失败: {}", e);
+            let mut config = CollectConfig::new(platform, branch_name.clone());
+            match platform {
+                Platform::Local => {
+                    if let Some(path) = &task.repo_path {
+                        config = config.with_local_path(PathBuf::from(path));
+                    } else {
+                        error!("    Local platform requires repo_path");
                         failed_count += 1;
+                        continue;
+                    }
+                }
+                _ => {
+                    if let (Some(owner), Some(repo)) = (&task.owner, &task.repo) {
+                        config = config.with_remote(owner.clone(), repo.clone());
+                    } else {
+                        error!("    Remote platform requires owner and repo");
+                        failed_count += 1;
+                        continue;
                     }
                 }
             }
-            Err(e) => {
-                error!("    采集失败: {}", e);
-                failed_count += 1;
+
+            if let Some(url) = &task.api_url {
+                config = config.with_api_url(url.clone());
+            }
+            if let Some(token) = &task.token {
+                config = config.with_token(token.clone());
+            }
+            if let Some(limit) = task.limit {
+                config = config.with_limit(limit);
+            }
+            config = config.with_level(level.as_str());
+
+            match collector.collect(&config).await {
+                Ok(mut result) => {
+                    result.level = level.as_str().to_string();
+
+                    match serde_json::to_string_pretty(&result) {
+                        Ok(json) => match fs::write(&output, json) {
+                            Ok(_) => {
+                                info!(
+                                    "   成功: {} commits, 保存到 {}",
+                                    result.commits.len(),
+                                    output.display()
+                                );
+                                success_count += 1;
+                            }
+                            Err(e) => {
+                                error!("    写入文件失败: {}", e);
+                                failed_count += 1;
+                            }
+                        },
+                        Err(e) => {
+                            error!("    序列化失败: {}", e);
+                            failed_count += 1;
+                        }
+                    }
+                }
+                Err(e) => {
+                    error!("    采集失败: {}", e);
+                    failed_count += 1;
+                }
             }
         }
     }
@@ -628,6 +833,10 @@ mod tests {
             Platform::GitLab
         ));
         assert!(matches!(
+            Platform::from(PlatformArg::AtomGit),
+            Platform::AtomGit
+        ));
+        assert!(matches!(
             Platform::from(PlatformArg::Gitee),
             Platform::Gitee
         ));
@@ -694,7 +903,7 @@ mod tests {
             None,
             Some("repo".to_string()),
             None,
-            "master".to_string(),
+            Some("master".to_string()),
             None,
             Some("token".to_string()),
             None,
@@ -712,7 +921,7 @@ mod tests {
             Some("owner".to_string()),
             Some("repo".to_string()),
             None,
-            "master".to_string(),
+            Some("master".to_string()),
             None,
             None,
             None,
@@ -732,7 +941,7 @@ mod tests {
                 owner: None,
                 repo: Some("repo".to_string()),
                 repo_path: None,
-                branch: "master".to_string(),
+                branch: Some("master".to_string()),
                 api_url: None,
                 token: Some("token".to_string()),
                 limit: None,
@@ -781,7 +990,7 @@ mod tests {
             None,
             None,
             Some(repo.to_path_buf()),
-            "master".to_string(),
+            Some("master".to_string()),
             None,
             None,
             Some(10),
@@ -790,7 +999,12 @@ mod tests {
         .await
         .unwrap();
 
-        let json = std::fs::read_to_string(&out).unwrap();
+        let repo_name = repo
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("unknown");
+        let expected_out = build_output_path(&out, repo_name, "master", false).unwrap();
+        let json = std::fs::read_to_string(&expected_out).unwrap();
         let v: serde_json::Value = serde_json::from_str(&json).unwrap();
         assert_eq!(v["platform"], "local");
         assert_eq!(v["level"], "l0");
@@ -804,7 +1018,7 @@ mod tests {
             None,
             None,
             None,
-            "master".to_string(),
+            Some("master".to_string()),
             None,
             None,
             None,
@@ -826,7 +1040,7 @@ mod tests {
             Some("owner".to_string()),
             Some("repo".to_string()),
             None,
-            "master".to_string(),
+            Some("master".to_string()),
             None,
             None,
             None,
@@ -848,7 +1062,7 @@ mod tests {
             Some("owner".to_string()),
             Some("repo".to_string()),
             None,
-            "master".to_string(),
+            Some("master".to_string()),
             None,
             Some("token".to_string()),
             None,
@@ -870,7 +1084,7 @@ mod tests {
             Some("owner".to_string()),
             Some("repo".to_string()),
             None,
-            "master".to_string(),
+            Some("master".to_string()),
             None,
             None,
             None,
