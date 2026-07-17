@@ -330,3 +330,26 @@ fn indicator_label(key: &str) -> &str {
         "commit_total" => "Commit 总数",
         "commits_last_12_months" => "近 12 月 Commit 数",
         "committers_last_12_months" => "近 12 月 Committer 数",
+        "last_commit_at" => "最近一次 Commit 时间",
+        "stars" => "标星数",
+        "forks" => "Fork 数",
+        "social_metrics_supported" => "平台社交指标支持",
+        "default_branch" => "默认分支",
+        "collector" => "采集器",
+        "repo_html_url" => "仓库 URL",
+        _ => key,
+    }
+}
+
+fn level_from_score(score: i32) -> &'static str {
+    if score >= 80 {
+        "LOW"
+    } else if score >= 60 {
+        "MEDIUM"
+    } else {
+        "HIGH"
+    }
+}
+
+fn confidence_from_coverage(coverage: i32) -> &'static str {
+    if coverage >= 85 {
