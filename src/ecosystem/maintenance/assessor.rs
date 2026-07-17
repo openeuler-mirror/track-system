@@ -399,3 +399,26 @@ mod tests {
 
     #[test]
     fn assess_target_builds_maintenance_section() {
+        let target = sample_target();
+        let raw_evidence = vec![json!({
+            "source_name": "github_repository_activity",
+            "assessment_category": "maintenance",
+            "assessment_subcategory": "repository_activity",
+            "data": {
+                "commit_total": 2000,
+                "commits_last_12_months": 180,
+                "committers_last_12_months": 20,
+                "last_commit_at": Utc::now().to_rfc3339(),
+                "stars": 26000,
+                "forks": 10000
+            }
+        })];
+
+        let report = assess_target(&target, json!({"evidence_count": 1}), &raw_evidence);
+        assert_eq!(report.report_type, "maintenance_profile");
+        assert_eq!(report.overall_risk, "LOW");
+        assert!(report.summary.contains("openssl"));
+        assert_eq!(report.section.indicators.len(), 6);
+    }
+
+    #[test]
