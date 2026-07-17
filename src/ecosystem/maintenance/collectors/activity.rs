@@ -114,3 +114,26 @@ where
     }
 
     warn!(
+        owner,
+        repo, branch, max_pages, "平台 API commit 计数达到页数上限，返回下界"
+    );
+    Ok((total, true))
+}
+
+async fn collect_recent_activity<C>(
+    client: &C,
+    owner: &str,
+    repo: &str,
+    branch: &str,
+    since: DateTime<Utc>,
+    max_pages: u32,
+) -> Result<(i64, bool, i64)>
+where
+    C: GitClient + ?Sized,
+{
+    let mut total = 0_i64;
+    let mut identities = BTreeSet::new();
+
+    for page in 1..=max_pages {
+        let params = CommitsParams::new(branch)
+            .since(since)
