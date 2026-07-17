@@ -514,3 +514,26 @@ mod tests {
                 source: "test".to_string(),
             },
             MaintenanceIndicator {
+                key: "bad_number".to_string(),
+                label: "bad_number".to_string(),
+                value: json!("x"),
+                status: "present".to_string(),
+                source: "test".to_string(),
+            },
+            MaintenanceIndicator {
+                key: "when".to_string(),
+                label: "when".to_string(),
+                value: json!(Utc::now().to_rfc3339()),
+                status: "present".to_string(),
+                source: "test".to_string(),
+            },
+        ];
+
+        assert_eq!(indicator_bool(&indicators, "flag"), Some(true));
+        assert_eq!(indicator_bool(&indicators, "invalid_flag"), None);
+        assert_eq!(indicator_i64(&indicators, "number"), Some(42));
+        assert_eq!(indicator_i64(&indicators, "bad_number"), None);
+        assert!(indicator_datetime(&indicators, "when").is_some());
+        assert_eq!(coverage_for_keys(&indicators, &[]), (100, Vec::new()));
+    }
+}
