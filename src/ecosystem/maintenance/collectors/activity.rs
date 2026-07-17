@@ -160,3 +160,26 @@ where
         }
     }
 
+    warn!(
+        owner,
+        repo, branch, max_pages, "平台 API 近 12 个月 commit 活跃度统计达到页数上限，返回下界"
+    );
+    Ok((total, true, identities.len() as i64))
+}
+
+pub fn normalized_commit_identity(commit: &Commit) -> String {
+    if !commit.committer_email.trim().is_empty() {
+        return commit.committer_email.to_ascii_lowercase();
+    }
+    if !commit.author_email.trim().is_empty() {
+        return commit.author_email.to_ascii_lowercase();
+    }
+    if !commit.committer_name.trim().is_empty() {
+        return format!("name:{}", commit.committer_name);
+    }
+    if !commit.author_name.trim().is_empty() {
+        return format!("name:{}", commit.author_name);
+    }
+    format!("sha:{}", commit.sha)
+}
+
