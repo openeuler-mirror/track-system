@@ -131,3 +131,25 @@ fn timestamp_type(backend: DatabaseBackend) -> Alias {
 }
 
 #[derive(DeriveIden)]
+enum MaintenanceReports {
+    Table,
+    Id,
+    PackageId,
+    ReportType,
+    Status,
+    OverallRisk,
+    Confidence,
+    Summary,
+    Dimensions,
+    EvidenceSummary,
+    ReportPayload,
+    GeneratedAt,
+    CreatedAt,
+    UpdatedAt,
+}
+
+#[derive(DeriveIden)]
+enum Packages {
+    Table,
+    Id,
+}
