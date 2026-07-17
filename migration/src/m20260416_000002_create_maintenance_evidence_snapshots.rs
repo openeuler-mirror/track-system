@@ -50,3 +50,29 @@ impl MigrationTrait for Migration {
                             .not_null(),
                     )
                     .col(
+                        ColumnDef::new(MaintenanceEvidenceSnapshots::HttpStatus)
+                            .integer()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(MaintenanceEvidenceSnapshots::ContentHash)
+                            .string()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(MaintenanceEvidenceSnapshots::RawPayload)
+                            .json()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(MaintenanceEvidenceSnapshots::NormalizedSignals)
+                            .json()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(MaintenanceEvidenceSnapshots::CollectedAt)
+                            .custom(timestamp_type(backend))
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(MaintenanceEvidenceSnapshots::CreatedAt)
