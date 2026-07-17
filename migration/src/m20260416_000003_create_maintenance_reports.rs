@@ -87,3 +87,25 @@ impl MigrationTrait for Migration {
                             .custom(timestamp_type(backend))
                             .not_null()
                             .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(MaintenanceReports::UpdatedAt)
+                            .custom(timestamp_type(backend))
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk_maintenance_reports_target")
+                            .from(MaintenanceReports::Table, MaintenanceReports::PackageId)
+                            .to(Packages::Table, Packages::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_maintenance_reports_target")
