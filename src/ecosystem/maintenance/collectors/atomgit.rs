@@ -142,3 +142,27 @@ impl AtomGitMaintenanceCollector {
                     "AtomGit 活跃度指标采集失败，仅返回平台元数据"
                 ),
             }
+        }
+
+        Ok(evidence)
+    }
+}
+
+async fn fetch_repository(
+    client: &Client,
+    token: &str,
+    owner: &str,
+    repo: &str,
+) -> Result<AtomGitRepositorySnapshot> {
+    let url = format!("{}/repos/{}/{}", ATOMGIT_API_BASE, owner, repo);
+    let response = client
+        .get(&url)
+        .bearer_auth(token)
+        .send()
+        .await
+        .context("send atomgit repository request failed")?;
+    let status = response.status();
+    if !status.is_success() {
+        let body = response.text().await.unwrap_or_default();
+        return Err(anyhow!("AtomGit API HTTP {}: {}", status.as_u16(), body));
+    }
