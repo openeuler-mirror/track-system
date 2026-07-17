@@ -190,3 +190,27 @@ async fn collect_activity(
         token,
         owner,
         repo,
+        branch,
+        None,
+        MAX_TOTAL_COUNT_PAGES,
+    )
+    .await?;
+    let since = Utc::now() - Duration::days(365);
+    let (commits_last_12_months, commits_last_12_months_is_lower_bound, committers_last_12_months) =
+        collect_recent_activity(
+            client,
+            token,
+            owner,
+            repo,
+            branch,
+            since,
+            MAX_RECENT_ACTIVITY_PAGES,
+        )
+        .await?;
+
+    Ok(RepositoryActivityMetrics {
+        default_branch: Some(branch.to_string()),
+        last_commit_at,
+        commit_total,
+        commit_total_is_lower_bound,
+        commits_last_12_months,
