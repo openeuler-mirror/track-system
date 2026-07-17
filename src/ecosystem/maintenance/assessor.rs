@@ -94,3 +94,27 @@ fn build_maintenance_assessment(raw_evidence: &[Value]) -> MaintenanceSubAssessm
     ];
     if social_metrics_supported {
         required_keys.extend(["stars", "forks"]);
+    }
+    let (coverage, missing) = coverage_for_keys(&indicators, &required_keys);
+    let mut score = 100 - (missing.len() as i32 * 8);
+    let mut reasons = vec![format!("维护态势纳入 {} 个证据条目", entries.len())];
+
+    let commit_total = indicator_i64(&indicators, "commit_total").unwrap_or(0);
+    let commits_last_12_months = indicator_i64(&indicators, "commits_last_12_months").unwrap_or(0);
+    let committers_last_12_months =
+        indicator_i64(&indicators, "committers_last_12_months").unwrap_or(0);
+    let last_commit_age_days = indicator_datetime(&indicators, "last_commit_at")
+        .map(|value| (Utc::now() - value).num_days())
+        .unwrap_or(365);
+    let stars = indicator_i64(&indicators, "stars").unwrap_or(0);
+    let forks = indicator_i64(&indicators, "forks").unwrap_or(0);
+
+    if commit_total < 100 {
+        score -= 8;
+        reasons.push("L0 社区历史提交总量偏低".to_string());
+    }
+    if commits_last_12_months < 24 {
+        score -= 18;
+        reasons.push("近 12 个月提交频次不足".to_string());
+    }
+    if committers_last_12_months < 5 {
