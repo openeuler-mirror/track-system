@@ -21,3 +21,25 @@ impl MigrationTrait for Migration {
                 .auto_increment()
                 .primary_key()
                 .to_owned(),
+        };
+
+        manager
+            .create_table(
+                Table::create()
+                    .table(MaintenanceReports::Table)
+                    .if_not_exists()
+                    .col(id_column)
+                    .col(
+                        ColumnDef::new(MaintenanceReports::PackageId)
+                            .integer()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(MaintenanceReports::ReportType)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(MaintenanceReports::Status)
+                            .string()
+                            .not_null()
