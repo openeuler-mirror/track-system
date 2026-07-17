@@ -22,3 +22,27 @@ pub struct AtomGitMaintenanceCollector;
 #[derive(Debug, Deserialize)]
 struct AtomGitRepositorySnapshot {
     #[serde(default)]
+    html_url: Option<String>,
+    #[serde(default)]
+    default_branch: Option<String>,
+    #[serde(default)]
+    stargazers_count: Option<i64>,
+    #[serde(default)]
+    forks_count: Option<i64>,
+}
+
+impl AtomGitMaintenanceCollector {
+    pub fn new() -> Self {
+        Self
+    }
+
+    pub fn matches_package(package: &packages::Model) -> bool {
+        package
+            .l0_repo_url
+            .as_deref()
+            .and_then(parse_atomgit_repo)
+            .is_some()
+    }
+
+    pub async fn collect(&self, package: &packages::Model) -> Result<Vec<Value>> {
+        let repo_url = package
