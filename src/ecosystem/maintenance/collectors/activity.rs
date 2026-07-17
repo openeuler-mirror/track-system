@@ -183,3 +183,26 @@ pub fn normalized_commit_identity(commit: &Commit) -> String {
     format!("sha:{}", commit.sha)
 }
 
+pub fn commit_timestamp(commit: &Commit) -> DateTime<Utc> {
+    if commit.committer_date >= commit.author_date {
+        commit.committer_date
+    } else {
+        commit.author_date
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use async_trait::async_trait;
+    use chrono::TimeZone;
+
+    use crate::collectors::{ApiResult, Branch, FileContent, GitClient, Repository};
+
+    #[derive(Clone)]
+    struct MockGitClient {
+        latest: Vec<Commit>,
+        total_pages: Vec<Vec<Commit>>,
+        recent_pages: Vec<Vec<Commit>>,
+    }
+
