@@ -142,3 +142,27 @@ fn build_maintenance_assessment(raw_evidence: &[Value]) -> MaintenanceSubAssessm
             .iter()
             .map(|key| format!("缺少维护状态指标: {}", key)),
     );
+
+    finalize_assessment(
+        score,
+        coverage,
+        reasons,
+        indicators,
+        collect_evidence_refs(&entries),
+    )
+}
+
+fn finalize_assessment(
+    raw_score: i32,
+    coverage: i32,
+    mut reasons: Vec<String>,
+    indicators: Vec<MaintenanceIndicator>,
+    evidence_refs: Vec<String>,
+) -> MaintenanceSubAssessment {
+    let score = raw_score.clamp(0, 100);
+    reasons.truncate(8);
+    MaintenanceSubAssessment {
+        level: level_from_score(score).to_string(),
+        confidence: confidence_from_coverage(coverage).to_string(),
+        score,
+        coverage,
