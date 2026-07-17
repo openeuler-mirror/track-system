@@ -126,3 +126,28 @@ fn timestamp_type(backend: DatabaseBackend) -> Alias {
     match backend {
         DatabaseBackend::Postgres => Alias::new("timestamp with time zone"),
         _ => Alias::new("timestamp"),
+    }
+}
+
+#[derive(DeriveIden)]
+enum MaintenanceEvidenceSnapshots {
+    Table,
+    Id,
+    PackageId,
+    SourceType,
+    SourceName,
+    SourceUrl,
+    HttpStatus,
+    ContentHash,
+    RawPayload,
+    NormalizedSignals,
+    CollectedAt,
+    CreatedAt,
+    UpdatedAt,
+}
+
+#[derive(DeriveIden)]
+enum Packages {
+    Table,
+    Id,
+}
