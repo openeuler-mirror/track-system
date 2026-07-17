@@ -19,7 +19,7 @@ use serde::Serialize;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Duration;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 use crate::analyzer::ChangeClassifier;
 use crate::backport_advisor::BackportAdvisor;
@@ -1876,7 +1876,7 @@ Summary: Test package
     #[serial]
     async fn test_stage_report_generation_min() {
         use crate::entities::{
-            compare_reports, l1_commit_records, packages, tracking, tracking_reports,
+            compare_reports, l1_commit_records, l2_snapshots, packages, tracking, tracking_reports,
         };
         use chrono::Utc;
         use sea_orm::{DatabaseBackend, MockDatabase};
@@ -2009,7 +2009,7 @@ Summary: Test package
     #[serial]
     async fn test_stage_report_generation_calls_risk_create() {
         use crate::entities::{
-            compare_reports, l1_commit_records, packages, tracking, tracking_reports,
+            compare_reports, l1_commit_records, l2_snapshots, packages, tracking, tracking_reports,
         };
         use chrono::{TimeZone, Utc};
         use httpmock::prelude::*;
