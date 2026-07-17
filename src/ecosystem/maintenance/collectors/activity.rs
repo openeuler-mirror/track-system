@@ -298,3 +298,26 @@ mod tests {
         assert_eq!(
             metrics.last_commit_at.as_deref(),
             Some("2026-04-23T10:00:00+00:00")
+        );
+    }
+
+    #[tokio::test]
+    async fn collect_commit_activity_marks_lower_bound_when_page_limit_hits() {
+        let now = Utc.with_ymd_and_hms(2026, 4, 23, 10, 0, 0).unwrap();
+        let client = MockGitClient {
+            latest: vec![commit("latest", "latest@example.com", now)],
+            total_pages: vec![vec![commit("a", "a@example.com", now); 100]],
+            recent_pages: vec![vec![commit("r1", "alice@example.com", now); 100]],
+        };
+
+        let metrics = collect_commit_activity_with_limits(&client, "owner", "repo", "main", 1, 1)
+            .await
+            .unwrap();
+
+        assert_eq!(metrics.commit_total, 100);
+        assert!(metrics.commit_total_is_lower_bound);
+        assert_eq!(metrics.commits_last_12_months, 100);
+        assert!(metrics.commits_last_12_months_is_lower_bound);
+        assert_eq!(metrics.committers_last_12_months, 1);
+    }
+}
