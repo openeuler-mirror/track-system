@@ -238,3 +238,26 @@ fn collect_indicators(entries: &[&Value]) -> Vec<MaintenanceIndicator> {
     indicators
 }
 
+fn collect_evidence_refs(entries: &[&Value]) -> Vec<String> {
+    let mut refs = BTreeSet::new();
+    for entry in entries {
+        let source_name = entry
+            .get("source_name")
+            .and_then(Value::as_str)
+            .unwrap_or("unknown");
+        let subcategory = entry
+            .get("assessment_subcategory")
+            .and_then(Value::as_str)
+            .unwrap_or("general");
+        refs.insert(format!("{}:{}", source_name, subcategory));
+    }
+    refs.into_iter().collect()
+}
+
+fn coverage_for_keys(
+    indicators: &[MaintenanceIndicator],
+    required_keys: &[&str],
+) -> (i32, Vec<String>) {
+    let mut missing = Vec::new();
+    let mut present = 0;
+    for key in required_keys {
