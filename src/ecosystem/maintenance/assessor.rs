@@ -468,3 +468,26 @@ mod tests {
     }
 
     #[test]
+    fn helper_functions_cover_status_labels_and_boundaries() {
+        assert_eq!(indicator_status(&Value::Null), "missing");
+        assert_eq!(indicator_status(&json!(false)), "absent");
+        assert_eq!(indicator_status(&json!("")), "missing");
+        assert_eq!(indicator_status(&json!([])), "missing");
+        assert_eq!(indicator_status(&json!({})), "missing");
+        assert_eq!(indicator_status(&json!("value")), "present");
+
+        assert_eq!(indicator_label("commit_total"), "Commit 总数");
+        assert_eq!(indicator_label("unknown_key"), "unknown_key");
+        assert_eq!(level_from_score(80), "LOW");
+        assert_eq!(level_from_score(60), "MEDIUM");
+        assert_eq!(level_from_score(59), "HIGH");
+        assert_eq!(confidence_from_coverage(85), "HIGH");
+        assert_eq!(confidence_from_coverage(60), "MEDIUM");
+        assert_eq!(confidence_from_coverage(59), "LOW");
+        assert_eq!(freshness_level(24), "LOW");
+        assert_eq!(freshness_level(72), "MEDIUM");
+        assert_eq!(freshness_level(73), "HIGH");
+        assert_eq!(freshness_score(12), 90);
+        assert_eq!(freshness_score(48), 70);
+        assert_eq!(freshness_score(96), 50);
+
