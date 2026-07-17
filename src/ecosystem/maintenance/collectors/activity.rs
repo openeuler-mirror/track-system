@@ -68,3 +68,26 @@ where
 
     Ok(RepositoryActivityMetrics {
         default_branch: Some(branch.to_string()),
+        last_commit_at,
+        commit_total,
+        commit_total_is_lower_bound,
+        commits_last_12_months: recent_commits,
+        commits_last_12_months_is_lower_bound,
+        committers_last_12_months: recent_committers,
+    })
+}
+
+async fn count_commits<C>(
+    client: &C,
+    owner: &str,
+    repo: &str,
+    branch: &str,
+    since: Option<DateTime<Utc>>,
+    max_pages: u32,
+) -> Result<(i64, bool)>
+where
+    C: GitClient + ?Sized,
+{
+    let mut total = 0_i64;
+
+    for page in 1..=max_pages {
