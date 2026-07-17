@@ -24,3 +24,29 @@ impl MigrationTrait for Migration {
         };
 
         manager
+            .create_table(
+                Table::create()
+                    .table(MaintenanceEvidenceSnapshots::Table)
+                    .if_not_exists()
+                    .col(id_column)
+                    .col(
+                        ColumnDef::new(MaintenanceEvidenceSnapshots::PackageId)
+                            .integer()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(MaintenanceEvidenceSnapshots::SourceType)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(MaintenanceEvidenceSnapshots::SourceName)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(MaintenanceEvidenceSnapshots::SourceUrl)
+                            .text()
+                            .not_null(),
+                    )
+                    .col(
