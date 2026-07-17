@@ -445,3 +445,26 @@ mod tests {
                 "assessment_category": "maintenance",
                 "assessment_subcategory": "platform_capability",
                 "data": {
+                    "social_metrics_supported": false,
+                    "stars": null,
+                    "forks": null
+                }
+            }),
+        ];
+
+        let report = assess_target(&target, json!({"evidence_count": 2}), &raw_evidence);
+
+        assert_eq!(report.overall_risk, "HIGH");
+        assert_eq!(report.confidence, "HIGH");
+        assert!(report.section.reasons.iter().any(|reason| {
+            reason.contains("平台未提供统一的 star/fork") || reason.contains("提交频次不足")
+        }));
+        assert_eq!(report.dimensions["freshness_risk"].level.as_str(), "HIGH");
+        assert!(report
+            .report_payload
+            .get("evidence_catalog")
+            .and_then(|value| value.get("category_counts"))
+            .is_some());
+    }
+
+    #[test]
