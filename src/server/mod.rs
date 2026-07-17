@@ -25,8 +25,8 @@ use crate::collectors::{gitea::GiteaClient, gitee::GiteeClient};
 
 use self::{
     routes::{
-        backport_routes, compare_routes, component_routes, health_routes, metadata_routes,
-        package_routes, reports_routes, sync_routes, tracking_routes,
+        backport_routes, compare_routes, component_routes, ecosystem_routes, health_routes,
+        metadata_routes, package_routes, reports_routes, sync_routes, tracking_routes,
     },
     state::AppState,
 };
@@ -66,6 +66,7 @@ pub fn create_app_with_state(state: AppState) -> Router {
                 .merge(sync_routes())
                 .merge(backport_routes())
                 .merge(component_routes())
+                .merge(ecosystem_routes())
                 .merge(crate::server::routes::snapshot_routes()),
         )
         .with_state(state)
