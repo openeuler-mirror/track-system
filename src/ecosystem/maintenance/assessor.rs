@@ -22,3 +22,27 @@ pub fn assess_target(
         package_name: package.name.clone(),
         l0_repo_url: package.l0_repo_url.clone(),
         refreshed_at,
+        assessment_version: ASSESSMENT_VERSION.to_string(),
+    };
+
+    let section = build_maintenance_assessment(raw_evidence);
+    let overall_risk = section.level.clone();
+    let confidence = section.confidence.clone();
+
+    let mut dimensions = BTreeMap::new();
+    dimensions.insert(
+        "maintenance_risk".to_string(),
+        MaintenanceDimension {
+            level: section.level.clone(),
+            score: section.score,
+            reasons: section.reasons.clone(),
+        },
+    );
+    dimensions.insert(
+        "coverage_risk".to_string(),
+        MaintenanceDimension {
+            level: level_from_score(section.coverage).to_string(),
+            score: section.coverage,
+            reasons: vec![format!("证据覆盖度: {}%", section.coverage)],
+        },
+    );
