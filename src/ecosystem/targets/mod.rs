@@ -20,3 +20,24 @@ pub(crate) fn configured_fetch_timeout(specific_env: &str, default_secs: u64) ->
 }
 
 #[cfg(test)]
+mod tests {
+    use super::*;
+    use serial_test::serial;
+    use std::ffi::OsString;
+
+    struct EnvGuard {
+        key: &'static str,
+        previous: Option<OsString>,
+    }
+
+    impl EnvGuard {
+        fn set(key: &'static str, value: &str) -> Self {
+            let previous = std::env::var_os(key);
+            std::env::set_var(key, value);
+            Self { key, previous }
+        }
+
+        fn remove(key: &'static str) -> Self {
+            let previous = std::env::var_os(key);
+            std::env::remove_var(key);
+            Self { key, previous }
