@@ -62,3 +62,24 @@ mod tests {
 
         assert_eq!(
             configured_fetch_timeout("ECOSYSTEM_TEST_TIMEOUT_SECS", 3),
+            Duration::from_secs(9)
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn configured_fetch_timeout_falls_back_to_global_and_default() {
+        let _specific = EnvGuard::remove("ECOSYSTEM_TEST_TIMEOUT_SECS");
+        let _global = EnvGuard::set("ECOSYSTEM_FETCH_TIMEOUT_SECS", "7");
+        assert_eq!(
+            configured_fetch_timeout("ECOSYSTEM_TEST_TIMEOUT_SECS", 3),
+            Duration::from_secs(7)
+        );
+
+        let _invalid_global = EnvGuard::set("ECOSYSTEM_FETCH_TIMEOUT_SECS", "0");
+        assert_eq!(
+            configured_fetch_timeout("ECOSYSTEM_TEST_TIMEOUT_SECS", 3),
+            Duration::from_secs(3)
+        );
+    }
+}
