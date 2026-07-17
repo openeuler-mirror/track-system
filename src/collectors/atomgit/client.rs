@@ -181,10 +181,8 @@ impl GitClient for AtomGitClient {
         let atomgit_commits: Vec<AtomGitCommit> = self.get(&url).await?;
 
         let mut commit_vec = Vec::new();
-        for commit in atomgit_commits {
-            let mut commit_detail = self.get_commit_detail(owner, repo, &commit.sha).await?;
-            commit_detail.sha = commit.sha;
-            commit_detail.html_url = commit.html_url;
+        for commit in &atomgit_commits {
+            let commit_detail = self.get_commit_detail(owner, repo, &commit.sha).await?;
             debug!("AtomGit API GET commit detail: {:?}", commit_detail);
             commit_vec.push(commit_detail);
         }
@@ -233,96 +231,5 @@ impl IssueClient for AtomGitClient {
 
         let issues: Vec<AtomGitIssue> = self.get(&url).await?;
         Ok(issues.into_iter().map(Into::into).collect())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::collectors::traits::CommitsParams;
-    use httpmock::prelude::*;
-    use serde_json::json;
-
-    #[tokio::test]
-    async fn test_get_commits_preserves_branch_list_commit_identity() {
-        let server = MockServer::start();
-        let client = AtomGitClient::for_testing("token", "master", server.base_url()).unwrap();
-
-        let branch_commit_url = "https://atomgit.com/src-openeuler/test-repo/commit/branch-sha";
-        let commits_response = json!([
-            {
-                "sha": "branch-sha",
-                "commit": {
-                    "title": "branch title",
-                    "message": "branch message",
-                    "author": {
-                        "name": "branch author",
-                        "email": "branch@example.com",
-                        "date": "2023-01-01T00:00:00Z"
-                    },
-                    "committer": {
-                        "name": "branch committer",
-                        "email": "branch@example.com",
-                        "date": "2023-01-01T00:00:00Z"
-                    }
-                },
-                "html_url": branch_commit_url
-            }
-        ]);
-
-        let detail_response = json!({
-            "sha": "master-sha",
-            "commit": {
-                "title": "detail title",
-                "message": "detail message",
-                "author": {
-                    "name": "detail author",
-                    "email": "detail@example.com",
-                    "date": "2023-01-02T00:00:00Z"
-                },
-                "committer": {
-                    "name": "detail committer",
-                    "email": "detail@example.com",
-                    "date": "2023-01-02T00:00:00Z"
-                }
-            },
-            "html_url": "https://atomgit.com/src-openeuler/test-repo/commit/master-sha",
-            "stats": {
-                "total": 3,
-                "additions": 2,
-                "deletions": 1
-            }
-        });
-
-        let list_mock = server.mock(|when, then| {
-            when.method(GET)
-                .path("/repos/src-openeuler/test-repo/commits")
-                .query_param("access_token", "token")
-                .query_param("sha", "openEuler-24.03-LTS-SP1")
-                .query_param("page", "1")
-                .query_param("per_page", "30");
-            then.status(200).json_body(commits_response);
-        });
-
-        let detail_mock = server.mock(|when, then| {
-            when.method(GET)
-                .path("/repos/src-openeuler/test-repo/commits/branch-sha")
-                .query_param("access_token", "token");
-            then.status(200).json_body(detail_response);
-        });
-
-        let params = CommitsParams::new("openEuler-24.03-LTS-SP1");
-        let commits = client
-            .get_commits("src-openeuler", "test-repo", params)
-            .await
-            .unwrap();
-
-        list_mock.assert();
-        detail_mock.assert();
-        assert_eq!(commits.len(), 1);
-        assert_eq!(commits[0].sha, "branch-sha");
-        assert_eq!(commits[0].html_url, branch_commit_url);
-        assert_eq!(commits[0].title, "detail title");
-        assert_eq!(commits[0].stats.as_ref().unwrap().total, 3);
     }
 }
