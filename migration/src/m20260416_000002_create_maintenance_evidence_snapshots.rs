@@ -101,3 +101,28 @@ impl MigrationTrait for Migration {
             .await?;
 
         manager
+            .create_index(
+                Index::create()
+                    .name("idx_maintenance_evidence_target")
+                    .table(MaintenanceEvidenceSnapshots::Table)
+                    .col(MaintenanceEvidenceSnapshots::PackageId)
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(
+                Table::drop()
+                    .table(MaintenanceEvidenceSnapshots::Table)
+                    .to_owned(),
+            )
+            .await
+    }
+}
+
+fn timestamp_type(backend: DatabaseBackend) -> Alias {
+    match backend {
+        DatabaseBackend::Postgres => Alias::new("timestamp with time zone"),
+        _ => Alias::new("timestamp"),
