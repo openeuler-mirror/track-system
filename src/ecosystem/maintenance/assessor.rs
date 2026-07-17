@@ -353,3 +353,26 @@ fn level_from_score(score: i32) -> &'static str {
 
 fn confidence_from_coverage(coverage: i32) -> &'static str {
     if coverage >= 85 {
+        "HIGH"
+    } else if coverage >= 60 {
+        "MEDIUM"
+    } else {
+        "LOW"
+    }
+}
+
+fn freshness_level(refresh_interval_hours: i32) -> &'static str {
+    if refresh_interval_hours <= 24 {
+        "LOW"
+    } else if refresh_interval_hours <= 72 {
+        "MEDIUM"
+    } else {
+        "HIGH"
+    }
+}
+
+fn freshness_score(refresh_interval_hours: i32) -> i32 {
+    match freshness_level(refresh_interval_hours) {
+        "LOW" => 90,
+        "MEDIUM" => 70,
+        _ => 50,
