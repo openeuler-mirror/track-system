@@ -65,3 +65,25 @@ impl MigrationTrait for Migration {
                     .col(
                         ColumnDef::new(MaintenanceReports::Dimensions)
                             .json()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(MaintenanceReports::EvidenceSummary)
+                            .json()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(MaintenanceReports::ReportPayload)
+                            .json()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(MaintenanceReports::GeneratedAt)
+                            .custom(timestamp_type(backend))
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(MaintenanceReports::CreatedAt)
+                            .custom(timestamp_type(backend))
+                            .not_null()
+                            .default(Expr::current_timestamp()),
