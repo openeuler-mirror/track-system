@@ -68,3 +68,26 @@ impl GiteeMaintenanceCollector {
             forks = repo_info.forks_count,
             "Gitee 平台维护元数据采集完成"
         );
+
+        let mut evidence = vec![json!({
+            "source_type": "gitee_repository_metadata",
+            "source_name": "gitee_repository_metadata",
+            "source_url": repo_info.html_url,
+            "http_status": 200,
+            "assessment_category": "maintenance",
+            "assessment_subcategory": "repository_metadata",
+            "data": {
+                "collector": "gitee_live_api",
+                "platform": "gitee",
+                "owner": owner,
+                "repo": repo,
+                "repo_html_url": repo_info.html_url,
+                "default_branch": repo_info.default_branch,
+                "stars": repo_info.stargazers_count,
+                "forks": repo_info.forks_count,
+                "social_metrics_supported": true,
+            }
+        })];
+
+        if let Some(branch) = repo_info
+            .default_branch
