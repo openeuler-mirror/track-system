@@ -630,3 +630,26 @@ fn build_version_catalog_evidence(repo_url: &str, versions: &[GenericGitVersion]
     let version_entries = versions
         .iter()
         .map(|version| {
+            json!({
+                "version": version.version,
+                "source_ref": version.source_ref,
+                "is_stable": version.is_stable,
+            })
+        })
+        .collect::<Vec<_>>();
+
+    json!({
+        "source_type": "generic_git_version_catalog",
+        "source_name": "generic_git_version_catalog",
+        "source_url": source_url,
+        "http_status": 200,
+        "assessment_category": "maintenance",
+        "assessment_subcategory": "version_catalog",
+        "data": {
+            "collector": "generic_git_ls_remote_tags",
+            "repo_html_url": source_url,
+            "latest_version": latest_version_from_generic_versions(versions, false),
+            "latest_stable": latest_version_from_generic_versions(versions, true)
+                .or_else(|| latest_version_from_generic_versions(versions, false)),
+            "versions": version_entries,
+        }
