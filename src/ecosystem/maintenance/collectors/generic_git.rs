@@ -998,3 +998,26 @@ mod tests {
         let _second = commit_file(&repo, &file_path, "second", &sig, Some(first));
 
         let metrics = compute_metrics(&repo).unwrap();
+        assert_eq!(metrics.commit_total, 2);
+        assert_eq!(metrics.commits_last_12_months, 2);
+        assert_eq!(metrics.committers_last_12_months, 1);
+        assert!(metrics.last_commit_at.is_some());
+        assert!(metrics.default_branch.is_some());
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn collect_from_local_repo_builds_activity_and_platform_evidence() {
+        let source_dir = tempdir().unwrap();
+        let source_repo = Repository::init(source_dir.path()).unwrap();
+        let sig = Signature::now("Test User", "test@example.com").unwrap();
+        let file_path = source_dir.path().join("file.txt");
+        let first = commit_file(&source_repo, &file_path, "first", &sig, None);
+        commit_file(&source_repo, &file_path, "second", &sig, Some(first));
+
+        let cache_dir = tempdir().unwrap();
+        let _cache_dir = EnvGuard::set(GENERIC_GIT_CACHE_ENV, cache_dir.path());
+        let _retention = EnvGuard::set(GENERIC_GIT_CACHE_RETENTION_ENV, "false");
+        let repo_url = source_dir.path().display().to_string();
+        let package = packages::Model {
+            id: 1,
