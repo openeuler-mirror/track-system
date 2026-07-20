@@ -118,3 +118,27 @@ impl GenericGitMaintenanceCollector {
                 "source_url": source_url,
                 "http_status": 200,
                 "assessment_category": "maintenance",
+                "assessment_subcategory": "repository_activity",
+                "data": {
+                    "collector": "generic_git_ls_remote_bare_fetch",
+                    "repo_html_url": source_url,
+                    "default_branch": metrics.default_branch,
+                    "commit_total": metrics.commit_total,
+                    "commits_last_12_months": metrics.commits_last_12_months,
+                    "committers_last_12_months": metrics.committers_last_12_months,
+                    "last_commit_at": metrics.last_commit_at,
+                }
+            }),
+            json!({
+                "source_type": "generic_git_platform_capability",
+                "source_name": "generic_git_platform_capability",
+                "source_url": source_url,
+                "http_status": 200,
+                "assessment_category": "maintenance",
+                "assessment_subcategory": "platform_capability",
+                "data": {
+                    "social_metrics_supported": false,
+                    "stars": null,
+                    "forks": null,
+                }
+            }),
