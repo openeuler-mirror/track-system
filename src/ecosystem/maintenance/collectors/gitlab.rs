@@ -94,3 +94,27 @@ impl GitLabMaintenanceCollector {
         })];
 
         if let Some(branch) = project
+            .default_branch
+            .as_deref()
+            .filter(|value| !value.trim().is_empty())
+        {
+            match collect_commit_activity(
+                &activity_client,
+                &repo_ref.owner,
+                &repo_ref.repo,
+                branch,
+            )
+            .await
+            {
+                Ok(activity) => evidence.push(json!({
+                    "source_type": "gitlab_repository_activity_live",
+                    "source_name": "gitlab_repository_activity",
+                    "source_url": project.web_url,
+                    "http_status": 200,
+                    "assessment_category": "maintenance",
+                    "assessment_subcategory": "repository_activity",
+                    "data": {
+                        "collector": "gitlab_live_api",
+                        "platform": "gitlab",
+                        "owner": repo_ref.owner,
+                        "repo": repo_ref.repo,
