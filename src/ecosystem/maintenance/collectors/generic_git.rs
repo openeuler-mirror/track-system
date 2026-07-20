@@ -975,3 +975,26 @@ mod tests {
         index.write().unwrap();
         let tree_id = index.write_tree().unwrap();
         let tree = repo.find_tree(tree_id).unwrap();
+
+        match parent {
+            Some(parent_oid) => {
+                let parent_commit = repo.find_commit(parent_oid).unwrap();
+                repo.commit(Some("HEAD"), sig, sig, message, &tree, &[&parent_commit])
+                    .unwrap()
+            }
+            None => repo
+                .commit(Some("HEAD"), sig, sig, message, &tree, &[])
+                .unwrap(),
+        }
+    }
+
+    #[test]
+    fn compute_metrics_from_local_repo() {
+        let dir = tempdir().unwrap();
+        let repo = Repository::init(dir.path()).unwrap();
+        let sig = Signature::now("Test User", "test@example.com").unwrap();
+        let file_path = dir.path().join("file.txt");
+        let first = commit_file(&repo, &file_path, "first", &sig, None);
+        let _second = commit_file(&repo, &file_path, "second", &sig, Some(first));
+
+        let metrics = compute_metrics(&repo).unwrap();
