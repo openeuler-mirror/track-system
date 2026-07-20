@@ -1205,3 +1205,26 @@ mod tests {
         let fallback_args = fetch_command_args(
             Path::new("/tmp/cache.git"),
             "+refs/heads/main:refs/heads/main",
+            false,
+        );
+        assert!(!fallback_args.contains(&"--filter=blob:none".to_string()));
+
+        assert!(should_retry_fetch_without_filter(&anyhow!(
+            "filtering not recognized by server"
+        )));
+        assert!(should_retry_fetch_without_filter(&anyhow!(
+            "the server does not support filter"
+        )));
+        assert!(!should_retry_fetch_without_filter(&anyhow!(
+            "authentication failed"
+        )));
+
+        assert!(parse_head_oid("not-a-sha\tHEAD").is_none());
+        assert!(
+            parse_head_oid("0123456789abcdef0123456789abcdef01234567\trefs/heads/main").is_none()
+        );
+        assert!(normalize_tag_version("refs/tags/snapshot-1.0.0").is_none());
+        assert!(normalize_tag_version("refs/tags/2024.05.10").is_none());
+        assert_eq!(
+            normalize_tag_version("refs/tags/project-v2_3_4.pre2").as_deref(),
+            Some("2.3.4-pre2")
