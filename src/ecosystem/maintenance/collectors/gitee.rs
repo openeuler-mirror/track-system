@@ -160,3 +160,26 @@ async fn fetch_repository(
         .json::<GiteeRepositorySnapshot>()
         .await
         .context("parse gitee repository response failed")
+}
+
+fn parse_gitee_repo(url: &str) -> Option<(String, String)> {
+    let normalized = normalize_repo_url(url)?;
+    let host = normalized.host_str()?;
+    if host != "gitee.com" {
+        return None;
+    }
+
+    let segments = normalized
+        .path_segments()?
+        .filter(|segment| !segment.is_empty())
+        .map(|segment| segment.trim_end_matches(".git").to_string())
+        .collect::<Vec<_>>();
+    if segments.len() < 2 {
+        return None;
+    }
+
+    Some((segments[0].clone(), segments[1].clone()))
+}
+
+fn normalize_repo_url(url: &str) -> Option<Url> {
+    if let Ok(parsed) = Url::parse(url) {
