@@ -21,3 +21,26 @@ pub struct MaintenanceService<'a> {
 }
 
 impl<'a> MaintenanceService<'a> {
+    pub fn new(db: &'a DatabaseConnection) -> Self {
+        Self { db }
+    }
+
+    pub async fn refresh_package(&self, package_id: i32) -> Result<MaintenanceRefreshResult> {
+        let package = Packages::find_by_id(package_id)
+            .one(self.db)
+            .await
+            .context("query package failed")?
+            .ok_or_else(|| anyhow!("package {} not found", package_id))?;
+
+        let now = Utc::now();
+        let evidence_payloads = self.collect_evidence(&package).await?;
+
+        for payload in &evidence_payloads {
+            let source_type = payload
+                .get("source_type")
+                .and_then(Value::as_str)
+                .unwrap_or("placeholder")
+                .to_string();
+            let source_name = payload
+                .get("source_name")
+                .and_then(Value::as_str)
