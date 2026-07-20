@@ -70,3 +70,27 @@ impl GitHubMaintenanceCollector {
             .l0_repo_url
             .as_deref()
             .ok_or_else(|| anyhow!("package {} missing l0_repo_url", package.name))?;
+        let (owner, repo) = parse_github_repo(repo_url)
+            .ok_or_else(|| anyhow!("failed to parse GitHub repo from {}", repo_url))?;
+        let api = GitHubApi::new(Some(GITHUB_API_BASE.to_string()))?;
+
+        info!(
+            owner,
+            repo,
+            package = package.name,
+            "开始采集 GitHub 组件维护指标"
+        );
+
+        self.collect_with_api(package, repo_url, owner, repo, api)
+            .await
+    }
+
+    async fn collect_with_api(
+        &self,
+        package: &packages::Model,
+        repo_url: &str,
+        owner: String,
+        repo: String,
+        api: GitHubApi,
+    ) -> Result<Vec<Value>> {
+        let repo_info = api.fetch_repository(&owner, &repo).await?;
