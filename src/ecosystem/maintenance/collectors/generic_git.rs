@@ -1251,3 +1251,26 @@ mod tests {
     fn configured_timeout_uses_positive_env_values_only() {
         let _timeout = EnvGuard::set(GENERIC_GIT_FETCH_TIMEOUT_ENV, "2");
         assert_eq!(
+            configured_timeout(GENERIC_GIT_FETCH_TIMEOUT_ENV, 9),
+            Duration::from_secs(2)
+        );
+        let _invalid = EnvGuard::set(GENERIC_GIT_FETCH_TIMEOUT_ENV, "0");
+        assert_eq!(
+            configured_timeout(GENERIC_GIT_FETCH_TIMEOUT_ENV, 9),
+            Duration::from_secs(9)
+        );
+    }
+
+    #[test]
+    fn parse_bool_env_accepts_enabled_values() {
+        assert!(parse_bool_env("true"));
+        assert!(parse_bool_env("1"));
+        assert!(parse_bool_env("enabled"));
+        assert!(parse_bool_env("ON"));
+        assert!(!parse_bool_env("false"));
+        assert!(!parse_bool_env("0"));
+        assert!(!parse_bool_env(""));
+    }
+
+    #[test]
+    #[serial]
