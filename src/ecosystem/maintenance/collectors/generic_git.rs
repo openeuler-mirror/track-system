@@ -676,3 +676,26 @@ fn parse_remote_tag_versions(output: &str) -> Vec<GenericGitVersion> {
                 version,
                 source_ref: reference.trim().trim_end_matches("^{}").to_string(),
                 is_stable,
+            });
+    }
+
+    let mut versions = by_version.into_values().collect::<Vec<_>>();
+    versions.sort_by(|left, right| compare_version_text(&left.version, &right.version));
+    versions
+}
+
+fn normalize_tag_version(reference: &str) -> Option<String> {
+    let tag = reference
+        .trim()
+        .trim_end_matches("^{}")
+        .strip_prefix("refs/tags/")
+        .unwrap_or(reference.trim())
+        .trim();
+    if tag.is_empty() || is_non_release_tag(tag) {
+        return None;
+    }
+
+    static VERSION_RE: OnceLock<Regex> = OnceLock::new();
+    let version_re = VERSION_RE.get_or_init(|| {
+        Regex::new(
+            r"(?ix)
