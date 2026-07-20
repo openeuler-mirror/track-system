@@ -354,3 +354,26 @@ fn fetch_cached_mirror(
     }
 
     let spec = remote_head
+        .default_branch
+        .as_deref()
+        .map(|default_branch| format!("+{0}:{0}", default_branch));
+    let refspec = if let Some(spec) = spec {
+        spec
+    } else {
+        "+refs/heads/*:refs/heads/*".to_string()
+    };
+    let operation = format!("fetch cached mirror failed: {}", repo_url);
+    let filtered_args = fetch_command_args(repo_path, &refspec, true);
+
+    match run_git_command_with_timeout(&filtered_args, timeouts.fetch_timeout, &operation) {
+        Ok(_) => Ok(()),
+        Err(error) if should_retry_fetch_without_filter(&error) => {
+            warn!(
+                repo_url,
+                error = %error,
+                "generic git partial fetch unsupported, retry without object filter"
+            );
+            let fallback_args = fetch_command_args(repo_path, &refspec, false);
+            run_git_command_with_timeout(&fallback_args, timeouts.fetch_timeout, &operation)?;
+            Ok(())
+        }
