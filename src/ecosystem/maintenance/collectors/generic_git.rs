@@ -94,3 +94,27 @@ impl GenericGitMaintenanceCollector {
         let metrics = tokio::task::spawn_blocking(move || {
             let _guard = mirror_lock
                 .lock()
+                .map_err(|_| anyhow!("generic git mirror lock poisoned"))?;
+            collect_metrics(&repo_url_owned)
+        })
+        .await
+        .context("join generic git collector failed")??;
+        let source_url = normalize_source_url(repo_url);
+
+        debug!(
+            package = package.name,
+            repo_url,
+            default_branch = metrics.default_branch,
+            commit_total = metrics.commit_total,
+            commits_last_12_months = metrics.commits_last_12_months,
+            committers_last_12_months = metrics.committers_last_12_months,
+            "通用 Git 维护指标采集完成"
+        );
+
+        Ok(vec![
+            json!({
+                "source_type": "generic_git_repository_activity",
+                "source_name": "generic_git_repository_activity",
+                "source_url": source_url,
+                "http_status": 200,
+                "assessment_category": "maintenance",
