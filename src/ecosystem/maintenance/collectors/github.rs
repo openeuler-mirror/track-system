@@ -310,3 +310,27 @@ impl GitHubApi {
 
 fn normalized_committer_identity(commit: &GitHubCommitListItem) -> Option<String> {
     commit
+        .commit
+        .committer
+        .as_ref()
+        .and_then(|identity| identity.email.clone())
+        .filter(|email| !email.trim().is_empty())
+        .map(|email| email.to_ascii_lowercase())
+        .or_else(|| {
+            commit
+                .commit
+                .author
+                .as_ref()
+                .and_then(|identity| identity.email.clone())
+                .filter(|email| !email.trim().is_empty())
+                .map(|email| email.to_ascii_lowercase())
+        })
+        .or_else(|| {
+            commit
+                .commit
+                .committer
+                .as_ref()
+                .and_then(|identity| identity.name.clone())
+                .filter(|name| !name.trim().is_empty())
+                .map(|name| format!("name:{}", name))
+        })
