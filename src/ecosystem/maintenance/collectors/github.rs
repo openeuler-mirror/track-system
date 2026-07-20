@@ -614,3 +614,26 @@ mod tests {
             when.method(GET)
                 .path("/repos/openssl/empty/commits")
                 .query_param("sha", "main")
+                .query_param("per_page", "1")
+                .query_param("page", "1");
+            then.status(409).body("empty repository");
+        });
+        let _missing = server.mock(|when, then| {
+            when.method(GET).path("/repos/openssl/missing");
+            then.status(404).body("not found");
+        });
+        let api = GitHubApi::new(Some(server.base_url())).unwrap();
+
+        assert_eq!(
+            api.count_commits("openssl", "empty", "main", None)
+                .await
+                .unwrap(),
+            0
+        );
+        let error = api
+            .fetch_repository("openssl", "missing")
+            .await
+            .unwrap_err();
+        assert!(error.to_string().contains("GitHub API HTTP 404"));
+    }
+}
