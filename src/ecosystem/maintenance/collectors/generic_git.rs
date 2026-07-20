@@ -653,3 +653,26 @@ fn build_version_catalog_evidence(repo_url: &str, versions: &[GenericGitVersion]
                 .or_else(|| latest_version_from_generic_versions(versions, false)),
             "versions": version_entries,
         }
+    })
+}
+
+fn parse_remote_tag_versions(output: &str) -> Vec<GenericGitVersion> {
+    let mut by_version: HashMap<String, GenericGitVersion> = HashMap::new();
+
+    for line in output.lines() {
+        let Some((_oid, reference)) = line.trim().split_once('\t') else {
+            continue;
+        };
+        let Some(version) = normalize_tag_version(reference) else {
+            continue;
+        };
+        let is_stable = VersionParser::parse(&version)
+            .map(|parsed| parsed.is_stable())
+            .unwrap_or(false);
+
+        by_version
+            .entry(version.clone())
+            .or_insert_with(|| GenericGitVersion {
+                version,
+                source_ref: reference.trim().trim_end_matches("^{}").to_string(),
+                is_stable,
