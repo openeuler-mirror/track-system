@@ -492,3 +492,26 @@ fn cleanup_cached_mirror(repo_path: &Path) {
         );
     } else {
         debug!(
+            cache_path = %repo_path.display(),
+            "generic git ephemeral cache cleaned"
+        );
+    }
+}
+
+fn cached_mirror_key(repo_url: &str) -> String {
+    let normalized = normalize_source_url(repo_url);
+    let mut hasher = Sha256::new();
+    hasher.update(normalized.as_bytes());
+    let digest = format!("{:x}", hasher.finalize());
+    let hint = normalized
+        .rsplit('/')
+        .next()
+        .unwrap_or("repo")
+        .trim_end_matches(".git")
+        .chars()
+        .map(|value| {
+            if value.is_ascii_alphanumeric() {
+                value.to_ascii_lowercase()
+            } else {
+                '-'
+            }
