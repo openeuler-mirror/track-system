@@ -1159,3 +1159,26 @@ mod tests {
         assert!(evidence["data"]["latest_stable"].is_null());
         assert_eq!(evidence["data"]["versions"].as_array().unwrap().len(), 0);
     }
+
+    #[test]
+    fn cached_head_matches_remote_branch_oid() {
+        let dir = tempdir().unwrap();
+        let repo = Repository::init(dir.path()).unwrap();
+        let sig = Signature::now("Test User", "test@example.com").unwrap();
+        let file_path = dir.path().join("file.txt");
+        let oid = commit_file(&repo, &file_path, "first", &sig, None);
+        let branch = repo.head().unwrap().name().map(|value| value.to_string());
+
+        let remote_head = RemoteHead {
+            default_branch: branch,
+            head_oid: Some(oid),
+        };
+
+        assert!(cached_head_matches_remote(&repo, &remote_head));
+    }
+
+    #[test]
+    fn cached_head_misses_when_default_branch_ref_is_absent() {
+        let dir = tempdir().unwrap();
+        let repo = Repository::init(dir.path()).unwrap();
+        let sig = Signature::now("Test User", "test@example.com").unwrap();
