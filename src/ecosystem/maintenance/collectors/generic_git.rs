@@ -1067,3 +1067,26 @@ mod tests {
             Some("refs/heads/main".to_string())
         );
         assert_eq!(parse_default_branch_ref("deadbeef\tHEAD"), None);
+    }
+
+    #[test]
+    fn parse_remote_head_from_ls_remote_output() {
+        let oid = "0123456789abcdef0123456789abcdef01234567";
+        let output = format!("ref: refs/heads/main\tHEAD\n{oid}\tHEAD\n");
+
+        let remote_head = parse_remote_head(&output);
+
+        assert_eq!(
+            remote_head.default_branch.as_deref(),
+            Some("refs/heads/main")
+        );
+        assert_eq!(remote_head.head_oid.unwrap().to_string(), oid);
+    }
+
+    #[test]
+    fn parse_remote_tag_versions_normalizes_release_tags() {
+        let output = "\
+0123456789abcdef0123456789abcdef01234567\trefs/tags/release-1_2_0
+1123456789abcdef0123456789abcdef01234567\trefs/tags/v1.10.0
+2123456789abcdef0123456789abcdef01234567\trefs/tags/2.0.0.rc1
+3123456789abcdef0123456789abcdef01234567\trefs/tags/nightly-3.0.0
