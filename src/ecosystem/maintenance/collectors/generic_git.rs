@@ -607,3 +607,26 @@ fn parse_head_oid(line: &str) -> Option<Oid> {
         Oid::from_str(oid.trim()).ok()
     } else {
         None
+    }
+}
+
+fn collect_remote_versions(repo_url: &str) -> Result<Vec<GenericGitVersion>> {
+    let output = run_git_command_with_timeout(
+        &[
+            "ls-remote".to_string(),
+            "--tags".to_string(),
+            "--refs".to_string(),
+            repo_url.to_string(),
+        ],
+        generic_git_timeouts().reference_timeout(),
+        "list remote tags failed",
+    )?;
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    Ok(parse_remote_tag_versions(&stdout))
+}
+
+fn build_version_catalog_evidence(repo_url: &str, versions: &[GenericGitVersion]) -> Value {
+    let source_url = normalize_source_url(repo_url);
+    let version_entries = versions
+        .iter()
+        .map(|version| {
