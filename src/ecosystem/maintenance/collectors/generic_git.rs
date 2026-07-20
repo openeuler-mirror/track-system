@@ -423,3 +423,26 @@ fn should_retry_fetch_without_filter(error: &anyhow::Error) -> bool {
         || message.contains("partial clone")
         || message.contains("promisor")
         || message.contains("protocol version")
+}
+
+fn parse_remote_head(output: &str) -> RemoteHead {
+    let mut remote_head = RemoteHead {
+        default_branch: None,
+        head_oid: None,
+    };
+
+    for line in output.lines() {
+        if remote_head.default_branch.is_none() {
+            remote_head.default_branch = parse_default_branch_ref(line);
+        }
+        if remote_head.head_oid.is_none() {
+            remote_head.head_oid = parse_head_oid(line);
+        }
+    }
+
+    remote_head
+}
+
+fn update_cached_head(repo: &Repository, default_branch: Option<&str>) -> Result<()> {
+    if let Some(default_branch) = default_branch {
+        repo.set_head(default_branch)
