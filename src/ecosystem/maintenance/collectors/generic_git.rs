@@ -1021,3 +1021,26 @@ mod tests {
         let repo_url = source_dir.path().display().to_string();
         let package = packages::Model {
             id: 1,
+            name: "openssl".to_string(),
+            level: 1,
+            sync_interval_hours: 24,
+            l0_repo_url: Some(repo_url.clone()),
+            description: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let evidence = GenericGitMaintenanceCollector::new()
+            .collect(&package)
+            .await
+            .unwrap();
+
+        assert_eq!(evidence.len(), 2);
+        assert_eq!(
+            evidence[0]["source_type"],
+            "generic_git_repository_activity"
+        );
+        assert_eq!(evidence[0]["data"]["commit_total"], 2);
+        assert_eq!(evidence[0]["data"]["committers_last_12_months"], 1);
+        assert_eq!(evidence[1]["data"]["social_metrics_supported"], false);
+        assert_eq!(evidence[1]["data"]["stars"], Value::Null);
