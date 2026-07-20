@@ -166,3 +166,27 @@ fn collect_metrics(repo_url: &str) -> Result<GenericGitMetrics> {
 }
 
 pub fn warm_cached_mirror(repo_url: &str) -> Result<GenericGitMirrorCacheSummary> {
+    let repo_url = repo_url.trim();
+    if repo_url.is_empty() {
+        return Err(anyhow!("repo url is empty"));
+    }
+
+    let mirror_lock = cached_mirror_lock(repo_url);
+    let _guard = mirror_lock
+        .lock()
+        .map_err(|_| anyhow!("generic git mirror lock poisoned"))?;
+
+    let cache_retained = generic_git_cache_retention_enabled();
+    let (cache_path, default_branch) = with_synced_mirror(repo_url, |repo, repo_path| {
+        let default_branch = repo.head().ok().and_then(|head| {
+            head.shorthand()
+                .map(|value| value.to_string())
+                .or_else(|| head.name().map(|value| value.to_string()))
+        });
+        Ok((repo_path.to_path_buf(), default_branch))
+    })?;
+
+    Ok(GenericGitMirrorCacheSummary {
+        repo_url: normalize_source_url(repo_url),
+        cache_path,
+        default_branch,
