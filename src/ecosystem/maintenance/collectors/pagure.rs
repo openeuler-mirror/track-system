@@ -22,3 +22,27 @@ struct PagureProjectSnapshot {
     #[serde(default)]
     date_modified: Option<String>,
     #[serde(default)]
+    user: Option<PagureUser>,
+}
+
+#[derive(Debug, Deserialize)]
+struct PagureUser {
+    name: String,
+}
+
+struct PagureRepoRef {
+    api_url: String,
+    owner: String,
+    repo: String,
+    platform: &'static str,
+}
+
+impl PagureMaintenanceCollector {
+    pub fn new() -> Self {
+        Self
+    }
+
+    pub fn matches_package(package: &packages::Model) -> bool {
+        package
+            .l0_repo_url
+            .as_deref()
