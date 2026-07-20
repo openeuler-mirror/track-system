@@ -352,3 +352,26 @@ fn parse_atomgit_repo(url: &str) -> Option<(String, String)> {
 
     let segments = normalized
         .path_segments()?
+        .filter(|segment| !segment.is_empty())
+        .map(|segment| segment.trim_end_matches(".git").to_string())
+        .collect::<Vec<_>>();
+    if segments.len() < 2 {
+        return None;
+    }
+
+    Some((segments[0].clone(), segments[1].clone()))
+}
+
+fn normalize_url(url: &str) -> Option<Url> {
+    if let Ok(parsed) = Url::parse(url) {
+        return Some(parsed);
+    }
+
+    let candidate = format!("https://{}", url.trim());
+    Url::parse(&candidate).ok()
+}
+
+fn normalize_source_url(repo_url: &str) -> String {
+    if Url::parse(repo_url).is_ok() {
+        repo_url
+            .trim_end_matches(".git")
