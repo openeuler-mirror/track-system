@@ -238,3 +238,27 @@ impl GitHubApi {
 
     async fn count_unique_committers_since(
         &self,
+        owner: &str,
+        repo: &str,
+        branch: &str,
+        since: DateTime<Utc>,
+    ) -> Result<i64> {
+        let mut unique_committers = std::collections::BTreeSet::new();
+        let mut page = 1;
+
+        loop {
+            if page > MAX_COMMITTER_PAGES {
+                break;
+            }
+
+            let url = format!(
+                "{}/repos/{}/{}/commits?sha={}&since={}&per_page=100&page={}",
+                self.base_url,
+                owner,
+                repo,
+                branch,
+                since.to_rfc3339(),
+                page
+            );
+            let commits: Vec<GitHubCommitListItem> = self.get_json(&url).await?;
+            if commits.is_empty() {
