@@ -94,3 +94,27 @@ impl PagureMaintenanceCollector {
             "source_name": "pagure_repository_metadata",
             "source_url": project.full_url,
             "http_status": 200,
+            "assessment_category": "maintenance",
+            "assessment_subcategory": "repository_metadata",
+            "data": {
+                "collector": "pagure_live_api",
+                "platform": repo_ref.platform,
+                "owner": owner,
+                "repo": repo,
+                "repo_html_url": project.full_url,
+                "namespace": project.namespace,
+                "social_metrics_supported": false,
+                "stars": null,
+                "forks": null,
+                "default_branch": null,
+                "last_project_modified_at": project.date_modified,
+            }
+            }),
+            json!({
+                "source_type": "pagure_repository_activity_live",
+                "source_name": "pagure_repository_activity",
+                "source_url": project.full_url,
+                "http_status": 200,
+                "assessment_category": "maintenance",
+                "assessment_subcategory": "repository_activity",
+                "data": {
