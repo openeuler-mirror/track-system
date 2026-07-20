@@ -183,3 +183,26 @@ fn parse_gitee_repo(url: &str) -> Option<(String, String)> {
 
 fn normalize_repo_url(url: &str) -> Option<Url> {
     if let Ok(parsed) = Url::parse(url) {
+        return Some(parsed);
+    }
+
+    let candidate = format!("https://{}", url.trim());
+    Url::parse(&candidate).ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_gitee_repo_accepts_standard_variants() {
+        assert_eq!(
+            parse_gitee_repo("https://gitee.com/src-openeuler/bash.git"),
+            Some(("src-openeuler".to_string(), "bash".to_string()))
+        );
+        assert_eq!(
+            parse_gitee_repo("gitee.com/openeuler/kernel"),
+            Some(("openeuler".to_string(), "kernel".to_string()))
+        );
+    }
+}
