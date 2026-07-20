@@ -1136,3 +1136,26 @@ mod tests {
             l0_repo_url: Some(source_dir.path().display().to_string()),
             description: None,
             created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let catalog = GenericGitMaintenanceCollector::new()
+            .collect_version_catalog(&package)
+            .await
+            .unwrap();
+
+        assert_eq!(catalog["source_type"], "generic_git_version_catalog");
+        assert_eq!(catalog["data"]["latest_version"], "1.1.0-rc1");
+        assert_eq!(catalog["data"]["latest_stable"], "1.0.0");
+        assert_eq!(catalog["data"]["versions"].as_array().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn build_version_catalog_evidence_handles_empty_versions() {
+        let evidence = build_version_catalog_evidence("https://example.com/repo.git", &[]);
+
+        assert_eq!(evidence["source_url"], "https://example.com/repo");
+        assert!(evidence["data"]["latest_version"].is_null());
+        assert!(evidence["data"]["latest_stable"].is_null());
+        assert_eq!(evidence["data"]["versions"].as_array().unwrap().len(), 0);
+    }
