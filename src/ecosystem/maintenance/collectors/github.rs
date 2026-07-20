@@ -358,3 +358,27 @@ fn parse_github_repo(url: &str) -> Option<(String, String)> {
     } else if let Some(stripped) = trimmed.strip_prefix("github.com/") {
         stripped.to_string()
     } else if let Some(stripped) = trimmed.strip_prefix("www.github.com/") {
+        stripped.to_string()
+    } else {
+        trimmed.to_string()
+    };
+
+    let mut segments = path.split('/').filter(|segment| !segment.is_empty());
+    let owner = segments.next()?;
+    let repo = segments.next()?;
+
+    Some((owner.to_string(), repo.to_string()))
+}
+
+fn parse_last_page_from_link(link: &str) -> Option<u32> {
+    for part in link.split(',') {
+        let item = part.trim();
+        if !item.contains("rel=\"last\"") {
+            continue;
+        }
+        let start = item.find('<')?;
+        let end = item.find('>')?;
+        let url = &item[start + 1..end];
+        let query = url.split('?').nth(1)?;
+        for pair in query.split('&') {
+            let mut iter = pair.splitn(2, '=');
