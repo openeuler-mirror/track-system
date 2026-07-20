@@ -1182,3 +1182,26 @@ mod tests {
         let dir = tempdir().unwrap();
         let repo = Repository::init(dir.path()).unwrap();
         let sig = Signature::now("Test User", "test@example.com").unwrap();
+        let file_path = dir.path().join("file.txt");
+        let oid = commit_file(&repo, &file_path, "first", &sig, None);
+
+        let remote_head = RemoteHead {
+            default_branch: Some("refs/heads/renamed".to_string()),
+            head_oid: Some(oid),
+        };
+
+        assert!(!cached_head_matches_remote(&repo, &remote_head));
+    }
+
+    #[test]
+    fn generic_git_helpers_cover_args_timeouts_and_errors() {
+        let args = fetch_command_args(
+            Path::new("/tmp/cache.git"),
+            "+refs/heads/main:refs/heads/main",
+            true,
+        );
+        assert!(args.contains(&"--filter=blob:none".to_string()));
+        assert!(args.contains(&"--no-tags".to_string()));
+        let fallback_args = fetch_command_args(
+            Path::new("/tmp/cache.git"),
+            "+refs/heads/main:refs/heads/main",
