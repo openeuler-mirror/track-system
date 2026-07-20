@@ -469,3 +469,26 @@ fn cached_mirror_root() -> PathBuf {
         return PathBuf::from(path);
     }
 
+    dirs::cache_dir()
+        .unwrap_or_else(|| std::env::temp_dir().join("track-system-cache"))
+        .join("track-system")
+        .join("generic-git-mirrors")
+}
+
+fn cleanup_cached_mirror(repo_path: &Path) {
+    let cleanup_result = if repo_path.is_dir() {
+        fs::remove_dir_all(repo_path)
+    } else if repo_path.exists() {
+        fs::remove_file(repo_path)
+    } else {
+        Ok(())
+    };
+
+    if let Err(error) = cleanup_result {
+        warn!(
+            cache_path = %repo_path.display(),
+            error = %error,
+            "generic git ephemeral cache cleanup failed"
+        );
+    } else {
+        debug!(
