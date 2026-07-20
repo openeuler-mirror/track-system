@@ -118,3 +118,26 @@ impl PagureMaintenanceCollector {
                 "assessment_category": "maintenance",
                 "assessment_subcategory": "repository_activity",
                 "data": {
+                    "collector": "pagure_live_api",
+                    "platform": repo_ref.platform,
+                    "owner": owner,
+                    "repo": repo,
+                    "repo_html_url": project.full_url,
+                    "default_branch": null,
+                    "commit_total": null,
+                    "commits_last_12_months": null,
+                    "committers_last_12_months": null,
+                    "last_commit_at": project.date_modified,
+                    "stars": null,
+                    "forks": null,
+                }
+            }),
+        ])
+    }
+}
+
+async fn fetch_project(client: &Client, api_url: &str) -> Result<PagureProjectSnapshot> {
+    let response = client
+        .get(api_url)
+        .send()
+        .await
