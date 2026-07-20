@@ -1297,3 +1297,26 @@ mod tests {
     fn warm_cached_mirror_retains_cache_when_retention_enabled() {
         let source_dir = tempdir().unwrap();
         let source_repo = Repository::init(source_dir.path()).unwrap();
+        let sig = Signature::now("Test User", "test@example.com").unwrap();
+        let file_path = source_dir.path().join("file.txt");
+        commit_file(&source_repo, &file_path, "first", &sig, None);
+
+        let cache_dir = tempdir().unwrap();
+        let _cache_dir = EnvGuard::set(GENERIC_GIT_CACHE_ENV, cache_dir.path());
+        let _retention = EnvGuard::set(GENERIC_GIT_CACHE_RETENTION_ENV, "true");
+        let repo_url = source_dir.path().display().to_string();
+
+        let summary = warm_cached_mirror(&repo_url).unwrap();
+
+        assert!(summary.cache_retained);
+        assert!(summary.cache_path.exists());
+    }
+
+    #[test]
+    #[serial]
+    fn generic_git_cache_retention_defaults_to_disabled() {
+        let _retention = EnvGuard::remove(GENERIC_GIT_CACHE_RETENTION_ENV);
+
+        assert!(!generic_git_cache_retention_enabled());
+    }
+}
