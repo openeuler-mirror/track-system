@@ -308,3 +308,26 @@ fn ensure_origin_remote(repo: &Repository, repo_url: &str) -> Result<()> {
     Ok(())
 }
 
+fn resolve_remote_head(
+    repo: &Repository,
+    repo_url: &str,
+    timeouts: GenericGitTimeouts,
+) -> Result<RemoteHead> {
+    let output = run_git_command_with_timeout(
+        &[
+            "ls-remote".to_string(),
+            "--symref".to_string(),
+            repo_url.to_string(),
+            "HEAD".to_string(),
+        ],
+        timeouts.reference_timeout(),
+        "connect origin remote failed",
+    )?;
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut remote_head = parse_remote_head(&stdout);
+
+    if remote_head.default_branch.is_none() {
+        remote_head.default_branch = repo
+            .head()
+            .ok()
+            .and_then(|head| head.name().map(|value| value.to_string()));
