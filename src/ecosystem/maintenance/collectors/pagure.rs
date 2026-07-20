@@ -210,3 +210,26 @@ fn parse_pagure_repo(url: &str) -> Option<PagureRepoRef> {
 
 fn normalize_url(url: &str) -> Option<Url> {
     if let Ok(parsed) = Url::parse(url) {
+        return Some(parsed);
+    }
+
+    let candidate = format!("https://{}", url.trim());
+    Url::parse(&candidate).ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_pagure_repo_supports_pagure_and_fedora() {
+        let repo = parse_pagure_repo("https://pagure.io/filesystem.git").unwrap();
+        assert_eq!(repo.platform, "pagure");
+        assert_eq!(repo.repo, "filesystem");
+
+        let repo = parse_pagure_repo("https://src.fedoraproject.org/rpms/qt5.git").unwrap();
+        assert_eq!(repo.platform, "fedora-dist-git");
+        assert_eq!(repo.owner, "rpms");
+        assert_eq!(repo.repo, "qt5");
+    }
+}
