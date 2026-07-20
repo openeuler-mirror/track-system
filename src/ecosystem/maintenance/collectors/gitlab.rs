@@ -46,3 +46,27 @@ impl GitLabMaintenanceCollector {
         let repo_url = package
             .l0_repo_url
             .as_deref()
+            .ok_or_else(|| anyhow!("package {} missing l0_repo_url", package.name))?;
+        let repo_ref = parse_gitlab_repo(repo_url)
+            .ok_or_else(|| anyhow!("failed to parse GitLab repo from {}", repo_url))?;
+
+        let token = std::env::var("GITLAB_PRIVATE_TOKEN")
+            .or_else(|_| std::env::var("GITLAB_TOKEN"))
+            .or_else(|_| std::env::var("GITLAB_ACCESS_TOKEN"))
+            .unwrap_or_default();
+        let client = build_client()?;
+        let activity_client = GitLabClient::with_base_url(repo_ref.api_base.clone(), token)?;
+
+        info!(
+            owner = repo_ref.owner,
+            repo = repo_ref.repo,
+            package = package.name,
+            "开始采集 GitLab 平台维护元数据"
+        );
+        let project = fetch_project(&client, &repo_ref).await?;
+
+        debug!(
+            owner = repo_ref.owner,
+            repo = repo_ref.repo,
+            stars = project.star_count,
+            forks = project.forks_count,
