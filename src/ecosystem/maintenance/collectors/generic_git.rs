@@ -883,3 +883,26 @@ fn compute_metrics(repo: &Repository) -> Result<GenericGitMetrics> {
 
     for oid in walk {
         let oid = oid.context("iterate revwalk failed")?;
+        let commit = repo.find_commit(oid).context("find commit failed")?;
+        commit_total += 1;
+
+        if last_commit_at.is_none() {
+            let ts = commit.time().seconds();
+            last_commit_at = Utc.timestamp_opt(ts, 0).single().map(|dt| dt.to_rfc3339());
+        }
+
+        let ts = commit.time().seconds();
+        if ts >= since_ts {
+            commits_last_12_months += 1;
+            let author = commit.author();
+            if let Some(email) = author.email().filter(|email| !email.trim().is_empty()) {
+                unique_committers.insert(email.to_ascii_lowercase());
+            } else if let Some(name) = author.name().filter(|name| !name.trim().is_empty()) {
+                unique_committers.insert(format!("name:{}", name));
+            } else {
+                unique_committers.insert(format!("oid:{}", oid));
+            }
+        }
+    }
+
+    Ok(GenericGitMetrics {
