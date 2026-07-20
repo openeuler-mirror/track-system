@@ -768,3 +768,26 @@ fn latest_version_from_generic_versions(
         .max_by(|(left, _), (right, _)| left.cmp(right))
         .map(|(_, raw)| raw)
 }
+
+fn compare_version_text(left: &str, right: &str) -> std::cmp::Ordering {
+    let left = VersionParser::parse(left).unwrap_or_else(|_| Version::new(0, 0, 0));
+    let right = VersionParser::parse(right).unwrap_or_else(|_| Version::new(0, 0, 0));
+    left.cmp(&right)
+}
+
+fn run_git_command_with_timeout(
+    args: &[String],
+    timeout: Duration,
+    operation: &str,
+) -> Result<Output> {
+    let mut child = Command::new("git")
+        .args(args)
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .with_context(|| format!("spawn git command failed: {}", operation))?;
+
+    let started_at = Instant::now();
+    loop {
+        if let Some(status) = child
