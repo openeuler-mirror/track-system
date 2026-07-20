@@ -46,3 +46,27 @@ impl PagureMaintenanceCollector {
         package
             .l0_repo_url
             .as_deref()
+            .and_then(parse_pagure_repo)
+            .is_some()
+    }
+
+    pub async fn collect(&self, package: &packages::Model) -> Result<Vec<Value>> {
+        let repo_url = package
+            .l0_repo_url
+            .as_deref()
+            .ok_or_else(|| anyhow!("package {} missing l0_repo_url", package.name))?;
+        let repo_ref = parse_pagure_repo(repo_url)
+            .ok_or_else(|| anyhow!("failed to parse Pagure/Fedora repo from {}", repo_url))?;
+
+        info!(
+            owner = repo_ref.owner,
+            repo = repo_ref.repo,
+            package = package.name,
+            platform = repo_ref.platform,
+            "开始采集 Pagure/Fedora 平台维护元数据"
+        );
+
+        let client = Client::builder()
+            .timeout(std::time::Duration::from_secs(DEFAULT_TIMEOUT_SECS))
+            .user_agent("track-system/maintenance-pagure")
+            .build()
