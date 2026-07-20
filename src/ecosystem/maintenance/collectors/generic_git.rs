@@ -1228,3 +1228,26 @@ mod tests {
         assert_eq!(
             normalize_tag_version("refs/tags/project-v2_3_4.pre2").as_deref(),
             Some("2.3.4-pre2")
+        );
+        assert_eq!(
+            compare_version_text("bad", "1.0.0"),
+            std::cmp::Ordering::Less
+        );
+        assert_eq!(
+            normalize_source_url("https://example.com/repo.git/"),
+            "https://example.com/repo"
+        );
+
+        let timeouts = GenericGitTimeouts {
+            fetch_timeout: Duration::from_secs(30),
+            connect_timeout: Duration::from_secs(5),
+            io_timeout: Duration::from_secs(10),
+        };
+        assert_eq!(timeouts.reference_timeout(), Duration::from_secs(15));
+    }
+
+    #[test]
+    #[serial]
+    fn configured_timeout_uses_positive_env_values_only() {
+        let _timeout = EnvGuard::set(GENERIC_GIT_FETCH_TIMEOUT_ENV, "2");
+        assert_eq!(
