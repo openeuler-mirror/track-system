@@ -141,3 +141,26 @@ async fn fetch_project(client: &Client, api_url: &str) -> Result<PagureProjectSn
         .get(api_url)
         .send()
         .await
+        .context("send pagure project request failed")?;
+    let status = response.status();
+    if !status.is_success() {
+        let body = response.text().await.unwrap_or_default();
+        return Err(anyhow!("Pagure API HTTP {}: {}", status.as_u16(), body));
+    }
+
+    response
+        .json::<PagureProjectSnapshot>()
+        .await
+        .context("parse pagure project response failed")
+}
+
+fn parse_pagure_repo(url: &str) -> Option<PagureRepoRef> {
+    let normalized = normalize_url(url)?;
+    let host = normalized.host_str()?;
+    let segments = normalized
+        .path_segments()?
+        .filter(|segment| !segment.is_empty())
+        .map(|segment| segment.trim_end_matches(".git").to_string())
+        .collect::<Vec<_>>();
+
+    match host {
