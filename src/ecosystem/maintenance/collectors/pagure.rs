@@ -70,3 +70,27 @@ impl PagureMaintenanceCollector {
             .timeout(std::time::Duration::from_secs(DEFAULT_TIMEOUT_SECS))
             .user_agent("track-system/maintenance-pagure")
             .build()
+            .context("build pagure maintenance client failed")?;
+
+        let project = fetch_project(&client, &repo_ref.api_url).await?;
+        let owner = project
+            .user
+            .as_ref()
+            .map(|user| user.name.clone())
+            .unwrap_or_else(|| repo_ref.owner.clone());
+        let repo = project.name.unwrap_or_else(|| repo_ref.repo.clone());
+
+        debug!(
+            owner = owner,
+            repo = repo,
+            fullname = project.fullname,
+            platform = repo_ref.platform,
+            "Pagure/Fedora 平台维护元数据采集完成"
+        );
+
+        Ok(vec![
+            json!({
+            "source_type": "pagure_repository_metadata",
+            "source_name": "pagure_repository_metadata",
+            "source_url": project.full_url,
+            "http_status": 200,
