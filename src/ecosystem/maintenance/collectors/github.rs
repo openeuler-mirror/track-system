@@ -453,3 +453,26 @@ mod tests {
             Some(("example".to_string(), "project".to_string()))
         );
         assert_eq!(
+            parse_github_repo("github.com/example/project"),
+            Some(("example".to_string(), "project".to_string()))
+        );
+        assert_eq!(
+            parse_github_repo("www.github.com/example/project/"),
+            Some(("example".to_string(), "project".to_string()))
+        );
+        assert_eq!(
+            parse_github_repo("example/project"),
+            Some(("example".to_string(), "project".to_string()))
+        );
+    }
+
+    #[test]
+    fn parse_github_repo_rejects_non_github_url() {
+        assert_eq!(
+            parse_github_repo("https://sourceware.org/git/binutils-gdb.git"),
+            None
+        );
+    }
+
+    #[test]
+    fn normalized_committer_identity_prefers_email_then_name_then_sha_fallback() {
