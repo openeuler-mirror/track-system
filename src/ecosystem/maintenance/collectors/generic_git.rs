@@ -377,3 +377,26 @@ fn fetch_cached_mirror(
             run_git_command_with_timeout(&fallback_args, timeouts.fetch_timeout, &operation)?;
             Ok(())
         }
+        Err(error) => Err(error),
+    }
+}
+
+fn fetch_command_args(repo_path: &Path, refspec: &str, use_partial_filter: bool) -> Vec<String> {
+    let mut args = vec![
+        format!("--git-dir={}", repo_path.display()),
+        "-c".to_string(),
+        "protocol.version=2".to_string(),
+        "fetch".to_string(),
+        "--quiet".to_string(),
+        "--prune".to_string(),
+        "--no-tags".to_string(),
+    ];
+    if use_partial_filter {
+        args.push("--filter=blob:none".to_string());
+    }
+    args.extend(["origin".to_string(), refspec.to_string()]);
+    args
+}
+
+fn cached_head_matches_remote(repo: &Repository, remote_head: &RemoteHead) -> bool {
+    let Some(remote_oid) = remote_head.head_oid else {
