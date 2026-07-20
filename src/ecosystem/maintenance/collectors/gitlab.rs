@@ -22,3 +22,27 @@ struct GitLabProjectSnapshot {
     forks_count: Option<i64>,
 }
 
+struct GitLabRepoRef {
+    api_base: String,
+    project_path: String,
+    owner: String,
+    repo: String,
+}
+
+impl GitLabMaintenanceCollector {
+    pub fn new() -> Self {
+        Self
+    }
+
+    pub fn matches_package(package: &packages::Model) -> bool {
+        package
+            .l0_repo_url
+            .as_deref()
+            .and_then(parse_gitlab_repo)
+            .is_some()
+    }
+
+    pub async fn collect(&self, package: &packages::Model) -> Result<Vec<Value>> {
+        let repo_url = package
+            .l0_repo_url
+            .as_deref()
