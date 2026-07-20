@@ -837,3 +837,26 @@ fn run_git_command_with_timeout(
 
 fn read_child_pipe(pipe: &mut Option<impl Read>) -> Result<Vec<u8>> {
     let mut buf = Vec::new();
+    if let Some(mut pipe) = pipe.take() {
+        pipe.read_to_end(&mut buf)
+            .context("read git command output failed")?;
+    }
+    Ok(buf)
+}
+
+fn command_output_message(output: &Output) -> String {
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    if !stderr.is_empty() {
+        return stderr;
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if !stdout.is_empty() {
+        return stdout;
+    }
+
+    output
+        .status
+        .code()
+        .map(|code| format!("git exited with status {}", code))
+        .unwrap_or_else(|| "git exited without a status code".to_string())
