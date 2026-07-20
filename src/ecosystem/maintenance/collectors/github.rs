@@ -476,3 +476,26 @@ mod tests {
 
     #[test]
     fn normalized_committer_identity_prefers_email_then_name_then_sha_fallback() {
+        let with_committer_email = GitHubCommitListItem {
+            sha: "a".to_string(),
+            commit: GitHubCommitInfo {
+                author: None,
+                committer: Some(GitHubCommitIdentity {
+                    name: Some("Committer".to_string()),
+                    email: Some("USER@EXAMPLE.COM".to_string()),
+                    date: None,
+                }),
+            },
+        };
+        assert_eq!(
+            normalized_committer_identity(&with_committer_email).as_deref(),
+            Some("user@example.com")
+        );
+
+        let with_author_name = GitHubCommitListItem {
+            sha: "b".to_string(),
+            commit: GitHubCommitInfo {
+                author: Some(GitHubCommitIdentity {
+                    name: Some("Author Name".to_string()),
+                    email: Some("".to_string()),
+                    date: None,
