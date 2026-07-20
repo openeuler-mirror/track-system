@@ -189,3 +189,26 @@ fn parse_gitlab_repo(url: &str) -> Option<GitLabRepoRef> {
         return None;
     }
 
+    let segments = normalized
+        .path_segments()?
+        .filter(|segment| !segment.is_empty())
+        .map(|segment| segment.trim_end_matches(".git").to_string())
+        .collect::<Vec<_>>();
+    if segments.len() < 2 {
+        return None;
+    }
+
+    let repo = segments.last()?.to_string();
+    let owner = segments[..segments.len() - 1].join("/");
+
+    Some(GitLabRepoRef {
+        api_base: format!("{}://{}/api/v4", normalized.scheme(), host),
+        project_path: segments.join("/"),
+        owner,
+        repo,
+    })
+}
+
+fn normalize_repo_url(url: &str) -> Option<Url> {
+    if let Ok(parsed) = Url::parse(url) {
+        return Some(parsed);
