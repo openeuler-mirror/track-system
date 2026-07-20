@@ -118,3 +118,27 @@ impl GitLabMaintenanceCollector {
                         "platform": "gitlab",
                         "owner": repo_ref.owner,
                         "repo": repo_ref.repo,
+                        "repo_html_url": project.web_url,
+                        "default_branch": activity.default_branch,
+                        "commit_total": activity.commit_total,
+                        "commit_total_is_lower_bound": activity.commit_total_is_lower_bound,
+                        "commits_last_12_months": activity.commits_last_12_months,
+                        "commits_last_12_months_is_lower_bound": activity.commits_last_12_months_is_lower_bound,
+                        "committers_last_12_months": activity.committers_last_12_months,
+                        "last_commit_at": activity.last_commit_at,
+                        "stars": project.star_count,
+                        "forks": project.forks_count,
+                    }
+                })),
+                Err(error) => warn!(
+                    owner = repo_ref.owner,
+                    repo = repo_ref.repo,
+                    package = package.name,
+                    error = %error,
+                    "GitLab 活跃度指标采集失败，仅返回平台元数据"
+                ),
+            }
+        }
+
+        Ok(evidence)
+    }
