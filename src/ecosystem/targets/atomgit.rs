@@ -1135,3 +1135,26 @@ mod tests {
         };
         let random_page = PageSnapshot {
             http_status: Some(200),
+            keyword_lines: Vec::new(),
+            plain_text: "AtomGit | GitCode".to_string(),
+            body_fingerprint: Some("shell".to_string()),
+            looks_like_spa_shell: true,
+            error: None,
+        };
+        let result = collector.detect_ip_policy(&terms_page, &route_page, &random_page);
+        assert_eq!(result["users_own_content"], true);
+        assert_eq!(result["license_grant_to_host_content"], true);
+        assert_eq!(result["platform_retains_own_ip"], true);
+        assert_eq!(result["same_as_random_probe"], true);
+    }
+
+    #[test]
+    fn detect_download_integrity_prefers_commit_tag_signature_over_release_checksum() {
+        let collector = AtomGitPlatformCollector::new();
+        let gpg_page = PageSnapshot {
+            http_status: Some(200),
+            keyword_lines: Vec::new(),
+            plain_text: "添加 GPG key 后，可以对提交/Tag 签名，也可以验签。".to_string(),
+            body_fingerprint: Some("gpg".to_string()),
+            looks_like_spa_shell: false,
+            error: None,
