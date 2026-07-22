@@ -284,3 +284,26 @@ impl AtomGitPlatformCollector {
                 }
             }),
             json!({
+                "source_type": "atomgit_operator_profile",
+                "source_name": "atomgit_operator_profile",
+                "source_url": ATOMGIT_PRIVACY_URL,
+                "assessment_category": "source",
+                "assessment_subcategory": "corporate_profile",
+                "data": {
+                    "organization_structure": operator_profile["organization_structure"],
+                    "foundation_status": operator_profile["foundation_status"],
+                    "operator_name": operator_profile["operator_name"],
+                    "hosting_provider": operator_profile["hosting_provider"],
+                    "operator_transition_date": operator_profile["operator_transition_date"],
+                    "operator_transition_mentioned": operator_profile["operator_transition_mentioned"],
+                    "gitcode_integration_mentioned": operator_profile["gitcode_integration_mentioned"],
+                    "privacy_keyword_lines": privacy_page.keyword_lines,
+                    "privacy_http_status": privacy_page.http_status,
+                    "privacy_error": privacy_page.error,
+                }
+            }),
+            json!({
+                "source_type": "atomgit_trade_controls",
+                "source_name": "atomgit_trade_controls",
+                "source_url": ATOMGIT_TRADE_CONTROLS_URL,
+                "assessment_category": "source",
