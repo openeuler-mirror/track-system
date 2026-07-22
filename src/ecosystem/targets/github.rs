@@ -262,3 +262,27 @@ impl GitHubPlatformCollector {
                     "organization_structure": corporate_profile["organization_structure"],
                     "foundation_status": corporate_profile["foundation_status"],
                     "microsoft_acquisition_completed": corporate_profile["microsoft_acquisition_completed"],
+                    "operates_independently_as_business": corporate_profile["operates_independently_as_business"],
+                    "ceo_mentioned": corporate_profile["ceo_mentioned"],
+                    "corporate_keyword_lines": corporate_page.keyword_lines,
+                    "corporate_http_status": corporate_page.http_status,
+                    "corporate_error": corporate_page.error,
+                }
+            }),
+            json!({
+                "source_type": "github_trade_controls",
+                "source_name": "github_trade_controls",
+                "source_url": GITHUB_TRADE_CONTROLS_URL,
+                "assessment_category": "source",
+                "assessment_subcategory": "trade_controls",
+                "data": {
+                    "trade_controls": trade_controls["summary"],
+                    "ofac_license_for_iran": trade_controls["ofac_license_for_iran"],
+                    "public_repo_access_in_sanctioned_regions": trade_controls["public_repo_access_in_sanctioned_regions"],
+                    "itar_restriction_mentioned": trade_controls["itar_restriction_mentioned"],
+                    "restricted_regions_mentioned": trade_controls["restricted_regions_mentioned"],
+                    "trade_keyword_lines": trade_page.keyword_lines,
+                    "trade_http_status": trade_page.http_status,
+                    "trade_error": trade_page.error,
+                }
+            }),
