@@ -190,3 +190,27 @@ impl AtomGitPlatformCollector {
             .await;
         self.log_page_result("atomgit ip policy route", &ip_policy_page);
         let gov_policy_page = self
+            .fetch_page(
+                &client,
+                ATOMGIT_GOV_TAKEDOWN_URL,
+                &["government", "takedown", "下架", "行政机关", "司法机关"],
+            )
+            .await;
+        self.log_page_result("atomgit government takedown route", &gov_policy_page);
+
+        Ok(self.build_evidence_records(
+            home_page,
+            terms_page,
+            privacy_page,
+            cla_page,
+            gpg_page,
+            release_overview_page,
+            release_operations_page,
+            random_policy_probe,
+            trade_policy_page,
+            ip_policy_page,
+            gov_policy_page,
+        ))
+    }
+
+    fn build_evidence_records(
