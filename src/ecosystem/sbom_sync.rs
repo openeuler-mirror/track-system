@@ -279,3 +279,26 @@ fn data_string(value: &Value, key: &str) -> Option<String> {
         .filter(|value| !value.is_empty())
         .map(ToOwned::to_owned)
 }
+
+fn non_empty_option(value: Option<String>) -> Option<String> {
+    value
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
+fn fill_once(slot: &mut Option<String>, value: Option<String>) {
+    if slot.is_none() {
+        *slot = value;
+    }
+}
+
+fn env_bool(key: &str, default: bool) -> bool {
+    std::env::var(key)
+        .ok()
+        .map(|value| {
+            matches!(
+                value.trim().to_ascii_lowercase().as_str(),
+                "1" | "true" | "yes" | "on"
+            )
+        })
+        .unwrap_or(default)
