@@ -532,3 +532,26 @@ mod tests {
         assert!(err.to_string().contains("SBOM_COMMUNITY_SYNC_URL"));
     }
 
+    #[test]
+    #[serial]
+    fn config_from_env_reads_optional_values() {
+        let _enabled = EnvGuard::set("SBOM_COMMUNITY_SYNC_ENABLED", "true");
+        let _url = EnvGuard::set(
+            "SBOM_COMMUNITY_SYNC_URL",
+            "http://sbom.internal/airspm/community/inner-sync",
+        );
+        let _secret = EnvGuard::set("SBOM_COMMUNITY_INNER_SECRET", "secret");
+        let _timeout = EnvGuard::set("SBOM_COMMUNITY_SYNC_TIMEOUT_SECS", "8");
+        let _status = EnvGuard::set("SBOM_COMMUNITY_SYNC_STATUS", "可信");
+
+        let config = SbomCommunitySyncConfig::from_env().unwrap().unwrap();
+
+        assert_eq!(
+            config.endpoint_url,
+            "http://sbom.internal/airspm/community/inner-sync"
+        );
+        assert_eq!(config.inner_secret, "secret");
+        assert_eq!(config.timeout, Duration::from_secs(8));
+        assert_eq!(config.status.as_deref(), Some("可信"));
+    }
+}
