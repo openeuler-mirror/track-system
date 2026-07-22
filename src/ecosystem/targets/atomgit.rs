@@ -1043,3 +1043,26 @@ mod tests {
                     "行政机关",
                 ],
                 12,
+            ),
+            plain_text: text.to_string(),
+            body_fingerprint: Some(sha256_hex(text.as_bytes())),
+            looks_like_spa_shell: false,
+            error: None,
+        }
+    }
+
+    fn spa_shell(fingerprint: &str) -> PageSnapshot {
+        PageSnapshot {
+            http_status: Some(200),
+            keyword_lines: Vec::new(),
+            plain_text: "AtomGit | GitCode".to_string(),
+            body_fingerprint: Some(fingerprint.to_string()),
+            looks_like_spa_shell: true,
+            error: None,
+        }
+    }
+
+    #[test]
+    fn matches_target_accepts_atomgit_aliases() {
+        let target = ecosystem_targets::Model {
+            id: 1,
