@@ -142,3 +142,27 @@ impl AtomGitPlatformCollector {
             )
             .await;
         self.log_page_result("atomgit cla", &cla_page);
+        let gpg_page = self
+            .fetch_page(
+                &client,
+                ATOMGIT_GPG_URL,
+                &["gpg", "提交/tag 签名", "签名密钥", "verified", "signature"],
+            )
+            .await;
+        self.log_page_result("atomgit gpg", &gpg_page);
+        let release_overview_page = self
+            .fetch_page(
+                &client,
+                ATOMGIT_RELEASE_OVERVIEW_URL,
+                &["releases", "发行版", "软件发布列表", "里程碑", "版本追踪"],
+            )
+            .await;
+        self.log_page_result("atomgit release overview", &release_overview_page);
+        let release_operations_page = self
+            .fetch_page(
+                &client,
+                ATOMGIT_RELEASE_OPERATIONS_URL,
+                &["下载源码", "附件", "编辑发行版", "删除发行版", "发行版详情"],
+            )
+            .await;
+        self.log_page_result("atomgit release operations", &release_operations_page);
