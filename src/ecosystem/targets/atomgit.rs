@@ -928,3 +928,26 @@ impl AtomGitPlatformCollector {
             "cloud_vendor_dependency": cloud_vendor_dependency,
             "operator_transition_risk": operator_transition_risk,
             "delegation_transfer_clause": delegation_transfer_clause,
+        })
+    }
+}
+
+fn sha256_hex(data: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(data);
+    format!("{:x}", hasher.finalize())
+}
+
+fn is_reachable(page: &PageSnapshot) -> bool {
+    page.http_status
+        .map(|status| (200..400).contains(&status))
+        .unwrap_or(false)
+}
+
+fn is_same_shell_as_random_probe(page: &PageSnapshot, random_probe: &PageSnapshot) -> bool {
+    match (&page.body_fingerprint, &random_probe.body_fingerprint) {
+        (Some(lhs), Some(rhs)) => lhs == rhs,
+        _ => false,
+    }
+}
+
