@@ -334,3 +334,27 @@ impl GitHubPlatformCollector {
                     "licensing_error": licensing_page.error,
                 }
             }),
+            json!({
+                "source_type": "github_copyright_policy",
+                "source_name": "github_copyright_policy",
+                "source_url": GITHUB_DMCA_URL,
+                "assessment_category": "source",
+                "assessment_subcategory": "copyright_policy",
+                "data": {
+                    "copyright_info": copyright_info["summary"],
+                    "dmca_safe_harbor_mentioned": copyright_info["dmca_safe_harbor_mentioned"],
+                    "counter_notice_supported": copyright_info["counter_notice_supported"],
+                    "github_copyright_notice_mentioned": copyright_info["github_copyright_notice_mentioned"],
+                    "copyright_keyword_lines": copyright_info["copyright_keyword_lines"],
+                    "dmca_http_status": dmca_page.http_status,
+                    "dmca_error": dmca_page.error,
+                }
+            }),
+            json!({
+                "source_type": "github_gov_takedown_archive",
+                "source_name": "github_gov_takedown_archive",
+                "source_url": "https://github.com/github/gov-takedowns",
+                "assessment_category": "source",
+                "assessment_subcategory": "government_takedown_archive",
+                "data": {
+                    "total_requests": gov_takedown_stats["total_requests"],
