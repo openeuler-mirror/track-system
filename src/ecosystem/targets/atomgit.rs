@@ -94,3 +94,27 @@ impl AtomGitPlatformCollector {
             .fetch_page(
                 &client,
                 ATOMGIT_DOCS_HOME_URL,
+                &[
+                    "developer's code home",
+                    "registered users",
+                    "organizations teams",
+                    "open source projects",
+                    "code repository",
+                ],
+            )
+            .await;
+        self.log_page_result("atomgit docs home", &home_page);
+        let terms_page = self
+            .fetch_page(
+                &client,
+                ATOMGIT_TERMS_URL,
+                &[
+                    "版权归作者本人所有",
+                    "开源许可证协议模板",
+                    "atomgit可以自行决定",
+                    "所有权与知识产权",
+                    "非独占性使用许可",
+                    "权利通知",
+                ],
+            )
+            .await;
