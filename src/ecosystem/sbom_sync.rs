@@ -46,3 +46,27 @@ pub struct SbomCommunitySyncClient {
 
 impl SbomCommunitySyncClient {
     pub fn new(config: SbomCommunitySyncConfig) -> Result<Self> {
+        let client = Client::builder()
+            .timeout(config.timeout)
+            .build()
+            .context("create SBOM community sync HTTP client failed")?;
+        Ok(Self { client, config })
+    }
+
+    pub fn from_env() -> Result<Option<Self>> {
+        SbomCommunitySyncConfig::from_env()?
+            .map(Self::new)
+            .transpose()
+    }
+
+    pub async fn sync_report(
+        &self,
+        target: &ecosystem_targets::Model,
+        report: &ecosystem_reports::Model,
+    ) -> Result<SbomCommunitySyncResponse> {
+        let request = build_community_inner_sync_request(target, report, &self.config);
+        let response = self
+            .client
+            .post(&self.config.endpoint_url)
+            .header("Content-Type", "application/json")
+            .json(&request)
