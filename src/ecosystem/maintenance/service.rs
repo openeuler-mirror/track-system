@@ -319,3 +319,25 @@ mod tests {
         assert_eq!(
             summary["sources"],
             json!(["generic_git", "github_repository_activity", "package"])
+        );
+    }
+
+    #[tokio::test]
+    async fn latest_report_queries_latest_package_report() {
+        let now = Utc::now();
+        let report = maintenance_reports::Model {
+            id: 13,
+            package_id: 5,
+            report_type: "maintenance_profile".to_string(),
+            status: "completed".to_string(),
+            overall_risk: "low".to_string(),
+            confidence: "high".to_string(),
+            summary: "latest".to_string(),
+            dimensions: json!({}),
+            evidence_summary: Some(json!({"evidence_count": 1})),
+            report_payload: json!({}),
+            generated_at: now,
+            created_at: now,
+            updated_at: now,
+        };
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
