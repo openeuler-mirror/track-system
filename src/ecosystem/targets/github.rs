@@ -382,3 +382,27 @@ impl GitHubPlatformCollector {
                         }
                     }
                     Err(error) => PageSnapshot {
+                        http_status: Some(status),
+                        keyword_lines: Vec::new(),
+                        plain_text: String::new(),
+                        error: Some(error.to_string()),
+                    },
+                }
+            }
+            Err(error) => PageSnapshot {
+                http_status: None,
+                keyword_lines: Vec::new(),
+                plain_text: String::new(),
+                error: Some(error.to_string()),
+            },
+        }
+    }
+
+    fn log_page_result(&self, label: &str, page: &PageSnapshot) {
+        match &page.error {
+            Some(error) => warn!(
+                page = label,
+                http_status = ?page.http_status,
+                error = %error,
+                "GitHub 页面抓取失败"
+            ),
