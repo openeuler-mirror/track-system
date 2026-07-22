@@ -675,3 +675,26 @@ impl AtomGitPlatformCollector {
                 10
             ),
         })
+    }
+
+    fn detect_government_takedown(
+        &self,
+        terms_page: &PageSnapshot,
+        privacy_page: &PageSnapshot,
+        gov_policy_page: &PageSnapshot,
+        random_policy_probe: &PageSnapshot,
+    ) -> Value {
+        let combined = format!("{}\n{}", terms_page.plain_text, privacy_page.plain_text);
+        let content_removal_reserved =
+            combined.contains("检查和编辑或删除用户提供的信息和材料") || combined.contains("删除");
+        let public_authority_disclosure = combined.contains("行政机关")
+            || combined.contains("司法机关")
+            || combined.contains("公共权力机构");
+        let national_security_disclosure = combined.contains("国家安全");
+        let publishes_public_requests = false;
+        let route_reachable = is_reachable(gov_policy_page);
+        let same_as_random_probe =
+            is_same_shell_as_random_probe(gov_policy_page, random_policy_probe);
+        let machine_readable_policy_text = route_reachable
+            && !gov_policy_page.looks_like_spa_shell
+            && !gov_policy_page.keyword_lines.is_empty();
