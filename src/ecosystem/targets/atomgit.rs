@@ -1250,3 +1250,26 @@ mod tests {
             random_policy_probe,
             trade_policy_page,
             ip_policy_page,
+            gov_policy_page,
+        );
+
+        assert_eq!(evidence.len(), 9);
+        assert_eq!(evidence[0]["source_type"], "atomgit_platform_overview");
+        assert_eq!(evidence[0]["data"]["registered_user_scale"], "12 Million+");
+        assert_eq!(
+            evidence[1]["data"]["operator_name"],
+            "重庆开源共创科技有限公司"
+        );
+        assert_eq!(
+            evidence[2]["data"]["trade_policy_same_as_generic_spa"],
+            true
+        );
+        assert_eq!(evidence[3]["data"]["users_own_content"], true);
+        assert_eq!(evidence[4]["data"]["public_authority_disclosure"], true);
+        assert_eq!(evidence[5]["data"]["supports_license_templates"], true);
+        assert_eq!(evidence[6]["data"]["cla_supported"], true);
+        assert_eq!(evidence[7]["data"]["operator_supply_risk_level"], "MEDIUM");
+        assert_eq!(evidence[8]["data"]["digital_signature_supported"], true);
+        assert_eq!(evidence[8]["data"]["signed_releases"], true);
+    }
+}
