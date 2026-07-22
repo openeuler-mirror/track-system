@@ -46,3 +46,27 @@ impl AtomGitPlatformCollector {
 
     pub fn matches_target(target: &ecosystem_targets::Model) -> bool {
         let name_key = normalize_lookup_key(&target.name);
+        let target_type_key = normalize_lookup_key(&target.target_type);
+        let rule_profile_key = normalize_lookup_key(&target.rule_profile);
+        let platform_key = target
+            .platform
+            .as_deref()
+            .map(normalize_lookup_key)
+            .unwrap_or_default();
+        let homepage_key = target
+            .homepage_url
+            .as_deref()
+            .map(normalize_lookup_key)
+            .unwrap_or_default();
+
+        let explicit_name_match = matches!(
+            name_key.as_str(),
+            "atomgit" | "atomgitplatform" | "gitcode" | "gitcodeplatform"
+        );
+        let explicit_profile_match =
+            rule_profile_key == "atomgitplatform" || rule_profile_key.contains("atomgitplatform");
+        let explicit_homepage_match =
+            homepage_key.contains("atomgitcom") || homepage_key.contains("docsatomgitcom");
+        let is_platform_target = target_type_key == "platform";
+        let platform_matches =
+            platform_key == "atomgit" || platform_key == "gitcode" || explicit_profile_match;
