@@ -859,3 +859,26 @@ impl AtomGitPlatformCollector {
             } else {
                 ""
             },
+            if !documented_release_artifact_signature && !provenance_attestation {
+                "，也未见公开的 Release 附件数字签名或来源证明文档，因此作为发行版代码下载平台，其完整性保障更偏向提交/Tag 层签名，而非下载物内建校验"
+            } else {
+                ""
+            }
+        );
+
+        json!({
+            "summary": summary,
+            "hash_verification_supported": hash_verification_supported,
+            "digital_signature_supported": digital_signature_supported,
+            "supports_gpg_commit_tag_verification": supports_gpg_commit_tag_verification,
+            "supports_release_attachments": supports_release_attachments,
+            "documented_release_checksum": documented_release_checksum,
+            "documented_release_artifact_signature": documented_release_artifact_signature,
+            "signed_releases": signed_releases,
+            "provenance_attestation": provenance_attestation,
+        })
+    }
+
+    fn detect_operator_supply_risk(
+        &self,
+        privacy_page: &PageSnapshot,
