@@ -358,3 +358,27 @@ impl GitHubPlatformCollector {
                 "assessment_subcategory": "government_takedown_archive",
                 "data": {
                     "total_requests": gov_takedown_stats["total_requests"],
+                    "requests_by_requester": gov_takedown_stats["requests_by_requester"],
+                    "truncated": gov_takedown_stats["truncated"],
+                    "data_source": "github/gov-takedowns",
+                    "archive_error": gov_takedown_stats["error"],
+                }
+            }),
+        ]
+    }
+
+    async fn fetch_page(&self, client: &Client, url: &str, keywords: &[&str]) -> PageSnapshot {
+        match client.get(url).send().await {
+            Ok(response) => {
+                let status = response.status().as_u16();
+                match response.text().await {
+                    Ok(body) => {
+                        let plain_text = strip_tags(&body);
+                        PageSnapshot {
+                            http_status: Some(status),
+                            keyword_lines: extract_keyword_lines(&plain_text, keywords, 12),
+                            plain_text,
+                            error: None,
+                        }
+                    }
+                    Err(error) => PageSnapshot {
