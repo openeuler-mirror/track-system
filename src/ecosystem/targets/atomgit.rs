@@ -491,3 +491,26 @@ impl AtomGitPlatformCollector {
 
     fn detect_basic_info(&self, home_page: &PageSnapshot) -> Value {
         let text = home_page.plain_text.as_str();
+        let lower = text.to_ascii_lowercase();
+        let registered_user_scale = extract_metric_with_phrase(text, "Registered Users");
+        let organization_scale = extract_metric_with_phrase(text, "Organizations Teams");
+        let project_scale = extract_metric_with_phrase(text, "Open Source Projects");
+        let repository_scale = extract_metric_with_phrase(text, "Code Repository");
+        let has_platform_intro = lower.contains("developer's code home")
+            || lower.contains("open source community")
+            || lower.contains("software development platform");
+
+        let summary = if has_platform_intro {
+            format!(
+                "AtomGit 是面向开发者的开源社区与代码托管协作平台{}{}{}{}",
+                registered_user_scale
+                    .as_ref()
+                    .map(|v| format!("，公开页面提及 {} Registered Users", v))
+                    .unwrap_or_default(),
+                organization_scale
+                    .as_ref()
+                    .map(|v| format!("、{} Organizations Teams", v))
+                    .unwrap_or_default(),
+                project_scale
+                    .as_ref()
+                    .map(|v| format!("、{} Open Source Projects", v))
