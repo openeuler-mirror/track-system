@@ -286,3 +286,27 @@ impl GitHubPlatformCollector {
                     "trade_error": trade_page.error,
                 }
             }),
+            json!({
+                "source_type": "github_ip_policy",
+                "source_name": "github_ip_policy",
+                "source_url": GITHUB_TERMS_URL,
+                "assessment_category": "source",
+                "assessment_subcategory": "ip_policy",
+                "data": {
+                    "ip_policy": ip_policy["summary"],
+                    "users_own_content": ip_policy["users_own_content"],
+                    "github_retains_platform_ip": ip_policy["github_retains_platform_ip"],
+                    "license_grant_to_host_content": ip_policy["license_grant_to_host_content"],
+                    "ip_keyword_lines": ip_policy["ip_keyword_lines"],
+                    "terms_http_status": terms_page.http_status,
+                    "terms_error": terms_page.error,
+                }
+            }),
+            json!({
+                "source_type": "github_government_takedown",
+                "source_name": "github_government_takedown",
+                "source_url": GITHUB_GOV_TAKEDOWN_URL,
+                "assessment_category": "source",
+                "assessment_subcategory": "government_takedown_policy",
+                "data": {
+                    "government_takedown_policy": government_takedown["summary"],
