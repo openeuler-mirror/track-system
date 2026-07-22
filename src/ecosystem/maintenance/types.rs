@@ -18,3 +18,22 @@ pub struct MaintenanceIndicator {
     pub source: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MaintenanceSubAssessment {
+    pub level: String,
+    pub confidence: String,
+    pub score: i32,
+    pub coverage: i32,
+    pub reasons: Vec<String>,
+    pub evidence_refs: Vec<String>,
+    pub indicators: Vec<MaintenanceIndicator>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MaintenanceRefreshContext {
+    pub package_id: i32,
+    pub package_name: String,
+    pub l0_repo_url: Option<String>,
+    pub refreshed_at: DateTime<Utc>,
+    pub assessment_version: String,
+}
