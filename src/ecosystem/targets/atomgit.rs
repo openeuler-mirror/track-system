@@ -882,3 +882,26 @@ impl AtomGitPlatformCollector {
     fn detect_operator_supply_risk(
         &self,
         privacy_page: &PageSnapshot,
+        terms_page: &PageSnapshot,
+    ) -> Value {
+        let privacy = privacy_page.plain_text.as_str();
+        let terms = terms_page.plain_text.as_str();
+        let single_operator_concentration = privacy.contains("重庆开源共创科技有限公司");
+        let cloud_vendor_dependency = privacy.contains("华为云计算技术有限公司");
+        let operator_transition_risk = privacy.contains("变更为重庆开源共创科技有限公司")
+            || privacy.contains("2025 年 9 月 9 日");
+        let delegation_transfer_clause =
+            terms.contains("全部或部分义务进行转让") || terms.contains("委托第三方运营");
+
+        let risk_level = if single_operator_concentration
+            && (cloud_vendor_dependency || operator_transition_risk)
+        {
+            "MEDIUM"
+        } else {
+            "LOW"
+        };
+
+        let summary = format!(
+            "AtomGit 当前由单一运营主体重庆开源共创科技有限公司负责运营{}{}{}，因此运营侧供应风险评估为 {}：若运营策略、合规要求、与 GitCode 的整合节奏或底层云资源发生变化，代码分发连续性可能受到影响",
+            if operator_transition_risk {
+                "，且公开政策显示 2025-09-09 发生过运营主体切换"
