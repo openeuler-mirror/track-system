@@ -113,3 +113,26 @@ impl<'a> MaintenanceService<'a> {
                 "package_level": package.level,
                 "l0_repo_url": package.l0_repo_url,
                 "description": package.description,
+            }
+        })];
+
+        evidence.extend(self.collect_platform_evidence(package).await?);
+
+        Ok(evidence)
+    }
+
+    async fn collect_platform_evidence(&self, package: &packages::Model) -> Result<Vec<Value>> {
+        let mut evidence = Vec::new();
+
+        if GitHubMaintenanceCollector::matches_package(package) {
+            evidence.extend(GitHubMaintenanceCollector::new().collect(package).await?);
+        } else if GitLabMaintenanceCollector::matches_package(package) {
+            evidence.extend(GitLabMaintenanceCollector::new().collect(package).await?);
+        } else if GiteeMaintenanceCollector::matches_package(package) {
+            evidence.extend(GiteeMaintenanceCollector::new().collect(package).await?);
+        } else if AtomGitMaintenanceCollector::matches_package(package) {
+            match AtomGitMaintenanceCollector::new().collect(package).await {
+                Ok(mut specialized) => evidence.append(&mut specialized),
+                Err(error) => warn!(
+                    package = package.name,
+                    error = %error,
