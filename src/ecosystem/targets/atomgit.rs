@@ -1089,3 +1089,26 @@ mod tests {
     }
 
     #[test]
+    fn matches_target_rejects_generic_atomgit_repository() {
+        let target = ecosystem_targets::Model {
+            id: 2,
+            name: "elfutils".to_string(),
+            target_type: "repository".to_string(),
+            platform: Some("atomgit".to_string()),
+            role: "application".to_string(),
+            homepage_url: Some("https://atomgit.com/src-openeuler/elfutils".to_string()),
+            api_base_url: Some("https://api.atomgit.com/api/v5".to_string()),
+            owner: Some("src-openeuler".to_string()),
+            repo: Some("elfutils".to_string()),
+            default_branch: Some("master".to_string()),
+            status: "active".to_string(),
+            refresh_interval_hours: 24,
+            rule_profile: "default".to_string(),
+            metadata: None,
+            last_collected_at: None,
+            last_report_at: None,
+            last_error: None,
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        };
+        assert!(!AtomGitPlatformCollector::matches_target(&target));
