@@ -629,3 +629,26 @@ impl AtomGitPlatformCollector {
             text.contains("权利通知") && text.contains("知识产权声明");
         let route_reachable = is_reachable(ip_policy_page);
         let same_as_random_probe =
+            is_same_shell_as_random_probe(ip_policy_page, random_policy_probe);
+        let machine_readable_policy_text = route_reachable
+            && !ip_policy_page.looks_like_spa_shell
+            && !ip_policy_page.keyword_lines.is_empty();
+
+        let summary = format!(
+            "AtomGit 条款明确{}{}{}{}",
+            if users_own_content {
+                "用户上传内容版权归作者本人所有"
+            } else {
+                "用户内容权属边界需要进一步结合条款确认"
+            },
+            if license_grant_to_host_content {
+                "，发布内容时需向平台授予非独占使用许可"
+            } else {
+                ""
+            },
+            if platform_retains_own_ip {
+                "；平台程序、页面与服务相关知识产权由平台保留"
+            } else {
+                ""
+            },
+            if ip_notice_process_mentioned {
