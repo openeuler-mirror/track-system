@@ -94,3 +94,27 @@ impl SbomCommunitySyncClient {
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct CommunityInnerSyncReq {
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub website_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub contact_info: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub build_date: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub function_description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub necessity_introduction: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub introduction_department: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub report_status: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub risk_level: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub confidence: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
