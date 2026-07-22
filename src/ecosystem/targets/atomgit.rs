@@ -261,3 +261,26 @@ impl AtomGitPlatformCollector {
             cla_policy = %cla_policy["summary"].as_str().unwrap_or(""),
             download_integrity = %download_integrity["summary"].as_str().unwrap_or(""),
             operator_supply_risk = %operator_supply_risk["summary"].as_str().unwrap_or(""),
+            "AtomGit 平台生态目标关键信息提取完成"
+        );
+
+        vec![
+            json!({
+                "source_type": "atomgit_platform_overview",
+                "source_name": "atomgit_platform_overview",
+                "source_url": ATOMGIT_DOCS_HOME_URL,
+                "assessment_category": "source",
+                "assessment_subcategory": "platform_overview",
+                "data": {
+                    "platform_intro": basic_info["summary"],
+                    "registered_user_scale": basic_info["registered_user_scale"],
+                    "organization_scale": basic_info["organization_scale"],
+                    "project_scale": basic_info["project_scale"],
+                    "repository_scale": basic_info["repository_scale"],
+                    "basic_info": basic_info["summary"],
+                    "home_keyword_lines": home_page.keyword_lines,
+                    "home_http_status": home_page.http_status,
+                    "home_error": home_page.error,
+                }
+            }),
+            json!({
