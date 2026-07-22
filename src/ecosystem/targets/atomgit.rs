@@ -214,3 +214,27 @@ impl AtomGitPlatformCollector {
     }
 
     fn build_evidence_records(
+        &self,
+        home_page: PageSnapshot,
+        terms_page: PageSnapshot,
+        privacy_page: PageSnapshot,
+        cla_page: PageSnapshot,
+        gpg_page: PageSnapshot,
+        release_overview_page: PageSnapshot,
+        release_operations_page: PageSnapshot,
+        random_policy_probe: PageSnapshot,
+        trade_policy_page: PageSnapshot,
+        ip_policy_page: PageSnapshot,
+        gov_policy_page: PageSnapshot,
+    ) -> Vec<Value> {
+        let basic_info = self.detect_basic_info(&home_page);
+        let operator_profile = self.detect_operator_profile(&privacy_page);
+        let trade_controls = self.detect_trade_controls(
+            &trade_policy_page,
+            &random_policy_probe,
+            &terms_page,
+            &privacy_page,
+        );
+        let ip_policy = self.detect_ip_policy(&terms_page, &ip_policy_page, &random_policy_probe);
+        let government_takedown = self.detect_government_takedown(
+            &terms_page,
