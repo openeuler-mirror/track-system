@@ -376,3 +376,26 @@ impl AtomGitPlatformCollector {
             }),
             json!({
                 "source_type": "atomgit_cla_policy",
+                "source_name": "atomgit_cla_policy",
+                "source_url": ATOMGIT_CLA_URL,
+                "assessment_category": "source",
+                "assessment_subcategory": "cla_policy",
+                "data": {
+                    "cla_policy": cla_policy["summary"],
+                    "cla_supported": cla_policy["cla_supported"],
+                    "cla_management_scope": cla_policy["cla_management_scope"],
+                    "cla_keyword_lines": cla_policy["cla_keyword_lines"],
+                    "cla_http_status": cla_page.http_status,
+                    "cla_error": cla_page.error,
+                }
+            }),
+            json!({
+                "source_type": "atomgit_operator_supply_risk",
+                "source_name": "atomgit_operator_supply_risk",
+                "source_url": ATOMGIT_PRIVACY_URL,
+                "assessment_category": "source",
+                "assessment_subcategory": "operator_supply_risk",
+                "data": {
+                    "operator_supply_risk": operator_supply_risk["summary"],
+                    "operator_supply_risk_level": operator_supply_risk["risk_level"],
+                    "single_operator_concentration": operator_supply_risk["single_operator_concentration"],
