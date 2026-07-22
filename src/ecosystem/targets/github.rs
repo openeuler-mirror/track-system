@@ -118,3 +118,27 @@ impl GitHubPlatformCollector {
         let trade_page = self
             .fetch_page(
                 &client,
+                GITHUB_TRADE_CONTROLS_URL,
+                &[
+                    "export administration regulations",
+                    "OFAC",
+                    "sanctioned regions",
+                    "public repository services",
+                    "ITAR",
+                    "trade control",
+                ],
+            )
+            .await;
+        self.log_page_result("github trade controls", &trade_page);
+        let gov_page = self
+            .fetch_page(
+                &client,
+                GITHUB_GOV_TAKEDOWN_URL,
+                &[
+                    "government",
+                    "takedown",
+                    "illegal content",
+                    "appeal",
+                    "public gov-takedowns repository",
+                    "geographic scope",
+                ],
