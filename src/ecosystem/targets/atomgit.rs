@@ -70,3 +70,27 @@ impl AtomGitPlatformCollector {
         let is_platform_target = target_type_key == "platform";
         let platform_matches =
             platform_key == "atomgit" || platform_key == "gitcode" || explicit_profile_match;
+
+        (explicit_name_match || explicit_profile_match || explicit_homepage_match)
+            && platform_matches
+            && is_platform_target
+    }
+
+    pub async fn collect(&self, target: &ecosystem_targets::Model) -> Result<Vec<Value>> {
+        if !Self::matches_target(target) {
+            return Ok(Vec::new());
+        }
+
+        info!("开始采集 AtomGit 平台生态目标信息");
+        let client = Client::builder()
+            .timeout(configured_fetch_timeout(
+                "ECOSYSTEM_ATOMGIT_FETCH_TIMEOUT_SECS",
+                DEFAULT_TIMEOUT_SECS,
+            ))
+            .user_agent("track-system/ecosystem-atomgit")
+            .build()?;
+
+        let home_page = self
+            .fetch_page(
+                &client,
+                ATOMGIT_DOCS_HOME_URL,
