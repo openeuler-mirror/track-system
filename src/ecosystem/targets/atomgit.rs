@@ -166,3 +166,27 @@ impl AtomGitPlatformCollector {
             )
             .await;
         self.log_page_result("atomgit release operations", &release_operations_page);
+
+        let random_policy_probe_url =
+            format!("https://atomgit.com/__policy_probe__/{}", Uuid::new_v4());
+        let random_policy_probe = self
+            .fetch_page(&client, &random_policy_probe_url, &[])
+            .await;
+        self.log_page_result("atomgit random policy probe", &random_policy_probe);
+        let trade_policy_page = self
+            .fetch_page(
+                &client,
+                ATOMGIT_TRADE_CONTROLS_URL,
+                &["trade", "control", "sanction", "管制", "制裁"],
+            )
+            .await;
+        self.log_page_result("atomgit trade policy route", &trade_policy_page);
+        let ip_policy_page = self
+            .fetch_page(
+                &client,
+                ATOMGIT_IP_POLICY_URL,
+                &["dmca", "copyright", "知识产权", "侵权", "权利通知"],
+            )
+            .await;
+        self.log_page_result("atomgit ip policy route", &ip_policy_page);
+        let gov_policy_page = self
