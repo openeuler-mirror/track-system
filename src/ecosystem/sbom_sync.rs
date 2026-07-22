@@ -70,3 +70,27 @@ impl SbomCommunitySyncClient {
             .post(&self.config.endpoint_url)
             .header("Content-Type", "application/json")
             .json(&request)
+            .send()
+            .await
+            .context("send SBOM community sync request failed")?;
+
+        let status = response.status();
+        let body = response
+            .text()
+            .await
+            .context("read SBOM community sync response failed")?;
+
+        if !status.is_success() {
+            return Err(anyhow!(
+                "SBOM community sync HTTP status {}: {}",
+                status,
+                body
+            ));
+        }
+
+        parse_community_inner_sync_response(&body)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct CommunityInnerSyncReq {
