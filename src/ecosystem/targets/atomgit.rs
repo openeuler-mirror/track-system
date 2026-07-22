@@ -1204,3 +1204,26 @@ mod tests {
             keyword_lines: Vec::new(),
             plain_text:
                 "平台可以在任何时候将本协议项下的全部或部分义务进行转让，也可委托第三方运营。"
+                    .to_string(),
+            body_fingerprint: Some("terms".to_string()),
+            looks_like_spa_shell: false,
+            error: None,
+        };
+        let result = collector.detect_operator_supply_risk(&privacy_page, &terms_page);
+        assert_eq!(result["risk_level"], "MEDIUM");
+        assert_eq!(result["single_operator_concentration"], true);
+        assert_eq!(result["cloud_vendor_dependency"], true);
+        assert_eq!(result["operator_transition_risk"], true);
+        assert_eq!(result["delegation_transfer_clause"], true);
+    }
+
+    #[test]
+    fn build_evidence_records_maps_atomgit_platform_signals() {
+        let collector = AtomGitPlatformCollector::new();
+        let home_page = page(
+            "Developer's code home for open source community. 12 Million+ Registered Users, 100 Thousand+ Organizations Teams, 5 Million+ Open Source Projects and 20 Million+ Code Repository.",
+        );
+        let terms_page = page(
+            "AtomGit上的用户信息和内容的版权归作者本人所有。用户可选择开源许可证协议模板。AtomGit可以自行决定以全部或任何方式使用和分享用户信息与内容，并保留与服务相关的所有权与知识产权。平台可以在任何时候将本协议项下的全部或部分义务进行转让，也可委托第三方运营，并保留对违规内容进行删除、编辑、屏蔽或下架的权利。",
+        );
+        let privacy_page = page(
