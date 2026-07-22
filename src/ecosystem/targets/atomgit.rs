@@ -422,3 +422,26 @@ impl AtomGitPlatformCollector {
                     "provenance_attestation": download_integrity["provenance_attestation"],
                     "gpg_keyword_lines": gpg_page.keyword_lines,
                     "release_keyword_lines": release_operations_page.keyword_lines,
+                    "gpg_http_status": gpg_page.http_status,
+                    "release_http_status": release_operations_page.http_status,
+                }
+            }),
+        ]
+    }
+
+    async fn fetch_page(&self, client: &Client, url: &str, keywords: &[&str]) -> PageSnapshot {
+        match client.get(url).send().await {
+            Ok(response) => {
+                let status = response.status().as_u16();
+                match response.text().await {
+                    Ok(body) => {
+                        let plain_text = strip_tags(&body);
+                        PageSnapshot {
+                            http_status: Some(status),
+                            keyword_lines: extract_keyword_lines(&plain_text, keywords, 12),
+                            body_fingerprint: Some(sha256_hex(plain_text.as_bytes())),
+                            looks_like_spa_shell: looks_like_spa_shell(&body),
+                            plain_text,
+                            error: None,
+                        }
+                    }
