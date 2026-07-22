@@ -46,3 +46,27 @@ impl GitHubPlatformCollector {
         let rule_profile_key = normalize_lookup_key(&target.rule_profile);
         let platform_key = target
             .platform
+            .as_deref()
+            .map(normalize_lookup_key)
+            .unwrap_or_default();
+        let homepage_key = target
+            .homepage_url
+            .as_deref()
+            .map(normalize_lookup_key)
+            .unwrap_or_default();
+
+        let explicit_name_match = matches!(
+            name_key.as_str(),
+            "github" | "githubplatform" | "githubcommunity"
+        );
+        let explicit_profile_match =
+            rule_profile_key == "githubplatform" || rule_profile_key.contains("githubplatform");
+        let explicit_homepage_match = homepage_key.contains("githubcomabout")
+            || homepage_key.contains("docsgithubcomensitepolicy");
+        let is_platform_target = target_type_key == "platform";
+
+        (explicit_name_match || explicit_profile_match || explicit_homepage_match)
+            && (platform_key == "github" || explicit_profile_match || is_platform_target)
+            && is_platform_target
+    }
+
