@@ -1181,3 +1181,26 @@ mod tests {
             &release_operations_page,
         );
         assert_eq!(result["supports_gpg_commit_tag_verification"], true);
+        assert_eq!(result["supports_release_attachments"], true);
+        assert_eq!(result["documented_release_checksum"], false);
+        assert_eq!(result["documented_release_artifact_signature"], false);
+        assert_eq!(result["digital_signature_supported"], true);
+        assert_eq!(result["hash_verification_supported"], false);
+    }
+
+    #[test]
+    fn detect_operator_supply_risk_uses_operator_and_cloud_dependency() {
+        let collector = AtomGitPlatformCollector::new();
+        let privacy_page = PageSnapshot {
+            http_status: Some(200),
+            keyword_lines: Vec::new(),
+            plain_text: "自 2025 年 9 月 9 日起，AtomGit 平台运营者由开放原子开源基金会变更为重庆开源共创科技有限公司。由华为云计算技术有限公司提供代码托管服务。".to_string(),
+            body_fingerprint: Some("privacy".to_string()),
+            looks_like_spa_shell: false,
+            error: None,
+        };
+        let terms_page = PageSnapshot {
+            http_status: Some(200),
+            keyword_lines: Vec::new(),
+            plain_text:
+                "平台可以在任何时候将本协议项下的全部或部分义务进行转让，也可委托第三方运营。"
