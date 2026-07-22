@@ -463,3 +463,26 @@ mod tests {
         assert_eq!(
             req.version_lifecycle.as_deref(),
             Some("LTS 版本提供长期支持")
+        );
+        assert_eq!(req.license_info.as_deref(), Some("Mulan PSL v2"));
+        assert_eq!(req.cla_info.as_deref(), Some("贡献前需要签署 CLA"));
+        assert_eq!(req.inner_secret, "secret");
+        assert_eq!(req.status, None);
+    }
+
+    #[test]
+    fn build_request_omits_empty_status_and_uses_repository_contact_fallback() {
+        let mut config = config();
+        config.status = Some("可信".to_string());
+        let target = target(None);
+        let report = report(json!({}));
+
+        let req = build_community_inner_sync_request(&target, &report, &config);
+
+        assert_eq!(req.status.as_deref(), Some("可信"));
+        assert_eq!(
+            req.contact_info.as_deref(),
+            Some("https://gitee.com/openeuler/community")
+        );
+        assert_eq!(
+            req.function_description.as_deref(),
