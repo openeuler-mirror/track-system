@@ -652,3 +652,26 @@ impl AtomGitPlatformCollector {
                 ""
             },
             if ip_notice_process_mentioned {
+                "，并提供权利通知/知识产权声明处理机制"
+            } else if route_reachable && !machine_readable_policy_text {
+                "；知识产权政策路由可达，但当前未提供可读正文"
+            } else {
+                ""
+            }
+        );
+
+        json!({
+            "summary": summary,
+            "users_own_content": users_own_content,
+            "license_grant_to_host_content": license_grant_to_host_content,
+            "platform_retains_own_ip": platform_retains_own_ip,
+            "ip_notice_process_mentioned": ip_notice_process_mentioned,
+            "route_reachable": route_reachable,
+            "machine_readable_policy_text": machine_readable_policy_text,
+            "same_as_random_probe": same_as_random_probe,
+            "ip_keyword_lines": extract_keyword_lines(
+                text,
+                &["版权归作者本人所有", "非独占性使用许可", "知识产权", "权利通知", "版权法保护"],
+                10
+            ),
+        })
