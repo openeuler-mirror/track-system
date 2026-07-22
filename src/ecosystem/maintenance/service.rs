@@ -341,3 +341,25 @@ mod tests {
             updated_at: now,
         };
         let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results(vec![vec![report.clone()]])
+            .into_connection();
+        let service = MaintenanceService::new(&db);
+
+        let latest = service.latest_report(5).await.unwrap();
+
+        assert_eq!(latest, Some(report));
+    }
+
+    #[tokio::test]
+    async fn save_report_maps_assessment_to_report_model() {
+        let now = Utc::now();
+        let report = maintenance_reports::Model {
+            id: 15,
+            package_id: 5,
+            report_type: "maintenance_profile".to_string(),
+            status: "completed".to_string(),
+            overall_risk: "medium".to_string(),
+            confidence: "high".to_string(),
+            summary: "maintenance summary".to_string(),
+            dimensions: json!({"activity_risk": {"level": "medium"}}),
+            evidence_summary: Some(json!({"evidence_count": 1})),
