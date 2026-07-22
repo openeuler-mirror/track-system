@@ -302,3 +302,26 @@ fn env_bool(key: &str, default: bool) -> bool {
             )
         })
         .unwrap_or(default)
+}
+
+fn required_env(key: &str) -> Result<String> {
+    optional_env(key)
+        .ok_or_else(|| anyhow!("{key} is required when SBOM community sync is enabled"))
+}
+
+fn optional_env(key: &str) -> Option<String> {
+    std::env::var(key)
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Utc;
+    use serde_json::json;
+    use serial_test::serial;
+    use std::ffi::OsString;
+
+    struct EnvGuard {
