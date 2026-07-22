@@ -159,3 +159,26 @@ impl<'a> MaintenanceService<'a> {
                     package = package.name,
                     repo_url = package.l0_repo_url.as_deref().unwrap_or_default(),
                     error = %error,
+                    "L0 Git tag 版本目录采集失败，跳过版本目录证据"
+                ),
+            }
+        }
+
+        Ok(evidence)
+    }
+
+    fn build_evidence_summary(
+        &self,
+        package: &packages::Model,
+        evidence_payloads: &[Value],
+    ) -> Value {
+        let mut category_counts: BTreeMap<String, usize> = BTreeMap::new();
+        let mut subcategory_counts: BTreeMap<String, usize> = BTreeMap::new();
+        let mut source_names = BTreeSet::new();
+
+        for payload in evidence_payloads {
+            if let Some(category) = payload.get("assessment_category").and_then(Value::as_str) {
+                *category_counts.entry(category.to_string()).or_default() += 1;
+            }
+            if let Some(subcategory) = payload
+                .get("assessment_subcategory")
