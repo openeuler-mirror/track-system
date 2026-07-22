@@ -297,3 +297,25 @@ mod tests {
                 "assessment_subcategory": "package_definition",
                 "source_name": "package"
             }),
+            json!({
+                "assessment_category": "maintenance",
+                "assessment_subcategory": "repository_activity",
+                "source_name": "github_repository_activity"
+            }),
+            json!({
+                "assessment_category": "version",
+                "assessment_subcategory": "version_catalog",
+                "source_name": "generic_git"
+            }),
+        ];
+
+        let summary = service.build_evidence_summary(&package, &evidence);
+
+        assert_eq!(summary["evidence_count"], 3);
+        assert_eq!(summary["package_id"], 5);
+        assert_eq!(summary["package_name"], "openssl");
+        assert_eq!(summary["category_counts"]["maintenance"], 2);
+        assert_eq!(summary["subcategory_counts"]["repository_activity"], 1);
+        assert_eq!(
+            summary["sources"],
+            json!(["generic_git", "github_repository_activity", "package"])
