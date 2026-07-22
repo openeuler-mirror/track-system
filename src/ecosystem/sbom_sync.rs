@@ -164,3 +164,26 @@ pub fn build_community_inner_sync_request(
         build_date: metadata_string(metadata, "build_date"),
         function_description: metadata_string(metadata, "function_description")
             .or_else(|| Some(default_function_description(target))),
+        necessity_introduction: metadata_string(metadata, "necessity_introduction"),
+        introduction_department: metadata_string(metadata, "introduction_department"),
+        report_status: non_empty_option(Some(report.status.clone())),
+        risk_level: non_empty_option(Some(report.overall_risk.clone())),
+        confidence: non_empty_option(Some(report.confidence.clone())),
+        summary: non_empty_option(Some(report.summary.clone())),
+        organization_structure: focus.organization_structure,
+        foundation_info: focus.foundation_info,
+        operator_info: metadata_string(metadata, "operator_info").or(focus.operator_info),
+        version_lifecycle: focus.version_lifecycle,
+        license_info: focus.license_info,
+        cla_info: focus.cla_info,
+        inner_secret: config.inner_secret.clone(),
+    }
+}
+
+pub fn parse_community_inner_sync_response(body: &str) -> Result<SbomCommunitySyncResponse> {
+    let response = serde_json::from_str::<SbomCommunitySyncResponse>(body)
+        .context("parse SBOM community sync response failed")?;
+
+    if response.code != 0 {
+        return Err(anyhow!(
+            "SBOM community sync failed: code={}, msg={}",
