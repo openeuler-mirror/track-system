@@ -744,3 +744,26 @@ impl AtomGitPlatformCollector {
         let text = terms_page.plain_text.as_str();
         let supports_license_templates = text.contains("开源许可证协议模板");
         let license_remains_with_author = text.contains("版权归作者本人所有");
+        let summary = format!(
+            "AtomGit 条款{}{}",
+            if supports_license_templates {
+                "提及用户可选择平台提供的既有开源许可证协议模板"
+            } else {
+                "未从当前公开页面稳定识别到平台许可证模板能力"
+            },
+            if license_remains_with_author {
+                "，同时强调用户内容版权仍归作者本人所有"
+            } else {
+                ""
+            }
+        );
+
+        json!({
+            "summary": summary,
+            "supports_license_templates": supports_license_templates,
+            "license_remains_with_author": license_remains_with_author,
+            "license_keyword_lines": extract_keyword_lines(
+                text,
+                &["开源许可证协议模板", "版权归作者本人所有", "使用许可"],
+                8
+            ),
