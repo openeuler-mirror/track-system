@@ -537,3 +537,26 @@ impl AtomGitPlatformCollector {
         let text = privacy_page.plain_text.as_str();
         let operator_transition_mentioned = text
             .contains("开放原子开源基金会变更为重庆开源共创科技有限公司")
+            || text.contains("2025 年 9 月 9 日");
+        let gitcode_integration_mentioned =
+            text.contains("GitCode 平台用户体系、产品体系、运营体系和客服体系");
+        let operator_name = if text.contains("重庆开源共创科技有限公司") {
+            Some("重庆开源共创科技有限公司".to_string())
+        } else {
+            None
+        };
+        let hosting_provider = if text.contains("华为云计算技术有限公司") {
+            Some("华为云计算技术有限公司".to_string())
+        } else {
+            None
+        };
+
+        let organization_structure = if operator_transition_mentioned {
+            "AtomGit 当前由重庆开源共创科技有限公司运营，并与 GitCode 平台体系深度融合，整体属于商业公司主导的平台治理模式".to_string()
+        } else {
+            "AtomGit 更接近公司化平台运营模式，治理结构由平台运营团队与服务体系主导".to_string()
+        };
+
+        let foundation_status = if operator_transition_mentioned {
+            "隐私政策明确自 2025-09-09 起运营主体由开放原子开源基金会变更为重庆开源共创科技有限公司，当前不属于基金会直接独立运营形态".to_string()
+        } else {
