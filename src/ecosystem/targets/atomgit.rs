@@ -238,3 +238,26 @@ impl AtomGitPlatformCollector {
         let ip_policy = self.detect_ip_policy(&terms_page, &ip_policy_page, &random_policy_probe);
         let government_takedown = self.detect_government_takedown(
             &terms_page,
+            &privacy_page,
+            &gov_policy_page,
+            &random_policy_probe,
+        );
+        let license_policy = self.detect_license_policy(&terms_page);
+        let cla_policy = self.detect_cla_policy(&cla_page);
+        let download_integrity = self.detect_download_integrity(
+            &gpg_page,
+            &release_overview_page,
+            &release_operations_page,
+        );
+        let operator_supply_risk = self.detect_operator_supply_risk(&privacy_page, &terms_page);
+
+        debug!(
+            platform_intro = %basic_info["summary"].as_str().unwrap_or(""),
+            organization_structure = %operator_profile["organization_structure"].as_str().unwrap_or(""),
+            trade_controls = %trade_controls["summary"].as_str().unwrap_or(""),
+            ip_policy = %ip_policy["summary"].as_str().unwrap_or(""),
+            government_takedown = %government_takedown["summary"].as_str().unwrap_or(""),
+            license_policy = %license_policy["summary"].as_str().unwrap_or(""),
+            cla_policy = %cla_policy["summary"].as_str().unwrap_or(""),
+            download_integrity = %download_integrity["summary"].as_str().unwrap_or(""),
+            operator_supply_risk = %operator_supply_risk["summary"].as_str().unwrap_or(""),
