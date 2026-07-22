@@ -205,3 +205,26 @@ impl<'a> MaintenanceService<'a> {
         })
     }
 
+    async fn save_report(
+        &self,
+        package_id: i32,
+        assessment: MaintenanceAssessment,
+    ) -> Result<maintenance_reports::Model> {
+        let now = Utc::now();
+        let report = maintenance_reports::ActiveModel {
+            package_id: Set(package_id),
+            report_type: Set(assessment.report_type),
+            status: Set("completed".to_string()),
+            overall_risk: Set(assessment.overall_risk),
+            confidence: Set(assessment.confidence),
+            summary: Set(assessment.summary),
+            dimensions: Set(json!(assessment.dimensions)),
+            evidence_summary: Set(Some(assessment.evidence_summary)),
+            report_payload: Set(assessment.report_payload),
+            generated_at: Set(assessment.generated_at),
+            created_at: Set(now),
+            updated_at: Set(now),
+            ..Default::default()
+        };
+
+        report
