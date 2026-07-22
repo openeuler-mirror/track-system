@@ -141,3 +141,26 @@ pub struct SbomCommunitySyncResponse {
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub struct SbomCommunitySyncData {
+    pub community_id: Option<String>,
+    pub name: Option<String>,
+    pub action: Option<String>,
+}
+
+pub fn build_community_inner_sync_request(
+    target: &ecosystem_targets::Model,
+    report: &ecosystem_reports::Model,
+    config: &SbomCommunitySyncConfig,
+) -> CommunityInnerSyncReq {
+    let metadata = target.metadata.as_ref();
+    let focus = extract_source_focus(&report.report_payload);
+
+    CommunityInnerSyncReq {
+        name: target.name.clone(),
+        website_url: non_empty_option(target.homepage_url.clone()),
+        contact_info: metadata_string(metadata, "contact_info")
+            .or_else(|| repository_contact_info(target)),
+        status: config.status.clone(),
+        build_date: metadata_string(metadata, "build_date"),
+        function_description: metadata_string(metadata, "function_description")
+            .or_else(|| Some(default_function_description(target))),
