@@ -22,3 +22,27 @@ const GITHUB_DMCA_URL: &str =
     "https://docs.github.com/en/site-policy/content-removal-policies/dmca-takedown-policy";
 const DEFAULT_TIMEOUT_SECS: u64 = 40;
 const GITHUB_GOV_TAKEDOWNS_API: &str =
+    "https://api.github.com/repos/github/gov-takedowns/git/trees/HEAD?recursive=1";
+
+#[derive(Debug, Clone)]
+struct PageSnapshot {
+    http_status: Option<u16>,
+    keyword_lines: Vec<String>,
+    plain_text: String,
+    error: Option<String>,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct GitHubPlatformCollector;
+
+impl GitHubPlatformCollector {
+    pub fn new() -> Self {
+        Self
+    }
+
+    pub fn matches_target(target: &ecosystem_targets::Model) -> bool {
+        let name_key = normalize_lookup_key(&target.name);
+        let target_type_key = normalize_lookup_key(&target.target_type);
+        let rule_profile_key = normalize_lookup_key(&target.rule_profile);
+        let platform_key = target
+            .platform
