@@ -974,3 +974,26 @@ fn normalize_lookup_key(input: &str) -> String {
         .filter(|ch| ch.is_ascii_alphanumeric())
         .flat_map(|ch| ch.to_lowercase())
         .collect()
+}
+
+fn strip_tags(text: &str) -> String {
+    let script_re = Regex::new(r"(?is)<script.*?>.*?</script>").expect("script regex");
+    let style_re = Regex::new(r"(?is)<style.*?>.*?</style>").expect("style regex");
+    let break_re = Regex::new(r"(?i)<br\s*/?>").expect("br regex");
+    let block_end_re =
+        Regex::new(r"(?i)</(p|div|li|tr|td|th|h\d|section|article)>").expect("block regex");
+    let tag_re = Regex::new(r"<[^>]+>").expect("tag regex");
+    let whitespace_re = Regex::new(r"[ \t]+").expect("whitespace regex");
+    let newline_re = Regex::new(r"\n\s*\n+").expect("newline regex");
+
+    let text = script_re.replace_all(text, " ");
+    let text = style_re.replace_all(&text, " ");
+    let text = break_re.replace_all(&text, "\n");
+    let text = block_end_re.replace_all(&text, "\n");
+    let text = tag_re.replace_all(&text, " ");
+    let text = text.replace("&nbsp;", " ");
+    let text = text.replace("&amp;", "&");
+    let text = text.replace("&quot;", "\"");
+    let text = text.replace("&#39;", "'");
+    let text = text.replace('\r', "");
+    let text = newline_re.replace_all(&text, "\n");
