@@ -310,3 +310,27 @@ impl GitHubPlatformCollector {
                 "assessment_subcategory": "government_takedown_policy",
                 "data": {
                     "government_takedown_policy": government_takedown["summary"],
+                    "supports_geographic_limit": government_takedown["supports_geographic_limit"],
+                    "supports_user_appeal": government_takedown["supports_user_appeal"],
+                    "publishes_public_requests": government_takedown["publishes_public_requests"],
+                    "government_keyword_lines": gov_page.keyword_lines,
+                    "government_http_status": gov_page.http_status,
+                    "government_error": gov_page.error,
+                }
+            }),
+            json!({
+                "source_type": "github_license_policy",
+                "source_name": "github_license_policy",
+                "source_url": GITHUB_LICENSING_URL,
+                "assessment_category": "source",
+                "assessment_subcategory": "license_policy",
+                "data": {
+                    "license_policy": license_policy["summary"],
+                    "supports_choosealicense": license_policy["supports_choosealicense"],
+                    "supports_license_detection": license_policy["supports_license_detection"],
+                    "mentions_default_copyright_rule": license_policy["mentions_default_copyright_rule"],
+                    "license_keyword_lines": licensing_page.keyword_lines,
+                    "licensing_http_status": licensing_page.http_status,
+                    "licensing_error": licensing_page.error,
+                }
+            }),
