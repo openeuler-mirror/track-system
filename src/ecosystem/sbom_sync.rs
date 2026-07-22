@@ -440,3 +440,26 @@ mod tests {
             req.website_url.as_deref(),
             Some("https://www.openeuler.org")
         );
+        assert_eq!(
+            req.contact_info.as_deref(),
+            Some("https://gitee.com/openeuler")
+        );
+        assert_eq!(req.build_date.as_deref(), Some("2020-03-27"));
+        assert_eq!(req.report_status.as_deref(), Some("completed"));
+        assert_eq!(req.risk_level.as_deref(), Some("HIGH"));
+        assert_eq!(req.confidence.as_deref(), Some("LOW"));
+        assert_eq!(
+            req.organization_structure.as_deref(),
+            Some("委员会 + SIG 分层治理")
+        );
+        assert_eq!(
+            req.foundation_info.as_deref(),
+            Some("开放原子开源基金会孵化并运营")
+        );
+        assert_eq!(
+            req.operator_info.as_deref(),
+            Some("由开放原子开源基金会托管运营。")
+        );
+        assert_eq!(
+            req.version_lifecycle.as_deref(),
+            Some("LTS 版本提供长期支持")
