@@ -371,3 +371,26 @@ mod tests {
             rule_profile: "openeuler_community".to_string(),
             metadata,
             last_collected_at: None,
+            last_report_at: None,
+            last_error: None,
+            created_at: now,
+            updated_at: now,
+        }
+    }
+
+    fn report(payload: Value) -> ecosystem_reports::Model {
+        let now = Utc::now();
+        ecosystem_reports::Model {
+            id: 10,
+            target_id: 1,
+            report_type: "ecosystem_profile".to_string(),
+            status: "completed".to_string(),
+            overall_risk: "HIGH".to_string(),
+            confidence: "LOW".to_string(),
+            summary: "生态评估摘要".to_string(),
+            dimensions: json!({}),
+            evidence_summary: Some(json!({"evidence_count": 5})),
+            report_payload: payload,
+            generated_at: now,
+            created_at: now,
+            updated_at: now,
