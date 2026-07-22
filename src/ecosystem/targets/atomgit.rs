@@ -905,3 +905,26 @@ impl AtomGitPlatformCollector {
             "AtomGit 当前由单一运营主体重庆开源共创科技有限公司负责运营{}{}{}，因此运营侧供应风险评估为 {}：若运营策略、合规要求、与 GitCode 的整合节奏或底层云资源发生变化，代码分发连续性可能受到影响",
             if operator_transition_risk {
                 "，且公开政策显示 2025-09-09 发生过运营主体切换"
+            } else {
+                ""
+            },
+            if cloud_vendor_dependency {
+                "，平台基础设施和代码托管服务显式依赖华为云"
+            } else {
+                ""
+            },
+            if delegation_transfer_clause {
+                "，用户协议还允许平台在一定条件下进行委托或义务转让"
+            } else {
+                ""
+            },
+            risk_level
+        );
+
+        json!({
+            "summary": summary,
+            "risk_level": risk_level,
+            "single_operator_concentration": single_operator_concentration,
+            "cloud_vendor_dependency": cloud_vendor_dependency,
+            "operator_transition_risk": operator_transition_risk,
+            "delegation_transfer_clause": delegation_transfer_clause,
