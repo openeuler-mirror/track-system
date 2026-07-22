@@ -583,3 +583,26 @@ impl AtomGitPlatformCollector {
         trade_policy_page: &PageSnapshot,
         random_policy_probe: &PageSnapshot,
         terms_page: &PageSnapshot,
+        privacy_page: &PageSnapshot,
+    ) -> Value {
+        let route_reachable = is_reachable(trade_policy_page);
+        let same_as_random_probe =
+            is_same_shell_as_random_probe(trade_policy_page, random_policy_probe);
+        let machine_readable_policy_text = route_reachable
+            && !trade_policy_page.looks_like_spa_shell
+            && !trade_policy_page.keyword_lines.is_empty();
+        let legal_compliance_required = terms_page.plain_text.contains("中华人民共和国")
+            || terms_page.plain_text.contains("法律法规")
+            || privacy_page.plain_text.contains("法律法规")
+            || privacy_page.plain_text.contains("行政机关");
+
+        let summary = if machine_readable_policy_text {
+            "AtomGit 公开提供了可读的贸易/制裁政策页面，平台受合规约束并可能对相关访问或内容实施限制".to_string()
+        } else if route_reachable {
+            "AtomGit 官方存在贸易管制政策路由，但当前返回统一 SPA 壳页，未检索到可读的具体条款；结合条款与隐私政策，可确认平台受中国法律法规、内容治理与行政司法要求约束，无法证明其不受贸易/合规限制影响".to_string()
+        } else {
+            "暂未获取到可读的 AtomGit 贸易管制公开页面；结合条款与隐私政策，平台仍受法律法规和行政司法要求约束，无法证明其不受贸易/合规限制影响".to_string()
+        };
+
+        json!({
+            "summary": summary,
