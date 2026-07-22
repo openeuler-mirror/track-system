@@ -836,3 +836,26 @@ impl AtomGitPlatformCollector {
         let documented_release_artifact_signature =
             release_lower.contains("gpg") || release_lower.contains("signature");
         let hash_verification_supported = documented_release_checksum;
+        let digital_signature_supported = supports_gpg_commit_tag_verification;
+        let signed_releases = documented_release_artifact_signature;
+        let provenance_attestation = release_lower.contains("provenance")
+            || release_lower.contains("attestation")
+            || release_text.contains("来源证明");
+
+        let summary = format!(
+            "AtomGit 公开文档{}{}{}{}",
+            if supports_gpg_commit_tag_verification {
+                "已说明支持 GPG Key，可用于提交/Tag 签名与验签"
+            } else {
+                "未明确公开提交或 Tag 的签名机制"
+            },
+            if supports_release_attachments {
+                "，并支持 Release/附件/源码下载"
+            } else {
+                ""
+            },
+            if !documented_release_checksum {
+                "；但当前未在公开 Release 文档中检索到平台自动提供 SHA256/MD5 等下载校验值机制"
+            } else {
+                ""
+            },
