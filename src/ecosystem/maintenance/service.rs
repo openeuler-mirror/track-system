@@ -363,3 +363,25 @@ mod tests {
             summary: "maintenance summary".to_string(),
             dimensions: json!({"activity_risk": {"level": "medium"}}),
             evidence_summary: Some(json!({"evidence_count": 1})),
+            report_payload: json!({"context": {"package_id": 5}}),
+            generated_at: now,
+            created_at: now,
+            updated_at: now,
+        };
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_exec_results([sea_orm::MockExecResult {
+                last_insert_id: 15,
+                rows_affected: 1,
+            }])
+            .append_query_results(vec![vec![report.clone()]])
+            .into_connection();
+        let service = MaintenanceService::new(&db);
+
+        let saved = service.save_report(5, assessment()).await.unwrap();
+
+        assert_eq!(saved.id, 15);
+        assert_eq!(saved.package_id, 5);
+        assert_eq!(saved.status, "completed");
+        assert_eq!(saved.overall_risk, "medium");
+    }
+}
