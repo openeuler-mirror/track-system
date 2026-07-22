@@ -560,3 +560,26 @@ impl AtomGitPlatformCollector {
         let foundation_status = if operator_transition_mentioned {
             "隐私政策明确自 2025-09-09 起运营主体由开放原子开源基金会变更为重庆开源共创科技有限公司，当前不属于基金会直接独立运营形态".to_string()
         } else {
+            "未从当前公开页面识别出基金会直接治理安排，整体更接近公司运营".to_string()
+        };
+
+        json!({
+            "organization_structure": organization_structure,
+            "foundation_status": foundation_status,
+            "operator_name": operator_name,
+            "hosting_provider": hosting_provider,
+            "operator_transition_date": if operator_transition_mentioned {
+                Some("2025-09-09".to_string())
+            } else {
+                None::<String>
+            },
+            "operator_transition_mentioned": operator_transition_mentioned,
+            "gitcode_integration_mentioned": gitcode_integration_mentioned,
+        })
+    }
+
+    fn detect_trade_controls(
+        &self,
+        trade_policy_page: &PageSnapshot,
+        random_policy_probe: &PageSnapshot,
+        terms_page: &PageSnapshot,
