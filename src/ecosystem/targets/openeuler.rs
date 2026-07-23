@@ -512,3 +512,26 @@ impl OpenEulerCommunityCollector {
             "POSSIBLY_INCONSISTENT"
         } else if about_mentions_openatom || foundation_page_mentions_openatom {
             "CONSISTENT"
+        } else {
+            "UNCLEAR"
+        };
+        let summary = if about_mentions_openatom || foundation_page_mentions_openatom {
+            "openEuler 公开页面显示其由开放原子开源基金会孵化并运营，基金会归属关系较明确"
+                .to_string()
+        } else {
+            "暂未从公开页面稳定识别到 openEuler 与开放原子开源基金会的明确归属关系".to_string()
+        };
+
+        json!({
+            "summary": summary,
+            "about_mentions_openatom": about_mentions_openatom,
+            "foundation_page_mentions_openatom": foundation_page_mentions_openatom,
+            "consistency": consistency,
+        })
+    }
+
+    fn detect_version_lifecycle(&self, lifecycle_page: &PageSnapshot) -> Value {
+        let fallback_text = extract_lifecycle_text_from_raw_body(&lifecycle_page.raw_body);
+        let text = if fallback_text.is_empty() {
+            lifecycle_page.plain_text.as_str()
+        } else {
