@@ -673,3 +673,26 @@ impl OpenEulerCommunityCollector {
             cla_types.push("Corporate CLA".to_string());
         }
         if lower.contains("employee cla") {
+            cla_types.push("Employee CLA".to_string());
+        }
+
+        let summary = if cla_required {
+            if cla_types.is_empty() {
+                "贡献前需要签署 CLA".to_string()
+            } else {
+                format!(
+                    "贡献前需要签署 CLA，公开页面给出了 {} 等签署类型",
+                    cla_types.join("、")
+                )
+            }
+        } else {
+            "暂未从公开页面识别出明确的 CLA 签署要求".to_string()
+        };
+
+        json!({
+            "summary": summary,
+            "cla_required": cla_required,
+            "cla_types": cla_types,
+        })
+    }
+}
