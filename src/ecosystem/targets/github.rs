@@ -851,3 +851,26 @@ mod tests {
 
     #[test]
     fn matches_target_accepts_github_aliases() {
+        let target = ecosystem_targets::Model {
+            id: 1,
+            name: "GitHub Platform".to_string(),
+            target_type: "platform".to_string(),
+            platform: Some("github".to_string()),
+            role: "hosting".to_string(),
+            homepage_url: Some("https://github.com".to_string()),
+            api_base_url: Some("https://api.github.com".to_string()),
+            owner: None,
+            repo: None,
+            default_branch: None,
+            status: "active".to_string(),
+            refresh_interval_hours: 24,
+            rule_profile: "github_platform".to_string(),
+            metadata: None,
+            last_collected_at: None,
+            last_report_at: None,
+            last_error: None,
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        };
+        assert!(GitHubPlatformCollector::matches_target(&target));
+    }
