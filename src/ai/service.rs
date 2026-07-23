@@ -478,3 +478,27 @@ mod tests {
             platform: Some("github".to_string()),
             report_type: Some("pipeline".to_string()),
             rule_risk: Some("medium".to_string()),
+            rule_confidence: Some("medium".to_string()),
+            rule_summary: Some("summary".to_string()),
+            evidence: serde_json::json!({
+                "diff_summary": {
+                    "l0_community_assessment": {
+                        "security": {
+                            "level": "HIGH",
+                            "confidence": "MEDIUM",
+                            "score": 55,
+                            "reasons": ["未发现明确的安全披露或响应策略"],
+                            "indicators": [
+                                {"key": "has_security_policy", "value": false},
+                                {"key": "open_cve_backlog", "value": 8}
+                            ]
+                        },
+                        "quality": {
+                            "level": "MEDIUM",
+                            "confidence": "HIGH",
+                            "score": 70,
+                            "reasons": ["发布物未体现数字签名能力"],
+                            "indicators": [
+                                {"key": "required_reviews", "value": 1},
+                                {"key": "signed_releases", "value": false}
+                            ]
