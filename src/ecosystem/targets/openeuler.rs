@@ -22,3 +22,27 @@ const DEFAULT_TIMEOUT_SECS: u64 = 20;
 #[derive(Debug, Clone)]
 struct PageSnapshot {
     http_status: Option<u16>,
+    keyword_lines: Vec<String>,
+    plain_text: String,
+    raw_body: String,
+    error: Option<String>,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct OpenEulerCommunityCollector;
+
+impl OpenEulerCommunityCollector {
+    pub fn new() -> Self {
+        Self
+    }
+
+    pub fn matches_target(target: &ecosystem_targets::Model) -> bool {
+        let mut text = vec![
+            target.name.to_ascii_lowercase(),
+            target.target_type.to_ascii_lowercase(),
+            target.rule_profile.to_ascii_lowercase(),
+        ];
+        if let Some(platform) = &target.platform {
+            text.push(platform.to_ascii_lowercase());
+        }
+        if let Some(homepage) = &target.homepage_url {
