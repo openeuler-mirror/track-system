@@ -406,3 +406,27 @@ impl GitHubPlatformCollector {
                 error = %error,
                 "GitHub 页面抓取失败"
             ),
+            None => info!(
+                page = label,
+                http_status = ?page.http_status,
+                keyword_lines = ?page.keyword_lines,
+                "GitHub 页面抓取成功"
+            ),
+        }
+        debug!(
+            page = label,
+            plain_text_preview = %page.plain_text.chars().take(240).collect::<String>(),
+            "GitHub 页面文本预览"
+        );
+    }
+
+    fn detect_basic_info(&self, about_page: &PageSnapshot) -> Value {
+        let text = about_page.plain_text.as_str();
+        let lower = text.to_ascii_lowercase();
+        let has_platform_intro = lower.contains("complete developer platform")
+            || lower.contains("build, scale, and deliver secure software")
+            || lower.contains("cloud-based platform")
+            || lower.contains("store, share, and work together with others to write code");
+        let developer_scale = if let Some(value) = extract_metric(text, "Developers") {
+            Some(value)
+        } else {
