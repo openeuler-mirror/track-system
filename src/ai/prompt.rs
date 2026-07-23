@@ -70,3 +70,27 @@ pub fn build_messages(
                 language,
                 question,
                 context.source,
+                context.target_name,
+                context.target_type,
+                context.platform,
+                context.report_type,
+                context.rule_risk,
+                context.rule_confidence,
+                context.rule_summary,
+                evidence
+            )
+        }),
+    ]
+}
+
+fn compact_json(value: &serde_json::Value, max_chars: usize) -> String {
+    let mut text = serde_json::to_string_pretty(value).unwrap_or_else(|_| "{}".to_string());
+    if text.chars().count() > max_chars {
+        text = text.chars().take(max_chars).collect::<String>();
+        text.push_str("\n...<truncated>");
+    }
+    text
+}
+
+#[cfg(test)]
+mod tests {
