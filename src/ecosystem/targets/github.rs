@@ -430,3 +430,27 @@ impl GitHubPlatformCollector {
         let developer_scale = if let Some(value) = extract_metric(text, "Developers") {
             Some(value)
         } else {
+            None
+        };
+        let org_scale = extract_metric(text, "Organizations");
+        let repo_scale = extract_metric(text, "Repositories");
+        let summary = if has_platform_intro {
+            format!(
+                "GitHub 是面向开发者的代码托管、协作开发与软件交付平台{}{}{}",
+                developer_scale
+                    .as_ref()
+                    .map(|v| format!("，公开页面提及 {} Developers", v))
+                    .unwrap_or_default(),
+                org_scale
+                    .as_ref()
+                    .map(|v| format!("、{} Organizations", v))
+                    .unwrap_or_default(),
+                repo_scale
+                    .as_ref()
+                    .map(|v| format!("、{} Repositories", v))
+                    .unwrap_or_default(),
+            )
+        } else {
+            "GitHub 是提供代码托管、协作开发与软件交付能力的全球开发平台".to_string()
+        };
+        json!({
