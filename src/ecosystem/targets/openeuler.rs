@@ -466,3 +466,26 @@ impl OpenEulerCommunityCollector {
             ("Security Committee", "security committee"),
             ("SIG", "special interest groups"),
         ];
+        let detected_committees = candidates
+            .iter()
+            .filter_map(|(label, pattern)| {
+                if lower.contains(pattern)
+                    || (pattern == &"special interest groups" && lower.contains("sig"))
+                {
+                    Some((*label).to_string())
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+
+        let summary = if detected_committees.is_empty() {
+            "暂未从 openEuler 公开页面识别出清晰的委员会或 SIG 分层结构".to_string()
+        } else {
+            format!(
+                "openEuler 采用委员会 + SIG 的分层治理结构，已识别 {}",
+                detected_committees.join("、")
+            )
+        };
+
+        json!({
