@@ -742,3 +742,26 @@ fn extract_keyword_lines(text: &str, keywords: &[&str], max_lines: usize) -> Vec
             }
         }
     }
+    lines
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn page(text: &str) -> PageSnapshot {
+        PageSnapshot {
+            http_status: Some(200),
+            keyword_lines: extract_keyword_lines(
+                text,
+                &[
+                    "OpenAtom",
+                    "Technical Committee",
+                    "Security Committee",
+                    "LTS",
+                    "CLA",
+                    "CC BY-SA 4.0",
+                    "MulanPSL2",
+                ],
+                12,
+            ),
