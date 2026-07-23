@@ -22,3 +22,27 @@ pub enum AiAnalysisSource {
     AdHoc,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum AiRiskLevel {
+    Low,
+    Medium,
+    High,
+    Critical,
+    Unknown,
+}
+
+impl AiRiskLevel {
+    pub fn from_report_value(value: &str) -> Self {
+        match value.to_ascii_lowercase().as_str() {
+            "low" | "低" => Self::Low,
+            "medium" | "moderate" | "中" => Self::Medium,
+            "high" | "高" => Self::High,
+            "critical" | "严重" => Self::Critical,
+            _ => Self::Unknown,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AiContext {
