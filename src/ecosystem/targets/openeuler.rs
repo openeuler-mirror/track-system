@@ -995,3 +995,26 @@ fn extract_lifecycle_text_from_vitepress_asset(body: &str) -> String {
             continue;
         };
         if let Ok(json_value) = serde_json::from_str::<Value>(raw) {
+            collect_text_segments_from_json(&json_value, &mut segments);
+            continue;
+        }
+        let Ok(decoded) = serde_json::from_str::<String>(&format!("\"{}\"", raw)) else {
+            continue;
+        };
+        let Ok(json_value) = serde_json::from_str::<Value>(&decoded) else {
+            continue;
+        };
+        collect_text_segments_from_json(&json_value, &mut segments);
+    }
+
+    segments.join(" ")
+}
+
+fn extract_lifecycle_text_from_vitepress_component(body: &str) -> String {
+    let generic_re = Regex::new(r#"(?s)`([^`]*)`"#).expect("generic lifecycle regex");
+    let mut segments = Vec::new();
+    for captures in generic_re.captures_iter(body) {
+        if let Some(matched) = captures.get(1) {
+            let text = matched.as_str().replace("\\n", "\n");
+            if contains_lifecycle_signals(&text) {
+                segments.push(text);
