@@ -920,3 +920,26 @@ mod tests {
     fn detect_corporate_profile_from_text() {
         let collector = GitHubPlatformCollector::new();
         let page = PageSnapshot {
+            http_status: Some(200),
+            keyword_lines: Vec::new(),
+            plain_text: "I’m thrilled to share that the Microsoft acquisition of GitHub is complete. Monday is my first day as CEO. GitHub will operate independently as a community, platform, and business.".to_string(),
+            error: None,
+        };
+        let result = collector.detect_corporate_profile(&page);
+        assert_eq!(result["microsoft_acquisition_completed"], true);
+        assert_eq!(result["operates_independently_as_business"], true);
+        assert_eq!(result["ceo_mentioned"], true);
+        assert!(result["organization_structure"]
+            .as_str()
+            .unwrap_or("")
+            .contains("微软完成收购"));
+        assert!(result["foundation_status"]
+            .as_str()
+            .unwrap_or("")
+            .contains("未见基金会"));
+    }
+
+    #[test]
+    fn detect_government_takedown_from_text() {
+        let collector = GitHubPlatformCollector::new();
+        let page = PageSnapshot {
