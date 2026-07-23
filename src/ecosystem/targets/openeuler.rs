@@ -903,3 +903,26 @@ mod tests {
         assert_eq!(lifecycle["innovation_every_twelve_months"], true);
         assert_eq!(lifecycle["sp_policy_mentioned"], true);
     }
+
+    #[test]
+    fn extract_lifecycle_text_from_vitepress_asset_extracts_key_points() {
+        let asset = r#"const h=JSON.parse('{"title":"openEuler 生命周期管理","description":"探索openEuler软件的生命周期管理","frontmatter":{"title":"openEuler版本规划及生命周期"},"headers":[],"relativePath":"zh/other/lifecycle/index.md","filePath":"zh/other/lifecycle/index.md","lastUpdated":0,"mainEntity":[{"text":"长期支持版本自25年8月起生效，发布间隔周期定为4年，提供4年社区支持。LTS版本全版本生命周期6年(4+2)。openEuler每隔12个月会发布一个社区创新版本，提供6个月社区支持。SP版本生命周期原则上按照小SP 9个月、大SP 24个月执行。"}]}');"#;
+        let text = extract_lifecycle_text_from_vitepress_asset(asset);
+        assert!(text.contains("发布间隔周期定为4年"));
+        assert!(text.contains("生命周期6年"));
+        assert!(text.contains("12个月"));
+        assert!(text.contains("SP版本生命周期"));
+    }
+
+    #[test]
+    fn extract_lifecycle_text_from_vitepress_component_extracts_markdown_blocks() {
+        let body = r#"const A=`# 1、openEuler社区版本生命周期管理规范（总体）
+
+社区版本分为长期支持版本和创新版本。
+
+- **长期支持版本（自25年8月起生效）：** 发布间隔周期定为4年，提供4年社区支持。
+- **社区创新版本（自25年8月起生效）：** openEuler每隔12个月会发布一个社区创新版本，提供6个月社区支持。
+`,I=`# 2、openEuler社区版本生命周期管理规范（LTS+SP）
+
+1. LTS版本**全版本**生命周期6年(4+2)，申请延长至8年。
+2. LTS 版本 SP 版本生命周期原则上按照小 SP（6月份 Release，可选）9个月，大 SP（12月份 Release）24个月执行。
