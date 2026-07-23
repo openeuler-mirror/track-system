@@ -926,3 +926,26 @@ mod tests {
 
 1. LTS版本**全版本**生命周期6年(4+2)，申请延长至8年。
 2. LTS 版本 SP 版本生命周期原则上按照小 SP（6月份 Release，可选）9个月，大 SP（12月份 Release）24个月执行。
+`;"#;
+        let text = extract_lifecycle_text_from_vitepress_component(body);
+        assert!(text.contains("发布间隔周期定为4年"));
+        assert!(text.contains("12个月会发布一个社区创新版本"));
+        assert!(text.contains("生命周期6年"));
+        assert!(text.contains("SP 版本生命周期"));
+    }
+}
+
+fn extract_lifecycle_text_from_raw_body(raw_body: &str) -> String {
+    if raw_body.is_empty() {
+        return String::new();
+    }
+
+    let jsonld_re =
+        Regex::new(r#"(?is)<script[^>]*type=["']application/ld\+json["'][^>]*>(.*?)</script>"#)
+            .expect("jsonld regex");
+    let mut segments = Vec::new();
+
+    for captures in jsonld_re.captures_iter(raw_body) {
+        let Some(script_body) = captures.get(1).map(|m| m.as_str()) else {
+            continue;
+        };
