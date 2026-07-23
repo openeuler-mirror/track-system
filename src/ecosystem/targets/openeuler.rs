@@ -328,3 +328,26 @@ impl OpenEulerCommunityCollector {
                         PageSnapshot {
                             http_status: Some(status),
                             keyword_lines: extract_keyword_lines(&plain_text, keywords, 12),
+                            plain_text,
+                            raw_body: body,
+                            error: None,
+                        }
+                    }
+                    Err(error) => PageSnapshot {
+                        http_status: Some(status),
+                        keyword_lines: Vec::new(),
+                        plain_text: String::new(),
+                        raw_body: String::new(),
+                        error: Some(error.to_string()),
+                    },
+                }
+            }
+            Err(error) => PageSnapshot {
+                http_status: None,
+                keyword_lines: Vec::new(),
+                plain_text: String::new(),
+                raw_body: String::new(),
+                error: Some(error.to_string()),
+            },
+        }
+    }
