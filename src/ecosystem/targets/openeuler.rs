@@ -834,3 +834,26 @@ mod tests {
 
         let evidence = collector.build_evidence_records(
             about_page,
+            organization_page,
+            foundation_page,
+            lifecycle_page,
+            contribution_page,
+            docs_terms_page,
+            license_text,
+        );
+
+        assert_eq!(evidence.len(), 5);
+        assert_eq!(
+            evidence[0]["source_type"],
+            "openeuler_community_organization"
+        );
+        assert_eq!(
+            evidence[0]["data"]["detected_committees"]
+                .as_array()
+                .map(Vec::len),
+            Some(6)
+        );
+        assert_eq!(
+            evidence[1]["data"]["foundation_consistency"],
+            "POSSIBLY_INCONSISTENT"
+        );
