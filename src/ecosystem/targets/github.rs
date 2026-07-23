@@ -454,3 +454,27 @@ impl GitHubPlatformCollector {
             "GitHub 是提供代码托管、协作开发与软件交付能力的全球开发平台".to_string()
         };
         json!({
+            "summary": summary,
+            "developer_scale": developer_scale,
+            "organization_scale": org_scale,
+            "repository_scale": repo_scale,
+        })
+    }
+
+    fn detect_trade_controls(&self, trade_page: &PageSnapshot) -> Value {
+        let text = trade_page.plain_text.as_str();
+        let lower = text.to_ascii_lowercase();
+        let ofac_license_for_iran = lower.contains("license from ofac")
+            && (lower.contains("iran") || text.contains("伊朗"));
+        let public_repo_access_in_sanctioned_regions = lower.contains("public repository services")
+            || lower.contains("free public repository services");
+        let itar_restriction_mentioned = lower.contains("itar");
+        let restricted_regions_mentioned = lower.contains("crimea")
+            || lower.contains("north korea")
+            || lower.contains("cuba")
+            || lower.contains("russia")
+            || lower.contains("belarus");
+        let mut parts = vec!["GitHub 平台受美国出口管制与制裁合规约束".to_string()];
+        if ofac_license_for_iran {
+            parts.push("公开说明提及已获得 OFAC 许可为伊朗开发者恢复云服务".to_string());
+        }
