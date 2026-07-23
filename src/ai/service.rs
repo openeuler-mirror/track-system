@@ -382,3 +382,27 @@ fn parse_string_array(value: &Value, key: &str) -> Vec<String> {
                 .map(ToString::to_string)
                 .collect()
         })
+        .unwrap_or_default()
+}
+
+fn parse_findings(value: &Value) -> Vec<AiAnalysisFinding> {
+    value
+        .get("findings")
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|item| {
+                    Some(AiAnalysisFinding {
+                        title: item.get("title")?.as_str()?.to_string(),
+                        risk: item
+                            .get("risk")
+                            .and_then(Value::as_str)
+                            .map(AiRiskLevel::from_report_value)
+                            .unwrap_or(AiRiskLevel::Unknown),
+                        evidence: item
+                            .get("evidence")
+                            .and_then(Value::as_str)
+                            .unwrap_or_default()
+                            .to_string(),
+                        recommendation: item
