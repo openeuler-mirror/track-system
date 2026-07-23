@@ -430,3 +430,27 @@ mod tests {
             base_url: "http://localhost".to_string(),
             api_key: None,
             model: "test".to_string(),
+            timeout: std::time::Duration::from_secs(1),
+            max_input_chars: 1000,
+        });
+        let context = AiContext {
+            source: AiAnalysisSource::AdHoc,
+            target_name: Some("nginx".to_string()),
+            target_type: Some("package".to_string()),
+            platform: Some("github".to_string()),
+            report_type: Some("maintenance".to_string()),
+            rule_risk: Some("high".to_string()),
+            rule_confidence: Some("medium".to_string()),
+            rule_summary: Some("summary".to_string()),
+            evidence: serde_json::json!({"summary":"summary"}),
+        };
+        let response = service
+            .analyze(
+                context,
+                AiAnalysisRequest {
+                    question: None,
+                    language: None,
+                    max_evidence_chars: None,
+                    allow_external_research: None,
+                },
+            )
