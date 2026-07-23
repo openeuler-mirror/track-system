@@ -166,3 +166,27 @@ impl OpenEulerCommunityCollector {
         let license_text = self
             .fetch_raw_text(&client, OPENEULER_GITEE_LICENSE_URL)
             .await;
+        self.log_page_result("openEuler license", &license_text);
+
+        Ok(self.build_evidence_records(
+            about_page,
+            organization_page,
+            foundation_page,
+            lifecycle_page,
+            contribution_page,
+            docs_terms_page,
+            license_text,
+        ))
+    }
+
+    fn build_evidence_records(
+        &self,
+        about_page: PageSnapshot,
+        organization_page: PageSnapshot,
+        foundation_page: PageSnapshot,
+        lifecycle_page: PageSnapshot,
+        contribution_page: PageSnapshot,
+        docs_terms_page: PageSnapshot,
+        license_text: PageSnapshot,
+    ) -> Vec<Value> {
+        let organization_structure = self.detect_organization_structure(&organization_page);
