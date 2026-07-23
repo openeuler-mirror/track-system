@@ -351,3 +351,26 @@ impl OpenEulerCommunityCollector {
             },
         }
     }
+
+    async fn build_lifecycle_plain_text(&self, client: &Client, html: &str) -> String {
+        let direct_text = strip_tags(html);
+        if contains_lifecycle_signals(&direct_text) {
+            return direct_text;
+        }
+
+        let jsonld_text = extract_lifecycle_text_from_raw_body(html);
+        if contains_lifecycle_signals(&jsonld_text) {
+            return jsonld_text;
+        }
+
+        if let Some(asset_path) = extract_vitepress_lifecycle_asset_path(html) {
+            let asset_url = to_absolute_asset_url(OPENEULER_LIFECYCLE_URL, &asset_path);
+            match client.get(asset_url).send().await {
+                Ok(response) => match response.text().await {
+                    Ok(body) => {
+                        let asset_text = extract_lifecycle_text_from_vitepress_asset(&body);
+                        if contains_lifecycle_signals(&asset_text) {
+                            return asset_text;
+                        }
+                    }
+                    Err(error) => warn!(error = %error, "读取 openEuler 生命周期资源失败"),
