@@ -880,3 +880,26 @@ mod tests {
                   "@context":"https://schema.org",
                   "@type":"FAQPage",
                   "mainEntity":[
+                    {
+                      "@type":"Question",
+                      "name":"openEuler社区版本生命周期管理规范（LTS+SP）",
+                      "acceptedAnswer":{
+                        "@type":"Answer",
+                        "text":"长期支持版本自25年8月起生效，发布间隔周期定为4年，提供4年社区支持。LTS版本全版本生命周期6年(4+2)，申请延长至8年。openEuler每隔12个月会发布一个社区创新版本，提供6个月社区支持。SP版本生命周期原则上按照小SP 9个月，大SP 24个月执行。"
+                      }
+                    }
+                  ]
+                }
+                </script>
+                </head><body></body></html>
+            "#
+            .to_string(),
+            error: None,
+        };
+
+        let lifecycle = collector.detect_version_lifecycle(&page);
+        assert_eq!(lifecycle["lts_every_four_years"], true);
+        assert_eq!(lifecycle["lts_lifecycle_six_years"], true);
+        assert_eq!(lifecycle["innovation_every_twelve_months"], true);
+        assert_eq!(lifecycle["sp_policy_mentioned"], true);
+    }
