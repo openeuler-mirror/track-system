@@ -117,3 +117,26 @@ mod tests {
             1000,
             AiPromptOptions {
                 allow_external_research: true,
+            },
+        );
+        assert_eq!(messages.len(), 2);
+        assert!(messages[1]["content"].as_str().unwrap().contains("nginx"));
+        assert!(messages[1]["content"]
+            .as_str()
+            .unwrap()
+            .contains("L0 社区安全和质量"));
+        assert!(messages[1]["content"]
+            .as_str()
+            .unwrap()
+            .contains("external_research_used"));
+        assert!(messages[0]["content"]
+            .as_str()
+            .unwrap()
+            .contains("允许在输入证据不足时"));
+    }
+
+    #[test]
+    fn build_messages_can_disable_external_research() {
+        let context = AiContext {
+            source: AiAnalysisSource::AdHoc,
+            target_name: Some("nginx".to_string()),
