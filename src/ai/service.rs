@@ -406,3 +406,27 @@ fn parse_findings(value: &Value) -> Vec<AiAnalysisFinding> {
                             .unwrap_or_default()
                             .to_string(),
                         recommendation: item
+                            .get("recommendation")
+                            .and_then(Value::as_str)
+                            .unwrap_or_default()
+                            .to_string(),
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ai::types::AiAnalysisSource;
+
+    #[tokio::test]
+    async fn local_analysis_works_without_remote_config() {
+        let service = AiAnalysisService::new(AiConfig {
+            enabled: false,
+            provider: "openai-compatible".to_string(),
+            base_url: "http://localhost".to_string(),
+            api_key: None,
+            model: "test".to_string(),
