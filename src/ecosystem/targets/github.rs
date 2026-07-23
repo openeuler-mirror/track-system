@@ -690,3 +690,26 @@ impl GitHubPlatformCollector {
             if dmca_safe_harbor_mentioned {
                 "，强调平台维持 DMCA safe harbor 合规"
             } else {
+                ""
+            },
+            if counter_notice_supported {
+                "，支持 counter notice 反通知流程"
+            } else {
+                ""
+            },
+            if github_copyright_notice_mentioned {
+                "；同时条款声明 GitHub 网站和服务外观受 GitHub 版权保护"
+            } else {
+                ""
+            }
+        );
+        json!({
+            "summary": summary,
+            "dmca_safe_harbor_mentioned": dmca_safe_harbor_mentioned,
+            "counter_notice_supported": counter_notice_supported,
+            "github_copyright_notice_mentioned": github_copyright_notice_mentioned,
+            "copyright_keyword_lines": extract_keyword_lines(
+                &format!("{}\n{}", terms, dmca),
+                &["DMCA", "safe harbor", "counter notice", "copyright © GitHub", "copyright infringement"],
+                10
+            ),
