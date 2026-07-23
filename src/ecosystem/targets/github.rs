@@ -550,3 +550,27 @@ impl GitHubPlatformCollector {
             },
             if license_grant_to_host_content {
                 "，同时需授予 GitHub 托管、展示与解析内容的必要许可"
+            } else {
+                ""
+            },
+            if github_retains_platform_ip
+                || dmca_page
+                    .plain_text
+                    .contains("Intellectual Property Notice")
+            {
+                "；平台自身网站与服务相关知识产权由 GitHub 及其许可方保留"
+            } else {
+                ""
+            }
+        );
+        json!({
+            "summary": summary,
+            "users_own_content": users_own_content,
+            "github_retains_platform_ip": github_retains_platform_ip,
+            "license_grant_to_host_content": license_grant_to_host_content,
+            "ip_keyword_lines": extract_keyword_lines(
+                terms,
+                &["You own the content you post on GitHub", "retain ownership", "license grant", "Intellectual Property Notice", "retain ownership of all intellectual property rights"],
+                8
+            ),
+        })
