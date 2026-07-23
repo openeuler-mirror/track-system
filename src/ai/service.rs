@@ -22,3 +22,27 @@ use super::{
 
 pub struct AiAnalysisService {
     config: AiConfig,
+}
+
+impl AiAnalysisService {
+    pub fn from_env() -> Self {
+        Self {
+            config: AiConfig::from_env(),
+        }
+    }
+
+    pub fn new(config: AiConfig) -> Self {
+        Self { config }
+    }
+
+    pub async fn analyze(
+        &self,
+        context: AiContext,
+        request: AiAnalysisRequest,
+    ) -> Result<AiAnalysisResponse> {
+        let language = request.language.as_deref().unwrap_or("中文");
+        let max_chars = request
+            .max_evidence_chars
+            .unwrap_or(self.config.max_input_chars)
+            .min(self.config.max_input_chars);
+
