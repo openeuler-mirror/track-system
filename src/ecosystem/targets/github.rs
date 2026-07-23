@@ -736,3 +736,26 @@ fn parse_gov_takedown_tree(tree_resp: &Value) -> Value {
     let mut total_requests: u64 = 0;
 
     for entry in tree {
+        // 只统计 blob（文件），跳过 tree（目录）节点
+        if entry.get("type").and_then(|v| v.as_str()) != Some("blob") {
+            continue;
+        }
+        let path = match entry.get("path").and_then(|v| v.as_str()) {
+            Some(p) => p,
+            None => continue,
+        };
+        // 首级目录作为请求方；根目录文件（无 '/'）不计入
+        let slash_pos = match path.find('/') {
+            Some(pos) => pos,
+            None => continue,
+        };
+        let requester = &path[..slash_pos];
+        *requests_by_requester
+            .entry(requester.to_string())
+            .or_insert(0) += 1;
+        total_requests += 1;
+    }
+
+    json!({
+        "total_requests": total_requests,
+        "requests_by_requester": requests_by_requester,
