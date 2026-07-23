@@ -118,3 +118,27 @@ impl OpenEulerCommunityCollector {
                 OPENEULER_LIFECYCLE_URL,
                 &[
                     "LTS",
+                    "长期支持版本",
+                    "创新版本",
+                    "发布间隔周期定为4年",
+                    "提供4年社区支持",
+                    "每隔12个月会发布一个社区创新版本",
+                    "提供6个月社区支持",
+                    "生命周期6年",
+                    "延长至8年",
+                    "SP",
+                    "released every two years",
+                    "community support for four years",
+                    "released every six months",
+                    "extended support",
+                ],
+            )
+            .await;
+        self.log_page_result("openEuler lifecycle", &lifecycle_page);
+        let contribution_page = self
+            .fetch_page(
+                &client,
+                OPENEULER_CONTRIBUTION_URL,
+                &[
+                    "CLA",
+                    "Contributor License Agreement",
