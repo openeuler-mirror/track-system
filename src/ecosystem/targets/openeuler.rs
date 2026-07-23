@@ -627,3 +627,26 @@ impl OpenEulerCommunityCollector {
         let community_repo_license_detected = if license_lower.contains("mulan psl v2") {
             Some("Mulan PSL v2")
         } else {
+            None
+        };
+        let docs_license_detected = if docs_lower.contains("cc by-sa 4.0") {
+            Some("CC BY-SA 4.0")
+        } else {
+            None
+        };
+        let site_footer_license_detected = if docs_lower.contains("mulanpsl2") {
+            Some("MulanPSL2")
+        } else {
+            None
+        };
+        let summary = match (
+            community_repo_license_detected,
+            docs_license_detected,
+            contribution_lower.contains("contributor license agreement"),
+        ) {
+            (Some(repo_license), Some(docs_license), true) => format!(
+                "社区治理仓许可证识别为 {}，文档页面存在 {} 口径，且贡献流程要求签署 CLA",
+                repo_license, docs_license
+            ),
+            (Some(repo_license), _, _) => format!("社区治理仓许可证识别为 {}", repo_license),
+            _ => "暂未从公开页面稳定识别出社区治理仓许可证口径".to_string(),
