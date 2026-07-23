@@ -70,3 +70,26 @@ pub struct AiAnalysisRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AiAnalysisFinding {
+    pub title: String,
+    pub risk: AiRiskLevel,
+    pub evidence: String,
+    pub recommendation: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AiAnalysisResponse {
+    pub source: AiAnalysisSource,
+    pub generated_at: DateTime<Utc>,
+    pub model: String,
+    pub used_remote_model: bool,
+    pub external_research_used: bool,
+    pub summary: String,
+    pub risk: AiRiskLevel,
+    pub confidence: String,
+    pub findings: Vec<AiAnalysisFinding>,
+    pub recommended_actions: Vec<String>,
+    pub external_references: Vec<String>,
+    pub sources_to_check: Vec<String>,
+    pub raw_model_output: Option<Value>,
+}
