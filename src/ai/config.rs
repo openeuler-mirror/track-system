@@ -40,3 +40,24 @@ impl AiConfig {
 
         Self {
             enabled,
+            provider,
+            base_url,
+            api_key,
+            model,
+            timeout,
+            max_input_chars,
+        }
+    }
+
+    pub fn remote_available(&self) -> bool {
+        self.enabled && self.api_key.is_some()
+    }
+
+    pub fn chat_completions_url(&self) -> String {
+        format!("{}/chat/completions", self.base_url.trim_end_matches('/'))
+    }
+}
+
+fn env_bool(key: &str, default: bool) -> bool {
+    env::var(key)
+        .ok()
