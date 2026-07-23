@@ -604,3 +604,26 @@ impl OpenEulerCommunityCollector {
             "lts_every_four_years": lts_every_four_years,
             "lts_every_two_years": lts_every_two_years,
             "lts_support_four_years": lts_support_four_years,
+            "lts_lifecycle_six_years": lts_lifecycle_six_years,
+            "lts_extendable_to_eight_years": lts_extendable_to_eight_years,
+            "innovation_every_twelve_months": innovation_every_twelve_months,
+            "innovation_every_six_months": innovation_every_six_months,
+            "innovation_support_six_months": innovation_support_six_months,
+            "extended_support_mentioned": extended_support_mentioned,
+            "sp_policy_mentioned": sp_policy_mentioned,
+        })
+    }
+
+    fn detect_license_policy(
+        &self,
+        license_text: &PageSnapshot,
+        docs_terms_page: &PageSnapshot,
+        contribution_page: &PageSnapshot,
+    ) -> Value {
+        let license_lower = license_text.plain_text.to_ascii_lowercase();
+        let docs_lower = docs_terms_page.plain_text.to_ascii_lowercase();
+        let contribution_lower = contribution_page.plain_text.to_ascii_lowercase();
+
+        let community_repo_license_detected = if license_lower.contains("mulan psl v2") {
+            Some("Mulan PSL v2")
+        } else {
