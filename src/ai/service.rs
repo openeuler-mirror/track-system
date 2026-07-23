@@ -262,3 +262,27 @@ fn l0_community_assessment(context: &AiContext) -> Option<&Value> {
                 .and_then(|value| value.get("sections"))
         })
         .or_else(|| context.evidence.get("sections"))
+        .filter(|value| {
+            value.get("security").is_some()
+                || value.get("quality").is_some()
+                || value.get("status").is_some()
+        })
+}
+
+fn section_risk(section: &Value, fallback: AiRiskLevel) -> AiRiskLevel {
+    section
+        .get("level")
+        .and_then(Value::as_str)
+        .map(AiRiskLevel::from_report_value)
+        .filter(|risk| *risk != AiRiskLevel::Unknown)
+        .unwrap_or(fallback)
+}
+
+fn section_evidence_summary(section: &Value, focused_keys: &[&str]) -> String {
+    let level = section
+        .get("level")
+        .and_then(Value::as_str)
+        .unwrap_or("unknown");
+    let confidence = section
+        .get("confidence")
+        .and_then(Value::as_str)
