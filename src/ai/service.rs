@@ -46,3 +46,27 @@ impl AiAnalysisService {
             .unwrap_or(self.config.max_input_chars)
             .min(self.config.max_input_chars);
 
+        if self.config.remote_available() {
+            match self
+                .analyze_remote(&context, &request, language, max_chars)
+                .await
+            {
+                Ok(response) => return Ok(response),
+                Err(err) => tracing::warn!(error = %err, "AI 远端分析失败，降级为本地启发式分析"),
+            }
+        }
+
+        Ok(self.analyze_local(context))
+    }
+
+    async fn analyze_remote(
+        &self,
+        context: &AiContext,
+        request: &AiAnalysisRequest,
+        language: &str,
+        max_chars: usize,
+    ) -> Result<AiAnalysisResponse> {
+        let client = OpenAiCompatibleClient::new(self.config.clone())?;
+        let allow_external_research = request.allow_external_research.unwrap_or(true);
+        let messages = build_messages(
+            context,
