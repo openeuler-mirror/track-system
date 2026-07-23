@@ -574,3 +574,27 @@ impl GitHubPlatformCollector {
                 8
             ),
         })
+    }
+
+    fn detect_government_takedown(&self, gov_page: &PageSnapshot) -> Value {
+        let text = gov_page.plain_text.as_str();
+        let lower = text.to_ascii_lowercase();
+        let supports_geographic_limit = lower.contains("geographic scope")
+            && (lower.contains("limit") || lower.contains("restrict"));
+        let supports_user_appeal = lower.contains("affected users to appeal");
+        let publishes_public_requests = lower.contains("public gov-takedowns repository")
+            || lower.contains("post the official request");
+        let summary = format!(
+            "GitHub 设有政府下架请求处理流程，{}{}{}",
+            if supports_geographic_limit {
+                "优先限制地理范围"
+            } else {
+                "会按当地法要求处理内容"
+            },
+            if supports_user_appeal {
+                "，并允许受影响用户申诉"
+            } else {
+                ""
+            },
+            if publishes_public_requests {
+                "；同时会将官方请求公开到 gov-takedowns 仓库以提升透明度"
