@@ -989,3 +989,26 @@ mod tests {
         );
         let gov_page = page(
             "GitHub limits the geographic scope where possible, allows the affected users to appeal, and posts the official request in the public gov-takedowns repository.",
+        );
+        let terms_page = page(
+            "You own the content you post on GitHub and you retain ownership. You grant us a license grant to host content. GitHub and our licensors retain ownership. Copyright & DMCA Policy.",
+        );
+        let licensing_page = page(
+            "Choosealicense.com helps repositories. Without a license, default copyright laws apply. Licensee and the Licenses API support SPDX license detection.",
+        );
+        let dmca_page = page(
+            "The DMCA takedown policy explains safe harbor, counter notice, public repository notices and copyright infringement.",
+        );
+        let stats = json!({
+            "total_requests": 3,
+            "requests_by_requester": {"RequesterA": 2, "RequesterB": 1},
+            "truncated": false,
+            "error": null
+        });
+
+        let evidence = collector.build_evidence_records(
+            about_page,
+            corporate_page,
+            trade_page,
+            gov_page,
+            terms_page,
