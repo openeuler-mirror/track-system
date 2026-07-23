@@ -305,3 +305,26 @@ impl OpenEulerCommunityCollector {
                 "data": {
                     "cla_policy": cla_policy["summary"],
                     "cla_required": cla_policy["cla_required"],
+                    "cla_types": cla_policy["cla_types"],
+                    "cla_keyword_lines": contribution_page.keyword_lines,
+                    "contribution_http_status": contribution_page.http_status,
+                    "contribution_error": contribution_page.error,
+                }
+            }),
+        ]
+    }
+
+    async fn fetch_page(&self, client: &Client, url: &str, keywords: &[&str]) -> PageSnapshot {
+        match client.get(url).send().await {
+            Ok(response) => {
+                let status = response.status().as_u16();
+                match response.text().await {
+                    Ok(body) => {
+                        let plain_text = if url == OPENEULER_LIFECYCLE_URL {
+                            self.build_lifecycle_plain_text(client, &body).await
+                        } else {
+                            strip_tags(&body)
+                        };
+                        PageSnapshot {
+                            http_status: Some(status),
+                            keyword_lines: extract_keyword_lines(&plain_text, keywords, 12),
