@@ -897,3 +897,26 @@ mod tests {
             last_error: None,
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
+        };
+        assert!(!GitHubPlatformCollector::matches_target(&target));
+    }
+
+    #[test]
+    fn detect_trade_controls_from_text() {
+        let collector = GitHubPlatformCollector::new();
+        let page = PageSnapshot {
+            http_status: Some(200),
+            keyword_lines: Vec::new(),
+            plain_text: "GitHub.com may be subject to the U.S. Export Administration Regulations and sanctions laws. GitHub secured a license from OFAC for Iran and continues to keep public repository services available in sanctioned regions. GitHub.com is not designed to host data subject to the ITAR.".to_string(),
+            error: None,
+        };
+        let result = collector.detect_trade_controls(&page);
+        assert_eq!(result["ofac_license_for_iran"], true);
+        assert_eq!(result["public_repo_access_in_sanctioned_regions"], true);
+        assert_eq!(result["itar_restriction_mentioned"], true);
+    }
+
+    #[test]
+    fn detect_corporate_profile_from_text() {
+        let collector = GitHubPlatformCollector::new();
+        let page = PageSnapshot {
