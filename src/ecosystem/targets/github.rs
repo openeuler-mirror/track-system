@@ -759,3 +759,26 @@ fn parse_gov_takedown_tree(tree_resp: &Value) -> Value {
     json!({
         "total_requests": total_requests,
         "requests_by_requester": requests_by_requester,
+        "truncated": truncated,
+    })
+}
+
+fn extract_metric(text: &str, suffix: &str) -> Option<String> {
+    let re = Regex::new(&format!(r"(?i)(\d+[A-Z+.]*)\s+{}", regex::escape(suffix))).ok()?;
+    re.captures(text)
+        .and_then(|captures| captures.get(1).map(|m| m.as_str().to_string()))
+}
+
+fn normalize_lookup_key(input: &str) -> String {
+    input
+        .chars()
+        .filter(|ch| ch.is_ascii_alphanumeric())
+        .flat_map(|ch| ch.to_lowercase())
+        .collect()
+}
+
+fn strip_tags(text: &str) -> String {
+    let script_re = Regex::new(r"(?is)<script.*?>.*?</script>").expect("script regex");
+    let style_re = Regex::new(r"(?is)<style.*?>.*?</style>").expect("style regex");
+    let break_re = Regex::new(r"(?i)<br\s*/?>").expect("br regex");
+    let block_end_re =
