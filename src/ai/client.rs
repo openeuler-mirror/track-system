@@ -73,3 +73,28 @@ impl AiClient for OpenAiCompatibleClient {
         let content = completion
             .choices
             .first()
+            .and_then(|choice| choice.message.content.as_deref())
+            .context("AI 响应缺少 choices[0].message.content")?;
+
+        serde_json::from_str(content).context("AI 响应不是合法 JSON")
+    }
+
+    fn model(&self) -> &str {
+        &self.config.model
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct ChatCompletionResponse {
+    choices: Vec<ChatChoice>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ChatChoice {
+    message: ChatMessage,
+}
+
+#[derive(Debug, Deserialize)]
+struct ChatMessage {
+    content: Option<String>,
+}
