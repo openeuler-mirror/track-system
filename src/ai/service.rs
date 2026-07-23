@@ -286,3 +286,27 @@ fn section_evidence_summary(section: &Value, focused_keys: &[&str]) -> String {
     let confidence = section
         .get("confidence")
         .and_then(Value::as_str)
+        .unwrap_or("unknown");
+    let score = section
+        .get("score")
+        .and_then(Value::as_i64)
+        .map(|value| value.to_string())
+        .unwrap_or_else(|| "-".to_string());
+    let reasons = section
+        .get("reasons")
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(Value::as_str)
+                .take(4)
+                .collect::<Vec<_>>()
+                .join("；")
+        })
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "未提供规则原因".to_string());
+
+    let indicators = focused_indicator_summary(section, focused_keys);
+    if indicators.is_empty() {
+        format!(
+            "level={}，confidence={}，score={}；{}",
