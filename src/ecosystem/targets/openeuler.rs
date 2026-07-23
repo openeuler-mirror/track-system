@@ -374,3 +374,26 @@ impl OpenEulerCommunityCollector {
                         }
                     }
                     Err(error) => warn!(error = %error, "读取 openEuler 生命周期资源失败"),
+                },
+                Err(error) => warn!(error = %error, "抓取 openEuler 生命周期资源失败"),
+            }
+        }
+
+        if let Some(component_path) = extract_vitepress_lifecycle_component_path(html) {
+            let component_url = to_absolute_asset_url(OPENEULER_LIFECYCLE_URL, &component_path);
+            match client.get(component_url).send().await {
+                Ok(response) => match response.text().await {
+                    Ok(body) => {
+                        let component_text = extract_lifecycle_text_from_vitepress_component(&body);
+                        if contains_lifecycle_signals(&component_text) {
+                            return component_text;
+                        }
+                    }
+                    Err(error) => warn!(error = %error, "读取 openEuler 生命周期组件失败"),
+                },
+                Err(error) => warn!(error = %error, "抓取 openEuler 生命周期组件失败"),
+            }
+        }
+
+        direct_text
+    }
