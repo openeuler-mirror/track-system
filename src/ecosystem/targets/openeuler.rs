@@ -1041,3 +1041,26 @@ fn contains_lifecycle_signals(text: &str) -> bool {
 fn collect_text_segments_from_json(value: &Value, segments: &mut Vec<String>) {
     match value {
         Value::String(text) => {
+            if text.contains("LTS")
+                || text.contains("长期支持版本")
+                || text.contains("创新版本")
+                || text.contains("生命周期")
+                || text.contains("社区支持")
+                || text.contains("SP")
+            {
+                segments.push(text.to_string());
+            }
+        }
+        Value::Array(items) => {
+            for item in items {
+                collect_text_segments_from_json(item, segments);
+            }
+        }
+        Value::Object(map) => {
+            for value in map.values() {
+                collect_text_segments_from_json(value, segments);
+            }
+        }
+        _ => {}
+    }
+}
