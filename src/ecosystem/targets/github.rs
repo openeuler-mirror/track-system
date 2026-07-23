@@ -874,3 +874,26 @@ mod tests {
         };
         assert!(GitHubPlatformCollector::matches_target(&target));
     }
+
+    #[test]
+    fn matches_target_rejects_generic_github_repository() {
+        let target = ecosystem_targets::Model {
+            id: 2,
+            name: "track-system".to_string(),
+            target_type: "repository".to_string(),
+            platform: Some("github".to_string()),
+            role: "application".to_string(),
+            homepage_url: Some("https://github.com/example/track-system".to_string()),
+            api_base_url: Some("https://api.github.com".to_string()),
+            owner: Some("example".to_string()),
+            repo: Some("track-system".to_string()),
+            default_branch: Some("main".to_string()),
+            status: "active".to_string(),
+            refresh_interval_hours: 24,
+            rule_profile: "default".to_string(),
+            metadata: None,
+            last_collected_at: None,
+            last_report_at: None,
+            last_error: None,
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
