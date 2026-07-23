@@ -94,3 +94,27 @@ impl AiAnalysisService {
             findings: parse_findings(&raw),
             recommended_actions: parse_string_array(&raw, "recommended_actions"),
             external_references: parse_string_array(&raw, "external_references"),
+            sources_to_check: parse_string_array(&raw, "sources_to_check"),
+            raw_model_output: Some(raw),
+        })
+    }
+
+    fn analyze_local(&self, context: AiContext) -> AiAnalysisResponse {
+        let risk = infer_risk_from_context(&context);
+        let confidence = context
+            .rule_confidence
+            .clone()
+            .unwrap_or_else(|| "medium".to_string());
+        let target_name = context
+            .target_name
+            .clone()
+            .unwrap_or_else(|| "未知目标".to_string());
+        let summary = format!(
+            "本地启发式分析基于现有规则报告生成：{} 当前规则风险为 {}，规则置信度为 {}。未启用远端 AI 模型时，建议以规则评估结果和证据完整性作为处置依据。",
+            target_name,
+            context.rule_risk.as_deref().unwrap_or("unknown"),
+            confidence
+        );
+
+        let mut findings = Vec::new();
+        if let Some(rule_summary) = &context.rule_summary {
