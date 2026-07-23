@@ -94,3 +94,27 @@ pub async fn execute(api_client: &ApiClient, action: EcosystemAction) -> Result<
                         .and_then(|preset| preset.api_base_url.clone())
                 }),
                 owner: owner.or_else(|| preset.as_ref().and_then(|preset| preset.owner.clone())),
+                repo: repo.or_else(|| preset.as_ref().and_then(|preset| preset.repo.clone())),
+                default_branch: default_branch.or_else(|| {
+                    preset
+                        .as_ref()
+                        .and_then(|preset| preset.default_branch.clone())
+                }),
+                status: Some(status.unwrap_or_else(default_status)),
+                refresh_interval_hours: Some(
+                    refresh_interval_hours.unwrap_or_else(default_refresh_interval_hours),
+                ),
+                rule_profile: rule_profile
+                    .or_else(|| preset.as_ref().map(|preset| preset.rule_profile.clone()))
+                    .unwrap_or_else(default_rule_profile),
+                metadata: parse_metadata(metadata)?,
+            };
+            create_target(api_client, request).await
+        }
+        EcosystemAction::List {
+            page,
+            page_size,
+            target_type,
+            platform,
+            status,
+        } => list_targets(api_client, page, page_size, target_type, platform, status).await,
