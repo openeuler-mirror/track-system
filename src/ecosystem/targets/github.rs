@@ -1058,3 +1058,26 @@ mod tests {
         assert_eq!(result["requests_by_requester"]["Germany"], 1);
         // 根目录 blob (README.md) 不计入
         assert!(result["requests_by_requester"].get("").is_none());
+    }
+
+    #[test]
+    fn parse_gov_takedown_tree_handles_truncated() {
+        let tree_resp = serde_json::json!({
+            "truncated": true,
+            "tree": [
+                {"path": "China/2023-01.md", "type": "blob", "sha": "aaa"},
+            ]
+        });
+        let result = parse_gov_takedown_tree(&tree_resp);
+        assert_eq!(result["truncated"], true);
+        assert_eq!(result["total_requests"], 1);
+    }
+
+    #[test]
+    fn parse_gov_takedown_tree_handles_missing_tree_field() {
+        let tree_resp = serde_json::json!({ "sha": "abc" });
+        let result = parse_gov_takedown_tree(&tree_resp);
+        assert!(result["error"].as_str().is_some());
+        assert!(result["total_requests"].is_null());
+    }
+}
