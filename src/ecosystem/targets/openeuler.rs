@@ -420,3 +420,26 @@ impl OpenEulerCommunityCollector {
                         plain_text: String::new(),
                         raw_body: String::new(),
                         error: Some(error.to_string()),
+                    },
+                }
+            }
+            Err(error) => PageSnapshot {
+                http_status: None,
+                keyword_lines: Vec::new(),
+                plain_text: String::new(),
+                raw_body: String::new(),
+                error: Some(error.to_string()),
+            },
+        }
+    }
+
+    fn log_page_result(&self, label: &str, page: &PageSnapshot) {
+        match &page.error {
+            Some(error) => warn!(
+                page = label,
+                http_status = ?page.http_status,
+                error = %error,
+                "openEuler 页面抓取失败"
+            ),
+            None => info!(
+                page = label,
