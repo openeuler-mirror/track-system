@@ -443,3 +443,26 @@ impl OpenEulerCommunityCollector {
             ),
             None => info!(
                 page = label,
+                http_status = ?page.http_status,
+                keyword_lines = ?page.keyword_lines,
+                "openEuler 页面抓取成功"
+            ),
+        }
+
+        debug!(
+            page = label,
+            plain_text_preview = %page.plain_text.chars().take(240).collect::<String>(),
+            "openEuler 页面文本预览"
+        );
+    }
+
+    fn detect_organization_structure(&self, organization_page: &PageSnapshot) -> Value {
+        let lower = organization_page.plain_text.to_ascii_lowercase();
+        let candidates = [
+            ("openEuler Committee", "openeuler committee"),
+            ("Technical Committee", "technical committee"),
+            ("Marketing Committee", "marketing committee"),
+            ("User Committee", "user committee"),
+            ("Security Committee", "security committee"),
+            ("SIG", "special interest groups"),
+        ];
