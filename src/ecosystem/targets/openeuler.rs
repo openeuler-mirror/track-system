@@ -282,3 +282,26 @@ impl OpenEulerCommunityCollector {
             json!({
                 "source_type": "openeuler_license_policy",
                 "source_name": "openeuler_license",
+                "source_url": OPENEULER_GITEE_LICENSE_URL,
+                "assessment_category": "source",
+                "assessment_subcategory": "license_policy",
+                "data": {
+                    "license_policy": license_policy["summary"],
+                    "community_repo_license_detected": license_policy["community_repo_license_detected"],
+                    "docs_license_detected": license_policy["docs_license_detected"],
+                    "site_footer_license_detected": license_policy["site_footer_license_detected"],
+                    "license_keyword_lines": license_policy["license_keyword_lines"],
+                    "docs_terms_keyword_lines": docs_terms_page.keyword_lines,
+                    "license_error": license_text.error,
+                    "docs_terms_error": docs_terms_page.error,
+                }
+            }),
+            json!({
+                "source_type": "openeuler_cla_policy",
+                "source_name": "openeuler_contribution",
+                "source_url": OPENEULER_CONTRIBUTION_URL,
+                "assessment_category": "source",
+                "assessment_subcategory": "cla_policy",
+                "data": {
+                    "cla_policy": cla_policy["summary"],
+                    "cla_required": cla_policy["cla_required"],
