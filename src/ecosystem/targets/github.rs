@@ -598,3 +598,26 @@ impl GitHubPlatformCollector {
             },
             if publishes_public_requests {
                 "；同时会将官方请求公开到 gov-takedowns 仓库以提升透明度"
+            } else {
+                ""
+            }
+        );
+        json!({
+            "summary": summary,
+            "supports_geographic_limit": supports_geographic_limit,
+            "supports_user_appeal": supports_user_appeal,
+            "publishes_public_requests": publishes_public_requests,
+        })
+    }
+
+    fn detect_license_policy(
+        &self,
+        licensing_page: &PageSnapshot,
+        terms_page: &PageSnapshot,
+    ) -> Value {
+        let text = licensing_page.plain_text.as_str();
+        let lower = text.to_ascii_lowercase();
+        let supports_choosealicense = lower.contains("choosealicense.com");
+        let supports_license_detection =
+            lower.contains("licensee") || lower.contains("licenses api");
+        let mentions_default_copyright_rule = lower.contains("default copyright laws apply");
