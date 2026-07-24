@@ -406,3 +406,27 @@ async fn resolve_target_id(api_client: &ApiClient, input: &str) -> Result<i32> {
     }
 
     let matches = targets
+        .iter()
+        .filter(|target| {
+            let name_key = normalize_lookup_key(&target.name);
+            name_key.contains(&input_key) || input_key.contains(&name_key)
+        })
+        .collect::<Vec<_>>();
+
+    match matches.as_slice() {
+        [target] => Ok(target.id),
+        [] => bail!("未找到生态目标: {}", input),
+        many => {
+            let names = many
+                .iter()
+                .map(|target| format!("{}({})", target.name, target.id))
+                .collect::<Vec<_>>()
+                .join(", ");
+            bail!("匹配到多个生态目标，请使用更精确的名称或 ID: {}", names)
+        }
+    }
+}
+
+async fn fetch_all_targets(api_client: &ApiClient) -> Result<Vec<EcosystemTargetDto>> {
+    let mut page = 1u64;
+    let page_size = 100u64;
