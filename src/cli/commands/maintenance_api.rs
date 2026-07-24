@@ -70,3 +70,27 @@ async fn refresh_package(api_client: &ApiClient, package_id: i32) -> Result<()> 
         .post::<_, ApiResponse<MaintenanceRefreshResultDto>>(
             &format!("/maintenance/packages/{}/refresh", package_id),
             &serde_json::json!({}),
+        )
+        .await?;
+    let result = response
+        .data
+        .ok_or_else(|| anyhow!("服务端未返回刷新结果"))?;
+    println!(
+        "{} 刷新完成: package_id={}, evidence_count={}, report_id={}, generated_at={}",
+        "✓".green().bold(),
+        result.package_id,
+        result.evidence_count,
+        result.report_id,
+        format_datetime_local(&result.generated_at)
+    );
+    Ok(())
+}
+
+async fn show_latest_report(api_client: &ApiClient, package_id: i32, verbose: bool) -> Result<()> {
+    let response = api_client
+        .get::<ApiResponse<MaintenanceReportDto>>(&format!(
+            "/maintenance/packages/{}/latest-report",
+            package_id
+        ))
+        .await?;
+    let report = response
