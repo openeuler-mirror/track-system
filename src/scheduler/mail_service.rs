@@ -22,3 +22,27 @@ use lettre::{
     transport::smtp::{authentication::Credentials, client::Tls},
     AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor,
 };
+use std::{
+    env, fs,
+    path::{Path, PathBuf},
+    time::Duration,
+};
+use tracing::{debug, info};
+
+use super::report_artifacts::{CveFixComparisonRow, ReportArtifact};
+
+const DEFAULT_MAIL_SUBJECT: &str = "Track-System CVE/ISSUE对比报告";
+const ENCRYPTED_PASSWORD_NONCE_LEN: usize = 12;
+const DEFAULT_EMBED_XLSX_PREVIEW_ROWS: usize = 30;
+const PREVIEW_DESCRIPTION_MAX_CHARS: usize = 220;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MailConfig {
+    pub enabled: bool,
+    pub smtp_host: String,
+    pub smtp_port: u16,
+    pub smtp_username: Option<String>,
+    pub smtp_password: Option<String>,
+    pub smtp_tls: SmtpTlsMode,
+    pub from: String,
+    pub to: Vec<String>,
