@@ -163,3 +163,26 @@ impl MailService {
             recipients = self.config.to.join(","),
             "xlsx 邮件发送成功"
         );
+
+        Ok(())
+    }
+}
+
+fn build_transport(config: &MailConfig) -> Result<AsyncSmtpTransport<Tokio1Executor>> {
+    let mut builder = match config.smtp_tls {
+        SmtpTlsMode::Wrapper => {
+            AsyncSmtpTransport::<Tokio1Executor>::relay(config.smtp_host.trim())
+                .context("创建 SMTPS 传输失败")?
+        }
+        SmtpTlsMode::StartTls => {
+            AsyncSmtpTransport::<Tokio1Executor>::starttls_relay(config.smtp_host.trim())
+                .context("创建 STARTTLS SMTP 传输失败")?
+        }
+        SmtpTlsMode::None => AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(
+            config.smtp_host.trim().to_string(),
+        )
+        .tls(Tls::None),
+    }
+    .port(config.smtp_port);
+
+    if config.has_auth() {
