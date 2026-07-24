@@ -1223,3 +1223,26 @@ mod tests {
         });
 
         assert_eq!(source_focus_bool(&payload, "has_lts_policy"), Some(true));
+        assert_eq!(
+            source_focus_bool(&payload, "innovation_support_six_months"),
+            Some(true)
+        );
+    }
+
+    #[test]
+    fn lifecycle_structured_flags_can_be_extracted() {
+        let payload = serde_json::json!({
+            "sections": {
+                "source": {
+                    "indicators": [
+                        {"key": "has_lts_policy", "value": true},
+                        {"key": "lts_every_four_years", "value": true},
+                        {"key": "lts_support_four_years", "value": true},
+                        {"key": "lts_lifecycle_six_years", "value": true},
+                        {"key": "innovation_every_twelve_months", "value": true},
+                        {"key": "innovation_support_six_months", "value": true},
+                        {"key": "sp_policy_mentioned", "value": true},
+                        {"key": "extended_support_mentioned", "value": true}
+                    ]
+                }
+            }
