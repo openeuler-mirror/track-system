@@ -855,3 +855,26 @@ fn print_github_gov_takedown_archive_details(report_payload: &Value) {
 
     let trunc_note = if truncated {
         "（列表已截断，实际更多）"
+    } else {
+        ""
+    };
+    println!("      政府下架档案 (github/gov-takedowns):{}", trunc_note);
+    println!("        * 历史请求总数: {} 条", total);
+
+    if let Some(serde_json::Value::Object(map)) = by_requester {
+        let mut entries: Vec<(String, u64)> = map
+            .into_iter()
+            .filter_map(|(k, v)| v.as_u64().map(|n| (k, n)))
+            .collect();
+        // 按请求数降序，同数量时按名称字母序
+        entries.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+
+        if !entries.is_empty() {
+            println!("        * 请求方明细 (按数量降序):");
+            for (requester, count) in &entries {
+                println!("            - {}: {} 条", requester, count);
+            }
+        }
+    }
+}
+
