@@ -740,3 +740,26 @@ fn print_lifecycle_structured_details(report_payload: &Value) {
         details.push("      * 版本分类: 区分 LTS 版本和创新版本".to_string());
     }
     if source_focus_bool(report_payload, "lts_every_four_years") == Some(true) {
+        details.push("      * LTS 发布周期: 自 2025 年 8 月起每 4 年发布一代".to_string());
+    } else if source_focus_bool(report_payload, "lts_every_two_years") == Some(true) {
+        details.push("      * LTS 发布周期: 历史规则约每 2 年发布一代".to_string());
+    }
+    if source_focus_bool(report_payload, "lts_support_four_years") == Some(true) {
+        details.push("      * LTS 社区支持: 4 年".to_string());
+    }
+    if source_focus_bool(report_payload, "lts_lifecycle_six_years") == Some(true) {
+        details.push("      * LTS 全生命周期: 6 年（4+2）".to_string());
+    }
+    if source_focus_bool(report_payload, "lts_extendable_to_eight_years") == Some(true) {
+        details.push("      * 生命周期延长: 可申请延长至 8 年".to_string());
+    }
+    if source_focus_bool(report_payload, "innovation_every_twelve_months") == Some(true) {
+        details.push("      * 创新版发布周期: 每 12 个月发布一次".to_string());
+    } else if source_focus_bool(report_payload, "innovation_every_six_months") == Some(true) {
+        details.push("      * 创新版发布周期: 历史规则约每 6 个月发布一次".to_string());
+    }
+    if source_focus_bool(report_payload, "innovation_support_six_months") == Some(true) {
+        details.push("      * 创新版社区支持: 6 个月".to_string());
+    }
+    if source_focus_bool(report_payload, "sp_policy_mentioned") == Some(true) {
+        details.push("      * SP 生命周期策略: 按大小 SP 区分维护周期".to_string());
