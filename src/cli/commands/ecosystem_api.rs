@@ -717,3 +717,26 @@ fn print_source_focus_details(report_payload: &Value) {
     println!(
         "    - 许可证信息: {}",
         license.unwrap_or_else(|| "-".to_string())
+    );
+    print_github_license_policy_details(report_payload);
+    if let Some(copyright) = copyright {
+        println!("    - Copyright 信息: {}", copyright);
+    }
+    print_github_copyright_details(report_payload);
+    println!("    - CLA 信息: {}", cla.unwrap_or_else(|| "-".to_string()));
+    if let Some(operator_supply_risk) = operator_supply_risk {
+        println!("    - 运营方供应风险: {}", operator_supply_risk);
+    }
+    if let Some(hash_signature) = hash_signature {
+        println!("    - 哈希/签名机制: {}", hash_signature);
+    }
+    print_download_integrity_details(report_payload);
+}
+
+fn print_lifecycle_structured_details(report_payload: &Value) {
+    let mut details = Vec::new();
+
+    if source_focus_bool(report_payload, "has_lts_policy") == Some(true) {
+        details.push("      * 版本分类: 区分 LTS 版本和创新版本".to_string());
+    }
+    if source_focus_bool(report_payload, "lts_every_four_years") == Some(true) {
