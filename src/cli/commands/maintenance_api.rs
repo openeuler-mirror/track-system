@@ -214,3 +214,27 @@ fn print_maintenance_focus_details(report_payload: &Value) {
     );
     println!(
         "    - 最近一次 Commit 时间: {}",
+        last_commit_at.unwrap_or_else(|| "-".to_string())
+    );
+    println!("    - Stars: {}", stars.unwrap_or_else(|| "-".to_string()));
+    println!("    - Forks: {}", forks.unwrap_or_else(|| "-".to_string()));
+}
+
+fn find_focus_value(report_payload: &Value, key: &str) -> Option<String> {
+    find_indicator_json_value(report_payload, key)
+        .or_else(|| find_raw_evidence_json_value(report_payload, key))
+        .and_then(|value| value_to_readable_text(&value))
+}
+
+fn find_indicator_json_value(report_payload: &Value, key: &str) -> Option<Value> {
+    report_payload
+        .get("section")
+        .and_then(|section| section.get("indicators"))
+        .and_then(Value::as_array)
+        .and_then(|indicators| {
+            indicators.iter().find_map(|indicator| {
+                let indicator_key = indicator.get("key").and_then(Value::as_str)?;
+                if indicator_key == key {
+                    indicator.get("value").cloned()
+                } else {
+                    None
