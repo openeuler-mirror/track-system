@@ -186,3 +186,26 @@ fn build_transport(config: &MailConfig) -> Result<AsyncSmtpTransport<Tokio1Execu
     .port(config.smtp_port);
 
     if config.has_auth() {
+        builder = builder.credentials(Credentials::new(
+            config.smtp_username.clone().unwrap_or_default(),
+            config.smtp_password.clone().unwrap_or_default(),
+        ));
+    }
+
+    Ok(builder.build())
+}
+
+fn build_artifact_message(
+    config: &MailConfig,
+    artifact: &ReportArtifact,
+    attachment_path: &Path,
+) -> Result<Message> {
+    let file_name = attachment_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .filter(|name| !name.is_empty())
+        .unwrap_or("track-system-cve-fix-comparison.xlsx")
+        .to_string();
+    let attachment_bytes = fs::read(attachment_path)
+        .with_context(|| format!("读取 xlsx 附件失败: {}", attachment_path.display()))?;
+
