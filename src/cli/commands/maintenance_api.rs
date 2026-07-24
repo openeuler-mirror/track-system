@@ -166,3 +166,27 @@ fn print_report_detail(report: &MaintenanceReportDto, verbose: bool) {
     println!("  置信度: {}", report.confidence);
     println!("  摘要: {}", report.summary);
     print_maintenance_focus_details(&report.report_payload);
+    println!("  维度摘要: {}", report.dimensions);
+    if verbose {
+        if let Some(evidence_summary) = &report.evidence_summary {
+            println!("  证据摘要: {}", evidence_summary);
+        }
+        println!("  报告载荷: {}", report.report_payload);
+    } else if let Some(evidence_summary) = &report.evidence_summary {
+        println!("  证据摘要: {}", evidence_summary);
+    }
+    println!(
+        "  生成时间: {}",
+        format_datetime_local(&report.generated_at)
+    );
+}
+
+fn print_maintenance_focus_details(report_payload: &Value) {
+    let commit_total = find_focus_value(report_payload, "commit_total");
+    let commits_last_12_months = find_focus_value(report_payload, "commits_last_12_months");
+    let committers_last_12_months = find_focus_value(report_payload, "committers_last_12_months");
+    let last_commit_at = find_focus_value(report_payload, "last_commit_at");
+    let stars = find_focus_value(report_payload, "stars");
+    let forks = find_focus_value(report_payload, "forks");
+
+    if commit_total.is_none()
