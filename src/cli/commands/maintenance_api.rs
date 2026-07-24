@@ -22,3 +22,27 @@ struct PaginatedResponse<T> {
     total_pages: u64,
 }
 
+pub async fn execute(api_client: &ApiClient, action: MaintenanceAction) -> Result<()> {
+    match action {
+        MaintenanceAction::Refresh { package } => {
+            let package_id = resolve_package_id(api_client, &package).await?;
+            refresh_package(api_client, package_id).await
+        }
+        MaintenanceAction::LatestReport { package, verbose } => {
+            let package_id = resolve_package_id(api_client, &package).await?;
+            show_latest_report(api_client, package_id, verbose).await
+        }
+        MaintenanceAction::Reports {
+            page,
+            page_size,
+            package,
+            report_type,
+        } => {
+            let package_id = match package {
+                Some(package) => Some(resolve_package_id(api_client, &package).await?),
+                None => None,
+            };
+            list_reports(api_client, page, page_size, package_id, report_type).await
+        }
+        MaintenanceAction::Report { id, verbose } => show_report(api_client, id, verbose).await,
+    }
