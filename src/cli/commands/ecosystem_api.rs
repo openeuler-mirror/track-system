@@ -286,3 +286,27 @@ fn default_refresh_interval_hours() -> i32 {
 
 async fn create_target(
     api_client: &ApiClient,
+    request: CreateEcosystemTargetRequest,
+) -> Result<()> {
+    println!("正在创建生态目标: {}", request.name.cyan());
+    let response = api_client
+        .post::<_, ApiResponse<EcosystemTargetDto>>("/ecosystem/targets", &request)
+        .await?;
+    let target = response
+        .data
+        .ok_or_else(|| anyhow!("服务端未返回生态目标数据"))?;
+    println!("{} 生态目标创建成功", "✓".green().bold());
+    print_target_detail(&target);
+    Ok(())
+}
+
+async fn list_targets(
+    api_client: &ApiClient,
+    page: u64,
+    page_size: u64,
+    target_type: Option<String>,
+    platform: Option<String>,
+    status: Option<String>,
+) -> Result<()> {
+    println!("{}", "正在获取生态目标列表...".cyan());
+    let mut query = format!("?page={}&page_size={}", page, page_size);
