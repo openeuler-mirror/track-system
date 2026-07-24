@@ -190,3 +190,27 @@ fn print_maintenance_focus_details(report_payload: &Value) {
     let forks = find_focus_value(report_payload, "forks");
 
     if commit_total.is_none()
+        && commits_last_12_months.is_none()
+        && committers_last_12_months.is_none()
+        && last_commit_at.is_none()
+        && stars.is_none()
+        && forks.is_none()
+    {
+        return;
+    }
+
+    println!("  维护指标:");
+    println!(
+        "    - Commit 总数: {}",
+        commit_total.unwrap_or_else(|| "-".to_string())
+    );
+    println!(
+        "    - 近 12 月 Commit 数: {}",
+        commits_last_12_months.unwrap_or_else(|| "-".to_string())
+    );
+    println!(
+        "    - 近 12 月 Committer 数: {}",
+        committers_last_12_months.unwrap_or_else(|| "-".to_string())
+    );
+    println!(
+        "    - 最近一次 Commit 时间: {}",
