@@ -118,3 +118,27 @@ pub async fn execute(api_client: &ApiClient, action: EcosystemAction) -> Result<
             platform,
             status,
         } => list_targets(api_client, page, page_size, target_type, platform, status).await,
+        EcosystemAction::Show { id } => show_target(api_client, id).await,
+        EcosystemAction::Update {
+            target,
+            name,
+            target_type,
+            role,
+            rule_profile,
+            platform,
+            homepage_url,
+            api_base_url,
+            owner,
+            repo,
+            default_branch,
+            status,
+            refresh_interval_hours,
+            metadata,
+            last_error,
+        } => {
+            let normalized_name = name.map(normalize_create_name);
+            let preset = normalized_name
+                .as_deref()
+                .and_then(ecosystem_preset_from_name);
+            let request = UpdateEcosystemTargetRequest {
+                name: normalized_name,
