@@ -24,3 +24,28 @@ use crate::{
 };
 
 pub async fn warm_package_cache(
+    State(state): State<AppState>,
+    Path(id): Path<i32>,
+) -> ApiResult<Json<ApiResponse<L0RepoCacheWarmItem>>> {
+    let service = L0RepoCacheService::new(state.db.as_ref());
+    let result = service.warm_package(id).await.map_err(|error| {
+        let message = error.to_string();
+        if message.contains("not found") {
+            ApiError::NotFound(message)
+        } else if message.contains("missing l0_repo_url") {
+            ApiError::BadRequest(message)
+        } else {
+            ApiError::InternalError(message)
+        }
+    })?;
+
+    Ok(Json(ApiResponse::success(result)))
+}
+
+pub async fn warm_all_package_caches(
+    State(state): State<AppState>,
+) -> ApiResult<Json<ApiResponse<L0RepoCacheWarmSummary>>> {
+    let service = L0RepoCacheService::new(state.db.as_ref());
+    let result = service
+        .warm_all_packages()
+        .await
