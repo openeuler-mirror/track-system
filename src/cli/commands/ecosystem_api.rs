@@ -1039,3 +1039,26 @@ fn find_source_raw_evidence_json_value(report_payload: &Value, key: &str) -> Opt
         .and_then(|entries| {
             entries.iter().find_map(|entry| {
                 let category = entry.get("assessment_category").and_then(Value::as_str)?;
+                if category != "source" {
+                    return None;
+                }
+                entry.get("data").and_then(|data| data.get(key)).cloned()
+            })
+        })
+}
+
+fn find_quality_raw_evidence_value(report_payload: &Value, key: &str) -> Option<String> {
+    find_quality_raw_evidence_json_value(report_payload, key)
+        .and_then(|value| value_to_readable_text(&value))
+}
+
+fn find_quality_raw_evidence_json_value(report_payload: &Value, key: &str) -> Option<Value> {
+    report_payload
+        .get("raw_evidence")
+        .and_then(Value::as_array)
+        .and_then(|entries| {
+            entries.iter().find_map(|entry| {
+                let category = entry.get("assessment_category").and_then(Value::as_str)?;
+                if category != "quality" {
+                    return None;
+                }
