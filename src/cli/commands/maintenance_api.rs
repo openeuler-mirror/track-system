@@ -118,3 +118,27 @@ async fn list_reports(
     let response = api_client
         .get::<ApiResponse<PaginatedResponse<MaintenanceReportDto>>>(&format!(
             "/maintenance/reports{}",
+            query
+        ))
+        .await?;
+    let data = response
+        .data
+        .ok_or_else(|| anyhow!("服务端未返回维护评估报告列表"))?;
+
+    if data.items.is_empty() {
+        println!("{}", "没有找到维护评估报告".yellow());
+        return Ok(());
+    }
+
+    println!("{}", "维护评估报告列表:".bold());
+    for item in data.items {
+        println!(
+            "  [{}] package={} risk={} confidence={} generated_at={}",
+            item.id,
+            item.package_id,
+            item.overall_risk,
+            item.confidence,
+            format_datetime_local(&item.generated_at)
+        );
+    }
+    Ok(())
