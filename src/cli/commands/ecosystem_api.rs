@@ -1108,3 +1108,26 @@ mod tests {
             r#"{"source_assessment":{"foundation":{"a":1}}}"#.to_string(),
         ))
         .unwrap();
+        assert!(value.is_some());
+    }
+
+    #[test]
+    fn parse_metadata_rejects_invalid_json() {
+        let err = parse_metadata(Some("{invalid}".to_string())).unwrap_err();
+        assert!(err.to_string().contains("metadata 不是合法 JSON"));
+    }
+
+    #[test]
+    fn ecosystem_create_defaults_are_stable() {
+        assert_eq!(default_target_type(), "community");
+        assert_eq!(default_role(), "governance");
+        assert_eq!(default_rule_profile(), "default");
+        assert_eq!(default_status(), "active");
+        assert_eq!(default_refresh_interval_hours(), 24);
+    }
+
+    #[test]
+    fn normalize_lookup_key_ignores_case_and_spaces() {
+        assert_eq!(
+            normalize_lookup_key("openEuler Community"),
+            "openeulercommunity"
