@@ -262,3 +262,27 @@ fn ecosystem_preset_from_name(input: &str) -> Option<EcosystemPreset> {
         });
     }
     None
+}
+
+fn default_target_type() -> String {
+    "community".to_string()
+}
+
+fn default_role() -> String {
+    "governance".to_string()
+}
+
+fn default_rule_profile() -> String {
+    "default".to_string()
+}
+
+fn default_status() -> String {
+    "active".to_string()
+}
+
+fn default_refresh_interval_hours() -> i32 {
+    24
+}
+
+async fn create_target(
+    api_client: &ApiClient,
