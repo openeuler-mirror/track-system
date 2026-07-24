@@ -1292,3 +1292,26 @@ mod tests {
                 }
             }
         });
+
+        assert_eq!(
+            source_focus_bool(&payload, "ofac_license_for_iran"),
+            Some(true)
+        );
+        assert_eq!(
+            source_focus_bool(&payload, "github_retains_platform_ip"),
+            Some(true)
+        );
+        assert_eq!(
+            source_focus_bool(&payload, "publishes_public_requests"),
+            Some(true)
+        );
+        assert_eq!(
+            source_focus_bool(&payload, "supports_license_detection"),
+            Some(true)
+        );
+        assert_eq!(
+            source_focus_bool(&payload, "counter_notice_supported"),
+            Some(true)
+        );
+    }
+}
