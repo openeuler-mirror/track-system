@@ -430,3 +430,27 @@ async fn resolve_target_id(api_client: &ApiClient, input: &str) -> Result<i32> {
 async fn fetch_all_targets(api_client: &ApiClient) -> Result<Vec<EcosystemTargetDto>> {
     let mut page = 1u64;
     let page_size = 100u64;
+    let mut targets = Vec::new();
+
+    loop {
+        let response = api_client
+            .get::<ApiResponse<PaginatedResponse<EcosystemTargetDto>>>(&format!(
+                "/ecosystem/targets?page={}&page_size={}",
+                page, page_size
+            ))
+            .await?;
+        let data = response
+            .data
+            .ok_or_else(|| anyhow!("服务端未返回生态目标列表"))?;
+
+        let total_pages = data.total_pages;
+        targets.extend(data.items);
+        if page >= total_pages || total_pages == 0 {
+            break;
+        }
+        page += 1;
+    }
+
+    Ok(targets)
+}
+
