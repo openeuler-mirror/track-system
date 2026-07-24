@@ -993,3 +993,26 @@ fn find_quality_indicator_value(report_payload: &Value, key: &str) -> Option<Str
 
 fn find_source_indicator_json_value(report_payload: &Value, key: &str) -> Option<Value> {
     report_payload
+        .get("sections")
+        .and_then(|sections| sections.get("source"))
+        .and_then(|source| source.get("indicators"))
+        .and_then(Value::as_array)
+        .and_then(|indicators| {
+            indicators.iter().find_map(|indicator| {
+                let indicator_key = indicator.get("key").and_then(Value::as_str)?;
+                if indicator_key == key {
+                    indicator.get("value").cloned()
+                } else {
+                    None
+                }
+            })
+        })
+}
+
+fn find_quality_indicator_json_value(report_payload: &Value, key: &str) -> Option<Value> {
+    report_payload
+        .get("sections")
+        .and_then(|sections| sections.get("quality"))
+        .and_then(|quality| quality.get("indicators"))
+        .and_then(Value::as_array)
+        .and_then(|indicators| {
