@@ -190,3 +190,27 @@ pub async fn execute(api_client: &ApiClient, action: EcosystemAction) -> Result<
 
 fn parse_metadata(input: Option<String>) -> Result<Option<Value>> {
     match input {
+        Some(raw) => {
+            let value = serde_json::from_str::<Value>(&raw)
+                .map_err(|e| anyhow!("metadata 不是合法 JSON: {}", e))?;
+            Ok(Some(value))
+        }
+        None => Ok(None),
+    }
+}
+
+fn normalize_lookup_key(input: &str) -> String {
+    input
+        .chars()
+        .filter(|ch| ch.is_ascii_alphanumeric())
+        .flat_map(|ch| ch.to_lowercase())
+        .collect()
+}
+
+fn normalize_create_name(input: String) -> String {
+    ecosystem_preset_from_name(&input)
+        .map(|preset| preset.canonical_name)
+        .unwrap_or(input)
+}
+
+fn ecosystem_preset_from_name(input: &str) -> Option<EcosystemPreset> {
