@@ -70,3 +70,27 @@ impl MailConfig {
             smtp_password: smtp_password_from_env(),
             smtp_tls: SmtpTlsMode::from_env_value(
                 env_string("TRACK_MAIL_SMTP_TLS")
+                    .as_deref()
+                    .unwrap_or("starttls"),
+            ),
+            from: env_string("TRACK_MAIL_FROM").unwrap_or_default(),
+            to: env_list("TRACK_MAIL_TO"),
+            cc: env_list("TRACK_MAIL_CC"),
+            subject: env_string("TRACK_MAIL_SUBJECT")
+                .unwrap_or_else(|| DEFAULT_MAIL_SUBJECT.to_string()),
+            timeout: Duration::from_secs(env_u64("TRACK_MAIL_TIMEOUT_SECS", 60)),
+            embed_xlsx_preview: env_bool("TRACK_MAIL_EMBED_XLSX_PREVIEW", true),
+            embed_xlsx_preview_max_rows: env_usize(
+                "TRACK_MAIL_EMBED_XLSX_MAX_ROWS",
+                DEFAULT_EMBED_XLSX_PREVIEW_ROWS,
+            ),
+        }
+    }
+
+    pub fn validate_enabled(&self) -> Result<()> {
+        if !self.enabled {
+            return Ok(());
+        }
+        if self.smtp_host.trim().is_empty() {
+            anyhow::bail!("TRACK_MAIL_SMTP_HOST 不能为空");
+        }
