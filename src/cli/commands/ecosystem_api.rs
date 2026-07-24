@@ -809,3 +809,26 @@ fn print_github_ip_policy_details(report_payload: &Value) {
     }
     if source_focus_bool(report_payload, "github_retains_platform_ip") == Some(true) {
         details.push(
+            "      * 平台知识产权: 网站、服务及界面相关知识产权由 GitHub 及其许可方保留"
+                .to_string(),
+        );
+    }
+
+    print_structured_details_block("      知识产权字段:", details);
+}
+
+fn print_github_government_takedown_details(report_payload: &Value) {
+    let mut details = Vec::new();
+
+    if source_focus_bool(report_payload, "supports_geographic_limit") == Some(true) {
+        details.push("      * 处置范围: 优先按地理范围限制下架影响面".to_string());
+    }
+    if source_focus_bool(report_payload, "supports_user_appeal") == Some(true) {
+        details.push("      * 用户救济: 允许受影响用户申诉".to_string());
+    }
+    if source_focus_bool(report_payload, "publishes_public_requests") == Some(true) {
+        details.push("      * 透明度: 官方请求会公开到 `gov-takedowns` 仓库".to_string());
+    }
+
+    print_structured_details_block("      政府下架字段:", details);
+}
