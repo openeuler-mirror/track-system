@@ -763,3 +763,26 @@ fn print_lifecycle_structured_details(report_payload: &Value) {
     }
     if source_focus_bool(report_payload, "sp_policy_mentioned") == Some(true) {
         details.push("      * SP 生命周期策略: 按大小 SP 区分维护周期".to_string());
+    }
+    if source_focus_bool(report_payload, "extended_support_mentioned") == Some(true) {
+        details.push("      * 扩展支持: -".to_string());
+    }
+
+    if details.is_empty() {
+        return;
+    }
+
+    println!("      具体规则:");
+    for detail in details {
+        println!("{}", detail);
+    }
+}
+
+fn print_github_trade_controls_details(report_payload: &Value) {
+    let mut details = Vec::new();
+
+    if source_focus_bool(report_payload, "ofac_license_for_iran") == Some(true) {
+        details.push("      * OFAC 许可: 已公开说明伊朗开发者云服务许可".to_string());
+    }
+    if source_focus_bool(report_payload, "public_repo_access_in_sanctioned_regions") == Some(true) {
+        details.push("      * 开源访问: 在部分受制裁地区维持公共仓库/开源协作访问".to_string());
