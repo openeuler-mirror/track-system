@@ -238,3 +238,27 @@ fn ecosystem_preset_from_name(input: &str) -> Option<EcosystemPreset> {
             homepage_url: Some("https://github.com/about".to_string()),
             api_base_url: Some("https://api.github.com".to_string()),
             owner: None,
+            repo: None,
+            default_branch: None,
+            rule_profile: "github_platform".to_string(),
+        });
+    }
+    if key == "atomgit"
+        || key == "gitcode"
+        || key.contains("atomgitplatform")
+        || key.contains("gitcodeplatform")
+    {
+        return Some(EcosystemPreset {
+            canonical_name: "AtomGit Platform".to_string(),
+            target_type: "platform".to_string(),
+            platform: Some("atomgit".to_string()),
+            role: "hosting".to_string(),
+            homepage_url: Some("https://atomgit.com".to_string()),
+            api_base_url: Some("https://api.atomgit.com/api/v5".to_string()),
+            owner: None,
+            repo: None,
+            default_branch: None,
+            rule_profile: "atomgit_platform".to_string(),
+        });
+    }
+    None
