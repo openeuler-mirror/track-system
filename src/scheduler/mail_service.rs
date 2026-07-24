@@ -232,3 +232,26 @@ fn build_artifact_message(
             MultiPart::mixed()
                 .multipart(MultiPart::alternative_plain_html(plain_body, html_body))
                 .singlepart(Attachment::new(file_name).body(attachment_bytes, content_type)),
+        )
+        .context("构造 xlsx 邮件失败")?;
+
+    Ok(message)
+}
+
+fn build_plain_body(config: &MailConfig, artifact: &ReportArtifact) -> String {
+    let mut body = format!(
+        "Track-System 已生成本轮 CVE/ISSUE 对比 xlsx 报告。\n\n生成时间: {}",
+        artifact.generated_at
+    );
+
+    if config.embed_xlsx_preview {
+        let preview_rows = artifact
+            .preview_rows
+            .iter()
+            .take(config.embed_xlsx_preview_max_rows)
+            .collect::<Vec<_>>();
+        if preview_rows.is_empty() {
+            body.push_str("\n\n正文预览: 无可展示数据，完整内容请查看附件。");
+        } else {
+            body.push_str("\n\n正文预览:");
+            let mut current_system_version = "";
