@@ -49,3 +49,28 @@ pub async fn warm_all_package_caches(
     let result = service
         .warm_all_packages()
         .await
+        .map_err(|error| ApiError::InternalError(error.to_string()))?;
+
+    Ok(Json(ApiResponse::success(result)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sea_orm::{DatabaseBackend, MockDatabase};
+
+    #[tokio::test]
+    async fn warm_package_cache_returns_not_found() {
+        let db = MockDatabase::new(DatabaseBackend::Sqlite)
+            .append_query_results::<crate::entities::packages::Model, _, _>([[]])
+            .into_connection();
+        let state = AppState::without_external_clients(db);
+
+        let result = warm_package_cache(State(state), Path(42)).await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            ApiError::NotFound(message) => assert!(message.contains("package 42 not found")),
+            other => panic!("unexpected error: {:?}", other),
+        }
+    }
+}
