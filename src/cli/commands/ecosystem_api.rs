@@ -478,3 +478,27 @@ async fn refresh_target(api_client: &ApiClient, id: i32) -> Result<()> {
         .data
         .ok_or_else(|| anyhow!("服务端未返回刷新结果"))?;
     println!("{} 生态目标刷新成功", "✓".green().bold());
+    println!("  目标 ID: {}", result.target_id);
+    println!("  证据数量: {}", result.evidence_count);
+    println!("  报告 ID: {}", result.report_id);
+    println!(
+        "  生成时间: {}",
+        format_datetime_local(&result.generated_at)
+    );
+    Ok(())
+}
+
+async fn latest_report(api_client: &ApiClient, id: i32, verbose: bool) -> Result<()> {
+    println!("正在获取最新生态报告: {}", id.to_string().cyan());
+    let response = api_client
+        .get::<ApiResponse<EcosystemReportDto>>(&format!("/ecosystem/targets/{}/latest-report", id))
+        .await?;
+    let report = response
+        .data
+        .ok_or_else(|| anyhow!("服务端未返回最新生态报告"))?;
+    print_report_detail(&report, verbose);
+    Ok(())
+}
+
+async fn list_reports(
+    api_client: &ApiClient,
