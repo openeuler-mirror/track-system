@@ -901,3 +901,26 @@ fn print_github_copyright_details(report_payload: &Value) {
         details.push("      * DMCA Safe Harbor: 平台明确维持 DMCA 安全港合规".to_string());
     }
     if source_focus_bool(report_payload, "counter_notice_supported") == Some(true) {
+        details.push("      * 反通知机制: 支持 counter notice 流程".to_string());
+    }
+    if source_focus_bool(report_payload, "github_copyright_notice_mentioned") == Some(true) {
+        details.push("      * 平台版权声明: GitHub 网站与服务外观受 GitHub 版权保护".to_string());
+    }
+
+    print_structured_details_block("      Copyright 字段:", details);
+}
+
+fn print_download_integrity_details(report_payload: &Value) {
+    let mut details = Vec::new();
+
+    if quality_focus_bool(report_payload, "supports_gpg_commit_tag_verification") == Some(true) {
+        details.push("      * GPG 验签: 支持提交/Tag 的 GPG 签名与验签".to_string());
+    }
+    if quality_focus_bool(report_payload, "supports_release_attachments") == Some(true) {
+        details.push("      * 发布下载: 支持 Release/附件/源码下载".to_string());
+    }
+    if quality_focus_bool(report_payload, "hash_verification_supported") == Some(false) {
+        details.push("      * 哈希校验: 未检索到平台公开提供的 Release 校验值机制".to_string());
+    }
+    if quality_focus_bool(report_payload, "documented_release_artifact_signature") == Some(false) {
+        details.push("      * 下载物签名: 未检索到公开的 Release 附件数字签名文档".to_string());
