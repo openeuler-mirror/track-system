@@ -94,3 +94,26 @@ impl MailConfig {
         if self.smtp_host.trim().is_empty() {
             anyhow::bail!("TRACK_MAIL_SMTP_HOST 不能为空");
         }
+        if self.from.trim().is_empty() {
+            anyhow::bail!("TRACK_MAIL_FROM 不能为空");
+        }
+        if self.to.is_empty() {
+            anyhow::bail!("TRACK_MAIL_TO 不能为空");
+        }
+        Ok(())
+    }
+
+    fn has_auth(&self) -> bool {
+        self.smtp_username.is_some() && self.smtp_password.is_some()
+    }
+}
+
+impl SmtpTlsMode {
+    fn from_env_value(value: &str) -> Self {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "none" | "off" | "false" | "0" => Self::None,
+            "wrapper" | "smtps" | "tls" => Self::Wrapper,
+            _ => Self::StartTls,
+        }
+    }
+}
