@@ -502,3 +502,26 @@ fn system_version_blacklist() -> Vec<String> {
             .map(|version| version.to_string())
             .collect(),
     }
+}
+
+fn row_groups_to_rows(groups: Vec<RowGroup>) -> Vec<CveFixComparisonRow> {
+    groups
+        .into_iter()
+        .map(|group| CveFixComparisonRow {
+            package: group.package,
+            cve_or_issue: group.identifiers.join(","),
+            upstream_fixed_version: group.upstream_fixed_version,
+            ctyunos_current_version: group.ctyunos_current_version,
+            system_version: group.system_version,
+            description: group.descriptions.join("\n"),
+            xingkong_ticket_no: group.xingkong_ticket_no,
+            commit_url: group.commit_url,
+        })
+        .collect()
+}
+
+struct IssueNumberGenerator {
+    next: u32,
+}
+
+struct RowGroup {
