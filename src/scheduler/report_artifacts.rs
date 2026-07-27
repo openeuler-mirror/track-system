@@ -1468,3 +1468,26 @@ mod tests {
             CveFixComparisonInput {
                 tracking_id: 2,
                 package_name: "coreutils".to_string(),
+                system_version: "CTyunOS25.07".to_string(),
+                ctyunos_current_version: "9.5-2".to_string(),
+                default_upstream_version: "9.5-4".to_string(),
+                commit_reports: vec![serde_json::json!({
+                    "Description": "Fix non-CVE bug",
+                    "CVEList": [],
+                    "Url": "https://example.com/coreutils/commit/1",
+                    "UpstreamVersionRelease": "9.5-4",
+                })],
+            },
+        ];
+
+        let rows = cve_fix_comparison_rows_for_inputs_with_issue_start(&inputs, 12030);
+
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0].package, "bash");
+        assert_eq!(rows[0].cve_or_issue, "CVE-2026-1111");
+        assert_eq!(rows[0].upstream_fixed_version, "5.2-3");
+        assert_eq!(rows[0].system_version, "CTyunOS22.06");
+        assert_eq!(rows[1].package, "coreutils");
+        assert_eq!(rows[1].cve_or_issue, "ISSUE-12030");
+        assert_eq!(rows[1].system_version, "CTyunOS25.07");
+    }
