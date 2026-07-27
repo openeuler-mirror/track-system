@@ -1882,3 +1882,26 @@ mod tests {
         assert!(xlsx.contains(r#"<sheet name="CTyunOS25.07" sheetId="2" r:id="rId2"/>"#));
         assert!(xlsx.contains("xl/worksheets/sheet1.xml"));
         assert!(xlsx.contains("xl/worksheets/sheet2.xml"));
+    }
+
+    #[test]
+    #[serial]
+    fn writes_valid_zip_container_for_xlsx() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("report.xlsx");
+        let rows = vec![CveFixComparisonRow {
+            package: "bash".to_string(),
+            cve_or_issue: "CVE-2026-1234".to_string(),
+            upstream_fixed_version: "1.2.3-4".to_string(),
+            ctyunos_current_version: "1.0-1".to_string(),
+            system_version: "ctyunos-22.06".to_string(),
+            description: "Fix CVE\ncommit_url: https://example.com/commit/abc".to_string(),
+            xingkong_ticket_no: "97883".to_string(),
+            commit_url: Some("https://example.com/commit/abc".to_string()),
+        }];
+
+        write_cve_fix_comparison_xlsx(&path, &rows).unwrap();
+        let bytes = fs::read(path).unwrap();
+        assert_eq!(&bytes[..4], b"PK\x03\x04");
+    }
+
