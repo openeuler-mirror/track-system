@@ -48,3 +48,28 @@ impl<'a> L0RepoCacheService<'a> {
         Self { db }
     }
 
+    pub async fn warm_package(&self, package_id: i32) -> Result<L0RepoCacheWarmItem> {
+        let package = Packages::find_by_id(package_id)
+            .one(self.db)
+            .await
+            .context("query package failed")?
+            .ok_or_else(|| anyhow!("package {} not found", package_id))?;
+
+        self.warm_package_model(package).await
+    }
+
+    pub async fn warm_all_packages(&self) -> Result<L0RepoCacheWarmSummary> {
+        let packages = Packages::find()
+            .order_by_asc(packages::Column::Id)
+            .all(self.db)
+            .await
+            .context("query packages failed")?;
+
+        let mut summary = L0RepoCacheWarmSummary {
+            scanned_packages: packages.len(),
+            ..Default::default()
+        };
+
+        for package in packages {
+            let package_id = package.id;
+            let package_name = package.name.clone();
