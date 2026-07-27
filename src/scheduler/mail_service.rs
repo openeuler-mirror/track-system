@@ -393,3 +393,26 @@ fn html_escape(value: &str) -> String {
 fn parse_mailbox(value: &str) -> Result<Mailbox> {
     value
         .trim()
+        .parse::<Mailbox>()
+        .with_context(|| format!("无效邮箱地址: {}", value))
+}
+
+fn smtp_password_from_env() -> Option<String> {
+    match (
+        env_string("TRACK_MAIL_SMTP_PASSWORD_ENCRYPTED"),
+        env_string("TRACK_MAIL_SMTP_PASSWORD_KEY_FILE"),
+    ) {
+        (Some(encrypted), Some(key_file)) => {
+            match decrypt_env_password(&encrypted, Path::new(&key_file)) {
+                Ok(password) => Some(password),
+                Err(err) => {
+                    tracing::warn!(
+                        error = %err,
+                        "解密 TRACK_MAIL_SMTP_PASSWORD_ENCRYPTED 失败，将回退到明文兼容配置"
+                    );
+                    env_string("TRACK_MAIL_SMTP_PASSWORD")
+                }
+            }
+        }
+        _ => env_string("TRACK_MAIL_SMTP_PASSWORD"),
+    }
