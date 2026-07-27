@@ -1583,3 +1583,26 @@ mod tests {
         let first_packages = volumes[0]
             .iter()
             .map(|row| row.package.as_str())
+            .collect::<HashSet<_>>();
+        let second_packages = volumes[1]
+            .iter()
+            .map(|row| row.package.as_str())
+            .collect::<HashSet<_>>();
+
+        assert_eq!(volumes.len(), 2);
+        assert_eq!(first_packages.len(), 30);
+        assert!(first_packages.contains("pkg00"));
+        assert!(first_packages.contains("pkg29"));
+        assert_eq!(second_packages.len(), 1);
+        assert!(second_packages.contains("pkg30"));
+    }
+
+    #[test]
+    #[serial]
+    fn row_volumes_for_inputs_keep_existing_package_in_same_volume_after_limit_is_reached() {
+        let _blacklist_guard = EnvVarGuard::set("TRACK_XLSX_SYSTEM_VERSION_BLACKLIST", "");
+        let _limit_guard = EnvVarGuard::set("TRACK_XLSX_MAX_PACKAGES", "1");
+        let inputs = vec![
+            CveFixComparisonInput {
+                tracking_id: 1,
+                package_name: "bash".to_string(),
