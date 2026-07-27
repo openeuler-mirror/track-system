@@ -646,3 +646,26 @@ mod tests {
         assert!(formatted.contains("CVE-2026-1234"));
         assert!(
             formatted.contains("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        );
+    }
+
+    #[test]
+    fn build_body_limits_embedded_xlsx_preview_rows() {
+        let config = MailConfig {
+            enabled: true,
+            smtp_host: "smtp.example.com".to_string(),
+            smtp_port: 25,
+            smtp_username: None,
+            smtp_password: None,
+            smtp_tls: SmtpTlsMode::None,
+            from: "track@example.com".to_string(),
+            to: vec!["ops@example.com".to_string()],
+            cc: Vec::new(),
+            subject: "subject".to_string(),
+            timeout: Duration::from_secs(1),
+            embed_xlsx_preview: true,
+            embed_xlsx_preview_max_rows: 1,
+        };
+        let artifact = ReportArtifact {
+            artifact_type: "cve_fix_comparison_xlsx".to_string(),
+            path: "/tmp/report.xlsx".to_string(),
