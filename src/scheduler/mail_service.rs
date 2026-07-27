@@ -439,3 +439,26 @@ fn read_password_key(key_file: &Path) -> Result<[u8; 32]> {
     let raw = fs::read_to_string(key_file)
         .with_context(|| format!("读取 SMTP 密码密钥文件失败: {}", key_file.display()))?;
     let trimmed = raw.trim();
+    let key_text = trimmed.strip_prefix("base64:").unwrap_or(trimmed);
+    let decoded = general_purpose::STANDARD
+        .decode(key_text)
+        .context("解析 SMTP 密码密钥失败：密钥文件内容不是有效 base64")?;
+    if decoded.len() != 32 {
+        anyhow::bail!("解析 SMTP 密码密钥失败：AES-256-GCM 密钥必须是 32 字节");
+    }
+
+    let mut key = [0_u8; 32];
+    key.copy_from_slice(&decoded);
+    Ok(key)
+}
+
+fn env_bool(key: &str, default: bool) -> bool {
+    env::var(key)
+        .ok()
+        .and_then(|value| match value.trim().to_ascii_lowercase().as_str() {
+            "1" | "true" | "yes" | "on" => Some(true),
+            "0" | "false" | "no" | "off" => Some(false),
+            _ => None,
+        })
+        .unwrap_or(default)
+}
