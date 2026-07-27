@@ -1859,3 +1859,26 @@ mod tests {
                 upstream_fixed_version: "5.2-3".to_string(),
                 ctyunos_current_version: "5.2-1".to_string(),
                 system_version: "CTyunOS22.06".to_string(),
+                description: "Fix CVE".to_string(),
+                xingkong_ticket_no: "97883".to_string(),
+                commit_url: None,
+            },
+            CveFixComparisonRow {
+                package: "grep".to_string(),
+                cve_or_issue: "CVE-2026-2222".to_string(),
+                upstream_fixed_version: "3.11-2".to_string(),
+                ctyunos_current_version: "3.11-1".to_string(),
+                system_version: "CTyunOS25.07".to_string(),
+                description: "Fix CVE".to_string(),
+                xingkong_ticket_no: "97883".to_string(),
+                commit_url: None,
+            },
+        ];
+
+        write_cve_fix_comparison_xlsx(&path, &rows).unwrap();
+        let xlsx = String::from_utf8_lossy(&fs::read(path).unwrap()).to_string();
+
+        assert!(xlsx.contains(r#"<sheet name="CTyunOS22.06" sheetId="1" r:id="rId1"/>"#));
+        assert!(xlsx.contains(r#"<sheet name="CTyunOS25.07" sheetId="2" r:id="rId2"/>"#));
+        assert!(xlsx.contains("xl/worksheets/sheet1.xml"));
+        assert!(xlsx.contains("xl/worksheets/sheet2.xml"));
