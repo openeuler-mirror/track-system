@@ -76,3 +76,29 @@ fn should_refresh_package(
         Some(last) => (now - last).num_hours() >= interval_hours,
         None => true,
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Duration;
+
+    #[test]
+    fn should_refresh_package_when_no_previous_report() {
+        assert!(should_refresh_package(Utc::now(), 24, None));
+    }
+
+    #[test]
+    fn should_refresh_package_when_interval_elapsed() {
+        let now = Utc::now();
+        let last = now - Duration::hours(25);
+        assert!(should_refresh_package(now, 24, Some(last)));
+    }
+
+    #[test]
+    fn should_not_refresh_package_before_interval_elapsed() {
+        let now = Utc::now();
+        let last = now - Duration::hours(23);
+        assert!(!should_refresh_package(now, 24, Some(last)));
+    }
+}
