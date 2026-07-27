@@ -142,3 +142,27 @@ pub fn create_cve_fix_comparison_artifact(
         package_name,
         system_version,
         ctyunos_current_version,
+        default_upstream_version,
+        commit_reports,
+        allocate_issue_start_number(),
+    );
+    let output_path = cve_fix_comparison_output_path(tracking_id, package_name);
+    write_cve_fix_comparison_xlsx(&output_path, &rows)?;
+
+    Ok(ReportArtifact {
+        artifact_type: "cve_fix_comparison_xlsx".to_string(),
+        path: output_path.to_string_lossy().to_string(),
+        format: "xlsx".to_string(),
+        rows: rows.len(),
+        source: "pipeline".to_string(),
+        template: XLSX_TEMPLATE_NAME.to_string(),
+        generated_at: Utc::now().to_rfc3339(),
+        preview_rows: rows,
+    })
+}
+
+pub fn create_round_cve_fix_comparison_artifact(
+    inputs: &[CveFixComparisonInput],
+) -> Result<ReportArtifact> {
+    let rows =
+        cve_fix_comparison_rows_for_inputs_with_issue_start(inputs, allocate_issue_start_number());
