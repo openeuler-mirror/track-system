@@ -73,3 +73,28 @@ impl<'a> L0RepoCacheService<'a> {
         for package in packages {
             let package_id = package.id;
             let package_name = package.name.clone();
+            let repo_url = package.l0_repo_url.clone();
+            match self.warm_package_model(package).await {
+                Ok(item) => {
+                    match item.status.as_str() {
+                        "warmed" => summary.warmed_packages += 1,
+                        "skipped" => summary.skipped_no_repo += 1,
+                        "failed" => summary.failed_packages += 1,
+                        _ => {}
+                    }
+                    summary.results.push(item);
+                }
+                Err(error) => {
+                    summary.failed_packages += 1;
+                    summary.results.push(L0RepoCacheWarmItem {
+                        package_id,
+                        package_name,
+                        repo_url,
+                        cache_path: None,
+                        default_branch: None,
+                        cache_retained: false,
+                        status: "failed".to_string(),
+                        message: error.to_string(),
+                    });
+                }
+            }
