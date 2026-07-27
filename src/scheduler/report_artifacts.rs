@@ -1813,3 +1813,26 @@ mod tests {
                     "Description": "Fix non-CVE bug",
                     "CVEList": [],
                     "Url": "https://example.com/bash/commit/1",
+                })],
+            })
+            .unwrap();
+        let first_issue = cve_fix_comparison_rows_for_inputs_with_issue_start(
+            &writer.inputs,
+            writer.issue_start_number,
+        )[0]
+        .cve_or_issue
+        .clone();
+
+        writer
+            .append_input(CveFixComparisonInput {
+                tracking_id: 2,
+                package_name: "grep".to_string(),
+                system_version: "ctyunos-25.07".to_string(),
+                ctyunos_current_version: "3.11-1".to_string(),
+                default_upstream_version: "3.11-2".to_string(),
+                commit_reports: vec![serde_json::json!({
+                    "Description": "Fix another non-CVE bug",
+                    "CVEList": [],
+                    "Url": "https://example.com/grep/commit/1",
+                })],
+            })
