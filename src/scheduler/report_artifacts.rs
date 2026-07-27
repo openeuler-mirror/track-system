@@ -1008,3 +1008,26 @@ fn extract_cve_identifiers(text: &str) -> Vec<String> {
     identifiers
 }
 
+fn normalize_identifier(identifier: &str) -> String {
+    if identifier.to_ascii_lowercase().starts_with("cve-") {
+        identifier.to_ascii_uppercase()
+    } else {
+        identifier.to_string()
+    }
+}
+
+fn description_entry_for_commit(
+    description: &str,
+    commit_url: &str,
+    identifiers: &[String],
+) -> String {
+    let commit_url = commit_url.trim();
+    let suffix = if commit_url.is_empty() {
+        String::new()
+    } else if identifiers.is_empty() {
+        format!("commit_url: {commit_url}")
+    } else {
+        format!("commit_url: {commit_url}({})", identifiers.join(","))
+    };
+
+    match (description.trim().is_empty(), suffix.is_empty()) {
