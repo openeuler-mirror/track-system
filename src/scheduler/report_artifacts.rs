@@ -548,3 +548,26 @@ impl IssueNumberGenerator {
 }
 
 fn write_cve_fix_comparison_xlsx(path: &Path, rows: &[CveFixComparisonRow]) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("创建报告附件目录失败: {}", parent.display()))?;
+    }
+
+    let sheets = sheet_rows_by_system_version(rows);
+    let mut files = vec![
+        (
+            "[Content_Types].xml".to_string(),
+            content_types_xml(sheets.len()).into_bytes(),
+        ),
+        ("_rels/.rels".to_string(), root_rels_xml().into_bytes()),
+        ("docProps/app.xml".to_string(), app_xml().into_bytes()),
+        ("docProps/core.xml".to_string(), core_xml().into_bytes()),
+        (
+            "xl/workbook.xml".to_string(),
+            workbook_xml(&sheets).into_bytes(),
+        ),
+        (
+            "xl/_rels/workbook.xml.rels".to_string(),
+            workbook_rels_xml(sheets.len()).into_bytes(),
+        ),
+        ("xl/styles.xml".to_string(), styles_xml().into_bytes()),
