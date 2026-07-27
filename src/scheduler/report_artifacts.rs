@@ -1629,3 +1629,26 @@ mod tests {
                 tracking_id: 3,
                 package_name: "bash".to_string(),
                 system_version: "ctyunos-25.07".to_string(),
+                ctyunos_current_version: "5.2-3".to_string(),
+                default_upstream_version: "5.2-4".to_string(),
+                commit_reports: vec![serde_json::json!({
+                    "Description": "Fix bash issue 2",
+                    "CVEList": [],
+                })],
+            },
+        ];
+
+        let volumes = cve_fix_comparison_row_volumes_for_inputs_with_issue_start(&inputs, 12080);
+
+        assert_eq!(volumes.len(), 2);
+        assert_eq!(volumes[0].len(), 2);
+        assert!(volumes[0].iter().all(|row| row.package == "bash"));
+        assert!(volumes[0]
+            .iter()
+            .any(|row| row.system_version == "CTyunOS22.06"));
+        assert!(volumes[0]
+            .iter()
+            .any(|row| row.system_version == "CTyunOS25.07"));
+        assert_eq!(volumes[1].len(), 1);
+        assert_eq!(volumes[1][0].package, "coreutils");
+    }
