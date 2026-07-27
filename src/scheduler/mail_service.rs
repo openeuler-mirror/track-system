@@ -600,3 +600,26 @@ mod tests {
     fn build_message_attaches_xlsx_file() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("report.xlsx");
+        fs::write(&path, b"xlsx-bytes").unwrap();
+        let config = MailConfig {
+            enabled: true,
+            smtp_host: "smtp.example.com".to_string(),
+            smtp_port: 25,
+            smtp_username: None,
+            smtp_password: None,
+            smtp_tls: SmtpTlsMode::None,
+            from: "track@example.com".to_string(),
+            to: vec!["ops@example.com".to_string()],
+            cc: Vec::new(),
+            subject: "subject".to_string(),
+            timeout: Duration::from_secs(1),
+            embed_xlsx_preview: true,
+            embed_xlsx_preview_max_rows: 30,
+        };
+        let artifact = ReportArtifact {
+            artifact_type: "cve_fix_comparison_xlsx".to_string(),
+            path: path.to_string_lossy().to_string(),
+            format: "xlsx".to_string(),
+            rows: 3,
+            source: "scheduler_round".to_string(),
+            template: "template".to_string(),
