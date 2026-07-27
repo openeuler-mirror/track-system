@@ -1307,3 +1307,26 @@ mod tests {
     #[test]
     #[serial]
     fn rows_keep_cve_ids_and_generate_issue_for_mixed_rows() {
+        let issue_start = 12010;
+        let commits = vec![
+            serde_json::json!({
+                "Description": "Fix CVE-2026-1234",
+                "ChangeType": "CVE",
+                "CVEList": ["CVE-2026-1234"],
+            }),
+            serde_json::json!({
+                "Description": "Fix issue without CVE",
+                "ChangeType": "Bugfix",
+                "CVEList": [],
+            }),
+        ];
+
+        let rows = cve_fix_comparison_rows_with_issue_start(
+            "bash",
+            "ctyunos-22.06",
+            "1.0-1",
+            "",
+            &commits,
+            issue_start,
+        );
+
