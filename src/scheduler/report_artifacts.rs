@@ -118,3 +118,27 @@ impl RoundCveFixComparisonWriter {
 
         for (idx, rows) in row_volumes.iter().enumerate() {
             let output_path = cve_fix_comparison_round_volume_output_path(
+                &self.output_path_prefix,
+                idx + 1,
+                row_volumes.len(),
+            );
+            write_cve_fix_comparison_xlsx(&output_path, rows)?;
+            artifacts.push(round_artifact_for_path(&output_path, rows));
+        }
+
+        Ok(artifacts)
+    }
+}
+
+pub fn create_cve_fix_comparison_artifact(
+    tracking_id: i32,
+    package_name: &str,
+    system_version: &str,
+    ctyunos_current_version: &str,
+    default_upstream_version: &str,
+    commit_reports: &[Value],
+) -> Result<ReportArtifact> {
+    let rows = cve_fix_comparison_rows_with_issue_start(
+        package_name,
+        system_version,
+        ctyunos_current_version,
