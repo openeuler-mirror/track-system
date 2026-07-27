@@ -1399,3 +1399,26 @@ mod tests {
                 "CVEList": [],
                 "Url": "https://example.com/openssl/49",
                 "UpstreamVersion": "3.0.12",
+                "UpstreamRelease": "49",
+            }),
+        ];
+
+        let rows = cve_fix_comparison_rows_with_issue_start(
+            "openssl",
+            "CTyunOS25.07",
+            "3.0.12-47",
+            "3.0.12-31",
+            &commits,
+            3022402,
+        );
+
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].package, "openssl");
+        assert_eq!(rows[0].upstream_fixed_version, "3.0.12-52");
+        assert_eq!(rows[0].ctyunos_current_version, "3.0.12-47");
+        assert_eq!(
+            rows[0].cve_or_issue,
+            "CVE-2026-34180,CVE-2026-42766,CVE-2026-45446,ISSUE-3022402"
+        );
+        assert!(rows[0]
+            .description
