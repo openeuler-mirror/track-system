@@ -478,3 +478,27 @@ fn xlsx_max_packages() -> usize {
 fn unique_package_count(groups: &[RowGroup]) -> usize {
     groups
         .iter()
+        .map(|group| group.package.as_str())
+        .collect::<HashSet<_>>()
+        .len()
+}
+
+fn system_version_is_blacklisted(system_version: &str) -> bool {
+    system_version_blacklist()
+        .iter()
+        .any(|blacklisted| blacklisted.eq_ignore_ascii_case(system_version.trim()))
+}
+
+fn system_version_blacklist() -> Vec<String> {
+    match std::env::var("TRACK_XLSX_SYSTEM_VERSION_BLACKLIST") {
+        Ok(value) => value
+            .split(',')
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(normalize_system_version)
+            .collect(),
+        Err(_) => DEFAULT_SYSTEM_VERSION_BLACKLIST
+            .iter()
+            .map(|version| version.to_string())
+            .collect(),
+    }
