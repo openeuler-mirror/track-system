@@ -406,3 +406,27 @@ fn collect_rows_into_volumes(
             group.package == package_name
                 && group.ctyunos_current_version == ctyunos_current_version
                 && group.system_version == system_version
+        });
+
+        let group = match group {
+            Some(group) => group,
+            None => {
+                groups.push(RowGroup {
+                    package: package_name.to_string(),
+                    upstream_fixed_version: upstream_fixed_version.clone(),
+                    ctyunos_current_version: ctyunos_current_version.to_string(),
+                    system_version: system_version.clone(),
+                    identifiers: Vec::new(),
+                    descriptions: Vec::new(),
+                    xingkong_ticket_no: ticket_no.to_string(),
+                    commit_url: None,
+                });
+                groups.last_mut().expect("just pushed row group")
+            }
+        };
+
+        if is_newer_version_release(&upstream_fixed_version, &group.upstream_fixed_version) {
+            group.upstream_fixed_version = upstream_fixed_version;
+        }
+
+        for identifier in identifiers {
