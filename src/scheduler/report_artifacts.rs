@@ -1353,3 +1353,26 @@ mod tests {
                 "UpstreamVersion": "2.32",
                 "UpstreamRelease": "11",
             }),
+        ];
+
+        let rows = cve_fix_comparison_rows_with_issue_start(
+            "libcap",
+            "ctyunos-22.06",
+            "2.32-8",
+            "",
+            &commits,
+            issue_start,
+        );
+
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].cve_or_issue, "CVE-2026-4878,ISSUE-12020");
+        assert_eq!(rows[0].upstream_fixed_version, "2.32-11");
+        assert_eq!(rows[0].system_version, "CTyunOS22.06");
+        assert!(rows[0]
+            .description
+            .contains("https://example.com/commit/cve(CVE-2026-4878)"));
+        assert!(rows[0]
+            .description
+            .contains("https://example.com/commit/issue(ISSUE-12020)"));
+    }
+
