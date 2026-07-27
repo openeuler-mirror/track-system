@@ -732,3 +732,26 @@ fn workbook_xml(sheets: &[SheetRows]) -> String {
     xml
 }
 
+fn workbook_rels_xml(sheet_count: usize) -> String {
+    let mut xml = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+"#
+    .to_string();
+    for sheet_id in 1..=sheet_count {
+        xml.push_str(&format!(
+            r#"  <Relationship Id="rId{sheet_id}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet{sheet_id}.xml"/>
+"#
+        ));
+    }
+    xml.push_str(&format!(
+        r#"  <Relationship Id="rId{}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+</Relationships>"#,
+        sheet_count + 1
+    ));
+    xml
+}
+
+fn styles_xml() -> String {
+    r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <fonts count="3">
