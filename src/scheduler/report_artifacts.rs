@@ -1261,3 +1261,26 @@ mod tests {
 
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].cve_or_issue, "CVE-2026-1234");
+        assert!(rows[0]
+            .description
+            .contains("commit_url: https://example.com/commit/abc(CVE-2026-1234)"));
+    }
+
+    #[test]
+    #[serial]
+    fn rows_generate_issue_numbers_for_non_cve_commits() {
+        let issue_start = 12000;
+        let commits = vec![
+            serde_json::json!({
+                "Description": "Fix parser bug",
+                "ChangeType": "Bugfix",
+                "CVEList": [],
+                "Url": "https://example.com/commit/bug-1",
+            }),
+            serde_json::json!({
+                "Description": "Backport upstream change",
+                "ChangeType": "Backport",
+                "CVEList": [],
+                "Url": "https://example.com/commit/backport-1",
+            }),
+        ];
