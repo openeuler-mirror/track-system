@@ -1054,3 +1054,26 @@ fn upstream_fixed_version(commit: &Value, default_upstream_version: &str) -> Str
 
 fn is_newer_version_release(candidate: &str, current: &str) -> bool {
     if candidate.trim().is_empty() {
+        return false;
+    }
+    if current.trim().is_empty() {
+        return true;
+    }
+
+    compare_version_release(candidate, current) == Ordering::Greater
+}
+
+fn compare_version_release(left: &str, right: &str) -> Ordering {
+    let (left_version, left_release) = split_version_release_display(left);
+    let (right_version, right_release) = split_version_release_display(right);
+
+    rpm_like_cmp(&left_version, &right_version)
+        .then_with(|| rpm_like_cmp(&left_release, &right_release))
+        .then_with(|| left.trim().cmp(right.trim()))
+}
+
+fn split_version_release_display(value: &str) -> (String, String) {
+    let trimmed = value.trim();
+    if let Some((version, release)) = trimmed.rsplit_once('-') {
+        if !version.trim().is_empty() && !release.trim().is_empty() {
+            return (version.trim().to_string(), release.trim().to_string());
