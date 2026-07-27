@@ -98,3 +98,28 @@ impl<'a> L0RepoCacheService<'a> {
                     });
                 }
             }
+        }
+
+        Ok(summary)
+    }
+
+    async fn warm_package_model(&self, package: packages::Model) -> Result<L0RepoCacheWarmItem> {
+        let repo_url = match package
+            .l0_repo_url
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        {
+            Some(repo_url) => repo_url.to_string(),
+            None => {
+                return Ok(L0RepoCacheWarmItem {
+                    package_id: package.id,
+                    package_name: package.name,
+                    repo_url: None,
+                    cache_path: None,
+                    default_branch: None,
+                    cache_retained: false,
+                    status: "skipped".to_string(),
+                    message: "package missing l0_repo_url".to_string(),
+                });
+            }
