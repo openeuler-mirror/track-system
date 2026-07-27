@@ -824,3 +824,26 @@ fn sheet_xml(rows: &[CveFixComparisonRow]) -> String {
                 &cell_ref(col_idx, excel_row),
                 value,
                 style,
+            ));
+        }
+        xml.push_str("</row>");
+    }
+    xml.push_str("</sheetData>");
+
+    let hyperlink_count = rows
+        .iter()
+        .filter(|row| row.commit_url.as_deref().is_some_and(|url| !url.is_empty()))
+        .count();
+    if hyperlink_count > 0 {
+        xml.push_str("<hyperlinks>");
+        let mut rid = 1;
+        for (idx, row) in rows.iter().enumerate() {
+            if row.commit_url.as_deref().is_some_and(|url| !url.is_empty()) {
+                xml.push_str(&format!(
+                    r#"<hyperlink ref="F{}" r:id="rId{}" tooltip="commit_url"/>"#,
+                    idx + 2,
+                    rid
+                ));
+                rid += 1;
+            }
+        }
