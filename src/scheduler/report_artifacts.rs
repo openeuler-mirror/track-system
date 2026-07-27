@@ -358,3 +358,27 @@ fn cve_fix_comparison_row_volumes_for_inputs_with_issue_start(
         rows.push(Vec::new());
     }
     rows
+}
+
+fn collect_rows_into_volumes(
+    package_name: &str,
+    system_version: &str,
+    ctyunos_current_version: &str,
+    default_upstream_version: &str,
+    commit_reports: &[Value],
+    ticket_no: &str,
+    issue_generator: &mut IssueNumberGenerator,
+    volumes: &mut Vec<Vec<RowGroup>>,
+    max_packages: usize,
+) {
+    let system_version = normalize_system_version(system_version);
+    if system_version_is_blacklisted(&system_version) {
+        info!(
+            package = package_name,
+            system_version = %system_version,
+            commit_reports = commit_reports.len(),
+            "跳过 CVE 漏洞修复对比 xlsx 数据：系统版本命中黑名单"
+        );
+        return;
+    }
+
