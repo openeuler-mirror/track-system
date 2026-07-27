@@ -462,3 +462,26 @@ fn env_bool(key: &str, default: bool) -> bool {
         })
         .unwrap_or(default)
 }
+
+fn env_string(key: &str) -> Option<String> {
+    env::var(key)
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
+fn env_list(key: &str) -> Vec<String> {
+    env::var(key)
+        .ok()
+        .map(|value| {
+            value
+                .split(',')
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(ToOwned::to_owned)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn env_u16(key: &str, default: u16) -> u16 {
