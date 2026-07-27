@@ -1215,3 +1215,26 @@ fn sanitize_filename(name: &str) -> String {
     if sanitized.trim_matches('_').is_empty() {
         "package".to_string()
     } else {
+        sanitized
+    }
+}
+
+fn xml_escape(input: &str) -> String {
+    input
+        .chars()
+        .filter(|ch| {
+            matches!(
+                *ch,
+                '\u{9}' | '\u{A}' | '\u{D}' | '\u{20}'..='\u{D7FF}' | '\u{E000}'..='\u{FFFD}'
+            )
+        })
+        .flat_map(|ch| match ch {
+            '&' => "&amp;".chars().collect::<Vec<_>>(),
+            '<' => "&lt;".chars().collect(),
+            '>' => "&gt;".chars().collect(),
+            '"' => "&quot;".chars().collect(),
+            '\'' => "&apos;".chars().collect(),
+            _ => vec![ch],
+        })
+        .collect()
+}
