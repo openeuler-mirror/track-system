@@ -347,3 +347,26 @@ fn append_preview_tables_html(html: &mut String, rows: &[&CveFixComparisonRow]) 
 
         html.push_str(&format!(
             r#"<tr>
+<td style="border:1px solid #d1d5db;vertical-align:top;">{}</td>
+<td style="border:1px solid #d1d5db;vertical-align:top;">{}</td>
+<td style="border:1px solid #d1d5db;vertical-align:top;">{}</td>
+<td style="border:1px solid #d1d5db;vertical-align:top;">{}</td>
+<td style="border:1px solid #d1d5db;vertical-align:top;">{}</td>
+</tr>"#,
+            html_escape(&row.package),
+            html_escape(&row.cve_or_issue),
+            html_escape(&row.upstream_fixed_version),
+            html_escape(&row.ctyunos_current_version),
+            html_escape(&truncate_text(
+                &row.description.replace('\n', " "),
+                PREVIEW_DESCRIPTION_MAX_CHARS
+            )),
+        ));
+    }
+    if table_open {
+        html.push_str("</tbody></table>");
+    }
+}
+
+fn truncate_text(value: &str, max_chars: usize) -> String {
+    if max_chars == 0 {
