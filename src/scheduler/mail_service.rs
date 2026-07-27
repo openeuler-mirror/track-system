@@ -416,3 +416,26 @@ fn smtp_password_from_env() -> Option<String> {
         }
         _ => env_string("TRACK_MAIL_SMTP_PASSWORD"),
     }
+}
+
+fn decrypt_env_password(encrypted: &str, key_file: &Path) -> Result<String> {
+    let key = read_password_key(key_file)?;
+    let payload = general_purpose::STANDARD
+        .decode(encrypted.trim())
+        .context("解析加密 SMTP 密码失败：密文不是有效 base64")?;
+    if payload.len() <= ENCRYPTED_PASSWORD_NONCE_LEN {
+        anyhow::bail!("解析加密 SMTP 密码失败：密文长度不足");
+    }
+
+    let (nonce_bytes, ciphertext) = payload.split_at(ENCRYPTED_PASSWORD_NONCE_LEN);
+    let cipher = Aes256Gcm::new_from_slice(&key).context("初始化 SMTP 密码解密器失败")?;
+    let plaintext = cipher
+        .decrypt(Nonce::from_slice(nonce_bytes), ciphertext)
+        .map_err(|_| anyhow::anyhow!("解密 SMTP 密码失败"))?;
+    String::from_utf8(plaintext).context("解密 SMTP 密码失败：明文不是有效 UTF-8")
+}
+
+fn read_password_key(key_file: &Path) -> Result<[u8; 32]> {
+    let raw = fs::read_to_string(key_file)
+        .with_context(|| format!("读取 SMTP 密码密钥文件失败: {}", key_file.display()))?;
+    let trimmed = raw.trim();
