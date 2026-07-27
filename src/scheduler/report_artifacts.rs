@@ -1192,3 +1192,26 @@ fn normalize_system_version(system_version: &str) -> String {
         format!("CTyunOS{}", normalized)
     }
 }
+
+fn first_non_empty(values: &[String]) -> String {
+    values
+        .iter()
+        .find(|value| !value.trim().is_empty())
+        .cloned()
+        .unwrap_or_default()
+}
+
+fn sanitize_filename(name: &str) -> String {
+    let sanitized = name
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | '.') {
+                ch
+            } else {
+                '_'
+            }
+        })
+        .collect::<String>();
+    if sanitized.trim_matches('_').is_empty() {
+        "package".to_string()
+    } else {
