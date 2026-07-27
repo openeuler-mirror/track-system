@@ -190,3 +190,27 @@ fn cve_fix_comparison_round_output_path_prefix() -> PathBuf {
 fn cve_fix_comparison_round_volume_output_path(
     prefix: &Path,
     volume_index: usize,
+    volume_count: usize,
+) -> PathBuf {
+    if volume_count <= 1 {
+        return prefix.with_extension("xlsx");
+    }
+
+    let file_name = prefix
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("CVE-ISSUE修复列表");
+    let parent = prefix.parent().unwrap_or_else(|| Path::new(""));
+    parent.join(format!("{file_name}_part{volume_index:02}.xlsx"))
+}
+
+fn report_artifact_base_dir() -> PathBuf {
+    std::env::var("TRACK_REPORT_ARTIFACT_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| std::env::temp_dir().join("track-system").join("reports"))
+}
+
+fn allocate_issue_start_number() -> u32 {
+    match reserve_issue_number_block() {
+        Ok(number) => number,
+        Err(error) => {
