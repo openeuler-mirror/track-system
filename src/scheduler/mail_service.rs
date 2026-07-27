@@ -370,3 +370,26 @@ fn append_preview_tables_html(html: &mut String, rows: &[&CveFixComparisonRow]) 
 
 fn truncate_text(value: &str, max_chars: usize) -> String {
     if max_chars == 0 {
+        return String::new();
+    }
+    let mut chars = value.chars();
+    let truncated = chars.by_ref().take(max_chars).collect::<String>();
+    if chars.next().is_some() {
+        format!("{truncated}...")
+    } else {
+        truncated
+    }
+}
+
+fn html_escape(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#39;")
+}
+
+fn parse_mailbox(value: &str) -> Result<Mailbox> {
+    value
+        .trim()
