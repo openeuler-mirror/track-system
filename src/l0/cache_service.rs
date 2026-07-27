@@ -148,3 +148,27 @@ impl<'a> L0RepoCacheService<'a> {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Utc;
+    use sea_orm::{DatabaseBackend, MockDatabase};
+    use serde_json::json;
+
+    #[tokio::test]
+    async fn warm_package_reports_missing_repo_url_as_skipped() {
+        let package = packages::Model {
+            id: 7,
+            name: "openssl".to_string(),
+            level: 1,
+            sync_interval_hours: 24,
+            l0_repo_url: None,
+            description: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+        let db = MockDatabase::new(DatabaseBackend::Sqlite)
+            .append_query_results([[package]])
+            .into_connection();
+        let service = L0RepoCacheService::new(&db);
