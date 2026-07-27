@@ -594,3 +594,26 @@ struct SheetRows {
     name: String,
     rows: Vec<CveFixComparisonRow>,
 }
+
+fn sheet_rows_by_system_version(rows: &[CveFixComparisonRow]) -> Vec<SheetRows> {
+    let mut sheets: Vec<SheetRows> = Vec::new();
+    for row in rows {
+        let sheet_name = sanitize_sheet_name(&row.system_version);
+        if let Some(sheet) = sheets.iter_mut().find(|sheet| sheet.name == sheet_name) {
+            sheet.rows.push(row.clone());
+        } else {
+            sheets.push(SheetRows {
+                name: sheet_name,
+                rows: vec![row.clone()],
+            });
+        }
+    }
+
+    if sheets.is_empty() {
+        sheets.push(SheetRows {
+            name: "NoData".to_string(),
+            rows: Vec::new(),
+        });
+    }
+
+    dedupe_sheet_names(&mut sheets);
