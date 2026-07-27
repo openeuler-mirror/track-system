@@ -1514,3 +1514,26 @@ mod tests {
                 ctyunos_current_version: "9.5-2".to_string(),
                 default_upstream_version: "9.5-4".to_string(),
                 commit_reports: vec![serde_json::json!({
+                    "Description": "Fix non-CVE bug",
+                    "CVEList": [],
+                })],
+            },
+            CveFixComparisonInput {
+                tracking_id: 3,
+                package_name: "grep".to_string(),
+                system_version: "ctyunos-25.07".to_string(),
+                ctyunos_current_version: "3.11-1".to_string(),
+                default_upstream_version: "3.11-2".to_string(),
+                commit_reports: vec![serde_json::json!({
+                    "Description": "Fix CVE-2026-2222",
+                    "CVEList": ["CVE-2026-2222"],
+                })],
+            },
+        ];
+
+        let rows = cve_fix_comparison_rows_for_inputs(&inputs);
+
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].package, "grep");
+        assert_eq!(rows[0].system_version, "CTyunOS25.07");
+    }
