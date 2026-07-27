@@ -1284,3 +1284,26 @@ mod tests {
                 "Url": "https://example.com/commit/backport-1",
             }),
         ];
+
+        let rows = cve_fix_comparison_rows_with_issue_start(
+            "bash",
+            "ctyunos-22.06",
+            "1.0-1",
+            "",
+            &commits,
+            issue_start,
+        );
+
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].cve_or_issue, "ISSUE-12000,ISSUE-12001");
+        assert!(rows[0]
+            .description
+            .contains("commit_url: https://example.com/commit/bug-1(ISSUE-12000)"));
+        assert!(rows[0]
+            .description
+            .contains("commit_url: https://example.com/commit/backport-1(ISSUE-12001)"));
+    }
+
+    #[test]
+    #[serial]
+    fn rows_keep_cve_ids_and_generate_issue_for_mixed_rows() {
