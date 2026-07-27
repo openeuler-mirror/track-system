@@ -1238,3 +1238,26 @@ fn xml_escape(input: &str) -> String {
         })
         .collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serial_test::serial;
+    use tempfile::tempdir;
+
+    #[test]
+    #[serial]
+    fn rows_include_commit_url_in_description() {
+        let commits = vec![serde_json::json!({
+            "Description": "Fix CVE-2026-1234",
+            "ChangeType": "CVE",
+            "CVEList": ["CVE-2026-1234"],
+            "Url": "https://example.com/commit/abc",
+            "CommitSha": "abcdef1234567890",
+            "UpstreamVersion": "1.2.3-4",
+        })];
+
+        let rows = cve_fix_comparison_rows("bash", "ctyunos-22.06", "1.0-1", "", &commits);
+
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].cve_or_issue, "CVE-2026-1234");
