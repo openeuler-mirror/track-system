@@ -1169,3 +1169,26 @@ fn version_release_display(version: &str, release: &str) -> String {
             version.trim().to_string()
         }
         (false, false) => format!("{}-{}", version.trim(), release.trim()),
+    }
+}
+
+fn normalize_system_version(system_version: &str) -> String {
+    let trimmed = system_version.trim();
+    if trimmed.is_empty() {
+        return String::new();
+    }
+
+    let lower = trimmed.to_ascii_lowercase();
+    let normalized = lower
+        .strip_prefix("ctyunos-")
+        .or_else(|| lower.strip_prefix("ctyunos"))
+        .unwrap_or(trimmed)
+        .trim_start_matches('-')
+        .trim();
+
+    if normalized.is_empty() {
+        "CTyunOS".to_string()
+    } else {
+        format!("CTyunOS{}", normalized)
+    }
+}
