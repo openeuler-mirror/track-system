@@ -577,3 +577,26 @@ mod tests {
         let mut payload = nonce.to_vec();
         payload.extend(ciphertext);
         let encrypted = general_purpose::STANDARD.encode(payload);
+
+        let _enabled = EnvVarGuard::set("TRACK_MAIL_ENABLED", "true");
+        let _host = EnvVarGuard::set("TRACK_MAIL_SMTP_HOST", "smtp.example.com");
+        let _from = EnvVarGuard::set("TRACK_MAIL_FROM", "track@example.com");
+        let _to = EnvVarGuard::set("TRACK_MAIL_TO", "a@example.com");
+        let _username = EnvVarGuard::set("TRACK_MAIL_SMTP_USERNAME", "track@example.com");
+        let _password = EnvVarGuard::remove("TRACK_MAIL_SMTP_PASSWORD");
+        let _encrypted = EnvVarGuard::set("TRACK_MAIL_SMTP_PASSWORD_ENCRYPTED", &encrypted);
+        let _key_file = EnvVarGuard::set(
+            "TRACK_MAIL_SMTP_PASSWORD_KEY_FILE",
+            key_path.to_str().unwrap(),
+        );
+
+        let config = MailConfig::from_env();
+
+        assert_eq!(config.smtp_password.as_deref(), Some("secret-password"));
+        assert!(config.has_auth());
+    }
+
+    #[test]
+    fn build_message_attaches_xlsx_file() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("report.xlsx");
