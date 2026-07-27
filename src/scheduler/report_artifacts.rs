@@ -709,3 +709,26 @@ fn core_xml() -> String {
 <cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <dc:creator>track-system</dc:creator>
   <cp:lastModifiedBy>track-system</cp:lastModifiedBy>
+  <dcterms:created xsi:type="dcterms:W3CDTF">{now}</dcterms:created>
+  <dcterms:modified xsi:type="dcterms:W3CDTF">{now}</dcterms:modified>
+</cp:coreProperties>"#,
+        now = Utc::now().to_rfc3339()
+    )
+}
+
+fn workbook_xml(sheets: &[SheetRows]) -> String {
+    let mut xml = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets>"#
+        .to_string();
+    for (idx, sheet) in sheets.iter().enumerate() {
+        let sheet_id = idx + 1;
+        xml.push_str(&format!(
+            r#"<sheet name="{}" sheetId="{sheet_id}" r:id="rId{sheet_id}"/>"#,
+            xml_escape(&sheet.name)
+        ));
+    }
+    xml.push_str("</sheets></workbook>");
+    xml
+}
+
