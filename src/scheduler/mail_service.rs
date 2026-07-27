@@ -301,3 +301,26 @@ fn build_html_body(config: &MailConfig, artifact: &ReportArtifact) -> String {
             .iter()
             .take(config.embed_xlsx_preview_max_rows)
             .collect::<Vec<_>>();
+        if preview_rows.is_empty() {
+            html.push_str("<p>正文预览：无可展示数据，完整内容请查看附件。</p>");
+        } else {
+            html.push_str("<p>正文预览：</p>");
+            append_preview_tables_html(&mut html, &preview_rows);
+            if artifact.preview_rows.len() > config.embed_xlsx_preview_max_rows {
+                html.push_str(&format!(
+                    "<p>仅展示前 {} 行，完整内容请查看附件。</p>",
+                    config.embed_xlsx_preview_max_rows
+                ));
+            }
+        }
+    }
+
+    html.push_str("<p style=\"color:#6b7280;\">该邮件由系统自动发送。</p></body></html>");
+    html
+}
+
+fn append_preview_tables_html(html: &mut String, rows: &[&CveFixComparisonRow]) {
+    let mut current_system_version = "";
+    let mut table_open = false;
+    for row in rows {
+        if row.system_version != current_system_version {
