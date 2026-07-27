@@ -196,3 +196,27 @@ mod tests {
                 },
                 packages::Model {
                     id: 2,
+                    name: "pkg-b".to_string(),
+                    level: 1,
+                    sync_interval_hours: 24,
+                    l0_repo_url: Some("   ".to_string()),
+                    description: Some("test".to_string()),
+                    created_at: Utc::now(),
+                    updated_at: Utc::now(),
+                },
+            ]])
+            .into_connection();
+        let service = L0RepoCacheService::new(&db);
+
+        let result = service.warm_all_packages().await.unwrap();
+        assert_eq!(result.scanned_packages, 2);
+        assert_eq!(result.warmed_packages, 0);
+        assert_eq!(result.skipped_no_repo, 2);
+        assert_eq!(result.failed_packages, 0);
+        assert_eq!(result.results.len(), 2);
+        assert_eq!(
+            serde_json::to_value(&result.results[0]).unwrap()["status"],
+            json!("skipped")
+        );
+    }
+}
