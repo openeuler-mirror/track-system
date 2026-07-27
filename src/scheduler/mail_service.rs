@@ -278,3 +278,26 @@ fn build_plain_body(config: &MailConfig, artifact: &ReportArtifact) -> String {
                     config.embed_xlsx_preview_max_rows
                 ));
             }
+        }
+    }
+
+    body.push_str("\n\n该邮件由系统自动发送。");
+    body
+}
+
+fn build_html_body(config: &MailConfig, artifact: &ReportArtifact) -> String {
+    let mut html = format!(
+        r#"<!doctype html><html><body style="font-family:Arial,'Microsoft YaHei',sans-serif;font-size:14px;color:#1f2937;">
+<p>Track-System 已生成本轮 CVE/ISSUE 对比 xlsx 报告。</p>
+<table cellpadding="4" cellspacing="0" style="border-collapse:collapse;margin:12px 0;">
+<tr><td style="color:#6b7280;">生成时间</td><td>{}</td></tr>
+</table>"#,
+        html_escape(&artifact.generated_at)
+    );
+
+    if config.embed_xlsx_preview {
+        let preview_rows = artifact
+            .preview_rows
+            .iter()
+            .take(config.embed_xlsx_preview_max_rows)
+            .collect::<Vec<_>>();
