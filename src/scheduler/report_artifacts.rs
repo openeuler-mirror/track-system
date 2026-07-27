@@ -1675,3 +1675,26 @@ mod tests {
     fn issue_number_reservation_uses_state_file_without_repeating() {
         let dir = tempdir().unwrap();
         let state_path = dir.path().join("issue-number-state");
+        let _state_guard = EnvVarGuard::set(
+            "TRACK_XLSX_ISSUE_NUMBER_STATE_FILE",
+            state_path.to_str().unwrap(),
+        );
+
+        let first = reserve_issue_number_block().unwrap();
+        let second = reserve_issue_number_block().unwrap();
+
+        assert!(first >= ISSUE_START_NUMBER);
+        assert_eq!(second, first + ISSUE_RESERVATION_BLOCK_SIZE);
+        assert_eq!(
+            fs::read_to_string(state_path).unwrap().trim(),
+            second.to_string()
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn round_writer_rewrites_same_file_as_inputs_are_appended() {
+        let dir = tempdir().unwrap();
+        let _artifact_dir_guard =
+            EnvVarGuard::set("TRACK_REPORT_ARTIFACT_DIR", dir.path().to_str().unwrap());
+        let _limit_guard = EnvVarGuard::set("TRACK_XLSX_MAX_PACKAGES", "30");
