@@ -214,3 +214,27 @@ fn allocate_issue_start_number() -> u32 {
     match reserve_issue_number_block() {
         Ok(number) => number,
         Err(error) => {
+            let fallback = time_based_issue_start_number(Utc::now().timestamp());
+            warn!(
+                error = %error,
+                fallback,
+                "分配持久化 ISSUE 号段失败，使用时间号段兜底"
+            );
+            fallback
+        }
+    }
+}
+
+fn reserve_issue_number_block() -> Result<u32> {
+    let state_path = issue_number_state_path();
+    if let Some(parent) = state_path.parent() {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("创建 ISSUE 号状态目录失败: {}", parent.display()))?;
+    }
+
+    let time_candidate = time_based_issue_start_number(Utc::now().timestamp());
+    let previous = fs::read_to_string(&state_path)
+        .ok()
+        .and_then(|value| value.trim().parse::<u32>().ok());
+    let reserved = previous
+        .map(|previous| previous.saturating_add(ISSUE_RESERVATION_BLOCK_SIZE))
