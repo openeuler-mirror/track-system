@@ -1146,3 +1146,26 @@ fn compare_numeric_segment(left: &str, right: &str) -> Ordering {
     let left_normalized = if left_trimmed.is_empty() {
         "0"
     } else {
+        left_trimmed
+    };
+    let right_normalized = if right_trimmed.is_empty() {
+        "0"
+    } else {
+        right_trimmed
+    };
+
+    left_normalized
+        .len()
+        .cmp(&right_normalized.len())
+        .then_with(|| left_normalized.cmp(right_normalized))
+}
+
+fn version_release_display(version: &str, release: &str) -> String {
+    match (version.trim().is_empty(), release.trim().is_empty()) {
+        (true, true) => String::new(),
+        (false, true) => version.trim().to_string(),
+        (true, false) => release.trim().to_string(),
+        (false, false) if version.trim().ends_with(&format!("-{}", release.trim())) => {
+            version.trim().to_string()
+        }
+        (false, false) => format!("{}-{}", version.trim(), release.trim()),
