@@ -893,3 +893,26 @@ fn write_stored_zip(path: &Path, files: &[(String, Vec<u8>)]) -> Result<()> {
     let dos_time = 0u16;
     let dos_date = (46u16 << 9) | (1u16 << 5) | 1u16;
 
+    for (name, data) in files {
+        let name_bytes = name.as_bytes();
+        let offset = output.len() as u32;
+        let crc = crc32(data);
+        let size = data.len() as u32;
+
+        write_u32(&mut output, 0x0403_4b50)?;
+        write_u16(&mut output, 20)?;
+        write_u16(&mut output, 0)?;
+        write_u16(&mut output, 0)?;
+        write_u16(&mut output, dos_time)?;
+        write_u16(&mut output, dos_date)?;
+        write_u32(&mut output, crc)?;
+        write_u32(&mut output, size)?;
+        write_u32(&mut output, size)?;
+        write_u16(&mut output, name_bytes.len() as u16)?;
+        write_u16(&mut output, 0)?;
+        output.write_all(name_bytes)?;
+        output.write_all(data)?;
+
+        write_u32(&mut central_directory, 0x0201_4b50)?;
+        write_u16(&mut central_directory, 20)?;
+        write_u16(&mut central_directory, 20)?;
