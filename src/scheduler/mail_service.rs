@@ -669,3 +669,26 @@ mod tests {
         let artifact = ReportArtifact {
             artifact_type: "cve_fix_comparison_xlsx".to_string(),
             path: "/tmp/report.xlsx".to_string(),
+            format: "xlsx".to_string(),
+            rows: 2,
+            source: "scheduler_round".to_string(),
+            template: "template".to_string(),
+            generated_at: "2026-06-02T00:00:00Z".to_string(),
+            preview_rows: vec![
+                CveFixComparisonRow {
+                    package: "bash".to_string(),
+                    cve_or_issue: "ISSUE-10200".to_string(),
+                    upstream_fixed_version: "5.2-3".to_string(),
+                    ctyunos_current_version: "5.2-1".to_string(),
+                    system_version: "CTyunOS22.06".to_string(),
+                    description: "Fix bash issue".to_string(),
+                    xingkong_ticket_no: "97883".to_string(),
+                    commit_url: None,
+                },
+                CveFixComparisonRow {
+                    package: "coreutils".to_string(),
+                    cve_or_issue: "ISSUE-10201".to_string(),
+                    upstream_fixed_version: "9.5-4".to_string(),
+                    ctyunos_current_version: "9.5-2".to_string(),
+                    system_version: "CTyunOS25.07".to_string(),
+                    description: "Fix coreutils issue".to_string(),
