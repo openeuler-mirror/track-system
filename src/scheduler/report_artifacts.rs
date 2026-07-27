@@ -166,3 +166,27 @@ pub fn create_round_cve_fix_comparison_artifact(
 ) -> Result<ReportArtifact> {
     let rows =
         cve_fix_comparison_rows_for_inputs_with_issue_start(inputs, allocate_issue_start_number());
+    let output_path = cve_fix_comparison_round_output_path_prefix().with_extension("xlsx");
+    write_cve_fix_comparison_xlsx(&output_path, &rows)?;
+    Ok(round_artifact_for_path(&output_path, &rows))
+}
+
+fn cve_fix_comparison_output_path(tracking_id: i32, package_name: &str) -> PathBuf {
+    let base_dir = report_artifact_base_dir();
+    let timestamp = Utc::now().format("%Y%m%d%H%M%S").to_string();
+    let package = sanitize_filename(package_name);
+    base_dir.join(format!(
+        "CVE-ISSUE修复列表_{}_tracking_{}_{}.xlsx",
+        package, tracking_id, timestamp
+    ))
+}
+
+fn cve_fix_comparison_round_output_path_prefix() -> PathBuf {
+    let base_dir = report_artifact_base_dir();
+    let timestamp = Utc::now().format("%Y%m%d%H%M%S%3f").to_string();
+    base_dir.join(format!("CVE-ISSUE修复列表{}", timestamp))
+}
+
+fn cve_fix_comparison_round_volume_output_path(
+    prefix: &Path,
+    volume_index: usize,
