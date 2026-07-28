@@ -256,13 +256,11 @@ impl L1VsL0Comparator {
         l0_info: &L0VersionInfo,
         l1_info: &L1VersionInfo,
     ) -> Result<L1VsL0Report> {
-        // 1. 版本对比
-        let version_comparison = self.compare_versions(
-            &l1_info.current_version,
-            &l0_info.latest_stable,
-            &l0_info.latest_version,
-            &l0_info.all_versions,
-        )?;
+        let component_version = resolved_component_version(l1_info);
+        let l1_latest_version = resolved_l1_latest_version(l1_info);
+
+        // 1. 版本对比：当前组件版本来自 L2，最新版本来自 L1；L0 主线版本仅展示
+        let version_comparison = self.compare_component_to_l1(l1_info)?;
 
         // 2. 识别可升级版本
         let upgradable_versions =
