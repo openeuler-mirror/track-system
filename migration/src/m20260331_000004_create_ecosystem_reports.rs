@@ -7,18 +7,27 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        let backend = manager.get_database_backend();
+        let id_column = match backend {
+            DatabaseBackend::Sqlite => ColumnDef::new(EcosystemReports::Id)
+                .integer()
+                .not_null()
+                .auto_increment()
+                .primary_key()
+                .to_owned(),
+            _ => ColumnDef::new(EcosystemReports::Id)
+                .big_integer()
+                .not_null()
+                .auto_increment()
+                .primary_key()
+                .to_owned(),
+        };
         manager
             .create_table(
                 Table::create()
                     .table(EcosystemReports::Table)
                     .if_not_exists()
-                    .col(
-                        ColumnDef::new(EcosystemReports::Id)
-                            .big_integer()
-                            .not_null()
-                            .auto_increment()
-                            .primary_key(),
-                    )
+                    .col(id_column)
                     .col(
                         ColumnDef::new(EcosystemReports::TargetId)
                             .integer()
