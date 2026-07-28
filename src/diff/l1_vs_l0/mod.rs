@@ -69,12 +69,78 @@ pub struct ChangelogEntry {
 pub struct L1VersionInfo {
     /// 软件包名称
     pub package_name: String,
-    /// 当前版本（从 spec 文件提取）
+    /// L1 当前版本（从 spec 文件提取）
     pub current_version: String,
+    /// 当前组件版本（L2 spec 文件版本）
+    pub component_version: Option<String>,
+    /// L1 仓库中可识别到的最新版本
+    pub latest_version: Option<String>,
+    /// L1 仓库中可识别到的版本集合
+    pub known_versions: Vec<String>,
+    /// 是否识别为 LTS/长期维护版本
+    pub is_lts: Option<bool>,
+    /// LTS 判定证据
+    pub lts_evidence: Vec<String>,
     /// Patch 列表
     pub patches: Vec<PatchInfo>,
     /// CVE 补丁
     pub cve_patches: Vec<CveInfo>,
+}
+
+/// 停维/生命周期公告证据
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct MaintenanceNotice {
+    /// 公告中提到的版本号
+    pub version: Option<String>,
+    /// 归一化后的版本系列，例如 1.0
+    pub series: Option<String>,
+    /// 维护截止日期，采用 YYYY-MM-DD；无法精确解析时为空
+    pub support_until: Option<String>,
+    /// 识别出的状态，例如 OUT_OF_SUPPORT、SCHEDULED_EOL
+    pub status: String,
+    /// 证据来源，例如 l0_commit:sha 或 official_page:url
+    pub source: String,
+    /// 命中的公告片段
+    pub evidence: String,
+}
+
+/// 当前版本停维状态
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct MaintenanceStatus {
+    /// SUPPORTED、SCHEDULED_EOL、OUT_OF_SUPPORT、END_OF_MAINTENANCE_NOTICE、UNKNOWN
+    pub status: String,
+    /// 是否识别到停维/停止支持类信息
+    pub stop_maintenance_detected: bool,
+    /// 与当前版本最匹配的公告
+    pub matched_notice: Option<MaintenanceNotice>,
+    /// 候选公告证据
+    pub evidence: Vec<MaintenanceNotice>,
+    /// HIGH、MEDIUM、LOW
+    pub confidence: String,
+}
+
+/// 过时版本判定
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct OutdatedVersionAssessment {
+    /// 当前组件版本（L2）
+    pub current_version: String,
+    /// 最新版本（L1）
+    pub latest_version: Option<String>,
+    pub latest_version_source: Option<String>,
+    /// 主线版本（L0），仅用于展示参考，不参与过时判定
+    pub mainline_version: Option<String>,
+    pub mainline_version_source: Option<String>,
+    pub major_version_gap: Option<u32>,
+    pub threshold_major_versions: u32,
+    pub is_outdated: bool,
+}
+
+/// LTS 判定
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct LtsAssessment {
+    pub is_lts: Option<bool>,
+    pub source: String,
+    pub evidence: Vec<String>,
 }
 
 /// Patch 信息
