@@ -1,7 +1,8 @@
 [package]
 name = "track-system"
-version = "1.1.0"
+version = "2.0.0"
 edition = "2021"
+rust-version = "1.90"
 authors = ["Yong Qin <qiny15@chinatelecom.cn>"]
 description = "Automated source code repository tracking and analysis tool"
 
