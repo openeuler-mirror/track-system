@@ -874,6 +874,16 @@ impl L2VsL1Comparator {
         })
     }
 
+    fn empty_commit_diff(l1_snapshot: &L1Snapshot, l2_snapshot: &L2Snapshot) -> CommitDiff {
+        CommitDiff {
+            l1_commits_count: l1_snapshot.commits.len(),
+            l2_commits_count: l2_snapshot.commits.len(),
+            behind_commits: Vec::new(),
+            base_commit: None,
+            base_version_release: None,
+        }
+    }
+
     /// 对比 spec 文件
     fn compare_spec(&self, l1: &L1Snapshot, l2: &L2Snapshot) -> Result<SpecDiff> {
         // 检查内容是否相同
