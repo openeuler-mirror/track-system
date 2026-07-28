@@ -16,9 +16,12 @@
 use crate::utils::version::{Version, VersionParser};
 use crate::utils::PatchParser;
 use anyhow::Result;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+
+const OUTDATED_MAJOR_VERSION_THRESHOLD: u32 = 3;
 
 /// L0 版本信息（上游社区）
 #[derive(Debug, Clone, Serialize, Deserialize)]
