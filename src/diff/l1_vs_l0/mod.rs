@@ -192,6 +192,12 @@ pub struct L1VsL0Report {
     pub patch_analysis: PatchAnalysis,
     /// CVE 分析
     pub cve_analysis: CveAnalysis,
+    /// L0/原生社区停维公告识别结果
+    pub maintenance_status: MaintenanceStatus,
+    /// 基于 L1 仓库版本信息的 3 个大版本差距判定
+    pub outdated_version: OutdatedVersionAssessment,
+    /// 基于 L1 仓库信息的 LTS 判定
+    pub lts: LtsAssessment,
     /// 升级建议
     pub recommendations: Vec<String>,
     /// 生成时间
