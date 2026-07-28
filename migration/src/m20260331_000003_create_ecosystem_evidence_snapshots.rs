@@ -95,11 +95,16 @@ impl MigrationTrait for Migration {
                             .to(EcosystemTargets::Table, EcosystemTargets::Id)
                             .on_delete(ForeignKeyAction::Cascade),
                     )
-                    .index(
-                        Index::create()
-                            .name("idx_ecosystem_evidence_target")
-                            .col(EcosystemEvidenceSnapshots::TargetId),
-                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_ecosystem_evidence_target")
+                    .table(EcosystemEvidenceSnapshots::Table)
+                    .col(EcosystemEvidenceSnapshots::TargetId)
                     .to_owned(),
             )
             .await
