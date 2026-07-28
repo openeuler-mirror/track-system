@@ -1245,8 +1245,63 @@ mod tests {
         assert_eq!(report.package_name, "nginx");
         assert_eq!(report.current_version, "1.22.0");
         assert_eq!(report.latest_stable, "1.24.0");
+        assert_eq!(report.latest_version, "1.24.0");
+        assert_eq!(report.mainline_version.as_deref(), Some("1.25.0-beta"));
         assert!(report.version_behind > 0);
         assert!(!report.recommendations.is_empty());
+    }
+
+    #[test]
+    fn test_compare_without_l0_keeps_l1_lifecycle_assessments() {
+        let comparator = L1VsL0Comparator::new();
+        let l1_info = L1VersionInfo {
+            package_name: "binutils".to_string(),
+            current_version: "2.34".to_string(),
+            component_version: None,
+            latest_version: Some("5.34".to_string()),
+            known_versions: vec!["2.34".to_string(), "5.34".to_string()],
+            is_lts: Some(true),
+            lts_evidence: vec!["L1 分支包含 LTS 标识: openEuler-20.03-LTS-SP4".to_string()],
+            patches: vec![],
+            cve_patches: vec![],
+        };
+
+        let report = comparator.compare_without_l0(&l1_info);
+
+        assert_eq!(report.package_name, "binutils");
+        assert_eq!(report.maintenance_status.status, "UNKNOWN");
+        assert!(!report.maintenance_status.stop_maintenance_detected);
+        assert_eq!(report.lts.is_lts, Some(true));
+        assert!(report.outdated_version.is_outdated);
+        assert_eq!(report.outdated_version.major_version_gap, Some(3));
+        assert!(report
+            .recommendations
+            .iter()
+            .any(|item| item.contains("缺少 L0 版本/生命周期证据")));
+    }
+
+    #[test]
+    fn test_outdated_assessment_uses_l2_l1_and_keeps_l0_reference() {
+        let comparator = L1VsL0Comparator::new();
+        let l1_info = L1VersionInfo {
+            package_name: "demo".to_string(),
+            current_version: "4.2.0".to_string(),
+            component_version: Some("1.2.0".to_string()),
+            latest_version: Some("4.2.0".to_string()),
+            known_versions: vec!["1.2.0".to_string(), "4.2.0".to_string()],
+            is_lts: None,
+            lts_evidence: vec![],
+            patches: vec![],
+            cve_patches: vec![],
+        };
+
+        let report = comparator.compare_without_l0(&l1_info);
+
+        assert_eq!(report.current_version, "1.2.0");
+        assert_eq!(report.latest_version, "4.2.0");
+        assert_eq!(report.mainline_version, None);
+        assert!(report.outdated_version.is_outdated);
+        assert_eq!(report.outdated_version.major_version_gap, Some(3));
     }
 
     #[tokio::test]
