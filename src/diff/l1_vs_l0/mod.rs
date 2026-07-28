@@ -36,6 +36,8 @@ pub struct L0VersionInfo {
     pub all_versions: Vec<VersionTag>,
     /// 版本 changelog
     pub changelogs: HashMap<String, Vec<ChangelogEntry>>,
+    /// 从 L0 仓库或组件原生社区识别出的停维/生命周期公告
+    pub maintenance_notices: Vec<MaintenanceNotice>,
 }
 
 /// 版本标签
