@@ -1799,6 +1799,7 @@ impl L2VsL1Comparator {
     }
 
     /// 对比 commit（通过数据库 version-release 匹配）
+    #[cfg(test)]
     async fn compare_commit_db(
         &self,
         l1_snapshot: &L1Snapshot,
@@ -1806,14 +1807,33 @@ impl L2VsL1Comparator {
         db: &DatabaseConnection,
         tracking_id: i32,
     ) -> Result<CommitDiff> {
+        self.compare_commit_db_with_tracking_ids(
+            l1_snapshot,
+            l2_snapshot,
+            db,
+            tracking_id,
+            tracking_id,
+        )
+        .await
+    }
+
+    async fn compare_commit_db_with_tracking_ids(
+        &self,
+        l1_snapshot: &L1Snapshot,
+        l2_snapshot: &L2Snapshot,
+        db: &DatabaseConnection,
+        l1_commit_tracking_id: i32,
+        l2_commit_tracking_id: i32,
+    ) -> Result<CommitDiff> {
         use crate::entities::{l1_commit_records, l2_commit_records, prelude::*};
 
         let l2_latest_commit = L2CommitRecords::find()
-            .filter(l2_commit_records::Column::TrackingId.eq(tracking_id))
+            .filter(l2_commit_records::Column::TrackingId.eq(l2_commit_tracking_id))
             .order_by_desc(l2_commit_records::Column::CommittedAt)
             .one(db)
             .await?;
 
+        let parsed_l2_release = Self::extract_release_from_spec(&l2_snapshot.spec_content);
         let (l2_version, l2_release) = if let Some(commit) = &l2_latest_commit {
             let version = commit
                 .spec_version
