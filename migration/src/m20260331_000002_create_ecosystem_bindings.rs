@@ -45,13 +45,13 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(EcosystemBindings::Metadata).json().null())
                     .col(
                         ColumnDef::new(EcosystemBindings::CreatedAt)
-                            .timestamp_with_time_zone()
+                            .custom(timestamp_type(backend))
                             .not_null()
                             .default(Expr::current_timestamp()),
                     )
                     .col(
                         ColumnDef::new(EcosystemBindings::UpdatedAt)
-                            .timestamp_with_time_zone()
+                            .custom(timestamp_type(backend))
                             .not_null()
                             .default(Expr::current_timestamp()),
                     )
