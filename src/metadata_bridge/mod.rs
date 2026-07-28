@@ -110,6 +110,7 @@ pub async fn import_snapshot<P: AsRef<Path>>(
         );
     }
 
+    normalize_snapshot_spec_version_release(&mut snapshot);
     persist_snapshot(db, &snapshot, input_path.as_ref()).await
 }
 
@@ -552,6 +553,51 @@ fn extract_spec_release(content: &str) -> Option<String> {
             cleaned
         })
         .filter(|s| !s.is_empty())
+}
+
+
+fn normalize_snapshot_spec_version_release(snapshot: &mut RepositorySnapshot) {
+    let Some(spec) = snapshot.spec.as_mut() else {
+        return;
+    };
+    let normalized = spec.content_base64.replace('\n', "");
+    if normalized.trim().is_empty() {
+        return;
+    }
+
+    let bytes = match BASE64_STANDARD.decode(normalized.as_bytes()) {
+        Ok(bytes) => bytes,
+        Err(err) => {
+            tracing::warn!(
+                tracking_id = snapshot.tracking_id,
+                spec_path = %spec.path,
+                error = %err,
+                "离线导入快照 spec 内容 Base64 解码失败，保留导入文件中的版本信息"
+            );
+            return;
+        }
+    };
+
+    let content = match String::from_utf8(bytes) {
+        Ok(content) => content,
+        Err(err) => {
+            tracing::warn!(
+                tracking_id = snapshot.tracking_id,
+                spec_path = %spec.path,
+                error = %err,
+                "离线导入快照 spec 内容不是 UTF-8，保留导入文件中的版本信息"
+            );
+            return;
+        }
+    };
+
+    let parsed = parse_spec(&content);
+    if !parsed.version.is_empty() {
+        spec.version = Some(parsed.version);
+    }
+    if !parsed.release.is_empty() {
+        spec.release = Some(parsed.release);
+    }
 }
 
 fn sha256_hex(data: &[u8]) -> String {
