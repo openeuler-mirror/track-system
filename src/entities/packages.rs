@@ -37,6 +37,10 @@ pub enum Relation {
     L0Commits,
     #[sea_orm(has_many = "super::backport_candidates::Entity")]
     BackportCandidates,
+    #[sea_orm(has_many = "super::maintenance_evidence_snapshots::Entity")]
+    MaintenanceEvidenceSnapshots,
+    #[sea_orm(has_many = "super::maintenance_reports::Entity")]
+    MaintenanceReports,
 }
 
 impl Related<super::tracking::Entity> for Entity {
