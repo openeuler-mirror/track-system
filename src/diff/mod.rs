@@ -24,7 +24,8 @@ pub use comparison_service::ComparisonService;
 pub use git_client::GitRepositoryClient;
 pub use l1_vs_l0::{
     CveAnalysis, CveInfo, L0VersionInfo, L1VersionInfo, L1VsL0Comparator, L1VsL0Report,
-    PatchAnalysis, PatchInfo, UpgradableVersion, VersionTag,
+    LtsAssessment, MaintenanceNotice, MaintenanceStatus, OutdatedVersionAssessment, PatchAnalysis,
+    PatchInfo, UpgradableVersion, VersionTag,
 };
 pub use l2_vs_l1::{
     ConflictType, Customization, CustomizationAnalysis, CustomizationType, EffortLevel, L1Snapshot,
