@@ -406,6 +406,140 @@ impl L1VsL0Comparator {
         })
     }
 
+    fn compare_component_to_l1(&self, l1_info: &L1VersionInfo) -> Result<VersionComparison> {
+        let component_version = resolved_component_version(l1_info);
+        let l1_latest_version = resolved_l1_latest_version(l1_info);
+        let l1_versions = l1_known_version_tags(l1_info);
+
+        self.compare_versions(
+            &component_version,
+            &l1_latest_version,
+            &l1_latest_version,
+            &l1_versions,
+        )
+    }
+
+    fn assess_outdated_version(
+        &self,
+        l1_info: &L1VersionInfo,
+        mainline_version: Option<String>,
+    ) -> OutdatedVersionAssessment {
+        let current_version = resolved_component_version(l1_info);
+        let latest_version = Some(resolved_l1_latest_version(l1_info));
+        let major_version_gap = latest_version.as_deref().and_then(|latest| {
+            let current = VersionParser::parse(&current_version).ok()?;
+            let latest = VersionParser::parse(latest).ok()?;
+            if latest.major >= current.major {
+                Some(latest.major - current.major)
+            } else {
+                Some(0)
+            }
+        });
+        let is_outdated = major_version_gap
+            .map(|gap| gap >= OUTDATED_MAJOR_VERSION_THRESHOLD)
+            .unwrap_or(false);
+
+        OutdatedVersionAssessment {
+            current_version,
+            latest_version,
+            latest_version_source: Some("l1_repo".to_string()),
+            mainline_version_source: mainline_version.as_ref().map(|_| "l0_repo".to_string()),
+            mainline_version,
+            major_version_gap,
+            threshold_major_versions: OUTDATED_MAJOR_VERSION_THRESHOLD,
+            is_outdated,
+        }
+    }
+
+    fn assess_lts(&self, l1_info: &L1VersionInfo) -> LtsAssessment {
+        LtsAssessment {
+            is_lts: l1_info.is_lts,
+            source: "l1_repo".to_string(),
+            evidence: l1_info.lts_evidence.clone(),
+        }
+    }
+
+    fn generate_partial_recommendations(
+        &self,
+        _maintenance_status: &MaintenanceStatus,
+        outdated_version: &OutdatedVersionAssessment,
+        lts: &LtsAssessment,
+    ) -> Vec<String> {
+        let mut recommendations =
+            vec!["缺少 L0 版本/生命周期证据，停维判断和主线版本信息不完整".to_string()];
+
+        if outdated_version.is_outdated {
+            recommendations.push(format!(
+                "当前组件版本与 L1 最新版本相差 {} 个大版本，已达到过时版本阈值 {}，建议规划升级",
+                outdated_version.major_version_gap.unwrap_or(0),
+                outdated_version.threshold_major_versions
+            ));
+        } else if outdated_version.latest_version.is_none() {
+            recommendations.push("未能从 L1 仓库历史版本确认过时版本状态".to_string());
+        }
+
+        match lts.is_lts {
+            Some(true) => recommendations.push("当前版本识别为 LTS/长期维护版本".to_string()),
+            Some(false) => recommendations.push("当前版本未识别为 LTS/长期维护版本".to_string()),
+            None => recommendations.push("未能从 L1 仓库信息确认当前版本是否为 LTS".to_string()),
+        }
+
+        recommendations
+    }
+
+    fn assess_maintenance_status(
+        &self,
+        current_version: &str,
+        notices: &[MaintenanceNotice],
+    ) -> MaintenanceStatus {
+        let current_series = version_to_series(current_version);
+        let matched_notice = notices
+            .iter()
+            .find(|notice| {
+                notice
+                    .series
+                    .as_deref()
+                    .map(|series| series == current_series)
+                    .unwrap_or(false)
+                    || notice
+                        .version
+                        .as_deref()
+                        .map(|version| version == current_version)
+                        .unwrap_or(false)
+            })
+            .cloned()
+            .or_else(|| {
+                notices
+                    .iter()
+                    .find(|notice| notice.series.is_none())
+                    .cloned()
+            });
+
+        let (status, confidence) = if let Some(notice) = matched_notice.as_ref() {
+            let status = classify_notice_status(notice.support_until.as_deref());
+            let confidence = if notice.support_until.is_some()
+                && (notice.series.is_some() || notice.version.is_some())
+            {
+                "HIGH"
+            } else {
+                "MEDIUM"
+            };
+            (status, confidence.to_string())
+        } else if notices.is_empty() {
+            ("UNKNOWN".to_string(), "LOW".to_string())
+        } else {
+            ("UNKNOWN".to_string(), "MEDIUM".to_string())
+        };
+
+        MaintenanceStatus {
+            status,
+            stop_maintenance_detected: matched_notice.is_some(),
+            matched_notice,
+            evidence: notices.iter().take(10).cloned().collect(),
+            confidence,
+        }
+    }
+
     /// 查找可升级版本
     fn find_upgradable_versions(
         &self,
