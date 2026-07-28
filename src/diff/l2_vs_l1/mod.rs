@@ -1862,14 +1862,33 @@ impl L2VsL1Comparator {
         let l1_commits: Vec<CommitEntry> =
             l1_models.iter().map(Self::model_to_commit_entry).collect();
 
+        let baseline_l2_release = l2_release
+            .as_deref()
+            .map(Self::normalize_l2_release_for_baseline);
+        if let (Some(raw_release), Some(baseline_release)) =
+            (l2_release.as_deref(), baseline_l2_release.as_deref())
+        {
+            if raw_release != baseline_release {
+                tracing::info!(
+                    l2_commit_tracking_id,
+                    raw_release,
+                    baseline_release,
+                    "归一化 L2 release 用于基线 commit 匹配"
+                );
+            }
+        }
+
         // 先基于数据库的 spec_version/spec_release 精确匹配
         let (base_commit, base_index) = {
-            let (commit, index) =
-                Self::find_base_commit_from_records(&l1_models, &l2_version, l2_release.as_deref());
+            let (commit, index) = Self::find_base_commit_from_records(
+                &l1_models,
+                &l2_version,
+                baseline_l2_release.as_deref(),
+            );
             if commit.is_some() {
                 (commit, index)
             } else {
-                Self::find_base_commit(&l1_commits, &l2_version, l2_release.as_deref())
+                Self::find_base_commit(&l1_commits, &l2_version, baseline_l2_release.as_deref())
             }
         };
 
