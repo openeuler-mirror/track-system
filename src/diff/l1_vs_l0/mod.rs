@@ -371,11 +371,14 @@ impl L1VsL0Comparator {
         // 解析当前版本
         let current_version = VersionParser::parse(current)?;
 
-        // 解析最新稳定版本
-        let latest_stable_version = VersionParser::parse(latest_stable)?;
+        // 解析最新稳定版本；生命周期场景可能只有停维公告而没有版本标签，
+        // 此时退回当前版本，保证停维/LTS/过时判定仍可生成报告。
+        let latest_stable_version =
+            VersionParser::parse(latest_stable).unwrap_or_else(|_| current_version.clone());
 
         // 解析最新版本
-        let latest_version = VersionParser::parse(latest)?;
+        let latest_version =
+            VersionParser::parse(latest).unwrap_or_else(|_| latest_stable_version.clone());
 
         // 解析所有版本
         let parsed_versions: Vec<Version> = all_versions
