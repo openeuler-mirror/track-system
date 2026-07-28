@@ -2289,6 +2289,50 @@ Summary: Test package
     }
 
     #[test]
+    fn test_extract_release_from_spec_expands_package_macro() {
+        let spec_content = r#"
+%global openssh_release 16
+
+Name: openssh
+Version: 9.6p1
+Release: %{openssh_release}
+
+%package -n pam_ssh_agent_auth
+Version: 0.10.4
+Release: 5.%{openssh_release}
+"#;
+        let release = L2VsL1Comparator::extract_release_from_spec(spec_content);
+        assert_eq!(release, Some("16".to_string()));
+    }
+
+    #[test]
+    fn test_has_unexpanded_macro() {
+        assert!(L2VsL1Comparator::has_unexpanded_macro("%{openssh_release}"));
+        assert!(L2VsL1Comparator::has_unexpanded_macro("%(echo %{release})"));
+        assert!(!L2VsL1Comparator::has_unexpanded_macro("16"));
+    }
+
+    #[test]
+    fn test_normalize_l2_release_for_baseline_strips_local_decimal_suffix() {
+        assert_eq!(
+            L2VsL1Comparator::normalize_l2_release_for_baseline("15.1"),
+            "15"
+        );
+        assert_eq!(
+            L2VsL1Comparator::normalize_l2_release_for_baseline("15.1.2"),
+            "15"
+        );
+        assert_eq!(
+            L2VsL1Comparator::normalize_l2_release_for_baseline("2.el8"),
+            "2.el8"
+        );
+        assert_eq!(
+            L2VsL1Comparator::normalize_l2_release_for_baseline("rc1.1"),
+            "rc1.1"
+        );
+    }
+
+    #[test]
     fn test_create_l1_snapshot() {
         let snapshot = create_test_snapshot();
         let result = L2VsL1Comparator::create_l1_snapshot("testpkg".to_string(), &snapshot);
