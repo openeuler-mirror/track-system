@@ -948,6 +948,224 @@ impl L1VsL0Comparator {
     }
 }
 
+fn resolved_component_version(l1_info: &L1VersionInfo) -> String {
+    l1_info
+        .component_version
+        .as_ref()
+        .filter(|version| !version.trim().is_empty())
+        .cloned()
+        .unwrap_or_else(|| l1_info.current_version.clone())
+}
+
+fn resolved_l1_latest_version(l1_info: &L1VersionInfo) -> String {
+    l1_info
+        .latest_version
+        .as_ref()
+        .filter(|version| !version.trim().is_empty())
+        .cloned()
+        .unwrap_or_else(|| l1_info.current_version.clone())
+}
+
+fn l1_known_version_tags(l1_info: &L1VersionInfo) -> Vec<VersionTag> {
+    let mut versions = Vec::new();
+
+    push_unique_version(&mut versions, &l1_info.current_version);
+    if let Some(latest) = l1_info.latest_version.as_ref() {
+        push_unique_version(&mut versions, latest);
+    }
+    for version in &l1_info.known_versions {
+        push_unique_version(&mut versions, version);
+    }
+
+    versions
+        .into_iter()
+        .filter_map(|version| {
+            let parsed = VersionParser::parse(&version).ok()?;
+            Some(VersionTag {
+                version,
+                date: Utc::now(),
+                changelog: "l1 repository version history".to_string(),
+                is_stable: parsed.is_stable(),
+            })
+        })
+        .collect()
+}
+
+fn push_unique_version(versions: &mut Vec<String>, version: &str) {
+    let version = version.trim();
+    if version.is_empty() || versions.iter().any(|item| item == version) {
+        return;
+    }
+    versions.push(version.to_string());
+}
+
+pub fn extract_versions_from_text(text: &str) -> Vec<String> {
+    let re = Regex::new(
+        r"(?ix)
+        (?:^|[^\d])
+        (?:v|version|release|tag|upgrade(?:d)?(?:\s+to)?|update(?:d)?(?:\s+to)?|版本|升级到|更新到)?
+        \s*
+        v?
+        (?P<version>\d+\.\d+(?:\.\d+)?(?:[-_\.]?(?:alpha|beta|rc)\d*)?)
+        ",
+    )
+    .expect("version extraction regex");
+
+    let mut versions = Vec::new();
+    for cap in re.captures_iter(text) {
+        let Some(matched) = cap.name("version") else {
+            continue;
+        };
+        let value = matched
+            .as_str()
+            .trim_matches(['.', ',', ';', ')', ']', '}']);
+        if is_probable_date(value) {
+            continue;
+        }
+        if VersionParser::parse(value).is_ok() && !versions.iter().any(|v| v == value) {
+            versions.push(value.to_string());
+        }
+    }
+    versions
+}
+
+pub fn extract_maintenance_notices(
+    text: &str,
+    source: impl Into<String>,
+) -> Vec<MaintenanceNotice> {
+    let source = source.into();
+    text.lines()
+        .flat_map(split_into_notice_fragments)
+        .filter_map(|fragment| build_maintenance_notice(fragment, &source))
+        .collect()
+}
+
+pub fn version_to_series(version: &str) -> String {
+    let versions = extract_versions_from_text(version);
+    let normalized = versions.first().map(String::as_str).unwrap_or(version);
+    let normalized = normalized
+        .trim()
+        .trim_start_matches('v')
+        .trim_start_matches('V');
+    let parts: Vec<&str> = normalized.split('.').collect();
+    if parts.len() >= 2 {
+        format!("{}.{}", parts[0], parts[1])
+    } else {
+        normalized.to_string()
+    }
+}
+
+fn split_into_notice_fragments(line: &str) -> Vec<&str> {
+    line.split(['。', ';', '；'])
+        .map(str::trim)
+        .filter(|part| !part.is_empty())
+        .collect()
+}
+
+fn build_maintenance_notice(fragment: &str, source: &str) -> Option<MaintenanceNotice> {
+    if !contains_maintenance_stop_signal(fragment) {
+        return None;
+    }
+    let version = extract_versions_from_text(fragment).into_iter().next();
+    let series = version.as_deref().map(version_to_series);
+    let support_until = extract_support_until(fragment);
+    let status = classify_notice_status(support_until.as_deref());
+
+    Some(MaintenanceNotice {
+        version,
+        series,
+        support_until,
+        status,
+        source: source.to_string(),
+        evidence: fragment.chars().take(240).collect(),
+    })
+}
+
+fn contains_maintenance_stop_signal(text: &str) -> bool {
+    let lower = text.to_ascii_lowercase();
+    lower.contains("end-of-life")
+        || lower.contains("end of life")
+        || lower.contains("eol")
+        || lower.contains("end of support")
+        || lower.contains("out of support")
+        || lower.contains("no longer supported")
+        || lower.contains("unsupported")
+        || text.contains("不再维护")
+        || text.contains("停止维护")
+        || text.contains("停止支持")
+        || text.contains("停维")
+        || text.contains("维护截止")
+        || text.contains("支持截止")
+        || text.contains("生命周期结束")
+        || text.contains("结束维护")
+        || text.contains("终止维护")
+}
+
+fn extract_support_until(text: &str) -> Option<String> {
+    let ymd = Regex::new(
+        r"(?x)
+        (?P<year>\d{4})
+        [年\-/\.]
+        (?P<month>\d{1,2})
+        [月\-/\.]
+        (?P<day>\d{1,2})
+        日?
+        ",
+    )
+    .expect("ymd regex");
+    if let Some(cap) = ymd.captures(text) {
+        let year = cap.name("year")?.as_str().parse::<i32>().ok()?;
+        let month = cap.name("month")?.as_str().parse::<u32>().ok()?;
+        let day = cap.name("day")?.as_str().parse::<u32>().ok()?;
+        if let Some(date) = NaiveDate::from_ymd_opt(year, month, day) {
+            return Some(date.format("%Y-%m-%d").to_string());
+        }
+    }
+
+    let day_month_year =
+        Regex::new(r"(?i)\b(?P<day>\d{1,2})\s+(?P<month>[a-z]{3,9})\s+(?P<year>\d{4})\b")
+            .expect("day month year regex");
+    if let Some(cap) = day_month_year.captures(text) {
+        let raw = format!(
+            "{} {} {}",
+            cap.name("day")?.as_str(),
+            cap.name("month")?.as_str(),
+            cap.name("year")?.as_str()
+        );
+        for fmt in ["%d %b %Y", "%d %B %Y"] {
+            if let Ok(date) = NaiveDate::parse_from_str(&raw, fmt) {
+                return Some(date.format("%Y-%m-%d").to_string());
+            }
+        }
+    }
+
+    None
+}
+
+fn classify_notice_status(support_until: Option<&str>) -> String {
+    let Some(support_until) = support_until else {
+        return "END_OF_MAINTENANCE_NOTICE".to_string();
+    };
+    let Some(date) = parse_support_until_date(support_until) else {
+        return "END_OF_MAINTENANCE_NOTICE".to_string();
+    };
+    if Utc::now().date_naive() <= date {
+        "SCHEDULED_EOL".to_string()
+    } else {
+        "OUT_OF_SUPPORT".to_string()
+    }
+}
+
+fn parse_support_until_date(value: &str) -> Option<NaiveDate> {
+    NaiveDate::parse_from_str(value, "%Y-%m-%d").ok()
+}
+
+fn is_probable_date(value: &str) -> bool {
+    VersionParser::parse(value)
+        .map(|version| version.major >= 1000)
+        .unwrap_or(false)
+}
+
 impl Default for L1VsL0Comparator {
     fn default() -> Self {
         Self::new()
