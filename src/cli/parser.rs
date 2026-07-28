@@ -783,6 +783,186 @@ pub enum ReportAction {
     },
 }
 
+
+// ============== Ecosystem Commands ==============
+
+#[derive(Subcommand, Debug)]
+pub enum EcosystemAction {
+    /// 创建生态目标
+    #[command(about = "Create ecosystem target")]
+    Create {
+        #[arg(long)]
+        name: String,
+        #[arg(long)]
+        target_type: Option<String>,
+        #[arg(long)]
+        role: Option<String>,
+        #[arg(long)]
+        rule_profile: Option<String>,
+        #[arg(long)]
+        platform: Option<String>,
+        #[arg(long)]
+        homepage_url: Option<String>,
+        #[arg(long)]
+        api_base_url: Option<String>,
+        #[arg(long)]
+        owner: Option<String>,
+        #[arg(long)]
+        repo: Option<String>,
+        #[arg(long)]
+        default_branch: Option<String>,
+        #[arg(long)]
+        status: Option<String>,
+        #[arg(long)]
+        refresh_interval_hours: Option<i32>,
+        #[arg(long, help = "metadata JSON 字符串")]
+        metadata: Option<String>,
+    },
+
+    /// 列出生态目标
+    #[command(about = "List ecosystem targets")]
+    List {
+        #[arg(long, default_value = "1")]
+        page: u64,
+        #[arg(long, default_value = "10")]
+        page_size: u64,
+        #[arg(long)]
+        target_type: Option<String>,
+        #[arg(long)]
+        platform: Option<String>,
+        #[arg(long)]
+        status: Option<String>,
+    },
+
+    /// 查看生态目标详情
+    #[command(about = "Show ecosystem target")]
+    Show { id: i32 },
+
+    /// 更新生态目标
+    #[command(about = "Update ecosystem target")]
+    Update {
+        #[arg(help = "目标 ID 或名称")]
+        target: String,
+        #[arg(long)]
+        name: Option<String>,
+        #[arg(long)]
+        target_type: Option<String>,
+        #[arg(long)]
+        role: Option<String>,
+        #[arg(long)]
+        rule_profile: Option<String>,
+        #[arg(long)]
+        platform: Option<String>,
+        #[arg(long)]
+        homepage_url: Option<String>,
+        #[arg(long)]
+        api_base_url: Option<String>,
+        #[arg(long)]
+        owner: Option<String>,
+        #[arg(long)]
+        repo: Option<String>,
+        #[arg(long)]
+        default_branch: Option<String>,
+        #[arg(long)]
+        status: Option<String>,
+        #[arg(long)]
+        refresh_interval_hours: Option<i32>,
+        #[arg(long, help = "metadata JSON 字符串")]
+        metadata: Option<String>,
+        #[arg(long)]
+        last_error: Option<String>,
+    },
+
+    /// 删除生态目标
+    #[command(about = "Delete ecosystem target")]
+    Delete {
+        #[arg(long)]
+        id: i32,
+        #[arg(long)]
+        confirm: bool,
+    },
+
+    /// 刷新生态目标
+    #[command(about = "Refresh ecosystem target")]
+    Refresh {
+        #[arg(long)]
+        id: i32,
+    },
+
+    /// 查询最新生态报告
+    #[command(about = "Show latest ecosystem report")]
+    LatestReport {
+        #[arg(long)]
+        id: i32,
+        #[arg(long, help = "打印原始报告载荷")]
+        verbose: bool,
+    },
+
+    /// 列出生态报告
+    #[command(about = "List ecosystem reports")]
+    Reports {
+        #[arg(long, default_value = "1")]
+        page: u64,
+        #[arg(long, default_value = "10")]
+        page_size: u64,
+        #[arg(long)]
+        target_id: Option<i32>,
+        #[arg(long)]
+        report_type: Option<String>,
+    },
+
+    /// 查看生态报告详情
+    #[command(about = "Show ecosystem report")]
+    Report {
+        id: i64,
+        #[arg(long, help = "打印原始报告载荷")]
+        verbose: bool,
+    },
+}
+
+
+// ============== Maintenance Commands ==============
+
+#[derive(Subcommand, Debug)]
+pub enum MaintenanceAction {
+    /// 刷新维护评估
+    #[command(about = "Refresh maintenance report for a package")]
+    Refresh {
+        #[arg(help = "软件包 ID 或名称")]
+        package: String,
+    },
+
+    /// 查询最新维护评估报告
+    #[command(about = "Show latest maintenance report")]
+    LatestReport {
+        #[arg(help = "软件包 ID 或名称")]
+        package: String,
+        #[arg(long, help = "打印原始报告载荷")]
+        verbose: bool,
+    },
+
+    /// 列出维护评估报告
+    #[command(about = "List maintenance reports")]
+    Reports {
+        #[arg(long, default_value = "1")]
+        page: u64,
+        #[arg(long, default_value = "10")]
+        page_size: u64,
+        #[arg(long)]
+        package: Option<String>,
+        #[arg(long)]
+        report_type: Option<String>,
+    },
+
+    /// 查看维护评估报告详情
+    #[command(about = "Show maintenance report")]
+    Report {
+        id: i64,
+        #[arg(long, help = "打印原始报告载荷")]
+        verbose: bool,
+    },
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
