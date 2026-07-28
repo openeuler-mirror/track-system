@@ -16,6 +16,7 @@ use std::{
 };
 
 use crate::collectors::traits::GitClient;
+use crate::spec::parse_spec;
 use crate::utils::spec::SpecParser;
 use anyhow::{bail, Context, Result};
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
