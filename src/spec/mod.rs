@@ -30,13 +30,20 @@ impl SpecFile {
     fn parse(content: &str) -> Self {
         let mut spec = Self::default();
 
-        let version_re = Regex::new(r"^Version:\s*(.+)$").unwrap();
-        let release_re = Regex::new(r"^Release:\s*(.+)$").unwrap();
+        let version_re = Regex::new(r"^Version\s*:\s*(.+)$").unwrap();
+        let release_re = Regex::new(r"^Release\s*:\s*(.+)$").unwrap();
+        let section_re =
+            Regex::new(r"^%(?:package|description|prep|build|install|check|files|changelog)\b")
+                .unwrap();
         let macro_define_re = Regex::new(r"^%(?:define|global)\s+(\w+)\s+(.+)$").unwrap();
         let macro_usage_re = Regex::new(r"%\{(\??)([\w_]+)\}").unwrap();
 
         for raw_line in content.lines() {
             let line = raw_line.trim();
+
+            if section_re.is_match(line) {
+                break;
+            }
 
             if let Some(caps) = macro_define_re.captures(line) {
                 let name = caps.get(1).unwrap().as_str();
