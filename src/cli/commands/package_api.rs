@@ -109,7 +109,6 @@ pub async fn execute(api_client: &ApiClient, action: PackageAction) -> Result<()
     }
 }
 
-
 fn parse_package_import_file(content: &str) -> Result<Vec<PackageImportRecord>> {
     let mut records = Vec::new();
 
@@ -149,7 +148,6 @@ fn parse_package_import_file(content: &str) -> Result<Vec<PackageImportRecord>> 
 
     Ok(records)
 }
-
 
 async fn import_packages_from_file(
     api_client: &ApiClient,
