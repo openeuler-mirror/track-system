@@ -657,6 +657,125 @@ mod tests {
         (server, client)
     }
 
+    #[test]
+    fn test_version_lifecycle_lines_extracts_l1_vs_l0_assessment() {
+        let content = serde_json::json!({
+            "l1_vs_l0": {
+                "maintenance_status": {
+                    "status": "SCHEDULED_EOL",
+                    "stop_maintenance_detected": true,
+                    "confidence": "HIGH",
+                    "matched_notice": {
+                        "version": "1.2.0",
+                        "series": "1.2",
+                        "support_until": "2027-12-31",
+                        "source": "official_page",
+                        "evidence": "1.2 will reach end of support on 2027-12-31"
+                    },
+                    "evidence": [
+                        {
+                            "evidence": "1.2 will reach end of support on 2027-12-31"
+                        }
+                    ]
+                },
+                "lts": {
+                    "is_lts": true,
+                    "source": "l1_repo",
+                    "evidence": ["L1 分支包含 LTS 标识: openEuler-24.03-LTS-SP3"]
+                },
+                "outdated_version": {
+                    "current_version": "1.2.0",
+                    "latest_version": "4.2.0",
+                    "latest_version_source": "l1_repo",
+                    "mainline_version": "5.0.0",
+                    "mainline_version_source": "l0_repo",
+                    "major_version_gap": 3,
+                    "threshold_major_versions": 3,
+                    "is_outdated": true
+                }
+            },
+            "version_warnings": [
+                "当前版本识别为 LTS/长期维护版本",
+                "当前组件版本与 L1 最新版本相差 3 个大版本，已达到过时版本阈值 3，建议规划升级"
+            ]
+        });
+
+        let text = version_lifecycle_lines(&content).unwrap().join("\n");
+        assert!(text.contains("停维生命周期识别: SCHEDULED_EOL"));
+        assert!(text.contains("停维信息命中: 是"));
+        assert!(text.contains("维护截止日期: 2027-12-31"));
+        assert!(text.contains("LTS 判断: 是"));
+        assert!(text.contains("过时版本评估: 是"));
+        assert!(text.contains("当前组件版本: 1.2.0"));
+        assert!(text.contains("最新版本(L1): 4.2.0"));
+        assert!(text.contains("主线版本(L0): 5.0.0"));
+        assert!(text.contains("大版本差距: 3 / 3"));
+        assert!(text.contains("版本风险提示:"));
+    }
+
+    #[test]
+    fn test_version_lifecycle_lines_reports_missing_l1_vs_l0_assessment() {
+        let content = serde_json::json!({
+            "l1_vs_l0": null,
+            "version_warnings": []
+        });
+
+        let text = version_lifecycle_lines(&content).unwrap().join("\n");
+        assert!(text.contains("L1 vs L0 子报告: 未生成"));
+        assert!(text.contains("停维生命周期识别: -"));
+        assert!(text.contains("LTS 判断: -"));
+        assert!(text.contains("过时版本评估: -"));
+        assert!(text.contains("版本风险提示: 无"));
+    }
+
+    #[test]
+    fn test_report_content_for_display_hides_l1_vs_l0_by_default() {
+        let content = serde_json::json!({
+            "commits": [],
+            "total_behind_commits": 0,
+            "l1_vs_l0": {
+                "current_version": "1.0.0"
+            },
+            "version_warnings": ["warning"]
+        });
+
+        let default_content = report_content_for_display(&content, false);
+        assert!(default_content.get("commits").is_some());
+        assert!(default_content.get("l1_vs_l0").is_none());
+        assert!(default_content.get("version_warnings").is_none());
+
+        let full_content = report_content_for_display(&content, true);
+        assert!(full_content.get("l1_vs_l0").is_some());
+        assert!(full_content.get("version_warnings").is_some());
+    }
+
+    #[test]
+    fn test_ai_analysis_lines_extracts_embedded_result() {
+        let content = serde_json::json!({
+            "ai_analysis": {
+                "model": "local-heuristic",
+                "used_remote_model": false,
+                "external_research_used": false,
+                "summary": "AI summary",
+                "risk": "medium",
+                "confidence": "medium",
+                "recommended_actions": ["review evidence", "plan upgrade"],
+                "external_references": ["https://example.com/security"],
+                "sources_to_check": ["upstream SECURITY.md"]
+            }
+        });
+
+        let text = ai_analysis_lines(&content).unwrap().join("\n");
+        assert!(text.contains("模型: local-heuristic"));
+        assert!(text.contains("远端模型: 否"));
+        assert!(text.contains("外部公开信息: 否"));
+        assert!(text.contains("风险等级: medium"));
+        assert!(text.contains("摘要: AI summary"));
+        assert!(text.contains("建议动作:"));
+        assert!(text.contains("外部参考:"));
+        assert!(text.contains("建议核验来源:"));
+    }
+
     #[tokio::test]
     async fn test_list_reports() {
         let (mut server, client) = setup_test_server().await;
