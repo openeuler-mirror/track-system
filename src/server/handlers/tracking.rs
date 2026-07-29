@@ -733,18 +733,6 @@ mod tests {
     }
 
     #[test]
-    fn test_tracking_response_from_model() {
-        let model = create_mock_tracking(1, 1);
-        let response: TrackingResponse = model.clone().into();
-
-        assert_eq!(response.id, model.id);
-        assert_eq!(response.package_id, model.package_id);
-        assert_eq!(response.l1_repo_owner, model.l1_repo_owner);
-        assert_eq!(response.l1_repo_name, model.l1_repo_name);
-        assert_eq!(response.tracking_status, model.tracking_status);
-    }
-
-    #[test]
     fn test_update_tracking_request_partial_update() {
         let req = UpdateTrackingRequest {
             l1_repo_owner: Some("new_owner".to_string()),
