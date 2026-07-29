@@ -25,8 +25,9 @@ use crate::collectors::{gitea::GiteaClient, gitee::GiteeClient};
 
 use self::{
     routes::{
-        backport_routes, compare_routes, component_routes, ecosystem_routes, health_routes,
-        metadata_routes, package_routes, reports_routes, sync_routes, tracking_routes,
+        ai_routes, backport_routes, compare_routes, component_routes, ecosystem_routes,
+        health_routes, l0_routes, maintenance_routes, metadata_routes, package_routes,
+        reports_routes, sync_routes, tracking_routes,
     },
     state::AppState,
 };
