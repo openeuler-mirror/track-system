@@ -548,6 +548,15 @@ async fn show_tracking(api_client: &ApiClient, id: i32) -> Result<()> {
             println!("{}", "跟踪配置详情:".bold());
             println!("  ID: {}", track.id);
             println!("  软件包 ID: {}", track.package_id);
+            if let Some(package_name) = &track.package_name {
+                println!("  软件包名称: {}", package_name);
+            }
+            if let Some(package_level) = track.package_level {
+                println!("  软件包等级: {}", package_level);
+            }
+            if let Some(l0_repo_url) = &track.l0_repo_url {
+                println!("  L0 上游仓库: {}", l0_repo_url);
+            }
             println!("  发行版 ID: {}", track.distro_id);
             println!("  L1 仓库: {}/{}", track.l1_repo_owner, track.l1_repo_name);
             println!("  L1 分支: {}", track.l1_branch);
