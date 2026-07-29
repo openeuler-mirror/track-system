@@ -18,9 +18,10 @@ use axum::{
 use chrono::Utc;
 use sea_orm::*;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 use crate::{
-    entities::{prelude::*, tracking},
+    entities::{maintenance_reports, prelude::*, tracking},
     server::{
         api::{ApiResponse, PaginatedResponse},
         error::{ApiError, ApiResult},
