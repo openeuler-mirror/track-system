@@ -74,6 +74,29 @@ pub async fn execute(api_client: &ApiClient, action: PackageAction) -> Result<()
             l0_repo,
             description,
         } => add_package(api_client, name, level, sync_interval, l0_repo, description).await,
+        PackageAction::Import {
+            file,
+            level,
+            sync_interval,
+            description,
+            update_existing,
+            create_tracking,
+            distro,
+            tracking_status,
+        } => {
+            import_packages_from_file(
+                api_client,
+                file,
+                level,
+                sync_interval,
+                description,
+                update_existing,
+                create_tracking,
+                distro,
+                tracking_status,
+            )
+            .await
+        }
         PackageAction::List { limit } => list_packages(api_client, limit).await,
         PackageAction::Show { name_or_id } => show_package(api_client, name_or_id).await,
         PackageAction::Update {
@@ -84,6 +107,181 @@ pub async fn execute(api_client: &ApiClient, action: PackageAction) -> Result<()
         } => update_package(api_client, name, sync_interval, level, description).await,
         PackageAction::Remove { name, confirm } => remove_package(api_client, name, confirm).await,
     }
+}
+
+
+fn parse_package_import_file(content: &str) -> Result<Vec<PackageImportRecord>> {
+    let mut records = Vec::new();
+
+    for (idx, raw_line) in content.lines().enumerate() {
+        let line_no = idx + 1;
+        let line = raw_line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+
+        let mut parts = line.splitn(2, ',');
+        let name = parts
+            .next()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| anyhow::anyhow!("第 {} 行缺少组件名称", line_no))?;
+        let repo = parts
+            .next()
+            .map(str::trim)
+            .ok_or_else(|| anyhow::anyhow!("第 {} 行缺少上游仓库地址", line_no))?;
+
+        let l0_repo_url = if repo.is_empty() || repo.eq_ignore_ascii_case("NA") {
+            None
+        } else {
+            Some(repo.to_string())
+        };
+
+        records.push(PackageImportRecord {
+            name: name.to_string(),
+            l0_repo_url,
+        });
+    }
+
+    if records.is_empty() {
+        bail!("导入文件中没有可用的软件包记录");
+    }
+
+    Ok(records)
+}
+
+
+async fn import_packages_from_file(
+    api_client: &ApiClient,
+    file: String,
+    level: i32,
+    sync_interval: String,
+    description: Option<String>,
+    update_existing: bool,
+    create_tracking: bool,
+    distro: Option<String>,
+    tracking_status: String,
+) -> Result<()> {
+    println!("正在从文件导入软件包: {}", file.cyan());
+
+    let content =
+        fs::read_to_string(&file).map_err(|e| anyhow::anyhow!("读取文件失败 {}: {}", file, e))?;
+    let records = parse_package_import_file(&content)?;
+    let sync_interval_hours = parse_sync_interval_hours(&sync_interval)?;
+    let mut existing_packages = api_client.get::<Vec<PackageDto>>("/packages").await?;
+    let tracking_distro = if create_tracking {
+        Some(
+            distro
+                .clone()
+                .ok_or_else(|| anyhow::anyhow!("启用 --create-tracking 时必须提供 --distro"))?,
+        )
+    } else {
+        None
+    };
+
+    let mut created = 0_u64;
+    let mut updated = 0_u64;
+    let mut skipped = 0_u64;
+    let mut tracking_created = 0_u64;
+    let mut tracking_failed = 0_u64;
+
+    for record in records {
+        let package_name = record.name.clone();
+        match existing_packages
+            .iter()
+            .find(|package| package.name == record.name)
+            .cloned()
+        {
+            Some(existing) if update_existing => {
+                let request = UpdatePackageRequest {
+                    level: Some(level),
+                    sync_interval_hours: Some(sync_interval_hours),
+                    l0_repo_url: record.l0_repo_url.clone(),
+                    description: description.clone(),
+                };
+                let updated_pkg = api_client
+                    .put::<_, PackageDto>(&format!("/packages/{}", existing.id), &request)
+                    .await?;
+                if let Some(existing_pkg) = existing_packages
+                    .iter_mut()
+                    .find(|package| package.id == updated_pkg.id)
+                {
+                    *existing_pkg = updated_pkg;
+                }
+                println!(
+                    "{} 更新软件包: {}",
+                    "↺".yellow().bold(),
+                    existing.name.cyan()
+                );
+                updated += 1;
+            }
+            Some(existing) => {
+                println!(
+                    "{} 跳过已存在软件包: {}",
+                    "-".yellow(),
+                    existing.name.cyan()
+                );
+                skipped += 1;
+            }
+            None => {
+                let request = CreatePackageRequest {
+                    name: record.name.clone(),
+                    level,
+                    sync_interval_hours,
+                    l0_repo_url: record.l0_repo_url.clone(),
+                    description: description.clone(),
+                };
+                let created_pkg = api_client
+                    .post::<_, PackageDto>("/packages", &request)
+                    .await?;
+                existing_packages.push(created_pkg);
+                println!("{} 添加软件包: {}", "+".green().bold(), record.name.cyan());
+                created += 1;
+            }
+        }
+
+        if let Some(distro) = &tracking_distro {
+            match create_tracking_with_default_repos(
+                api_client,
+                package_name.clone(),
+                distro.clone(),
+                tracking_status.clone(),
+            )
+            .await
+            {
+                Ok(_) => tracking_created += 1,
+                Err(err) => {
+                    tracking_failed += 1;
+                    println!(
+                        "{} 创建 tracking 失败: package={}, error={}",
+                        "✗".red().bold(),
+                        package_name.cyan(),
+                        err
+                    );
+                }
+            }
+        }
+    }
+
+    println!(
+        "{} 导入完成: 新增 {}, 更新 {}, 跳过 {}",
+        "✓".green().bold(),
+        created,
+        updated,
+        skipped
+    );
+    if tracking_distro.is_some() {
+        println!(
+            "{} tracking 联动创建: 成功 {}, 失败 {}",
+            "✓".green().bold(),
+            tracking_created,
+            tracking_failed
+        );
+        if tracking_failed > 0 {
+            return Err(anyhow::anyhow!("{} 个 tracking 创建失败", tracking_failed));
+        }
+    }
+    Ok(())
 }
 
 /// 添加软件包
