@@ -28,10 +28,11 @@ pub mod sync_service;
 
 pub use cron_scheduler::CronScheduler;
 pub use ecosystem_sync_service::EcosystemSyncService;
+pub use maintenance_sync_service::{MaintenanceSyncService, MaintenanceSyncSummary};
 pub use pipeline_executor::{
-    BackportSuggestionResult, ClassificationResult, DiffComparisonResult, JobProgress,
-    L1IngestionResult, L2SnapshotResult, PipelineExecutor, PipelineStage, ReportGenerationResult,
-    StageResult, SyncJobResult,
+    BackportSuggestionResult, ClassificationResult, ClassifiedCommitResult, DiffComparisonResult,
+    JobProgress, L1IngestionResult, L2SnapshotResult, PipelineExecutor, PipelineStage,
+    ReportGenerationResult, StageResult, SyncJobResult,
 };
 pub use pipeline_state::{PipelineState, PipelineStateManager};
 pub use scheduler_manager::{SchedulerConfig, SchedulerManager, SchedulerStatus};
