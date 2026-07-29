@@ -209,14 +209,19 @@ pub async fn get_report(
     let (report_model, tracking_opt) = report;
 
     // 获取 package 名称
-    let package_name = if let Some(tracking_model) = tracking_opt {
-        Packages::find_by_id(tracking_model.package_id)
+    let (package_name, maintenance_summary) = if let Some(tracking_model) = tracking_opt {
+        let package = Packages::find_by_id(tracking_model.package_id)
             .one(state.db.as_ref())
-            .await?
-            .map(|p| p.name)
-            .unwrap_or_else(|| "unknown".to_string())
+            .await?;
+        let package_name = package
+            .as_ref()
+            .map(|p| p.name.clone())
+            .unwrap_or_else(|| "unknown".to_string());
+        let maintenance_summary =
+            latest_maintenance_summary(state.db.as_ref(), tracking_model.package_id).await?;
+        (package_name, maintenance_summary)
     } else {
-        "unknown".to_string()
+        ("unknown".to_string(), None)
     };
 
     let report_detail = ReportDetail {
