@@ -256,8 +256,9 @@ pub async fn create_tracking(
     };
 
     let result = tracking.insert(state.db.as_ref()).await?;
+    let response = build_tracking_response(state.db.as_ref(), result).await?;
 
-    Ok(Json(ApiResponse::created(result.into())))
+    Ok(Json(ApiResponse::created(response)))
 }
 
 /// GET /api/tracking/:id
