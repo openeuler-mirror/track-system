@@ -417,4 +417,38 @@ mod tests {
         assert!(result.is_ok(), "Result failed: {:?}", result.err());
         mock.assert_async().await;
     }
+
+    #[tokio::test]
+    async fn test_execute_warm_cache_action() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("POST", "/api/l0/cache/warm/88")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "data": {
+                        "package_id": 88,
+                        "package_name": "coreutils",
+                        "repo_url": "https://git.savannah.gnu.org/git/coreutils.git",
+                        "cache_path": "/cache/coreutils.git",
+                        "default_branch": "master",
+                        "cache_retained": true,
+                        "status": "warmed",
+                        "message": "cache warmed"
+                    }
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let action = L0Action::WarmCache {
+            package_id: Some(88),
+        };
+        let result = execute(&client, action).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
 }
