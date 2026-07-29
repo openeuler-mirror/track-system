@@ -374,15 +374,26 @@ async fn add_tracking(
 
 
 pub(crate) async fn create_tracking_with_default_repos(
-    _api_client: &ApiClient,
+    api_client: &ApiClient,
     package: String,
-    _distro: String,
-    _status: String,
+    distro: String,
+    status: String,
 ) -> Result<()> {
-    Err(anyhow!(
-        "tracking 默认仓库创建尚未接入: package={}",
-        package
-    ))
+    let (l1_repo, l2_repo) = build_default_tracking_repos(&package);
+    for (l2_branch, l1_branch) in DEFAULT_BRANCH_MAPPINGS {
+        add_tracking(
+            api_client,
+            package.clone(),
+            distro.clone(),
+            l1_repo.clone(),
+            l1_branch.to_string(),
+            l2_repo.clone(),
+            l2_branch.to_string(),
+            status.clone(),
+        )
+        .await?;
+    }
+    Ok(())
 }
 
 
