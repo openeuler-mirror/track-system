@@ -15,6 +15,7 @@ use axum::{
     extract::{Path, Query, State},
     Json,
 };
+use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use sea_orm::ActiveModelTrait;
 use serde::{Deserialize, Serialize};
 
