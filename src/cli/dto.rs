@@ -45,6 +45,9 @@ pub struct DistroDto {
 pub struct TrackingDto {
     pub id: i32,
     pub package_id: i32,
+    pub package_name: Option<String>,
+    pub package_level: Option<i32>,
+    pub l0_repo_url: Option<String>,
     pub distro_id: i32,
     pub l1_repo_owner: String,
     pub l1_repo_name: String,
@@ -55,6 +58,7 @@ pub struct TrackingDto {
     pub last_sync_time: Option<DateTime<Utc>>,
     pub last_l1_commit_sha: Option<String>,
     pub last_l2_commit_sha: Option<String>,
+    pub maintenance_summary: Option<TrackingMaintenanceSummaryDto>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -72,6 +76,21 @@ pub struct L2SnapshotDto {
     pub spec_release: Option<String>,
     pub snapshot_data: serde_json::Value,
     pub created_at: DateTime<Utc>,
+}
+
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrackingMaintenanceSummaryDto {
+    pub report_id: i64,
+    pub overall_risk: String,
+    pub confidence: String,
+    pub generated_at: DateTime<Utc>,
+    pub commit_total: Option<i64>,
+    pub commits_last_12_months: Option<i64>,
+    pub committers_last_12_months: Option<i64>,
+    pub last_commit_at: Option<String>,
+    pub stars: Option<i64>,
+    pub forks: Option<i64>,
 }
 
 /// 同步状态 DTO

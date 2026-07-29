@@ -496,16 +496,30 @@ async fn list_tracking(
             println!();
             println!("{}", "跟踪配置列表:".bold());
             println!(
-                "{:<5} {:<15} {:<15} {:<30} {:<10}",
-                "ID", "软件包ID", "发行版ID", "L1 仓库", "状态"
+                "{:<5} {:<18} {:<12} {:<30} {:<10} {:<8}",
+                "ID", "软件包", "发行版ID", "L1 仓库", "状态", "维护风险"
             );
-            println!("{}", "-".repeat(75));
+            println!("{}", "-".repeat(100));
 
             for track in trackings {
                 let l1_repo = format!("{}/{}", track.l1_repo_owner, track.l1_repo_name);
+                let package_label = track
+                    .package_name
+                    .clone()
+                    .unwrap_or_else(|| track.package_id.to_string());
+                let maintenance_risk = track
+                    .maintenance_summary
+                    .as_ref()
+                    .map(|summary| summary.overall_risk.clone())
+                    .unwrap_or_else(|| "-".to_string());
                 println!(
-                    "{:<5} {:<15} {:<15} {:<30} {:<10}",
-                    track.id, track.package_id, track.distro_id, l1_repo, track.tracking_status
+                    "{:<5} {:<18} {:<12} {:<30} {:<10} {:<8}",
+                    track.id,
+                    package_label,
+                    track.distro_id,
+                    l1_repo,
+                    track.tracking_status,
+                    maintenance_risk
                 );
             }
 
