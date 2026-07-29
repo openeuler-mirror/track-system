@@ -583,10 +583,13 @@ mod tests {
     async fn test_create_tracking_success() {
         let mock_package = create_mock_package(1);
         let mock_tracking = create_mock_tracking(1, 1);
+        let mock_report = create_mock_maintenance_report(1);
 
         let db = MockDatabase::new(DatabaseBackend::Postgres)
             .append_query_results([[mock_package]]) // Package exists
             .append_query_results([[mock_tracking]]) // Created tracking
+            .append_query_results([[create_mock_package(1)]]) // enrich package lookup
+            .append_query_results([[mock_report]]) // latest maintenance report
             .into_connection();
         let state = AppState::without_external_clients(db);
 
