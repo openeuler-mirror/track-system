@@ -344,7 +344,7 @@ pub async fn delete_tracking(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::entities::{packages, tracking};
+    use crate::entities::{maintenance_reports, packages, tracking};
     use axum::extract::{Path, State};
     use sea_orm::{DatabaseBackend, MockDatabase};
 
