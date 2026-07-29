@@ -76,6 +76,7 @@ impl<'a> EcosystemService<'a> {
         let evidence_summary = self.build_evidence_summary(&target, &evidence_payloads);
         let assessment = assess_target(&target, evidence_summary.clone(), &evidence_payloads);
         let report = self.save_report(target.id, assessment).await?;
+        self.sync_report_to_sbom(&target, &report).await;
 
         let mut target_model: ecosystem_targets::ActiveModel = target.into();
         target_model.last_collected_at = Set(Some(now));
