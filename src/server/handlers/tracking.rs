@@ -613,9 +613,13 @@ mod tests {
     #[tokio::test]
     async fn test_get_tracking_success() {
         let mock_tracking = create_mock_tracking(1, 1);
+        let mock_package = create_mock_package(1);
+        let mock_report = create_mock_maintenance_report(1);
 
         let db = MockDatabase::new(DatabaseBackend::Postgres)
             .append_query_results([[mock_tracking]])
+            .append_query_results([[mock_package]])
+            .append_query_results([[mock_report]])
             .into_connection();
         let state = AppState::without_external_clients(db);
 
