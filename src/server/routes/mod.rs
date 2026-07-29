@@ -24,11 +24,14 @@ pub mod snapshot;
 pub mod sync;
 pub mod tracking;
 
+pub use ai::ai_routes;
 pub use backport::backport_routes;
 pub use compare::compare_routes;
 pub use component::component_routes;
 pub use ecosystem::ecosystem_routes;
 pub use health::health_routes;
+pub use l0::l0_routes;
+pub use maintenance::maintenance_routes;
 pub use metadata::metadata_routes;
 pub use package::package_routes;
 pub use reports::reports_routes;
