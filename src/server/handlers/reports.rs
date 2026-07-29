@@ -338,6 +338,85 @@ pub async fn export_report(
     Ok(content)
 }
 
+async fn latest_maintenance_summary(
+    db: &sea_orm::DatabaseConnection,
+    package_id: i32,
+) -> Result<Option<ReportMaintenanceSummary>, ApiError> {
+    use crate::entities::{maintenance_reports, prelude::*};
+    use sea_orm::*;
+
+    let report = MaintenanceReports::find()
+        .filter(maintenance_reports::Column::PackageId.eq(package_id))
+        .order_by_desc(maintenance_reports::Column::GeneratedAt)
+        .one(db)
+        .await
+        .map_err(ApiError::from)?;
+
+    Ok(report.map(|report| ReportMaintenanceSummary {
+        report_id: report.id,
+        overall_risk: report.overall_risk,
+        confidence: report.confidence,
+        generated_at: report.generated_at,
+        commit_total: find_report_i64(&report.report_payload, "commit_total"),
+        commits_last_12_months: find_report_i64(&report.report_payload, "commits_last_12_months"),
+        committers_last_12_months: find_report_i64(
+            &report.report_payload,
+            "committers_last_12_months",
+        ),
+        last_commit_at: find_report_string(&report.report_payload, "last_commit_at"),
+        stars: find_report_i64(&report.report_payload, "stars"),
+        forks: find_report_i64(&report.report_payload, "forks"),
+    }))
+}
+
+fn find_report_i64(report_payload: &Value, key: &str) -> Option<i64> {
+    find_report_json_value(report_payload, key).and_then(|value| match value {
+        Value::Number(number) => number.as_i64(),
+        Value::String(text) => text.parse::<i64>().ok(),
+        _ => None,
+    })
+}
+
+fn find_report_string(report_payload: &Value, key: &str) -> Option<String> {
+    find_report_json_value(report_payload, key).and_then(|value| match value {
+        Value::String(text) if !text.trim().is_empty() => Some(text),
+        Value::Number(number) => Some(number.to_string()),
+        Value::Bool(flag) => Some(flag.to_string()),
+        _ => None,
+    })
+}
+
+fn find_report_json_value(report_payload: &Value, key: &str) -> Option<Value> {
+    report_payload
+        .get("section")
+        .and_then(|section| section.get("indicators"))
+        .and_then(Value::as_array)
+        .and_then(|indicators| {
+            indicators.iter().find_map(|indicator| {
+                let indicator_key = indicator.get("key").and_then(Value::as_str)?;
+                if indicator_key == key {
+                    indicator.get("value").cloned()
+                } else {
+                    None
+                }
+            })
+        })
+        .or_else(|| {
+            report_payload
+                .get("raw_evidence")
+                .and_then(Value::as_array)
+                .and_then(|entries| {
+                    entries.iter().find_map(|entry| {
+                        let category = entry.get("assessment_category").and_then(Value::as_str)?;
+                        if category != "maintenance" {
+                            return None;
+                        }
+                        entry.get("data").and_then(|data| data.get(key)).cloned()
+                    })
+                })
+        })
+}
+
 /// 导出格式查询参数
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExportFormatQuery {
