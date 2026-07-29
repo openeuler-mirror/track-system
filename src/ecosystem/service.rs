@@ -350,3 +350,266 @@ impl<'a> EcosystemService<'a> {
         Ok(report.insert(self.db).await?)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ecosystem::types::{
+        EcosystemAssessmentSections, EcosystemDimension, EcosystemSubAssessment,
+    };
+    use sea_orm::{DatabaseBackend, MockDatabase};
+    use serial_test::serial;
+    use std::ffi::OsString;
+
+    struct EnvGuard {
+        key: &'static str,
+        previous: Option<OsString>,
+    }
+
+    impl EnvGuard {
+        fn remove(key: &'static str) -> Self {
+            let previous = std::env::var_os(key);
+            std::env::remove_var(key);
+            Self { key, previous }
+        }
+    }
+
+    impl Drop for EnvGuard {
+        fn drop(&mut self) {
+            if let Some(previous) = &self.previous {
+                std::env::set_var(self.key, previous);
+            } else {
+                std::env::remove_var(self.key);
+            }
+        }
+    }
+
+    fn target_with_metadata(metadata: Option<Value>) -> ecosystem_targets::Model {
+        let now = Utc::now();
+        ecosystem_targets::Model {
+            id: 7,
+            name: "openEuler".to_string(),
+            target_type: "community".to_string(),
+            platform: Some("openeuler".to_string()),
+            role: "upstream".to_string(),
+            homepage_url: Some("https://www.openeuler.org".to_string()),
+            api_base_url: Some("https://api.openeuler.org".to_string()),
+            owner: Some("openeuler".to_string()),
+            repo: Some("community".to_string()),
+            default_branch: Some("master".to_string()),
+            status: "active".to_string(),
+            refresh_interval_hours: 24,
+            rule_profile: "openeuler_community".to_string(),
+            metadata,
+            last_collected_at: None,
+            last_report_at: None,
+            last_error: None,
+            created_at: now,
+            updated_at: now,
+        }
+    }
+
+    fn sub_assessment(level: &str, score: i32) -> EcosystemSubAssessment {
+        EcosystemSubAssessment {
+            level: level.to_string(),
+            confidence: "high".to_string(),
+            score,
+            coverage: 90,
+            reasons: vec![format!("{level} reason")],
+            evidence_refs: vec!["metadata_source".to_string()],
+            indicators: Vec::new(),
+        }
+    }
+
+    fn assessment() -> EcosystemAssessment {
+        let sections = EcosystemAssessmentSections {
+            source: sub_assessment("low", 90),
+            maintenance: sub_assessment("medium", 70),
+            security: sub_assessment("high", 50),
+            quality: sub_assessment("low", 85),
+        };
+        let mut dimensions = BTreeMap::new();
+        dimensions.insert(
+            "source_risk".to_string(),
+            EcosystemDimension {
+                level: "low".to_string(),
+                score: 90,
+                reasons: vec!["source ok".to_string()],
+            },
+        );
+
+        EcosystemAssessment {
+            report_type: "ecosystem_profile".to_string(),
+            overall_risk: "high".to_string(),
+            confidence: "high".to_string(),
+            summary: "summary".to_string(),
+            sections,
+            dimensions,
+            evidence_summary: json!({"evidence_count": 2}),
+            report_payload: json!({"context": {"target_id": 7}}),
+            generated_at: Utc::now(),
+        }
+    }
+
+    #[test]
+    fn metadata_evidence_expands_all_supported_sections() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+        let service = EcosystemService::new(&db);
+        let target = target_with_metadata(Some(json!({
+            "source_assessment": {
+                "organization_structure": {"foundation_status": "foundation"},
+                "license_policy": {"license_policy": "MulanPSL-2.0"}
+            },
+            "maintenance_assessment": {"commits_last_12_months": 120},
+            "security_assessment": {"has_security_policy": true},
+            "quality_assessment": {"signed_releases": true}
+        })));
+
+        let evidence = service.collect_metadata_evidence(&target);
+
+        assert_eq!(evidence.len(), 5);
+        assert!(evidence
+            .iter()
+            .any(|item| item["assessment_subcategory"] == "organization_structure"));
+        assert!(evidence
+            .iter()
+            .any(|item| item["assessment_category"] == "security"));
+        assert!(evidence
+            .iter()
+            .any(|item| item["source_url"] == "https://www.openeuler.org"));
+    }
+
+    #[test]
+    fn metadata_evidence_is_empty_without_metadata() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+        let service = EcosystemService::new(&db);
+        let target = target_with_metadata(None);
+
+        assert!(service.collect_metadata_evidence(&target).is_empty());
+    }
+
+    #[test]
+    fn evidence_summary_counts_categories_subcategories_and_sources() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+        let service = EcosystemService::new(&db);
+        let target = target_with_metadata(None);
+        let evidence = vec![
+            json!({
+                "assessment_category": "source",
+                "assessment_subcategory": "license_policy",
+                "source_name": "metadata_source"
+            }),
+            json!({
+                "assessment_category": "source",
+                "assessment_subcategory": "license_policy",
+                "source_name": "metadata_source"
+            }),
+            json!({
+                "assessment_category": "security",
+                "assessment_subcategory": "cve_process",
+                "source_name": "metadata_security"
+            }),
+        ];
+
+        let summary = service.build_evidence_summary(&target, &evidence);
+
+        assert_eq!(summary["evidence_count"], 3);
+        assert_eq!(summary["target_type"], "community");
+        assert_eq!(summary["category_counts"]["source"], 2);
+        assert_eq!(summary["subcategory_counts"]["license_policy"], 2);
+        assert_eq!(
+            summary["sources"],
+            json!(["metadata_security", "metadata_source"])
+        );
+    }
+
+    #[tokio::test]
+    async fn latest_report_queries_latest_target_report() {
+        let now = Utc::now();
+        let report = ecosystem_reports::Model {
+            id: 9,
+            target_id: 7,
+            report_type: "ecosystem_profile".to_string(),
+            status: "completed".to_string(),
+            overall_risk: "medium".to_string(),
+            confidence: "high".to_string(),
+            summary: "latest".to_string(),
+            dimensions: json!({}),
+            evidence_summary: Some(json!({"evidence_count": 2})),
+            report_payload: json!({}),
+            generated_at: now,
+            created_at: now,
+            updated_at: now,
+        };
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results(vec![vec![report.clone()]])
+            .into_connection();
+        let service = EcosystemService::new(&db);
+
+        let latest = service.latest_report(7).await.unwrap();
+
+        assert_eq!(latest, Some(report));
+    }
+
+    #[tokio::test]
+    async fn save_report_maps_assessment_to_report_model() {
+        let now = Utc::now();
+        let report = ecosystem_reports::Model {
+            id: 11,
+            target_id: 7,
+            report_type: "ecosystem_profile".to_string(),
+            status: "completed".to_string(),
+            overall_risk: "high".to_string(),
+            confidence: "high".to_string(),
+            summary: "summary".to_string(),
+            dimensions: json!({"source_risk": {"level": "low"}}),
+            evidence_summary: Some(json!({"evidence_count": 2})),
+            report_payload: json!({"context": {"target_id": 7}}),
+            generated_at: now,
+            created_at: now,
+            updated_at: now,
+        };
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_exec_results([sea_orm::MockExecResult {
+                last_insert_id: 11,
+                rows_affected: 1,
+            }])
+            .append_query_results(vec![vec![report.clone()]])
+            .into_connection();
+        let service = EcosystemService::new(&db);
+
+        let saved = service.save_report(7, assessment()).await.unwrap();
+
+        assert_eq!(saved.id, 11);
+        assert_eq!(saved.target_id, 7);
+        assert_eq!(saved.overall_risk, "high");
+        assert_eq!(saved.status, "completed");
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn sbom_sync_is_noop_when_disabled() {
+        let _enabled = EnvGuard::remove("SBOM_COMMUNITY_SYNC_ENABLED");
+        let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+        let service = EcosystemService::new(&db);
+        let target = target_with_metadata(None);
+        let now = Utc::now();
+        let report = ecosystem_reports::Model {
+            id: 12,
+            target_id: target.id,
+            report_type: "ecosystem_profile".to_string(),
+            status: "completed".to_string(),
+            overall_risk: "LOW".to_string(),
+            confidence: "HIGH".to_string(),
+            summary: "summary".to_string(),
+            dimensions: json!({}),
+            evidence_summary: Some(json!({"evidence_count": 2})),
+            report_payload: json!({}),
+            generated_at: now,
+            created_at: now,
+            updated_at: now,
+        };
+
+        service.sync_report_to_sbom(&target, &report).await;
+    }
+}
