@@ -54,6 +54,9 @@ impl SpecFile {
             }
 
             if let Some(caps) = version_re.captures(line) {
+                if !spec.version.is_empty() {
+                    continue;
+                }
                 let raw = caps.get(1).unwrap().as_str().trim();
                 let expanded = spec.expand_macros(raw, &macro_usage_re);
                 spec.version = SpecFile::format_version(&expanded);
