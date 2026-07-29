@@ -780,4 +780,154 @@ mod tests {
             Some(100)
         );
     }
+
+    #[test]
+    fn assess_target_penalizes_missing_and_stale_evidence() {
+        let mut target = sample_target();
+        target.refresh_interval_hours = 96;
+        let raw_evidence = vec![
+            json!({
+                "source_name": "platform",
+                "assessment_category": "source",
+                "assessment_subcategory": "hosting",
+                "data": {
+                    "basic_info": "",
+                    "trade_controls": "存在制裁和下架限制",
+                    "ip_policy": null,
+                    "license_policy": []
+                }
+            }),
+            json!({
+                "source_name": "repo",
+                "assessment_category": "maintenance",
+                "assessment_subcategory": "activity",
+                "data": {
+                    "commit_total": "12",
+                    "commits_last_12_months": "3",
+                    "committers_last_12_months": "1",
+                    "last_commit_at": (Utc::now() - Duration::days(180)).to_rfc3339(),
+                    "stars": "4",
+                    "forks": "5"
+                }
+            }),
+            json!({
+                "source_name": "security",
+                "assessment_category": "security",
+                "assessment_subcategory": "cve",
+                "data": {
+                    "has_security_policy": "no",
+                    "cve_fix_commits_last_12_months": 0,
+                    "cve_linked_issues_last_12_months": 0,
+                    "median_cve_fix_days": "90",
+                    "open_cve_backlog": "9"
+                }
+            }),
+            json!({
+                "source_name": "quality",
+                "assessment_category": "quality",
+                "assessment_subcategory": "release",
+                "data": {
+                    "dedicated_code_reviewers": 0,
+                    "required_reviews": 0,
+                    "signed_releases": "false",
+                    "provenance_attestation": "0",
+                    "release_checklist": "no"
+                }
+            }),
+        ];
+
+        let assessment = assess_target(&target, json!({"evidence_count": 4}), &raw_evidence);
+
+        assert_eq!(assessment.overall_risk, "HIGH");
+        assert_eq!(assessment.confidence, "LOW");
+        assert_eq!(assessment.sections.security.level, "HIGH");
+        assert!(assessment.sections.source.reasons.iter().any(|reason| {
+            reason.contains("贸易管制") || reason.contains("缺少关键来源指标")
+        }));
+        assert!(assessment
+            .sections
+            .maintenance
+            .reasons
+            .iter()
+            .any(|reason| {
+                reason.contains("提交频次不足") || reason.contains("最近一次提交")
+            }));
+        assert_eq!(
+            assessment.dimensions["freshness_risk"].level.as_str(),
+            "HIGH"
+        );
+        assert_eq!(worst_level(["LOW", "MEDIUM", "HIGH"]), "HIGH");
+        assert_eq!(aggregate_confidence(["HIGH", "MEDIUM", "LOW"]), "LOW");
+    }
+
+    #[test]
+    fn helper_functions_cover_status_labels_and_boundaries() {
+        assert_eq!(indicator_status(&Value::Null), "missing");
+        assert_eq!(indicator_status(&json!(false)), "absent");
+        assert_eq!(indicator_status(&json!("")), "missing");
+        assert_eq!(indicator_status(&json!([])), "missing");
+        assert_eq!(indicator_status(&json!({})), "missing");
+        assert_eq!(indicator_status(&json!("value")), "present");
+
+        assert_eq!(indicator_label("unknown_key"), "unknown_key");
+        assert_eq!(level_from_score(80), "LOW");
+        assert_eq!(level_from_score(60), "MEDIUM");
+        assert_eq!(level_from_score(59), "HIGH");
+        assert_eq!(confidence_from_coverage(85), "HIGH");
+        assert_eq!(confidence_from_coverage(60), "MEDIUM");
+        assert_eq!(confidence_from_coverage(59), "LOW");
+        assert_eq!(freshness_level(24), "LOW");
+        assert_eq!(freshness_level(72), "MEDIUM");
+        assert_eq!(freshness_level(73), "HIGH");
+        assert_eq!(freshness_score(12), 90);
+        assert_eq!(freshness_score(48), 70);
+        assert_eq!(freshness_score(96), 50);
+        assert_eq!(level_weight("UNKNOWN"), 0);
+        assert_eq!(confidence_weight("UNKNOWN"), 0);
+
+        let indicators = vec![
+            EcosystemIndicator {
+                key: "flag".to_string(),
+                label: "flag".to_string(),
+                value: json!("yes"),
+                status: "present".to_string(),
+                source: "test".to_string(),
+            },
+            EcosystemIndicator {
+                key: "invalid_flag".to_string(),
+                label: "invalid_flag".to_string(),
+                value: json!("maybe"),
+                status: "present".to_string(),
+                source: "test".to_string(),
+            },
+            EcosystemIndicator {
+                key: "number".to_string(),
+                label: "number".to_string(),
+                value: json!("42"),
+                status: "present".to_string(),
+                source: "test".to_string(),
+            },
+            EcosystemIndicator {
+                key: "bad_number".to_string(),
+                label: "bad_number".to_string(),
+                value: json!("x"),
+                status: "present".to_string(),
+                source: "test".to_string(),
+            },
+            EcosystemIndicator {
+                key: "when".to_string(),
+                label: "when".to_string(),
+                value: json!(Utc::now().to_rfc3339()),
+                status: "present".to_string(),
+                source: "test".to_string(),
+            },
+        ];
+
+        assert_eq!(indicator_bool(&indicators, "flag"), Some(true));
+        assert_eq!(indicator_bool(&indicators, "invalid_flag"), None);
+        assert_eq!(indicator_i64(&indicators, "number"), Some(42));
+        assert_eq!(indicator_i64(&indicators, "bad_number"), None);
+        assert!(indicator_datetime(&indicators, "when").is_some());
+        assert_eq!(coverage_for_keys(&indicators, &[]), (100, Vec::new()));
+    }
 }
