@@ -14,11 +14,19 @@
 //! 通过 HTTP API 管理软件包
 
 use crate::cli::client::ApiClient;
+use crate::cli::commands::tracking_api::create_tracking_with_default_repos;
 use crate::cli::dto::{CreatePackageRequest, PackageDto, UpdatePackageRequest};
 use crate::cli::formatter::format_datetime_local;
 use crate::cli::parser::PackageAction;
 use anyhow::{bail, Result};
 use colored::Colorize;
+use std::fs;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct PackageImportRecord {
+    name: String,
+    l0_repo_url: Option<String>,
+}
 
 fn parse_sync_interval_hours(input: &str) -> Result<i32> {
     let s = input.trim().trim_matches(|c| c == '"' || c == '\'');
