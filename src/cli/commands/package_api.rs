@@ -551,6 +551,33 @@ mod tests {
         assert!(parse_sync_interval_hours("8761h").is_err());
     }
 
+    #[test]
+    fn test_parse_package_import_file() {
+        let content = r#"
+# comment
+bash,https://git.savannah.gnu.org/git/bash.git
+hdparm,NA
+
+curl,https://github.com/curl/curl
+"#;
+        let records = parse_package_import_file(content).unwrap();
+        assert_eq!(records.len(), 3);
+        assert_eq!(
+            records[0],
+            PackageImportRecord {
+                name: "bash".to_string(),
+                l0_repo_url: Some("https://git.savannah.gnu.org/git/bash.git".to_string()),
+            }
+        );
+        assert_eq!(
+            records[1],
+            PackageImportRecord {
+                name: "hdparm".to_string(),
+                l0_repo_url: None,
+            }
+        );
+    }
+
     #[tokio::test]
     async fn test_add_package() {
         let (mut server, client) = setup_test_server().await;
