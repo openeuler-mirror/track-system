@@ -87,6 +87,9 @@ pub struct UpdateTrackingRequest {
 pub struct TrackingResponse {
     pub id: i32,
     pub package_id: i32,
+    pub package_name: Option<String>,
+    pub package_level: Option<i32>,
+    pub l0_repo_url: Option<String>,
     pub distro_id: i32,
     pub l1_repo_owner: String,
     pub l1_repo_name: String,
@@ -106,6 +109,9 @@ impl From<tracking::Model> for TrackingResponse {
         Self {
             id: model.id,
             package_id: model.package_id,
+            package_name: None,
+            package_level: None,
+            l0_repo_url: None,
             distro_id: model.distro_id,
             l1_repo_owner: model.l1_repo_owner,
             l1_repo_name: model.l1_repo_name,
