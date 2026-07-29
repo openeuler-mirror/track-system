@@ -770,6 +770,35 @@ mod tests {
         assert!(result.is_err());
     }
 
+    #[test]
+    fn test_normalize_imported_l2_snapshot_spec_expands_macros() {
+        let spec_text = r#"
+%global openssh_release 16
+
+Name:           openssh
+Version:        9.6p1
+Release:        %{openssh_release}
+
+%package -n pam_ssh_agent_auth
+Version:        0.10.4
+Release:        5.%{openssh_release}
+"#;
+        let mut snapshot = RepositorySnapshot::new(1, crate::snapshot::types::SnapshotOrigin::L2);
+        snapshot.spec = Some(crate::snapshot::types::SpecEntry {
+            path: "openssh.spec".to_string(),
+            sha256: "sha".to_string(),
+            version: Some("9.6p1".to_string()),
+            release: Some("%{openssh_release}".to_string()),
+            content_base64: BASE64_STANDARD.encode(spec_text),
+        });
+
+        normalize_imported_snapshot_spec_version_release(&mut snapshot);
+
+        let spec = snapshot.spec.as_ref().unwrap();
+        assert_eq!(spec.version.as_deref(), Some("9.6p1"));
+        assert_eq!(spec.release.as_deref(), Some("16"));
+    }
+
     #[tokio::test]
     async fn test_import_l0_metadata_invalid_tracking() {
         use sea_orm::{DatabaseBackend, MockDatabase};
