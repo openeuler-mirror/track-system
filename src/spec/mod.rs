@@ -195,4 +195,24 @@ Release: 1
         let spec = SpecFile::parse(content);
         assert_eq!(spec.version, "1.2.3");
     }
+
+    #[test]
+    fn test_parse_ignores_subpackage_version_release() {
+        let content = r#"
+%global openssh_release 13
+
+Name:           openssh
+Version:        9.6p1
+Release:        %{openssh_release}
+Summary:        OpenSSH package
+
+%package -n pam_ssh_agent_auth
+Summary:        PAM module for authentication with ssh-agent
+Version:        0.10.4
+Release:        5.%{openssh_release}
+"#;
+        let spec = SpecFile::parse(content);
+        assert_eq!(spec.version, "9.6p1");
+        assert_eq!(spec.release, "13");
+    }
 }
