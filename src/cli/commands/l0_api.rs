@@ -301,6 +301,67 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_warm_cache_single_package() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("POST", "/api/l0/cache/warm/321")
+            .match_body(mockito::Matcher::Json(serde_json::json!({})))
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "data": {
+                        "package_id": 321,
+                        "package_name": "bash",
+                        "repo_url": "https://git.savannah.gnu.org/git/bash.git",
+                        "cache_path": "/var/cache/track-system/bash.git",
+                        "default_branch": "master",
+                        "cache_retained": true,
+                        "status": "warmed",
+                        "message": "cache warmed"
+                    }
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = warm_cache(&client, Some(321)).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_warm_cache_all_packages() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mock = server
+            .mock("POST", "/api/l0/cache/warm/all")
+            .match_body(mockito::Matcher::Json(serde_json::json!({})))
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "data": {
+                        "scanned_packages": 5,
+                        "warmed_packages": 3,
+                        "skipped_no_repo": 1,
+                        "failed_packages": 1,
+                        "results": []
+                    }
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = warm_cache(&client, None).await;
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
     async fn test_execute_poll_action() {
         let (mut server, client) = setup_test_server().await;
 
