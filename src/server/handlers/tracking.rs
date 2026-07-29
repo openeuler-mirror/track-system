@@ -273,7 +273,8 @@ pub async fn get_tracking(
         .await?
         .ok_or_else(|| ApiError::NotFound(format!("Tracking {} not found", id)))?;
 
-    Ok(Json(ApiResponse::success(tracking.into())))
+    let response = build_tracking_response(state.db.as_ref(), tracking).await?;
+    Ok(Json(ApiResponse::success(response)))
 }
 
 /// PUT /api/tracking/:id
