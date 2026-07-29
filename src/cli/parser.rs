@@ -675,6 +675,22 @@ pub enum TrackingAction {
         status: String,
     },
 
+    /// 从配置文件批量创建跟踪配置
+    #[command(about = "Import tracking configurations from csv file")]
+    Import {
+        /// 配置文件路径，CSV 表头需包含 package,l2_repo,l1_repo
+        #[arg(long)]
+        file: String,
+
+        /// 发行版ID（仅支持数字ID）
+        #[arg(long, help = "发行版ID（仅支持数字ID）")]
+        distro: String,
+
+        /// 跟踪状态（active/paused）
+        #[arg(long, default_value = "active", help = "跟踪状态（active/paused）")]
+        status: String,
+    },
+
     /// 列出所有跟踪配置
     #[command(about = "List all tracking configurations")]
     List {

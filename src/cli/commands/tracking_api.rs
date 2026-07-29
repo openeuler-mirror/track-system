@@ -189,6 +189,11 @@ pub async fn execute(api_client: &ApiClient, action: TrackingAction) -> Result<(
             )
             .await
         }
+        TrackingAction::Import {
+            file,
+            distro,
+            status,
+        } => import_tracking_from_file(api_client, file, distro, status).await,
         TrackingAction::List {
             limit,
             package,
@@ -199,6 +204,75 @@ pub async fn execute(api_client: &ApiClient, action: TrackingAction) -> Result<(
         TrackingAction::Resume { id } => update_tracking_status(api_client, id, true).await,
         TrackingAction::Remove { id, confirm } => remove_tracking(api_client, id, confirm).await,
     }
+}
+
+
+fn parse_tracking_import_file(path: &Path) -> Result<Vec<TrackingImportRecord>> {
+    let content = fs::read_to_string(path)
+        .map_err(|e| anyhow!("读取 tracking 导入文件失败 {}: {}", path.display(), e))?;
+    let first_non_empty = content
+        .lines()
+        .map(str::trim)
+        .find(|line| !line.is_empty() && !line.starts_with('#'))
+        .ok_or_else(|| anyhow!("tracking 导入文件中没有可用记录"))?;
+
+    if first_non_empty.eq_ignore_ascii_case("package,l2_repo,l1_repo") {
+        let mut reader = ReaderBuilder::new()
+            .has_headers(true)
+            .comment(Some(b'#'))
+            .trim(csv::Trim::All)
+            .from_reader(content.as_bytes());
+
+        let mut records = Vec::new();
+        for row in reader.deserialize() {
+            let record: TrackingImportRecord = row?;
+            if record.package.trim().is_empty()
+                || record.l1_repo.trim().is_empty()
+                || record.l2_repo.trim().is_empty()
+            {
+                return Err(anyhow!("tracking 导入文件存在空字段"));
+            }
+            records.push(record);
+        }
+
+        if records.is_empty() {
+            return Err(anyhow!("tracking 导入文件中没有可用记录"));
+        }
+
+        return Ok(records);
+    }
+
+    let mut records = Vec::new();
+    for (idx, raw_line) in content.lines().enumerate() {
+        let line_no = idx + 1;
+        let line = raw_line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let mut parts = line.splitn(2, ',');
+        let package = parts
+            .next()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| anyhow!("第 {} 行缺少组件名称", line_no))?;
+        let _l0_repo = parts
+            .next()
+            .map(str::trim)
+            .ok_or_else(|| anyhow!("第 {} 行缺少上游仓库地址", line_no))?;
+
+        let (l1_repo, l2_repo) = build_default_tracking_repos(package);
+        records.push(TrackingImportRecord {
+            package: package.to_string(),
+            l1_repo,
+            l2_repo,
+        });
+    }
+
+    if records.is_empty() {
+        return Err(anyhow!("tracking 导入文件中没有可用记录"));
+    }
+
+    Ok(records)
 }
 
 /// 添加跟踪配置
@@ -310,6 +384,72 @@ pub(crate) async fn create_tracking_with_default_repos(
         "tracking 默认仓库创建尚未接入: package={}",
         package
     ))
+}
+
+
+async fn import_tracking_from_file(
+    api_client: &ApiClient,
+    file: String,
+    distro: String,
+    status: String,
+) -> Result<()> {
+    println!("正在从配置文件导入 tracking: {}", file.cyan());
+    let path = Path::new(&file);
+    if !path.exists() {
+        return Err(anyhow!("配置文件不存在: {}", file));
+    }
+
+    let records = parse_tracking_import_file(path)?;
+    let mut succeeded = 0_u64;
+    let mut failed = 0_u64;
+
+    for record in records {
+        println!();
+        println!("导入 tracking: {}", record.package.cyan());
+        match {
+            let mut result = Ok(());
+            for (l2_branch, l1_branch) in DEFAULT_BRANCH_MAPPINGS {
+                if let Err(err) = add_tracking(
+                    api_client,
+                    record.package.clone(),
+                    distro.clone(),
+                    record.l1_repo.clone(),
+                    l1_branch.to_string(),
+                    record.l2_repo.clone(),
+                    l2_branch.to_string(),
+                    status.clone(),
+                )
+                .await
+                {
+                    result = Err(err);
+                    break;
+                }
+            }
+            result
+        } {
+            Ok(_) => {
+                succeeded += 1;
+            }
+            Err(err) => {
+                failed += 1;
+                println!("{} 导入失败: {}", "✗".red().bold(), err);
+            }
+        }
+    }
+
+    println!();
+    println!(
+        "{} tracking 批量导入完成: 成功 {}, 失败 {}",
+        "✓".green().bold(),
+        succeeded,
+        failed
+    );
+
+    if failed > 0 {
+        return Err(anyhow!("{} 个 tracking 导入失败", failed));
+    }
+
+    Ok(())
 }
 
 /// 列出跟踪配置
