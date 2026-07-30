@@ -198,6 +198,10 @@ pub struct ClassifiedCommitResult {
 pub struct ReportGenerationResult {
     pub report_id: i64,
     pub report_status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cve_fix_comparison_input: Option<CveFixComparisonInput>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cve_fix_comparison_xlsx: Option<String>,
 }
 
 /// 回合建议结果
