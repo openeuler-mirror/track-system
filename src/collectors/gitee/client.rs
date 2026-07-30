@@ -98,12 +98,11 @@ impl GiteeClient {
         let mut retries = 0;
 
         loop {
-            let response = self
-                .client
-                .get(url)
-                .query(&[("access_token", &self.token)])
-                .send()
-                .await?;
+            let mut request = self.client.get(url);
+            if let Some(token) = &self.token {
+                request = request.query(&[("access_token", token)]);
+            }
+            let response = request.send().await?;
 
             let status = response.status();
 
