@@ -254,6 +254,9 @@ mod tests {
 
     #[test]
     fn test_validate() {
+        let _guard = lock_env();
+        clear_server_env();
+
         let config = ClientConfig::default();
         assert!(config.validate().is_ok());
 
