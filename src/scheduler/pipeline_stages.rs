@@ -263,6 +263,8 @@ impl<'a> PipelineExecutor<'a> {
             report_id: Some(report_id),
             files_changed,
             has_spec_changes,
+            l2_vs_l1_diff: None,
+            l1_vs_l0_diff: None,
         })
     }
 
