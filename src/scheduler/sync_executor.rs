@@ -101,8 +101,9 @@ impl<'a> SyncExecutor<'a> {
         let outcome = match self.do_sync(&tracking).await {
             Ok(result) => result,
             Err(err) => {
+                let failure = SyncResult::failed(&err.to_string());
                 self.sync_manager
-                    .complete_sync_task(tracking_id, false)
+                    .complete_sync_task_with_result(tracking_id, &failure)
                     .await
                     .context("完成同步任务失败")?;
 
