@@ -46,9 +46,11 @@ impl GiteeClient {
             .no_proxy()
             .build()?;
 
+        let token = normalize_token(token);
+
         Ok(Self {
             client,
-            token: token.into(),
+            token,
             base_url: GITEE_API_BASE.to_string(),
         })
     }
