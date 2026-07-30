@@ -86,6 +86,1284 @@ struct RiskCreateReq {
     package_id: u64,
     #[serde(rename = "inner_secret")]
     inner_secret: String,
+    #[serde(rename = "report_url")]
+    report_url: String,
+    #[serde(rename = "risk_type")]
+    risk_type: RiskType,
+}
+
+fn short_sha(sha: &str) -> String {
+    sha.chars().take(12).collect()
+}
+
+fn infer_changelog_entry_type(text: &str) -> String {
+    let lower = text.to_ascii_lowercase();
+    if lower.contains("cve") || lower.contains("security") || text.contains("安全") {
+        "security".to_string()
+    } else if lower.contains("fix") || lower.contains("bug") || text.contains("修复") {
+        "bugfix".to_string()
+    } else {
+        "change".to_string()
+    }
+}
+
+fn latest_version_from_strings(versions: &[String]) -> Option<String> {
+    versions
+        .iter()
+        .filter_map(|version| {
+            crate::utils::version::VersionParser::parse(version)
+                .ok()
+                .filter(|parsed| parsed.major < 1000)
+                .map(|parsed| (parsed, version.clone()))
+        })
+        .max_by(|(left, _), (right, _)| left.cmp(right))
+        .map(|(_, raw)| raw)
+}
+
+fn latest_version_from_tags(
+    versions: &[diff::l1_vs_l0::VersionTag],
+    stable_only: bool,
+) -> Option<String> {
+    versions
+        .iter()
+        .filter(|tag| !stable_only || tag.is_stable)
+        .filter_map(|tag| {
+            crate::utils::version::VersionParser::parse(&tag.version)
+                .ok()
+                .map(|parsed| (parsed, tag.version.clone()))
+        })
+        .max_by(|(left, _), (right, _)| left.cmp(right))
+        .map(|(_, raw)| raw)
+}
+
+async fn latest_snapshot_record(
+    db: &sea_orm::DatabaseConnection,
+    tracking_id: i32,
+    snapshot_type: &str,
+) -> Result<Option<crate::entities::l2_snapshots::Model>> {
+    use crate::entities::{l2_snapshots, prelude::L2Snapshots};
+
+    L2Snapshots::find()
+        .filter(l2_snapshots::Column::TrackingId.eq(tracking_id))
+        .filter(l2_snapshots::Column::SnapshotType.eq(snapshot_type))
+        .order_by_desc(l2_snapshots::Column::CreatedAt)
+        .one(db)
+        .await
+        .context("查询快照记录失败")
+}
+
+async fn latest_l2_snapshot_record_for_tracking(
+    db: &sea_orm::DatabaseConnection,
+    tracking: &tracking::Model,
+) -> Result<Option<crate::entities::l2_snapshots::Model>> {
+    use crate::entities::prelude::Tracking;
+    use crate::entities::tracking as tracking_entity;
+
+    if !is_l2_newer_fallback_tracking(tracking) {
+        return latest_snapshot_record(db, tracking.id, "l2").await;
+    }
+
+    let source_tracking = Tracking::find()
+        .filter(tracking_entity::Column::PackageId.eq(tracking.package_id))
+        .filter(tracking_entity::Column::L2Branch.eq(tracking.l2_branch.clone()))
+        .filter(tracking_entity::Column::L1Branch.eq(L2_NEWER_PRIMARY_L1_BRANCH))
+        .one(db)
+        .await
+        .context("查询 fallback L2 快照来源 tracking 失败")?;
+
+    let Some(source_tracking) = source_tracking else {
+        warn!(
+            tracking_id = tracking.id,
+            l2_branch = tracking.l2_branch,
+            source_l1_branch = L2_NEWER_PRIMARY_L1_BRANCH,
+            "openEuler-24.09 tracking 未找到可复用 L2 快照的 openEuler-24.03 tracking"
+        );
+        return Ok(None);
+    };
+
+    let record = latest_snapshot_record(db, source_tracking.id, "l2").await?;
+    if record.is_some() {
+        info!(
+            tracking_id = tracking.id,
+            source_tracking_id = source_tracking.id,
+            l2_branch = tracking.l2_branch,
+            source_l1_branch = L2_NEWER_PRIMARY_L1_BRANCH,
+            "openEuler-24.09 tracking 复用 openEuler-24.03 tracking 的 L2 快照"
+        );
+    } else {
+        warn!(
+            tracking_id = tracking.id,
+            source_tracking_id = source_tracking.id,
+            l2_branch = tracking.l2_branch,
+            source_l1_branch = L2_NEWER_PRIMARY_L1_BRANCH,
+            "openEuler-24.09 tracking 对应的 openEuler-24.03 tracking 也没有 L2 快照"
+        );
+    }
+    Ok(record)
+}
+
+fn is_l2_newer_target_l2_branch(tracking: &tracking::Model) -> bool {
+    L2_NEWER_FALLBACK_L2_BRANCHES
+        .iter()
+        .any(|branch| tracking.l2_branch.contains(branch))
+}
+
+fn is_l2_newer_fallback_tracking(tracking: &tracking::Model) -> bool {
+    is_l2_newer_target_l2_branch(tracking) && tracking.l1_branch == L2_NEWER_FALLBACK_L1_BRANCH
+}
+
+fn l2_newer_fallback_required(
+    tracking: &tracking::Model,
+    report: &diff::l2_vs_l1::L2VsL1Report,
+) -> bool {
+    is_l2_newer_target_l2_branch(tracking) && l2_newer_than_l1(report)
+}
+
+fn l2_newer_than_l1(report: &diff::l2_vs_l1::L2VsL1Report) -> bool {
+    report
+        .spec_diff
+        .version_diff
+        .as_ref()
+        .map(|version_diff| {
+            version_diff.relationship == diff::l2_vs_l1::VersionRelationship::L2Newer
+        })
+        .unwrap_or(false)
+}
+
+fn l2_vs_l1_diff_summary(r: &diff::l2_vs_l1::L2VsL1Report) -> Value {
+    serde_json::json!({
+        "patches_added": r.patch_diff.l2_added.len(),
+        "patches_added_list": r.patch_diff.l2_added.iter().map(|p| serde_json::json!({
+            "filename": p.filename,
+            "path": p.path,
+            "content_hash": p.content_hash,
+            "size": p.size,
+            "applied": p.applied,
+        })).collect::<Vec<_>>(),
+        "patches_modified": r.patch_diff.l2_modified.len(),
+        "patches_modified_list": r.patch_diff.l2_modified.iter().map(|p| serde_json::json!({
+            "filename": p.filename,
+            "l1_hash": p.l1_hash,
+            "l2_hash": p.l2_hash,
+        })).collect::<Vec<_>>(),
+        "patches_removed": r.patch_diff.l2_removed.len(),
+        "patches_removed_list": r.patch_diff.l2_removed.iter().map(|p| serde_json::json!({
+            "filename": p.filename,
+            "path": p.path,
+            "content_hash": p.content_hash,
+            "size": p.size,
+            "applied": p.applied,
+        })).collect::<Vec<_>>(),
+        "patches_identical": r.patch_diff.identical.len(),
+        "has_spec_changes": !r.spec_diff.content_identical,
+        "spec_diff": serde_json::json!({
+            "version_diff": r.spec_diff.version_diff.as_ref().map(|v| serde_json::json!({
+                "l1_version": v.l1_version,
+                "l2_version": v.l2_version,
+                "relationship": format!("{:?}", v.relationship),
+            })),
+            "diff_summary": r.spec_diff.diff_summary,
+            "key_changes": r.spec_diff.key_changes,
+            "build_requires_added": r.spec_diff.build_requires_added,
+            "build_requires_removed": r.spec_diff.build_requires_removed,
+            "configure_options_added": r.spec_diff.configure_options_added,
+            "configure_options_removed": r.spec_diff.configure_options_removed,
+        }),
+        "conflicts": r.conflicts.len(),
+        "commit_diff": serde_json::json!({
+            "l1_commits_count": r.commit_diff.l1_commits_count,
+            "l2_commits_count": r.commit_diff.l2_commits_count,
+            "behind_commits_count": r.commit_diff.behind_commits.len(),
+            "behind_commits": r.commit_diff.behind_commits.iter().map(|c| serde_json::json!({
+                "sha": c.sha,
+                "title": c.title,
+                "author": c.author,
+                "authored_at": c.authored_at,
+                "url": c.url,
+                "stats": serde_json::json!({
+                    "additions": c.stats.additions,
+                    "deletions": c.stats.deletions,
+                    "files_changed": c.stats.files_changed,
+                }),
+                "primary_change_type": c.primary_change_type,
+                "cve_list": c.cve_list,
+            })).collect::<Vec<_>>(),
+            "base_commit": r.commit_diff.base_commit.as_ref().map(|c| serde_json::json!({
+                "sha": c.sha,
+                "title": c.title,
+                "author": c.author,
+                "authored_at": c.authored_at,
+            })),
+            "base_version_release": r.commit_diff.base_version_release,
+        }),
+    })
+}
+
+fn l1_vs_l0_diff_summary(r: &diff::l1_vs_l0::L1VsL0Report) -> Value {
+    serde_json::json!({
+        "version_behind": r.version_behind,
+        "current_version": r.current_version,
+        "latest_stable": r.latest_stable,
+        "latest_version": r.latest_version,
+        "mainline_version": r.mainline_version,
+        "upgradable_versions": r.upgradable_versions.len(),
+        "upgradable_versions_list": r.upgradable_versions.iter().map(|v| serde_json::json!({
+            "version": v.version,
+            "release_date": v.release_date,
+            "is_security_release": v.is_security_release,
+            "breaking_changes": v.breaking_changes,
+        })).collect::<Vec<_>>(),
+        "patches_merged": r.patch_analysis.merged_in_upstream.len(),
+        "patches_merged_list": r.patch_analysis.merged_in_upstream.iter().map(|p| serde_json::json!({
+            "filename": p.filename,
+            "description": p.description,
+            "applied": p.applied,
+            "content_hash": p.content_hash,
+        })).collect::<Vec<_>>(),
+        "patches_still_needed": r.patch_analysis.still_needed.len(),
+        "patches_still_needed_list": r.patch_analysis.still_needed.iter().map(|p| serde_json::json!({
+            "filename": p.filename,
+            "description": p.description,
+            "applied": p.applied,
+            "content_hash": p.content_hash,
+        })).collect::<Vec<_>>(),
+        "patches_can_be_removed": r.patch_analysis.can_be_removed_after_upgrade,
+        "cves_fixed": r.cve_analysis.fixed_in_upstream.len(),
+        "cves_fixed_list": r.cve_analysis.fixed_in_upstream.iter().map(|c| serde_json::json!({
+            "cve_id": c.cve_id,
+            "patch_file": c.patch_file,
+            "description": c.description,
+            "severity": c.severity,
+        })).collect::<Vec<_>>(),
+        "cves_not_fixed": r.cve_analysis.not_fixed_in_upstream.len(),
+        "cves_not_fixed_list": r.cve_analysis.not_fixed_in_upstream.iter().map(|c| serde_json::json!({
+            "cve_id": c.cve_id,
+            "patch_file": c.patch_file,
+            "description": c.description,
+            "severity": c.severity,
+        })).collect::<Vec<_>>(),
+        "maintenance_status": serde_json::json!({
+            "status": r.maintenance_status.status,
+            "stop_maintenance_detected": r.maintenance_status.stop_maintenance_detected,
+            "matched_notice": r.maintenance_status.matched_notice,
+            "evidence": r.maintenance_status.evidence,
+            "confidence": r.maintenance_status.confidence,
+        }),
+        "outdated_version": serde_json::json!({
+            "current_version": r.outdated_version.current_version,
+            "latest_version": r.outdated_version.latest_version,
+            "latest_version_source": r.outdated_version.latest_version_source,
+            "mainline_version": r.outdated_version.mainline_version,
+            "mainline_version_source": r.outdated_version.mainline_version_source,
+            "major_version_gap": r.outdated_version.major_version_gap,
+            "threshold_major_versions": r.outdated_version.threshold_major_versions,
+            "is_outdated": r.outdated_version.is_outdated,
+        }),
+        "lts": serde_json::json!({
+            "is_lts": r.lts.is_lts,
+            "source": r.lts.source,
+            "evidence": r.lts.evidence,
+        }),
+        "recommendations": r.recommendations,
+    })
+}
+
+async fn apply_l2_vs_l1_commit_diff(
+    db: &sea_orm::DatabaseConnection,
+    l2_vs_l1_diff: &Value,
+    tracking: &tracking::Model,
+    package_name: &str,
+    l1_snapshot_version: Option<&str>,
+    l1_snapshot_release: Option<&str>,
+    base_version: &mut String,
+    base_release: &mut String,
+    commit_reports: &mut Vec<Value>,
+    classification_overrides: &HashMap<String, (String, Vec<String>)>,
+    risk_client: Option<&Client>,
+    risk_create_url: &str,
+) -> Result<()> {
+    let Some(commit_diff) = l2_vs_l1_diff.get("commit_diff") else {
+        debug!(tracking_id = tracking.id, "commit_diff 为空");
+        return Ok(());
+    };
+
+    if let Some(version_release) = commit_diff.get("base_version_release") {
+        if let Some(version) = version_release.get(0).and_then(Value::as_str) {
+            if !version.is_empty() {
+                *base_version = version.to_string();
+                info!(tracking_id = tracking.id, base_version = %base_version, "获取到 base_commit 版本");
+            }
+        } else {
+            debug!(tracking_id = tracking.id, package_name = %package_name, "version 为空");
+        }
+        if let Some(release) = version_release.get(1).and_then(Value::as_str) {
+            if !release.is_empty() {
+                *base_release = release.to_string();
+                info!(tracking_id = tracking.id, base_release = %base_release, "获取到 base_commit release");
+            }
+        } else {
+            debug!(tracking_id = tracking.id, package_name = %package_name, "release 为空");
+        }
+    } else {
+        debug!(tracking_id = tracking.id, "base_version_release 为空");
+    }
+
+    let Some(behind_commits) = commit_diff.get("behind_commits").and_then(Value::as_array) else {
+        return Ok(());
+    };
+    let behind_commit_shas = behind_commits
+        .iter()
+        .filter_map(|commit| text_field(commit, "sha"))
+        .collect::<Vec<_>>();
+    let l1_commits = l1_commit_records_by_sha(db, tracking.id, &behind_commit_shas).await?;
+    let fallback_upstream_version_release =
+        upstream_version_release_from_diff(l2_vs_l1_diff, l1_snapshot_version, l1_snapshot_release);
+
+    for commit in behind_commits {
+        let commit_sha = text_field(commit, "sha").unwrap_or_default();
+        let l1_commit = l1_commits.get(&commit_sha);
+        let commit_message = l1_commit
+            .map(|record| record.commit_message.trim().to_string())
+            .filter(|message| !message.is_empty())
+            .or_else(|| text_field(commit, "message"))
+            .or_else(|| text_field(commit, "title"))
+            .unwrap_or_default();
+        let (change_type, cve_list) =
+            if let Some((change_type, cve_list)) = classification_overrides.get(&commit_sha) {
+                (change_type.clone(), cve_list.clone())
+            } else {
+                let change_type = l1_commit
+                    .and_then(|record| record.primary_change_type.clone())
+                    .filter(|value| !value.trim().is_empty())
+                    .or_else(|| text_field(commit, "primary_change_type"))
+                    .unwrap_or_else(|| infer_change_type_from_commit(commit, &commit_message));
+                let cve_list = l1_commit
+                    .and_then(cve_list_from_l1_record)
+                    .unwrap_or_else(|| cve_list_from_json_field(commit, "cve_list"));
+                (change_type, cve_list)
+            };
+        let level = risk_level_label(&change_type);
+        let raw_commit_url = l1_commit
+            .map(|record| record.api_url.trim().to_string())
+            .filter(|url| !url.is_empty())
+            .or_else(|| text_field(commit, "url"))
+            .unwrap_or_default();
+        let commit_url = crate::utils::commit_url::normalize_commit_url_for_branch(
+            crate::collectors::traits::Platform::from_str(
+                tracking.platform.as_deref().unwrap_or("gitee"),
+            )
+            .unwrap_or(crate::collectors::traits::Platform::Gitee),
+            &raw_commit_url,
+            &tracking.l1_branch,
+        );
+        let author = l1_commit
+            .map(|record| record.author_name.trim().to_string())
+            .filter(|author| !author.is_empty())
+            .or_else(|| text_field(commit, "author"))
+            .unwrap_or_default();
+        let authored_at = l1_commit
+            .map(|record| record.committed_at.to_rfc3339())
+            .or_else(|| text_field(commit, "authored_at"));
+        let upstream_version_release = commit_version_release(l1_commit)
+            .unwrap_or_else(|| fallback_upstream_version_release.clone());
+
+        if let Some(risk_client) = risk_client {
+            let req = RiskCreateReq {
+                description: format!("{} (branch: {})", commit_message, tracking.l2_branch),
+                level: risk_level_number(&change_type),
+                reporter: "track-system".to_string(),
+                r#type: change_type.clone(),
+                software: package_name.to_string(),
+                version: base_version.clone(),
+                release: base_release.clone(),
+                platform: "noarch".to_string(),
+                disclosure_time: authored_at.clone(),
+                source: Some(tracking.l1_repo_owner.clone()),
+                package_id: 0,
+                inner_secret: "Ctyun@123".to_string(),
+                report_url: commit_url.clone(),
+                risk_type: risk_type_from_change_type(&change_type),
+            };
+            debug!(
+                tracking_id = tracking.id,
+                commit_sha = %commit_sha,
+                req = ?req,
+                "调用 risk/create 请求"
+            );
+
+            match risk_client
+                .post(risk_create_url)
+                .header("Content-Type", "application/json")
+                .json(&req)
+                .send()
+                .await
+            {
+                Ok(resp) if resp.status().is_success() => {
+                    let body = resp.text().await.unwrap_or_default();
+                    debug!(
+                        tracking_id = tracking.id,
+                        commit_sha = %commit_sha,
+                        body = body,
+                        "调用 risk/create 成功"
+                    );
+                }
+                Ok(resp) => {
+                    let status = resp.status().as_u16();
+                    let body = resp.text().await.unwrap_or_default();
+                    warn!(
+                        tracking_id = tracking.id,
+                        commit_sha = %commit_sha,
+                        status = status,
+                        body = body,
+                        "调用 risk/create 失败"
+                    );
+                }
+                Err(err) => {
+                    warn!(
+                        tracking_id = tracking.id,
+                        commit_sha = %commit_sha,
+                        error = %err,
+                        "调用 risk/create 失败"
+                    );
+                }
+            }
+        }
+
+        commit_reports.push(serde_json::json!({
+            "Description": commit_message,
+            "Level": level,
+            "Reporter": author,
+            "Software": package_name,
+            "Version": base_version,
+            "Release": base_release,
+            "Platform": "noarch",
+            "DisclosureTime": authored_at,
+            "Source": &tracking.l1_repo_owner,
+            "CommitSha": commit_sha,
+            "ChangeType": change_type,
+            "CVEList": cve_list,
+            "PackageID": tracking.package_id,
+            "Url": commit_url,
+            "UpstreamVersion": upstream_version_release.0,
+            "UpstreamRelease": upstream_version_release.1,
+            "UpstreamVersionRelease": version_release_display(&upstream_version_release.0, &upstream_version_release.1),
+        }));
+    }
+
+    Ok(())
+}
+
+async fn l1_commit_records_by_sha(
+    db: &sea_orm::DatabaseConnection,
+    tracking_id: i32,
+    shas: &[String],
+) -> Result<HashMap<String, l1_commit_records::Model>> {
+    if shas.is_empty() {
+        return Ok(HashMap::new());
+    }
+
+    let unique_shas = shas
+        .iter()
+        .map(|sha| sha.trim())
+        .filter(|sha| !sha.is_empty())
+        .collect::<HashSet<_>>()
+        .into_iter()
+        .map(ToOwned::to_owned)
+        .collect::<Vec<_>>();
+    if unique_shas.is_empty() {
+        return Ok(HashMap::new());
+    }
+
+    let records = L1CommitRecords::find()
+        .filter(l1_commit_records::Column::TrackingId.eq(tracking_id))
+        .filter(l1_commit_records::Column::CommitSha.is_in(unique_shas))
+        .all(db)
+        .await?;
+
+    Ok(records
+        .into_iter()
+        .map(|record| (record.commit_sha.clone(), record))
+        .collect())
+}
+
+fn commit_version_release(record: Option<&l1_commit_records::Model>) -> Option<(String, String)> {
+    let record = record?;
+    let version = record.spec_version.as_deref().unwrap_or_default().trim();
+    if version.is_empty() {
+        return None;
+    }
+
+    let release = record.spec_release.as_deref().unwrap_or_default().trim();
+    Some((version.to_string(), release.to_string()))
+}
+
+fn cve_list_from_l1_record(record: &l1_commit_records::Model) -> Option<Vec<String>> {
+    record
+        .cve_list
+        .as_ref()
+        .map(|value| cve_list_from_value(value))
+        .filter(|items| !items.is_empty())
+}
+
+fn cve_list_from_json_field(value: &Value, field: &str) -> Vec<String> {
+    value
+        .get(field)
+        .map(cve_list_from_value)
+        .unwrap_or_default()
+}
+
+fn cve_list_from_value(value: &Value) -> Vec<String> {
+    value
+        .as_array()
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(Value::as_str)
+                .map(str::trim)
+                .filter(|item| !item.is_empty())
+                .map(ToOwned::to_owned)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default()
+}
+
+fn upstream_version_release_from_diff(
+    l2_vs_l1_diff: &Value,
+    l1_snapshot_version: Option<&str>,
+    l1_snapshot_release: Option<&str>,
+) -> (String, String) {
+    let snapshot_version_release = version_release_display(
+        l1_snapshot_version.unwrap_or_default(),
+        l1_snapshot_release.unwrap_or_default(),
+    );
+    let version_release = first_non_empty_json_str(&[
+        l2_vs_l1_diff.get("l1_version_release"),
+        l2_vs_l1_diff
+            .get("spec_diff")
+            .and_then(|spec| spec.get("version_diff"))
+            .and_then(|diff| diff.get("l1_version_release")),
+    ]);
+    let (version, release) = split_version_release(&version_release);
+    if !version.is_empty() && !release.is_empty() {
+        return (version, release);
+    }
+
+    let version_release_from_diff = first_non_empty_json_str(&[
+        l2_vs_l1_diff.get("l1_version"),
+        l2_vs_l1_diff
+            .get("spec_diff")
+            .and_then(|spec| spec.get("version_diff"))
+            .and_then(|diff| diff.get("l1_version")),
+    ]);
+    let version_release =
+        first_non_empty_string(&[version_release_from_diff, snapshot_version_release]);
+    let (version, release) = split_version_release(&version_release);
+    if release.is_empty() {
+        (
+            version,
+            l1_snapshot_release.unwrap_or_default().trim().to_string(),
+        )
+    } else {
+        (version, release)
+    }
+}
+
+fn first_non_empty_string(values: &[String]) -> String {
+    values
+        .iter()
+        .map(|value| value.trim())
+        .find(|value| !value.is_empty())
+        .unwrap_or_default()
+        .to_string()
+}
+
+fn split_version_release(version_release: &str) -> (String, String) {
+    let trimmed = version_release.trim();
+    if trimmed.is_empty() {
+        return (String::new(), String::new());
+    }
+
+    match trimmed.rsplit_once('-') {
+        Some((version, release)) if !version.trim().is_empty() && !release.trim().is_empty() => {
+            (version.trim().to_string(), release.trim().to_string())
+        }
+        _ => (trimmed.to_string(), String::new()),
+    }
+}
+
+fn infer_change_type_from_commit(commit: &Value, message: &str) -> String {
+    let has_cve = commit
+        .get("cve_list")
+        .and_then(Value::as_array)
+        .is_some_and(|items| !items.is_empty());
+    let lower = message.to_ascii_lowercase();
+    if has_cve || lower.contains("cve") || lower.contains("security") {
+        "CVE".to_string()
+    } else if lower.contains("fix") || lower.contains("bug") || lower.contains("issue") {
+        "Bugfix".to_string()
+    } else if lower.contains("backport") || lower.contains("cherry-pick") {
+        "Backport".to_string()
+    } else {
+        "Unknown".to_string()
+    }
+}
+
+fn risk_level_label(change_type: &str) -> &'static str {
+    match change_type {
+        "CVE" => "High",
+        "Bugfix" => "Medium",
+        "Unknown" => "Normal",
+        _ => "Low",
+    }
+}
+
+fn risk_level_number(change_type: &str) -> i32 {
+    match change_type {
+        "CVE" => 3,
+        "Bugfix" => 2,
+        _ => 1,
+    }
+}
+
+fn risk_type_from_change_type(change_type: &str) -> RiskType {
+    match change_type {
+        "CVE" => RiskType::CVE,
+        "Bugfix" => RiskType::Bug,
+        "Backport" => RiskType::Porting,
+        "Unknown" => RiskType::CodeScan,
+        _ => RiskType::Porting,
+    }
+}
+
+fn text_field(value: &Value, field: &str) -> Option<String> {
+    value
+        .get(field)
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|text| !text.is_empty())
+        .map(ToOwned::to_owned)
+}
+
+fn first_non_empty_json_str(values: &[Option<&Value>]) -> String {
+    values
+        .iter()
+        .filter_map(|value| value.and_then(Value::as_str))
+        .map(str::trim)
+        .find(|text| !text.is_empty())
+        .unwrap_or_default()
+        .to_string()
+}
+
+fn classification_overrides(
+    classification_result: Option<&StageResult>,
+) -> HashMap<String, (String, Vec<String>)> {
+    let mut overrides = HashMap::new();
+    let Some(class_stage) = classification_result else {
+        return overrides;
+    };
+    let Some(items) = class_stage.details.get("commits").and_then(Value::as_array) else {
+        return overrides;
+    };
+
+    for item in items {
+        let Some(sha) = item.get("commit_sha").and_then(Value::as_str) else {
+            continue;
+        };
+        let change_type = item
+            .get("primary_change_type")
+            .and_then(Value::as_str)
+            .unwrap_or("Unknown")
+            .to_string();
+        let cve_list = item
+            .get("cve_list")
+            .and_then(Value::as_array)
+            .map(|items| {
+                items
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .map(ToOwned::to_owned)
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        overrides.insert(sha.to_string(), (change_type, cve_list));
+    }
+
+    overrides
+}
+
+fn version_release_display(version: &str, release: &str) -> String {
+    match (version.trim().is_empty(), release.trim().is_empty()) {
+        (true, true) => String::new(),
+        (false, true) => version.to_string(),
+        (true, false) => release.to_string(),
+        (false, false) => format!("{version}-{release}"),
+    }
+}
+
+fn merge_classification_results_into_commits(
+    commit_reports: &mut [Value],
+    class_stage: &StageResult,
+) {
+    let Some(items) = class_stage.details.get("commits").and_then(Value::as_array) else {
+        return;
+    };
+
+    let mut by_sha: HashMap<String, (&str, &Value)> = HashMap::new();
+    for item in items {
+        if let Some(sha) = item.get("commit_sha").and_then(Value::as_str) {
+            let change_type = item
+                .get("primary_change_type")
+                .and_then(Value::as_str)
+                .unwrap_or("Unknown");
+            let cve_list = item.get("cve_list").unwrap_or(&Value::Null);
+            by_sha.insert(sha.to_string(), (change_type, cve_list));
+        }
+    }
+
+    for commit in commit_reports {
+        let Some(sha) = commit.get("CommitSha").and_then(Value::as_str) else {
+            continue;
+        };
+        let Some((change_type, cve_list)) = by_sha.get(sha) else {
+            continue;
+        };
+        if let Some(object) = commit.as_object_mut() {
+            object.insert(
+                "ChangeType".to_string(),
+                Value::String((*change_type).to_string()),
+            );
+            object.insert(
+                "Level".to_string(),
+                Value::String(risk_level_label(change_type).to_string()),
+            );
+            object.insert("CVEList".to_string(), (*cve_list).clone());
+        }
+    }
+}
+
+fn append_version_catalog_entries(
+    catalog: &Value,
+    source: &str,
+    collected_at: chrono::DateTime<Utc>,
+    seen_versions: &mut HashSet<String>,
+    all_versions: &mut Vec<diff::l1_vs_l0::VersionTag>,
+    changelogs: &mut HashMap<String, Vec<diff::l1_vs_l0::ChangelogEntry>>,
+) {
+    let mut candidates = Vec::new();
+
+    if let Some(versions) = catalog.get("versions").and_then(Value::as_array) {
+        for item in versions {
+            if let Some(version) = version_from_catalog_item(item) {
+                candidates.push(version);
+            }
+        }
+    }
+
+    if let Some(latest_stable) = catalog.get("latest_stable").and_then(Value::as_str) {
+        candidates.push((latest_stable.to_string(), Some(true), None));
+    }
+    if let Some(latest_version) = catalog.get("latest_version").and_then(Value::as_str) {
+        candidates.push((latest_version.to_string(), None, None));
+    }
+
+    for (version, stable_hint, source_ref) in candidates {
+        append_l0_version_tag(
+            version.trim(),
+            stable_hint,
+            source_ref.as_deref(),
+            source,
+            collected_at,
+            seen_versions,
+            all_versions,
+            changelogs,
+        );
+    }
+}
+
+fn version_from_catalog_item(item: &Value) -> Option<(String, Option<bool>, Option<String>)> {
+    if let Some(version) = item.as_str() {
+        return Some((version.to_string(), None, None));
+    }
+
+    let version = item.get("version").and_then(Value::as_str)?.to_string();
+    let is_stable = item.get("is_stable").and_then(Value::as_bool);
+    let source_ref = item
+        .get("source_ref")
+        .and_then(Value::as_str)
+        .map(str::to_string);
+    Some((version, is_stable, source_ref))
+}
+
+fn append_l0_version_tag(
+    version: &str,
+    stable_hint: Option<bool>,
+    source_ref: Option<&str>,
+    source: &str,
+    collected_at: chrono::DateTime<Utc>,
+    seen_versions: &mut HashSet<String>,
+    all_versions: &mut Vec<diff::l1_vs_l0::VersionTag>,
+    changelogs: &mut HashMap<String, Vec<diff::l1_vs_l0::ChangelogEntry>>,
+) {
+    if version.is_empty() {
+        return;
+    }
+
+    let Ok(parsed) = crate::utils::version::VersionParser::parse(version) else {
+        return;
+    };
+    if !seen_versions.insert(version.to_string()) {
+        return;
+    }
+    let is_stable = stable_hint.unwrap_or_else(|| parsed.is_stable());
+    let source_detail = source_ref
+        .filter(|value| !value.trim().is_empty())
+        .map(|value| format!(" ({})", value))
+        .unwrap_or_default();
+
+    all_versions.push(diff::l1_vs_l0::VersionTag {
+        version: version.to_string(),
+        date: collected_at,
+        changelog: format!("version catalog: {}{}", source, source_detail),
+        is_stable,
+    });
+    changelogs
+        .entry(version.to_string())
+        .or_default()
+        .push(diff::l1_vs_l0::ChangelogEntry {
+            entry_type: "release".to_string(),
+            description: format!("版本目录识别到 L0 版本 {}{}", version, source_detail),
+            commit_sha: None,
+        });
+}
+
+fn version_catalog_payloads<'a>(
+    evidence: &'a crate::entities::maintenance_evidence_snapshots::Model,
+) -> Vec<&'a Value> {
+    let mut payloads = Vec::new();
+    if let Some(catalog) = find_version_catalog_data(&evidence.raw_payload) {
+        payloads.push(catalog);
+    }
+    if let Some(signals) = evidence.normalized_signals.as_ref() {
+        if let Some(catalog) = find_version_catalog_data(signals) {
+            payloads.push(catalog);
+        }
+    }
+    payloads
+}
+
+fn find_version_catalog_data(value: &Value) -> Option<&Value> {
+    if is_version_catalog_data(value) {
+        return Some(value);
+    }
+    value.get("data").and_then(find_version_catalog_data)
+}
+
+fn is_version_catalog_data(value: &Value) -> bool {
+    value.get("versions").and_then(Value::as_array).is_some()
+        || value
+            .get("latest_version")
+            .and_then(Value::as_str)
+            .is_some()
+        || value.get("latest_stable").and_then(Value::as_str).is_some()
+}
+
+fn should_collect_l0_version_catalog(package: &crate::entities::packages::Model) -> bool {
+    let Some(url) = package.l0_repo_url.as_deref() else {
+        return false;
+    };
+    let lower = url.to_ascii_lowercase();
+
+    lower.ends_with(".git")
+        || lower.starts_with("git://")
+        || lower.starts_with("ssh://")
+        || lower.contains('@')
+        || lower.contains("github.com/")
+        || lower.contains("gitlab.")
+        || lower.contains("gitlab.com/")
+        || lower.contains("gitee.com/")
+        || lower.contains("atomgit.com/")
+        || lower.contains("pagure.io/")
+}
+
+fn is_patch_path(path: &str) -> bool {
+    let lower = path.to_ascii_lowercase();
+    lower.ends_with(".patch") || lower.ends_with(".diff")
+}
+
+fn detect_lts_from_l1_sources(
+    tracking: &tracking::Model,
+    spec_text: &str,
+    commit_messages: &[String],
+) -> (Option<bool>, Vec<String>) {
+    let mut evidence = Vec::new();
+    let branch = tracking.l1_branch.as_str();
+    let repo = tracking.l1_repo_name.as_str();
+
+    if contains_lts_positive(branch) {
+        evidence.push(format!("L1 分支包含 LTS 标识: {}", branch));
+    }
+    if contains_lts_positive(repo) {
+        evidence.push(format!("L1 仓库名包含 LTS 标识: {}", repo));
+    }
+    if contains_lts_positive(spec_text) {
+        evidence.push("L1 spec 内容包含 LTS/长期维护标识".to_string());
+    }
+    for message in commit_messages.iter().take(20) {
+        if contains_lts_positive(message) {
+            evidence.push(format!(
+                "L1 commit message 包含 LTS 标识: {}",
+                message.chars().take(120).collect::<String>()
+            ));
+            break;
+        }
+    }
+
+    evidence.truncate(5);
+    if !evidence.is_empty() {
+        return (Some(true), evidence);
+    }
+
+    let negative_text = format!("{}\n{}\n{}", branch, repo, spec_text);
+    if contains_lts_negative(&negative_text) {
+        (
+            Some(false),
+            vec!["L1 仓库信息包含非 LTS/创新版本标识".to_string()],
+        )
+    } else {
+        (None, Vec::new())
+    }
+}
+
+fn contains_lts_positive(text: &str) -> bool {
+    let lower = text.to_ascii_lowercase();
+    lower.contains("lts")
+        || lower.contains("long term support")
+        || text.contains("长期支持")
+        || text.contains("长期维护")
+}
+
+fn contains_lts_negative(text: &str) -> bool {
+    let lower = text.to_ascii_lowercase();
+    lower.contains("non-lts")
+        || lower.contains("non lts")
+        || lower.contains("innovation")
+        || text.contains("非LTS")
+        || text.contains("非 LTS")
+        || text.contains("创新版本")
+}
+
+fn collect_version_warnings(l1_vs_l0_diff: &Value) -> Vec<String> {
+    let mut warnings = Vec::new();
+    if let Some(items) = l1_vs_l0_diff
+        .get("recommendations")
+        .and_then(Value::as_array)
+    {
+        warnings.extend(
+            items
+                .iter()
+                .filter_map(Value::as_str)
+                .filter(|item| {
+                    item.contains("停维")
+                        || item.contains("过时")
+                        || item.contains("LTS")
+                        || item.contains("长期维护")
+                })
+                .map(ToString::to_string),
+        );
+    }
+    warnings
+}
+
+async fn build_tracking_report_ai_analysis(
+    tracking: &tracking::Model,
+    package_name: &str,
+    diff_summary: &Value,
+    representative_changes: &Value,
+) -> Value {
+    let context = AiContext {
+        source: AiAnalysisSource::TrackingReport,
+        target_name: Some(package_name.to_string()),
+        target_type: Some("package".to_string()),
+        platform: tracking.platform.clone(),
+        report_type: Some("pipeline".to_string()),
+        rule_risk: Some(infer_tracking_report_rule_risk(diff_summary)),
+        rule_confidence: Some("medium".to_string()),
+        rule_summary: Some(build_tracking_report_rule_summary(
+            diff_summary,
+            representative_changes,
+        )),
+        evidence: serde_json::json!({
+            "diff_summary": diff_summary,
+            "representative_changes": representative_changes,
+        }),
+    };
+
+    let request = AiAnalysisRequest {
+        question: Some(
+            "请基于当前 tracking 报告评估 L2 组件相对 L1/L0 的版本、变更和维护风险，并结合 L0 社区安全与质量证据给出处置建议。安全重点关注 L0 仓库是否有安全策略、CVE 修复发布或 CVE 关联记录、待处理 CVE 积压和修复时效；质量重点关注是否有代码 review 机制、专人 review、发布物数字签名、校验值或 provenance/attestation。".to_string(),
+        ),
+        language: Some("中文".to_string()),
+        max_evidence_chars: None,
+        allow_external_research: Some(true),
+    };
+
+    match AiAnalysisService::from_env()
+        .analyze(context, request)
+        .await
+    {
+        Ok(response) => {
+            let mut value = serde_json::to_value(response).unwrap_or_else(|error| {
+                serde_json::json!({
+                    "status": "failed",
+                    "generated_at": Utc::now(),
+                    "error": format!("序列化 AI 评估结果失败: {}", error),
+                })
+            });
+            if let Some(object) = value.as_object_mut() {
+                object.remove("raw_model_output");
+            }
+            value
+        }
+        Err(error) => serde_json::json!({
+            "status": "failed",
+            "generated_at": Utc::now(),
+            "error": error.to_string(),
+        }),
+    }
+}
+
+async fn latest_l0_community_assessment(
+    db: &sea_orm::DatabaseConnection,
+    package: &crate::entities::packages::Model,
+) -> Result<Option<Value>> {
+    use crate::entities::{ecosystem_reports, ecosystem_targets};
+
+    let mut target_query = EcosystemTargets::find()
+        .filter(ecosystem_targets::Column::Role.eq("l0"))
+        .filter(ecosystem_targets::Column::Status.eq("active"));
+
+    if let Some(l0_repo_url) = package.l0_repo_url.as_deref() {
+        target_query = target_query.filter(
+            ecosystem_targets::Column::HomepageUrl
+                .eq(l0_repo_url)
+                .or(ecosystem_targets::Column::Name.eq(package.name.clone())),
+        );
+    } else {
+        target_query =
+            target_query.filter(ecosystem_targets::Column::Name.eq(package.name.clone()));
+    }
+
+    let targets = target_query.all(db).await?;
+    for target in targets {
+        let Some(report) = EcosystemReports::find()
+            .filter(ecosystem_reports::Column::TargetId.eq(target.id))
+            .order_by_desc(ecosystem_reports::Column::GeneratedAt)
+            .one(db)
+            .await?
+        else {
+            continue;
+        };
+
+        return Ok(Some(compact_l0_community_assessment(&target, &report)));
+    }
+
+    Ok(None)
+}
+
+fn compact_l0_community_assessment(
+    target: &crate::entities::ecosystem_targets::Model,
+    report: &crate::entities::ecosystem_reports::Model,
+) -> Value {
+    let sections = report.report_payload.get("sections");
+    let security = sections.and_then(|value| value.get("security")).cloned();
+    let quality = sections.and_then(|value| value.get("quality")).cloned();
+
+    serde_json::json!({
+        "target": {
+            "id": target.id,
+            "name": target.name,
+            "role": target.role,
+            "platform": target.platform,
+            "homepage_url": target.homepage_url,
+            "owner": target.owner,
+            "repo": target.repo,
+        },
+        "report": {
+            "id": report.id,
+            "report_type": report.report_type,
+            "overall_risk": report.overall_risk,
+            "confidence": report.confidence,
+            "summary": report.summary,
+            "generated_at": report.generated_at,
+        },
+        "security": security.map(compact_assessment_section),
+        "quality": quality.map(compact_assessment_section),
+    })
+}
+
+fn compact_assessment_section(section: Value) -> Value {
+    let indicators = section
+        .get("indicators")
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter(|item| is_l0_security_quality_indicator(item))
+                .cloned()
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+
+    serde_json::json!({
+        "level": section.get("level").cloned().unwrap_or(Value::Null),
+        "confidence": section.get("confidence").cloned().unwrap_or(Value::Null),
+        "score": section.get("score").cloned().unwrap_or(Value::Null),
+        "coverage": section.get("coverage").cloned().unwrap_or(Value::Null),
+        "reasons": section.get("reasons").cloned().unwrap_or(Value::Null),
+        "evidence_refs": section.get("evidence_refs").cloned().unwrap_or(Value::Null),
+        "indicators": indicators,
+    })
+}
+
+fn is_l0_security_quality_indicator(indicator: &Value) -> bool {
+    let Some(key) = indicator.get("key").and_then(Value::as_str) else {
+        return false;
+    };
+
+    matches!(
+        key,
+        "has_security_policy"
+            | "cve_fix_commits_last_12_months"
+            | "cve_linked_issues_last_12_months"
+            | "median_cve_fix_days"
+            | "open_cve_backlog"
+            | "dedicated_code_reviewers"
+            | "required_reviews"
+            | "signed_releases"
+            | "digital_signature_supported"
+            | "supports_gpg_commit_tag_verification"
+            | "supports_release_attachments"
+            | "documented_release_checksum"
+            | "documented_release_artifact_signature"
+            | "hash_verification_supported"
+            | "provenance_attestation"
+            | "release_checklist"
+            | "hash_signature_assessment"
+    )
+}
+
+fn infer_tracking_report_rule_risk(diff_summary: &Value) -> String {
+    if diff_summary
+        .get("l1_vs_l0")
+        .and_then(|value| value.get("maintenance_status"))
+        .and_then(|value| value.get("stop_maintenance_detected"))
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+        || diff_summary
+            .get("l1_vs_l0")
+            .and_then(|value| value.get("outdated_version"))
+            .and_then(|value| value.get("is_outdated"))
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+    {
+        return "high".to_string();
+    }
+
+    let has_high_commit = diff_summary
+        .get("commits")
+        .and_then(Value::as_array)
+        .map(|commits| {
+            commits.iter().any(|commit| {
+                commit
+                    .get("Level")
+                    .and_then(Value::as_str)
+                    .map(|level| level.eq_ignore_ascii_case("high"))
+                    .unwrap_or(false)
+            })
+        })
+        .unwrap_or(false);
+    if has_high_commit {
+        return "high".to_string();
+    }
+
+    let has_medium_commit = diff_summary
+        .get("commits")
+        .and_then(Value::as_array)
+        .map(|commits| {
+            commits.iter().any(|commit| {
+                commit
+                    .get("Level")
+                    .and_then(Value::as_str)
+                    .map(|level| level.eq_ignore_ascii_case("medium"))
+                    .unwrap_or(false)
+            })
+        })
+        .unwrap_or(false);
+    if has_medium_commit
+        || diff_summary
+            .get("version_warnings")
+            .and_then(Value::as_array)
+            .map(|items| !items.is_empty())
+            .unwrap_or(false)
+    {
+        return "medium".to_string();
+    }
+
+    "low".to_string()
+}
+
+fn build_tracking_report_rule_summary(
+    diff_summary: &Value,
+    representative_changes: &Value,
+) -> String {
+    let mut parts = Vec::new();
+    let behind_commits = diff_summary
+        .get("total_behind_commits")
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
+    parts.push(format!("L2 相对 L1 落后 commit 数 {}", behind_commits));
+
+    let version_warning_count = diff_summary
+        .get("version_warnings")
+        .and_then(Value::as_array)
+        .map(Vec::len)
+        .unwrap_or(0);
+    parts.push(format!("版本风险提示 {} 条", version_warning_count));
+
+    if let Some(outdated) = diff_summary
+        .get("l1_vs_l0")
+        .and_then(|value| value.get("outdated_version"))
+    {
+        let is_outdated = outdated
+            .get("is_outdated")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        let gap = outdated
+            .get("major_version_gap")
+            .and_then(Value::as_i64)
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| "-".to_string());
+        parts.push(format!(
+            "过时版本评估 {}，大版本差距 {}",
+            if is_outdated { "命中" } else { "未命中" },
+            gap
+        ));
+    }
+
+    let cve_count = representative_changes
+        .get("cve_count")
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
+    let needs_review_count = representative_changes
+        .get("needs_review_count")
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
+    parts.push(format!(
+        "CVE 数 {}，需人工复核 {}",
+        cve_count, needs_review_count
+    ));
+
+    parts.join("；")
 }
 
 impl<'a> PipelineExecutor<'a> {
@@ -844,6 +2122,13 @@ impl<'a> PipelineExecutor<'a> {
                                                 source: Some(tracking.l1_repo_owner.clone()),
                                                 package_id: 0,
                                                 inner_secret: "Ctyun@123".to_string(),
+                                                report_url: commit.api_url.clone(),
+                                                risk_type: risk_type_from_change_type(
+                                                    &commit
+                                                        .primary_change_type
+                                                        .clone()
+                                                        .unwrap_or_else(|| "Unknown".to_string()),
+                                                ),
                                             };
                                             info!(
                                                 tracking_id = tracking.id,
