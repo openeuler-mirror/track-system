@@ -2684,6 +2684,44 @@ impl<'a> PipelineExecutor<'a> {
             })
         };
 
+        let l0_community_assessment = match latest_l0_community_assessment(self.db, &package).await
+        {
+            Ok(Some(assessment)) => assessment,
+            Ok(None) => serde_json::json!({
+                "status": "missing",
+                "reason": "未找到与当前软件包匹配的 L0 ecosystem report，无法基于规则证据评估 L0 社区安全和质量情况。",
+            }),
+            Err(error) => {
+                warn!(
+                    tracking_id = tracking.id,
+                    package_name = %package_name,
+                    error = %error,
+                    "查询 L0 社区安全/质量评估失败"
+                );
+                serde_json::json!({
+                    "status": "failed",
+                    "reason": format!("查询 L0 ecosystem report 失败: {}", error),
+                })
+            }
+        };
+        if let Some(object) = diff_summary.as_object_mut() {
+            object.insert(
+                "l0_community_assessment".to_string(),
+                l0_community_assessment,
+            );
+        }
+
+        let ai_analysis = build_tracking_report_ai_analysis(
+            tracking,
+            &package_name,
+            &diff_summary,
+            &representative_changes,
+        )
+        .await;
+        if let Some(object) = diff_summary.as_object_mut() {
+            object.insert("ai_analysis".to_string(), ai_analysis);
+        }
+
         // 创建报告记录到 tracking_reports 表（用于最终报告）
         let report = tracking_reports::ActiveModel {
             tracking_id: Set(tracking.id),
