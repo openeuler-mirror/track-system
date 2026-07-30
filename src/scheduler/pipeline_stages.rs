@@ -16,11 +16,13 @@ use chrono::Utc;
 use reqwest::Client;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
 use serde::Serialize;
-use std::collections::HashMap;
+use serde_json::Value;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::time::Duration;
 use tracing::{debug, info, warn};
 
+use crate::ai::{AiAnalysisRequest, AiAnalysisService, AiAnalysisSource, AiContext};
 use crate::analyzer::ChangeClassifier;
 use crate::backport_advisor::BackportAdvisor;
 use crate::diff;
