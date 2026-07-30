@@ -132,6 +132,7 @@ impl<'a> SyncService<'a> {
         &self,
         platform: Platform,
         token: Option<String>,
+        default_branch: &str,
     ) -> Result<Box<dyn Collector>> {
         use crate::collectors::{AtomGitClient, GitHubClient, GiteaClient, GiteeClient};
 
