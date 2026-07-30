@@ -851,7 +851,6 @@ pub enum ReportAction {
     },
 }
 
-
 // ============== Ecosystem Commands ==============
 
 #[derive(Subcommand, Debug)]
@@ -987,7 +986,6 @@ pub enum EcosystemAction {
         verbose: bool,
     },
 }
-
 
 // ============== Maintenance Commands ==============
 
