@@ -3292,10 +3292,16 @@ mod tests {
         };
 
         let db = MockDatabase::new(DatabaseBackend::Postgres)
-            .append_query_results::<packages::Model, _, _>(vec![vec![package_model]])
+            .append_query_results::<packages::Model, _, _>(vec![vec![package_model.clone()]])
             .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![]])
             .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![]])
             .append_query_results::<l0_commits::Model, _, _>(vec![vec![]])
+            .append_query_results::<packages::Model, _, _>(vec![vec![]])
+            .append_query_results::<maintenance_evidence_snapshots::Model, _, _>(vec![vec![]])
+            .append_query_results::<packages::Model, _, _>(vec![vec![package_model]])
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![]])
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![]])
+            .append_query_results::<l1_commit_records::Model, _, _>(vec![vec![]])
             .append_query_results::<compare_reports::Model, _, _>(vec![vec![compare_model]])
             .into_connection();
 
