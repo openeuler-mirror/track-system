@@ -181,9 +181,9 @@ pub struct ClassificationResult {
     pub classified_count: usize,
     pub cve_count: usize,
     pub needs_review_count: usize,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub commits: Vec<ClassifiedCommitResult>,
 }
-
-
 
 /// 单个 commit 的变更分类结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
