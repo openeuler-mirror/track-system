@@ -395,6 +395,7 @@ Release:        5.%{openssh_release}
         let res = result.unwrap();
         assert_eq!(res.level, "l2");
         assert_eq!(res.commits.len(), 1);
+        assert_eq!(res.commits[0].api_url, "url");
         assert!(res.spec.is_some());
     }
 
