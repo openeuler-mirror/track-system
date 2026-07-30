@@ -693,6 +693,8 @@ mod tests {
         let result = ReportGenerationResult {
             report_id: 789,
             report_status: "completed".to_string(),
+            cve_fix_comparison_input: None,
+            cve_fix_comparison_xlsx: None,
         };
 
         let json = serde_json::to_value(&result).unwrap();
