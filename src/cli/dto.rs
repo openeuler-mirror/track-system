@@ -162,7 +162,6 @@ pub struct UpdateTrackingRequest {
     pub tracking_status: Option<String>,
 }
 
-
 /// 生态目标 DTO
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EcosystemTargetDto {
@@ -179,7 +178,7 @@ pub struct EcosystemTargetDto {
     pub status: String,
     pub refresh_interval_hours: i32,
     pub rule_profile: String,
-    pub metadata: Option<serde_json::Value>,
+    pub metadata: Option<Value>,
     pub last_collected_at: Option<DateTime<Utc>>,
     pub last_report_at: Option<DateTime<Utc>>,
     pub last_error: Option<String>,
@@ -197,9 +196,9 @@ pub struct EcosystemReportDto {
     pub overall_risk: String,
     pub confidence: String,
     pub summary: String,
-    pub dimensions: serde_json::Value,
-    pub evidence_summary: Option<serde_json::Value>,
-    pub report_payload: serde_json::Value,
+    pub dimensions: Value,
+    pub evidence_summary: Option<Value>,
+    pub report_payload: Value,
     pub generated_at: DateTime<Utc>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -220,7 +219,7 @@ pub struct CreateEcosystemTargetRequest {
     pub status: Option<String>,
     pub refresh_interval_hours: Option<i32>,
     pub rule_profile: String,
-    pub metadata: Option<serde_json::Value>,
+    pub metadata: Option<Value>,
 }
 
 /// 生态目标更新请求
@@ -238,7 +237,7 @@ pub struct UpdateEcosystemTargetRequest {
     pub status: Option<String>,
     pub refresh_interval_hours: Option<i32>,
     pub rule_profile: Option<String>,
-    pub metadata: Option<serde_json::Value>,
+    pub metadata: Option<Value>,
     pub last_error: Option<String>,
 }
 
@@ -251,7 +250,6 @@ pub struct EcosystemRefreshResultDto {
     pub generated_at: DateTime<Utc>,
 }
 
-
 /// 维护评估报告 DTO
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MaintenanceReportDto {
@@ -262,9 +260,9 @@ pub struct MaintenanceReportDto {
     pub overall_risk: String,
     pub confidence: String,
     pub summary: String,
-    pub dimensions: serde_json::Value,
-    pub evidence_summary: Option<serde_json::Value>,
-    pub report_payload: serde_json::Value,
+    pub dimensions: Value,
+    pub evidence_summary: Option<Value>,
+    pub report_payload: Value,
     pub generated_at: DateTime<Utc>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
