@@ -663,6 +663,8 @@ mod tests {
             report_id: Some(456),
             files_changed: 15,
             has_spec_changes: true,
+            l2_vs_l1_diff: None,
+            l1_vs_l0_diff: None,
         };
 
         let json = serde_json::to_value(&result).unwrap();
