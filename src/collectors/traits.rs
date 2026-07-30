@@ -419,6 +419,8 @@ impl CollectConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommitMetadata {
     pub sha: String,
+    #[serde(default)]
+    pub api_url: String,
     /// 提交标题
     pub title: String,
     pub message: String,
