@@ -1888,30 +1888,31 @@ impl<'a> PipelineExecutor<'a> {
 
         // 获取 L0 版本信息（从 l0_commits 表）
         let l0_info = self.get_l0_version_info(tracking).await?;
-        if l0_info.is_none() {
-            warn!(
-                tracking_id = tracking.id,
-                "缺少 L0 版本信息，跳过 L1 vs L0 对比"
-            );
-            return Ok(None);
-        }
 
         // 获取 L1 版本信息（从 commit_records 和快照）
         let l1_info = self.get_l1_version_info(tracking).await?;
-        if l1_info.is_none() {
+        let Some(l1_info) = l1_info else {
             warn!(
                 tracking_id = tracking.id,
                 "缺少 L1 版本信息，跳过 L1 vs L0 对比"
             );
             return Ok(None);
-        }
+        };
 
         // 使用 L1VsL0Comparator
         let comparator = L1VsL0Comparator::new();
-        let report = comparator
-            .compare(&l0_info.unwrap(), &l1_info.unwrap())
-            .await
-            .context("L1 vs L0 对比失败")?;
+        let report = if let Some(l0_info) = l0_info {
+            comparator
+                .compare(&l0_info, &l1_info)
+                .await
+                .context("L1 vs L0 对比失败")?
+        } else {
+            warn!(
+                tracking_id = tracking.id,
+                "缺少 L0 版本信息，生成部分 L1 vs L0 评估"
+            );
+            comparator.compare_without_l0(&l1_info)
+        };
 
         info!(
             tracking_id = tracking.id,
