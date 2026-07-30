@@ -2789,7 +2789,10 @@ impl<'a> PipelineExecutor<'a> {
 mod tests {
     use super::*;
     use crate::diff;
-    use crate::entities::{l0_commits, l2_snapshots, packages, tracking};
+    use crate::entities::{
+        l0_commits, l1_commit_records, l2_snapshots, maintenance_evidence_snapshots, packages,
+        tracking,
+    };
     use chrono::Utc;
     use sea_orm::{DatabaseBackend, MockDatabase};
     use serial_test::serial;
