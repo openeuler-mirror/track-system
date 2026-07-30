@@ -297,17 +297,14 @@ impl<'a> SyncService<'a> {
                 continue;
             }
 
-            let api_url = match platform {
-                Platform::Gitee => format!(
-                    "https://gitee.com/src-openeuler/{}/commit/{}",
-                    tracking.l1_repo_name, commit.sha
-                ),
-                Platform::AtomGit => format!(
-                    "https://atomgit.com/src-openeuler/{}/commit/{}",
-                    tracking.l1_repo_name, commit.sha
-                ),
-                _ => String::new(),
-            };
+            let api_url = crate::utils::commit_url::build_commit_url(
+                platform,
+                "",
+                &tracking.l1_repo_owner,
+                &tracking.l1_repo_name,
+                &commit.sha,
+                &tracking.l1_branch,
+            );
             let (spec_version_opt, spec_release_opt) = self
                 .fetch_spec_version_release(platform, tracking, &commit.sha)
                 .await;
