@@ -49,7 +49,7 @@ fn default_verify_ssl() -> bool {
 impl Default for ClientConfig {
     fn default() -> Self {
         Self {
-            server_url: "http://localhost:3000".to_string(),
+            server_url: default_server_url(),
             auth_token: None,
             timeout: default_timeout(),
             verify_ssl: default_verify_ssl(),
