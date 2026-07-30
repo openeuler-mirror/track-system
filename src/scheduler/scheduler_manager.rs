@@ -15,12 +15,20 @@
 
 use anyhow::{Context, Result};
 use chrono::Utc;
-use sea_orm::DatabaseConnection;
+use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, Set};
 use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
-use super::{PipelineExecutor, SyncApiClient, SyncJobResult, SyncManager};
+use crate::ecosystem::maintenance::MaintenanceService;
+use crate::entities::{prelude::TrackingReports, tracking, tracking_reports};
+
+use super::{
+    mail_service::MailService,
+    report_artifacts::{CveFixComparisonInput, ReportArtifact, RoundCveFixComparisonWriter},
+    MaintenanceSyncService, PipelineExecutor, PipelineStage, SyncApiClient, SyncJobResult,
+    SyncManager, SyncResult,
+};
 
 /// 调度器配置
 #[derive(Debug, Clone)]
