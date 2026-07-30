@@ -284,75 +284,125 @@ impl SchedulerManager {
     ) -> Result<Vec<SyncJobResult>> {
         let sync_manager = SyncManager::new(&self.db);
 
-        // 获取待处理的任务（按优先级排序）
-        let pending_tasks = sync_manager
-            .get_pending_sync_tasks_with_tracking_id(wake_up, tracking_id)
-            .await
-            .context("获取待处理任务失败")?;
-
-        info!(pending_count = pending_tasks.len(), "发现待处理任务");
-
-        // 更新状态
-        {
-            let mut status = self.status.write().await;
-            status.pending_jobs = pending_tasks.len();
-        }
-
         let mut results = Vec::new();
         let executor = PipelineExecutor::new(&self.db, self.client.clone());
         let mut round_artifact_writer = RoundCveFixComparisonWriter::new();
         let mut round_artifact_report_ids: Vec<i32> = Vec::new();
         let mut packages_to_refresh_after_artifacts: Vec<(i32, i32)> = Vec::new();
 
-        // 限制并发数量
-        let limit = self.config.max_concurrent_jobs.min(pending_tasks.len());
+        let mut round = 0;
+        let wake_flag = wake_up;
 
-        for tracking in pending_tasks.into_iter().take(limit) {
-            let tracking_id = tracking.id;
+        info!("get_pending_sync_tasks_with_tracking_id,wake_up={wake_up}",);
+        let mut pending_tasks = sync_manager
+            .get_pending_sync_tasks_with_tracking_id(wake_flag, tracking_id)
+            .await
+            .context("获取待处理任务失败")?;
+        if tracking_id.is_none() {
+            let before_count = pending_tasks.len();
+            pending_tasks.retain(|track| !is_l2_newer_fallback_tracking(track));
+            let skipped_count = before_count.saturating_sub(pending_tasks.len());
+            if skipped_count > 0 {
+                info!(
+                    skipped_count,
+                    "跳过 openEuler-24.09 fallback tracking 常规调度，仅在 L2Newer 时按需使用"
+                );
+            }
+        }
+        order_pending_tasks_for_l2_newer_fallback(&mut pending_tasks);
+        loop {
+            let pending_count = pending_tasks.len();
+            info!(round = round + 1, pending_count, "发现待处理任务");
 
-            // 创建 sync_job
-            let job = match sync_manager.queue_sync_job(tracking_id, 0).await {
-                Ok(job) => job,
-                Err(err) => {
-                    error!(
-                        tracking_id = tracking_id,
-                        error = %err,
-                        "创建 sync_job 失败"
-                    );
-                    continue;
-                }
-            };
+            {
+                let mut status = self.status.write().await;
+                status.pending_jobs = pending_count;
+            }
 
-            // 执行流水线
-            match executor.execute_sync_job(job.id).await {
-                Ok(result) => {
-                    info!(
-                        job_id = job.id,
-                        tracking_id = tracking_id,
-                        success = result.success,
-                        "同步任务完成"
-                    );
+            if pending_count == 0 {
+                break;
+            }
 
-                    // 更新 sync_manager 状态
-                    if result.success {
-                        let _ = sync_manager.complete_sync_task(tracking_id, true).await;
-                    } else {
-                        let _ = sync_manager.complete_sync_task(tracking_id, false).await;
+            let limit = self.config.max_concurrent_jobs.min(pending_count);
+            let mut executed_in_round = 0;
+
+            let to_process: Vec<_> = pending_tasks.drain(0..limit).collect();
+            for tracking in to_process {
+                let tracking_id = tracking.id;
+
+                let job = match sync_manager.queue_sync_job(tracking_id, 0).await {
+                    Ok(job) => job,
+                    Err(err) => {
+                        error!(
+                            tracking_id = tracking_id,
+                            error = %err,
+                            "创建 sync_job 失败"
+                        );
+                        continue;
                     }
+                };
 
-                    results.push(result);
-                }
-                Err(err) => {
-                    error!(
-                        job_id = job.id,
-                        tracking_id = tracking_id,
-                        error = %err,
-                        "同步任务失败"
-                    );
+                executed_in_round += 1;
 
-                    let _ = sync_manager.complete_sync_task(tracking_id, false).await;
+                match executor.execute_sync_job(job.id).await {
+                    Ok(result) => {
+                        info!(
+                            job_id = job.id,
+                            tracking_id = tracking_id,
+                            success = result.success,
+                            "同步任务完成"
+                        );
+
+                        let _ = sync_manager
+                            .complete_sync_task_with_result(
+                                tracking_id,
+                                &sync_result_from_job_result(&result),
+                            )
+                            .await;
+                        if result.success {
+                            if let Err(err) = self
+                                .append_result_to_round_cve_fix_comparison_artifact(
+                                    &result,
+                                    &mut round_artifact_writer,
+                                    &mut round_artifact_report_ids,
+                                )
+                                .await
+                            {
+                                warn!(
+                                    tracking_id = tracking_id,
+                                    error = %err,
+                                    "追加调度轮次 CVE 漏洞修复对比 xlsx 失败，但不影响同步任务"
+                                );
+                            }
+                            packages_to_refresh_after_artifacts
+                                .push((tracking_id, tracking.package_id));
+                        }
+                        results.push(result);
+                    }
+                    Err(err) => {
+                        error!(
+                            job_id = job.id,
+                            tracking_id = tracking_id,
+                            error = %err,
+                            "同步任务失败"
+                        );
+
+                        let _ = sync_manager
+                            .complete_sync_task_with_result(
+                                tracking_id,
+                                &failed_sync_result(err.to_string()),
+                            )
+                            .await;
+                    }
                 }
             }
+
+            if executed_in_round == 0 {
+                error!("本轮未执行任何任务，停止继续调度");
+                break;
+            }
+
+            round += 1;
         }
 
         // 更新状态
@@ -360,6 +410,45 @@ impl SchedulerManager {
             let mut status = self.status.write().await;
             status.total_jobs_executed += results.len();
             status.last_execution = Some(Utc::now());
+        }
+
+        for artifact in round_artifact_writer.artifacts() {
+            self.send_cve_fix_comparison_artifact_if_enabled(artifact)
+                .await;
+        }
+
+        for (tracking_id, package_id) in packages_to_refresh_after_artifacts {
+            if let Err(err) = MaintenanceService::new(&self.db)
+                .refresh_package(package_id)
+                .await
+            {
+                warn!(
+                    tracking_id = tracking_id,
+                    package_id = package_id,
+                    error = %err,
+                    "xlsx 和邮件处理完成后 tracking maintenance 刷新失败，但不影响同步任务"
+                );
+            }
+        }
+
+        match MaintenanceSyncService::new(&self.db)
+            .refresh_due_packages()
+            .await
+        {
+            Ok(summary) => {
+                info!(
+                    scanned_packages = summary.scanned_packages,
+                    due_packages = summary.due_packages,
+                    refreshed_packages = summary.refreshed_packages,
+                    failed_packages = summary.failed_packages,
+                    skipped_no_repo = summary.skipped_no_repo,
+                    skipped_not_due = summary.skipped_not_due,
+                    "xlsx 和邮件处理完成后 maintenance 周期刷新完成"
+                );
+            }
+            Err(err) => {
+                warn!(error = %err, "xlsx 和邮件处理完成后 maintenance 周期刷新失败，但不影响同步调度轮次");
+            }
         }
 
         info!(executed = results.len(), "调度轮次完成");
@@ -466,6 +555,35 @@ impl SchedulerManager {
 
         Ok(())
     }
+}
+
+fn order_pending_tasks_for_l2_newer_fallback(tasks: &mut [tracking::Model]) {
+    tasks.sort_by(|left, right| {
+        fallback_order_key(left)
+            .cmp(&fallback_order_key(right))
+            .then_with(|| left.id.cmp(&right.id))
+    });
+}
+
+fn is_l2_newer_fallback_tracking(track: &tracking::Model) -> bool {
+    let is_target_l2 = ["25.05", "25.07"]
+        .iter()
+        .any(|branch| track.l2_branch.contains(branch));
+    is_target_l2 && track.l1_branch == "openEuler-24.09"
+}
+
+fn fallback_order_key(track: &tracking::Model) -> (i32, String, i32) {
+    let is_target_l2 = ["25.05", "25.07"]
+        .iter()
+        .any(|branch| track.l2_branch.contains(branch));
+    let l1_priority = if is_target_l2 && track.l1_branch == "openEuler-24.03-LTS-SP3" {
+        0
+    } else if is_target_l2 && track.l1_branch == "openEuler-24.09" {
+        1
+    } else {
+        2
+    };
+    (track.package_id, track.l2_branch.clone(), l1_priority)
 }
 
 fn sync_result_from_job_result(result: &SyncJobResult) -> SyncResult {
