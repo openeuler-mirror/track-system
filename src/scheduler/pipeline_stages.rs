@@ -3867,18 +3867,68 @@ Summary: Test package
             updated_at: Utc::now(),
             last_error: None,
         };
+        let package_model = packages::Model {
+            id: 1,
+            name: "demo".to_string(),
+            level: 1,
+            sync_interval_hours: 24,
+            l0_repo_url: Some("https://example.com/demo".to_string()),
+            description: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+        let evidence_model = maintenance_evidence_snapshots::Model {
+            id: 1,
+            package_id: 1,
+            source_type: "generic_git_version_catalog".to_string(),
+            source_name: "generic_git_version_catalog".to_string(),
+            source_url: "https://example.com/demo".to_string(),
+            http_status: Some(200),
+            content_hash: None,
+            raw_payload: serde_json::json!({
+                "assessment_subcategory": "version_catalog",
+                "data": {
+                    "latest_version": "2.0.0-rc1",
+                    "latest_stable": "1.4.0",
+                    "versions": [
+                        {"version": "1.0.0", "source_ref": "refs/tags/v1.0.0", "is_stable": true},
+                        {"version": "1.4.0", "source_ref": "refs/tags/v1.4.0", "is_stable": true},
+                        {"version": "2.0.0-rc1", "source_ref": "refs/tags/v2.0.0-rc1", "is_stable": false}
+                    ]
+                }
+            }),
+            normalized_signals: None,
+            collected_at: Utc::now(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
 
         let db = MockDatabase::new(DatabaseBackend::Postgres)
             .append_query_results::<l0_commits::Model, _, _>(vec![vec![]])
+            .append_query_results::<packages::Model, _, _>(vec![vec![package_model]])
+            .append_query_results::<maintenance_evidence_snapshots::Model, _, _>(vec![vec![
+                evidence_model,
+            ]])
             .into_connection();
 
         let executor = PipelineExecutor::new(&db, None);
-        let result = executor.get_l0_version_info(&tracking_model).await.unwrap();
-        assert!(result.is_none());
+        let result = executor
+            .get_l0_version_info(&tracking_model)
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(result.latest_version, "2.0.0-rc1");
+        assert_eq!(result.latest_stable, "1.4.0");
+        assert_eq!(result.all_versions.len(), 3);
+        assert!(result
+            .all_versions
+            .iter()
+            .any(|version| version.version == "2.0.0-rc1" && !version.is_stable));
     }
 
     #[tokio::test]
-    async fn test_get_l1_version_info_unimplemented() {
+    async fn test_get_l1_version_info_empty() {
         let tracking_model = tracking::Model {
             id: 1,
             package_id: 1,
