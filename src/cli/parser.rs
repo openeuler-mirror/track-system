@@ -832,7 +832,8 @@ pub enum ReportAction {
 
         /// 显示完整报告内容（包含 l1_vs_l0）
         #[arg(long)]
-        all: bool,    },
+        all: bool,
+    },
 
     /// 导出报告
     #[command(about = "Export report")]
