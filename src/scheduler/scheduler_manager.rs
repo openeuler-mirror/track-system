@@ -607,6 +607,27 @@ mod tests_basic {
     use super::*;
     use sea_orm::{DatabaseBackend, MockDatabase};
 
+    fn test_tracking_model(id: i32, l1_branch: &str, l2_branch: &str) -> tracking::Model {
+        tracking::Model {
+            id,
+            package_id: 1,
+            distro_id: 1,
+            l1_branch: l1_branch.to_string(),
+            l1_repo_owner: "owner".to_string(),
+            l1_repo_name: "repo".to_string(),
+            l2_branch: l2_branch.to_string(),
+            l2_repo_path: "/tmp/l2".to_string(),
+            tracking_status: "idle".to_string(),
+            last_sync_time: Some(Utc::now()),
+            last_l1_commit_sha: None,
+            last_l2_commit_sha: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            last_error: None,
+            platform: Some("Gitee".to_string()),
+        }
+    }
+
     #[tokio::test]
     async fn test_scheduler_start_stop_status() {
         let db = Arc::new(MockDatabase::new(DatabaseBackend::Postgres).into_connection());
