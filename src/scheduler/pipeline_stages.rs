@@ -4351,10 +4351,13 @@ Summary: Test package
 
         let db = MockDatabase::new(DatabaseBackend::Postgres)
             .append_query_results::<packages::Model, _, _>(vec![vec![package_model.clone()]])
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![]])
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![]])
             .append_query_results::<compare_reports::Model, _, _>(vec![vec![compare_model.clone()]])
             .append_query_results::<l1_commit_records::Model, _, _>(vec![
                 vec![commit_model.clone()],
             ])
+            .append_query_results::<ecosystem_targets::Model, _, _>(vec![vec![]])
             .append_query_results::<tracking_reports::Model, _, _>(vec![vec![
                 inserted_report.clone()
             ]])
