@@ -4048,6 +4048,28 @@ Summary: Test package
                 fixed_in_upstream: vec![],
                 not_fixed_in_upstream: vec![],
             },
+            maintenance_status: diff::l1_vs_l0::MaintenanceStatus {
+                status: "UNKNOWN".to_string(),
+                stop_maintenance_detected: false,
+                matched_notice: None,
+                evidence: vec![],
+                confidence: "LOW".to_string(),
+            },
+            outdated_version: diff::l1_vs_l0::OutdatedVersionAssessment {
+                current_version: "1.0.0".to_string(),
+                latest_version: Some("1.0.0".to_string()),
+                latest_version_source: Some("l1_repo".to_string()),
+                mainline_version: Some("1.0.0".to_string()),
+                mainline_version_source: Some("l0_repo".to_string()),
+                major_version_gap: Some(0),
+                threshold_major_versions: 3,
+                is_outdated: false,
+            },
+            lts: diff::l1_vs_l0::LtsAssessment {
+                is_lts: None,
+                source: "l1_repo".to_string(),
+                evidence: vec![],
+            },
             recommendations: vec![],
             created_at: Utc::now(),
         };
