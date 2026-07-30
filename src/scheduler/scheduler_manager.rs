@@ -170,12 +170,54 @@ impl SchedulerManager {
                 status.total_jobs_executed += 1;
                 status.last_execution = Some(Utc::now());
 
-                // 更新 sync_manager 状态
                 if result.success {
-                    sync_manager.complete_sync_task(tracking_id, true).await?;
-                } else {
-                    sync_manager.complete_sync_task(tracking_id, false).await?;
+                    let mut writer = RoundCveFixComparisonWriter::new();
+                    let mut report_ids = Vec::new();
+                    match self
+                        .append_result_to_round_cve_fix_comparison_artifact(
+                            &result,
+                            &mut writer,
+                            &mut report_ids,
+                        )
+                        .await
+                    {
+                        Ok(Some(_artifact)) => {
+                            for artifact in writer.artifacts() {
+                                self.send_cve_fix_comparison_artifact_if_enabled(artifact)
+                                    .await;
+                            }
+                        }
+                        Ok(None) => {}
+                        Err(err) => {
+                            warn!(
+                                tracking_id = tracking_id,
+                                error = %err,
+                                "手动同步生成 CVE 漏洞修复对比 xlsx 失败，但不影响同步结果"
+                            );
+                        }
+                    }
                 }
+
+                if result.success {
+                    if let Err(err) = MaintenanceService::new(&self.db)
+                        .refresh_package(package_id)
+                        .await
+                    {
+                        warn!(
+                            tracking_id = tracking_id,
+                            package_id = package_id,
+                            error = %err,
+                            "手动同步 xlsx 处理完成后 maintenance 刷新失败，但不影响同步结果"
+                        );
+                    }
+                }
+
+                sync_manager
+                    .complete_sync_task_with_result(
+                        tracking_id,
+                        &sync_result_from_job_result(&result),
+                    )
+                    .await?;
             }
             Err(err) => {
                 error!(
@@ -315,6 +357,123 @@ impl SchedulerManager {
         info!(executed = results.len(), "调度轮次完成");
 
         Ok(results)
+    }
+
+    async fn append_result_to_round_cve_fix_comparison_artifact(
+        &self,
+        result: &SyncJobResult,
+        writer: &mut RoundCveFixComparisonWriter,
+        report_ids: &mut Vec<i32>,
+    ) -> Result<Option<ReportArtifact>> {
+        let Some(report_stage) = result.stage_results.get(&PipelineStage::ReportGeneration) else {
+            return Ok(None);
+        };
+        let Some(input_value) = report_stage.details.get("cve_fix_comparison_input") else {
+            return Ok(None);
+        };
+        let input: CveFixComparisonInput = serde_json::from_value(input_value.clone())
+            .with_context(|| {
+                format!("解析 tracking {} 的 xlsx 汇总输入失败", result.tracking_id)
+            })?;
+        if input.commit_reports.is_empty() {
+            return Ok(None);
+        }
+
+        let report_id = report_stage
+            .details
+            .get("report_id")
+            .and_then(|v| v.as_i64())
+            .map(|id| id as i32);
+        let artifact = writer.append_input(input)?;
+        let artifact_path = artifact.path.clone();
+        if let Some(report_id) = report_id {
+            if !report_ids.contains(&report_id) {
+                report_ids.push(report_id);
+            }
+        }
+
+        for report_id in report_ids.iter().copied() {
+            self.update_report_with_round_cve_fix_comparison_artifact(report_id, &artifact)
+                .await?;
+        }
+
+        info!(
+            path = %artifact_path,
+            tracking_id = result.tracking_id,
+            rows = artifact.rows,
+            "追加调度轮次 CVE 漏洞修复对比 xlsx 成功"
+        );
+        if artifact.rows == 0 {
+            warn!(
+                path = %artifact_path,
+                tracking_id = result.tracking_id,
+                "CVE 漏洞修复对比 xlsx 当前无数据行，请检查系统版本黑名单或 commit_reports 是否为空"
+            );
+        }
+
+        Ok(Some(artifact))
+    }
+
+    async fn send_cve_fix_comparison_artifact_if_enabled(&self, artifact: &ReportArtifact) {
+        let mail_service = MailService::from_env();
+        if !mail_service.enabled() {
+            return;
+        }
+
+        if let Err(err) = mail_service.send_xlsx_artifact(artifact).await {
+            warn!(
+                path = %artifact.path,
+                error = %err,
+                "发送 CVE 漏洞修复对比 xlsx 邮件失败，但不影响调度结果"
+            );
+        }
+    }
+
+    async fn update_report_with_round_cve_fix_comparison_artifact(
+        &self,
+        report_id: i32,
+        artifact: &ReportArtifact,
+    ) -> Result<()> {
+        let Some(report) = TrackingReports::find_by_id(report_id)
+            .one(&*self.db)
+            .await?
+        else {
+            return Ok(());
+        };
+        let artifact_value = serde_json::to_value(artifact)?;
+        let mut diff_summary = report.diff_summary.clone();
+        if let Some(object) = diff_summary.as_object_mut() {
+            object.insert(
+                "artifacts".to_string(),
+                serde_json::json!({
+                    "cve_fix_comparison_xlsx": artifact_value,
+                }),
+            );
+        }
+
+        let mut active: tracking_reports::ActiveModel = report.into();
+        active.diff_summary = Set(diff_summary);
+        active.updated_at = Set(Utc::now());
+        active.update(&*self.db).await?;
+
+        Ok(())
+    }
+}
+
+fn sync_result_from_job_result(result: &SyncJobResult) -> SyncResult {
+    if result.success {
+        SyncResult::success(0, 0)
+    } else {
+        failed_sync_result(result.message.clone())
+    }
+}
+
+fn failed_sync_result(message: impl Into<String>) -> SyncResult {
+    SyncResult {
+        status: super::SyncStatus::Failed,
+        commits_synced: 0,
+        issues_synced: 0,
+        message: message.into(),
     }
 }
 
