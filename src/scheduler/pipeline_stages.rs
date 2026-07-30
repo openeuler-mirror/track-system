@@ -3032,6 +3032,7 @@ mod tests {
             classified_count: 15,
             cve_count: 3,
             needs_review_count: 2,
+            commits: Vec::new(),
         };
 
         assert_eq!(result.classified_count, 15);
