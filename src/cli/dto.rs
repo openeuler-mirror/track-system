@@ -64,22 +64,6 @@ pub struct TrackingDto {
     pub updated_at: DateTime<Utc>,
 }
 
-/// L2 快照信息 DTO
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct L2SnapshotDto {
-    pub id: i32,
-    pub tracking_id: i32,
-    pub commit_hash: String,
-    pub commit_message: String,
-    pub commit_author: String,
-    pub commit_date: DateTime<Utc>,
-    pub spec_version: Option<String>,
-    pub spec_release: Option<String>,
-    pub snapshot_data: serde_json::Value,
-    pub created_at: DateTime<Utc>,
-}
-
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TrackingMaintenanceSummaryDto {
     pub report_id: i64,
@@ -94,6 +78,20 @@ pub struct TrackingMaintenanceSummaryDto {
     pub forks: Option<i64>,
 }
 
+/// L2 快照信息 DTO
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct L2SnapshotDto {
+    pub id: i32,
+    pub tracking_id: i32,
+    pub commit_hash: String,
+    pub commit_message: String,
+    pub commit_author: String,
+    pub commit_date: DateTime<Utc>,
+    pub spec_version: Option<String>,
+    pub spec_release: Option<String>,
+    pub snapshot_data: serde_json::Value,
+    pub created_at: DateTime<Utc>,
+}
 /// 同步状态 DTO
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SyncStatusDto {
