@@ -25,6 +25,7 @@ use tracing::{error, info, warn};
 use crate::entities::{sync_jobs, tracking};
 use crate::telemetry::Telemetry;
 
+use super::report_artifacts::CveFixComparisonInput;
 use super::{SyncApiClient, SyncManager};
 
 /// 流水线阶段
