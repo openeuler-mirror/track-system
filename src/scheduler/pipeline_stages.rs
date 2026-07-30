@@ -1642,7 +1642,7 @@ impl<'a> PipelineExecutor<'a> {
                 .context("解析 L2 快照 payload 失败")?;
 
         let comparator = diff::l2_vs_l1::L2VsL1Comparator::new();
-        let l1_snap = diff::l2_vs_l1::L2VsL1Comparator::create_l1_snapshot(
+        let mut l1_snap = diff::l2_vs_l1::L2VsL1Comparator::create_l1_snapshot(
             package_name.clone(),
             &l1_snapshot,
         )
