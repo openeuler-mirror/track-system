@@ -678,6 +678,26 @@ mod tests_basic {
         let results = manager.execute_round().await.unwrap();
         assert_eq!(results.len(), 0);
     }
+
+    #[test]
+    fn test_l2_newer_fallback_tracking_is_filtered_from_regular_round() {
+        let primary = test_tracking_model(1, "openEuler-24.03-LTS-SP3", "CTyunOS25.07");
+        let fallback = test_tracking_model(2, "openEuler-24.09", "CTyunOS25.07");
+        let regular = test_tracking_model(3, "openEuler-24.09", "CTyunOS23.01");
+
+        assert!(!is_l2_newer_fallback_tracking(&primary));
+        assert!(is_l2_newer_fallback_tracking(&fallback));
+        assert!(!is_l2_newer_fallback_tracking(&regular));
+
+        let mut tasks = vec![fallback, regular.clone(), primary.clone()];
+        tasks.retain(|track| !is_l2_newer_fallback_tracking(track));
+        order_pending_tasks_for_l2_newer_fallback(&mut tasks);
+
+        assert_eq!(tasks.len(), 2);
+        assert!(tasks.iter().any(|task| task.id == primary.id));
+        assert!(tasks.iter().any(|task| task.id == regular.id));
+        assert!(!tasks.iter().any(|task| task.id == 2));
+    }
 }
 
 #[cfg(test)]
