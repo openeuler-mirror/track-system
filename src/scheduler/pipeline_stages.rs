@@ -1653,11 +1653,101 @@ impl<'a> PipelineExecutor<'a> {
         )
         .context("构建 L2 快照失败")?;
 
-        // 执行对比
-        let report = comparator
-            .compare(&l1_snap, &l2_snap, self.db, tracking.id)
+        // 先只判断版本/内容关系。25.05/25.07 可能需要切换到 openEuler-24.09
+        // 重新判断，避免在错误的 L1 基线上提前生成误导性的 commit 差异。
+        let mut report = comparator
+            .compare_with_options(&l1_snap, &l2_snap, self.db, tracking.id, true)
             .await
-            .context("L2 vs L1 内容对比失败")?;
+            .context("L2 vs L1 内容对比预判断失败")?;
+
+        if l2_newer_fallback_required(tracking, &report) {
+            let fallback_tracking = self
+                .find_or_create_l2_newer_fallback_tracking(tracking)
+                .await?;
+
+            if let Some(fallback_tracking) = fallback_tracking {
+                if let Some(fallback_l1_record) = self
+                    .latest_or_refresh_fallback_l1_snapshot_record(&fallback_tracking)
+                    .await?
+                {
+                    let fallback_l1_snapshot: crate::snapshot::types::RepositorySnapshot =
+                        serde_json::from_value(fallback_l1_record.payload.clone())
+                            .context("解析 openEuler-24.09 L1 快照 payload 失败")?;
+                    let fallback_l1_snap = diff::l2_vs_l1::L2VsL1Comparator::create_l1_snapshot(
+                        package_name.clone(),
+                        &fallback_l1_snapshot,
+                    )
+                    .context("构建 openEuler-24.09 L1 快照失败")?;
+                    let fallback_probe = comparator
+                        .compare_with_options(
+                            &fallback_l1_snap,
+                            &l2_snap,
+                            self.db,
+                            fallback_tracking.id,
+                            true,
+                        )
+                        .await
+                        .context("使用 openEuler-24.09 重新判断 L2 vs L1 失败")?;
+
+                    if l2_newer_than_l1(&fallback_probe) {
+                        info!(
+                            tracking_id = tracking.id,
+                            fallback_tracking_id = fallback_tracking.id,
+                            fallback_l1_branch = L2_NEWER_FALLBACK_L1_BRANCH,
+                            "L2 版本仍高于 openEuler-24.09，跳过 commit 差异判断"
+                        );
+                        l1_snap = fallback_l1_snap;
+                        report = fallback_probe;
+                    } else {
+                        info!(
+                            tracking_id = tracking.id,
+                            fallback_tracking_id = fallback_tracking.id,
+                            fallback_l1_branch = L2_NEWER_FALLBACK_L1_BRANCH,
+                            "使用 openEuler-24.09 重新判断后 L2 不再领先，采用 openEuler-24.09 对比结果"
+                        );
+                        report = comparator
+                            .compare_with_commit_tracking_ids(
+                                &fallback_l1_snap,
+                                &l2_snap,
+                                self.db,
+                                fallback_tracking.id,
+                                tracking.id,
+                                false,
+                            )
+                            .await
+                            .context("使用 openEuler-24.09 重新执行 L2 vs L1 内容对比失败")?;
+                        l1_snap = fallback_l1_snap;
+                    }
+                } else {
+                    warn!(
+                        tracking_id = tracking.id,
+                        fallback_tracking_id = fallback_tracking.id,
+                        fallback_l1_branch = L2_NEWER_FALLBACK_L1_BRANCH,
+                        "openEuler-24.09 L1 快照不可用，跳过 commit 差异判断避免误判"
+                    );
+                }
+            } else {
+                warn!(
+                    tracking_id = tracking.id,
+                    l2_branch = tracking.l2_branch,
+                    fallback_l1_branch = L2_NEWER_FALLBACK_L1_BRANCH,
+                    "未找到 openEuler-24.09 tracking，跳过 commit 差异判断避免误判"
+                );
+            }
+        } else {
+            if l2_newer_than_l1(&report) {
+                info!(
+                    tracking_id = tracking.id,
+                    l2_branch = tracking.l2_branch,
+                    "L2 版本高于 L1，认为 L2 没有落后 commit，跳过 commit 差异判断"
+                );
+            } else {
+                report = comparator
+                    .compare(&l1_snap, &l2_snap, self.db, tracking.id)
+                    .await
+                    .context("L2 vs L1 内容对比失败")?;
+            }
+        }
 
         info!(
             tracking_id = tracking.id,
