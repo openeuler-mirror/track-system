@@ -1445,6 +1445,42 @@ impl<'a> PipelineExecutor<'a> {
             "执行 L2 快照生成阶段"
         );
 
+        if is_l2_newer_fallback_tracking(tracking) {
+            info!(
+                tracking_id = tracking.id,
+                l1_branch = tracking.l1_branch,
+                l2_branch = tracking.l2_branch,
+                source_l1_branch = L2_NEWER_PRIMARY_L1_BRANCH,
+                "openEuler-24.09 fallback tracking 跳过独立 L2 快照生成，复用 openEuler-24.03 tracking 的 L2 快照"
+            );
+
+            let l2_record = latest_l2_snapshot_record_for_tracking(self.db, tracking).await?;
+            if let Some(snapshot) = l2_record {
+                let snapshot_data: crate::snapshot::types::RepositorySnapshot =
+                    serde_json::from_value(snapshot.payload.clone())
+                        .context("解析复用 L2 快照 payload 失败")?;
+
+                return Ok(L2SnapshotResult {
+                    snapshot_id: Some(snapshot.id as i64),
+                    snapshot_path: None,
+                    files_count: snapshot_data.files.len(),
+                    has_new_data: true,
+                });
+            }
+
+            warn!(
+                tracking_id = tracking.id,
+                source_l1_branch = L2_NEWER_PRIMARY_L1_BRANCH,
+                "openEuler-24.09 fallback tracking 未找到可复用 L2 快照，跳过独立 L2 快照生成"
+            );
+            return Ok(L2SnapshotResult {
+                snapshot_id: None,
+                snapshot_path: None,
+                files_count: 0,
+                has_new_data: false,
+            });
+        }
+
         // 检查 L2 仓库路径是否存在
         let l2_repo_path = PathBuf::from(&tracking.l2_repo_path);
         if !l2_repo_path.exists() {
