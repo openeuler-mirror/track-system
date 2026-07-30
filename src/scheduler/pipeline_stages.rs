@@ -30,10 +30,35 @@ use crate::entities::{l1_commit_records, prelude::*, tracking, tracking_reports}
 use crate::metadata_bridge;
 
 use super::pipeline_executor::{
-    BackportSuggestionResult, ClassificationResult, DiffComparisonResult, L1IngestionResult,
-    L2SnapshotResult, PipelineExecutor, PipelineStage, ReportGenerationResult, StageResult,
+    BackportSuggestionResult, ClassificationResult, ClassifiedCommitResult, DiffComparisonResult,
+    L1IngestionResult, L2SnapshotResult, PipelineExecutor, PipelineStage, ReportGenerationResult,
+    StageResult,
 };
+use super::report_artifacts::CveFixComparisonInput;
 use super::{SyncService, SyncStatus};
+
+const L2_NEWER_FALLBACK_L2_BRANCHES: [&str; 2] = ["25.05", "25.07"];
+const L2_NEWER_PRIMARY_L1_BRANCH: &str = "openEuler-24.03-LTS-SP3";
+const L2_NEWER_FALLBACK_L1_BRANCH: &str = "openEuler-24.09";
+
+#[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
+enum RiskType {
+    CodeScan = 1, // 代码扫描漏洞
+    CVE = 2,      // CVE 安全漏洞
+    Bug = 3,      // bug
+    Porting = 4,  // 回合移植
+    License = 5,  // license冲突
+}
+
+impl serde::Serialize for RiskType {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_i32(*self as i32)
+    }
+}
 
 #[derive(Debug, Clone, Serialize)]
 struct RiskCreateReq {
