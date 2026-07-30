@@ -1760,6 +1760,123 @@ impl<'a> PipelineExecutor<'a> {
         Ok(Some(report))
     }
 
+    async fn latest_or_refresh_fallback_l1_snapshot_record(
+        &self,
+        fallback_tracking: &tracking::Model,
+    ) -> Result<Option<crate::entities::l2_snapshots::Model>> {
+        if let Some(record) = latest_snapshot_record(self.db, fallback_tracking.id, "l1").await? {
+            return Ok(Some(record));
+        }
+
+        info!(
+            tracking_id = fallback_tracking.id,
+            fallback_l1_branch = L2_NEWER_FALLBACK_L1_BRANCH,
+            "openEuler-24.09 L1 快照缺失，尝试即时同步并生成快照"
+        );
+
+        let sync_service = SyncService::new(self.db);
+        match sync_service.sync_tracking(fallback_tracking.id).await {
+            Ok(sync_result) => {
+                info!(
+                    tracking_id = fallback_tracking.id,
+                    commits_synced = sync_result.commits_synced,
+                    issues_synced = sync_result.issues_synced,
+                    status = ?sync_result.status,
+                    "openEuler-24.09 L1 即时同步完成"
+                );
+            }
+            Err(err) => {
+                warn!(
+                    tracking_id = fallback_tracking.id,
+                    error = %err,
+                    "openEuler-24.09 L1 即时同步失败"
+                );
+                return Ok(None);
+            }
+        }
+
+        let output_path = format!(
+            "/tmp/l1_fallback_snapshot_{}_{}.json",
+            fallback_tracking.id,
+            Utc::now().timestamp()
+        );
+        if let Err(err) =
+            metadata_bridge::export_l1_snapshot(self.db, fallback_tracking.id, None, &output_path)
+                .await
+        {
+            warn!(
+                tracking_id = fallback_tracking.id,
+                error = %err,
+                "openEuler-24.09 L1 即时快照生成失败"
+            );
+            return Ok(None);
+        }
+
+        latest_snapshot_record(self.db, fallback_tracking.id, "l1").await
+    }
+
+    async fn find_or_create_l2_newer_fallback_tracking(
+        &self,
+        source_tracking: &tracking::Model,
+    ) -> Result<Option<tracking::Model>> {
+        use crate::entities::tracking as tracking_entity;
+        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+
+        if source_tracking.l1_branch == L2_NEWER_FALLBACK_L1_BRANCH {
+            return Ok(Some(source_tracking.clone()));
+        }
+
+        if let Some(existing) = Tracking::find()
+            .filter(tracking_entity::Column::PackageId.eq(source_tracking.package_id))
+            .filter(tracking_entity::Column::L2Branch.eq(source_tracking.l2_branch.clone()))
+            .filter(tracking_entity::Column::L1RepoOwner.eq(source_tracking.l1_repo_owner.clone()))
+            .filter(tracking_entity::Column::L1RepoName.eq(source_tracking.l1_repo_name.clone()))
+            .filter(tracking_entity::Column::L1Branch.eq(L2_NEWER_FALLBACK_L1_BRANCH))
+            .one(self.db)
+            .await
+            .context("查询 openEuler-24.09 fallback tracking 失败")?
+        {
+            return Ok(Some(existing));
+        }
+
+        let now = Utc::now();
+        let fallback = tracking::ActiveModel {
+            package_id: Set(source_tracking.package_id),
+            distro_id: Set(source_tracking.distro_id),
+            l1_repo_owner: Set(source_tracking.l1_repo_owner.clone()),
+            l1_repo_name: Set(source_tracking.l1_repo_name.clone()),
+            l1_branch: Set(L2_NEWER_FALLBACK_L1_BRANCH.to_string()),
+            l2_branch: Set(source_tracking.l2_branch.clone()),
+            l2_repo_path: Set(source_tracking.l2_repo_path.clone()),
+            tracking_status: Set("active".to_string()),
+            created_at: Set(now),
+            updated_at: Set(now),
+            platform: Set(source_tracking.platform.clone()),
+            ..Default::default()
+        };
+
+        match fallback.insert(self.db).await {
+            Ok(model) => {
+                info!(
+                    tracking_id = source_tracking.id,
+                    fallback_tracking_id = model.id,
+                    fallback_l1_branch = L2_NEWER_FALLBACK_L1_BRANCH,
+                    "按需创建 openEuler-24.09 fallback tracking"
+                );
+                Ok(Some(model))
+            }
+            Err(err) => {
+                warn!(
+                    tracking_id = source_tracking.id,
+                    error = %err,
+                    fallback_l1_branch = L2_NEWER_FALLBACK_L1_BRANCH,
+                    "按需创建 openEuler-24.09 fallback tracking 失败"
+                );
+                Err(err).context("创建 openEuler-24.09 fallback tracking 失败")
+            }
+        }
+    }
+
     /// 执行 L1 vs L0 对比
     async fn compare_l1_vs_l0(
         &self,
