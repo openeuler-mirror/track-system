@@ -2537,203 +2537,129 @@ impl<'a> PipelineExecutor<'a> {
 
         // 从 diff_result 中获取 report_id，然后查询 compare_reports 表
         if let Some(diff_stage) = diff_result {
-            if let Some(report_id) = diff_stage.details.get("report_id").and_then(|v| v.as_i64()) {
-                // 查询 compare_reports 表获取对比数据
-                if let Some(compare_report) = CompareReports::find_by_id(report_id as i32)
-                    .one(self.db)
-                    .await?
+            let mut compare_from_pipeline = false;
+            if let Some(l1_vs_l0_diff) = diff_stage.details.get("l1_vs_l0_diff") {
+                if !l1_vs_l0_diff.is_null() {
+                    version_warnings.extend(collect_version_warnings(l1_vs_l0_diff));
+                    l1_vs_l0_summary = Some(l1_vs_l0_diff.clone());
+                    compare_from_pipeline = true;
+                }
+            }
+
+            if let Some(l2_vs_l1_diff) = diff_stage.details.get("l2_vs_l1_diff") {
+                if !l2_vs_l1_diff.is_null() {
+                    apply_l2_vs_l1_commit_diff(
+                        self.db,
+                        l2_vs_l1_diff,
+                        tracking,
+                        &package_name,
+                        l1_snapshot_version.as_deref(),
+                        l1_snapshot_release.as_deref(),
+                        &mut base_version,
+                        &mut base_release,
+                        &mut commit_reports,
+                        &classification_overrides,
+                        risk_client.as_ref(),
+                        &risk_create_url,
+                    )
+                    .await?;
+                    compare_from_pipeline = true;
+                }
+            }
+            diff_context_from_pipeline = compare_from_pipeline;
+
+            if !compare_from_pipeline {
+                if let Some(report_id) =
+                    diff_stage.details.get("report_id").and_then(|v| v.as_i64())
                 {
-                    // 从 l2_vs_l1_diff 中提取 commit_diff 信息
-                    if let Some(l2_vs_l1_diff) = &compare_report.l2_vs_l1_diff {
-                        if let Some(commit_diff) = l2_vs_l1_diff.get("commit_diff") {
-                            // 获取 base_version_release
-                            if let Some(version_release) = commit_diff.get("base_version_release") {
-                                if let Some(version) =
-                                    version_release.get(0).and_then(|v| v.as_str())
-                                {
-                                    base_version = version.to_string();
-                                    info!(tracking_id = tracking.id, base_version = %base_version, "获取到 base_commit 版本");
-                                }
-                                if let Some(release) =
-                                    version_release.get(1).and_then(|v| v.as_str())
-                                {
-                                    base_release = release.to_string();
-                                    info!(tracking_id = tracking.id, base_release = %base_release, "获取到 base_commit release");
-                                }
-                            }
+                    // 查询 compare_reports 表获取对比数据
+                    if let Some(compare_report) = CompareReports::find_by_id(report_id as i32)
+                        .one(self.db)
+                        .await?
+                    {
+                        // 从 l2_vs_l1_diff 中提取 commit_diff 信息
+                        if let Some(l1_vs_l0_diff) = &compare_report.l1_vs_l0_diff {
+                            version_warnings.extend(collect_version_warnings(l1_vs_l0_diff));
+                            l1_vs_l0_summary = Some(l1_vs_l0_diff.clone());
+                        }
 
-                            // 获取 behind_commits 列表
-                            if let Some(behind_commits) =
-                                commit_diff.get("behind_commits").and_then(|v| v.as_array())
-                            {
-                                // 提取 behind_commits 中的 SHA 列表
-                                let behind_commit_shas: Vec<String> = behind_commits
-                                    .iter()
-                                    .filter_map(|c| {
-                                        c.get("sha").and_then(|s| s.as_str()).map(|s| s.to_string())
-                                    })
-                                    .collect();
-
-                                // 从 l1_commit_records 表中获取这些 commit 的详细信息
-                                if !behind_commit_shas.is_empty() {
-                                    let commits = L1CommitRecords::find()
-                                        .filter(
-                                            l1_commit_records::Column::TrackingId.eq(tracking.id),
-                                        )
-                                        .filter(
-                                            l1_commit_records::Column::CommitSha
-                                                .is_in(behind_commit_shas),
-                                        )
-                                        .all(self.db)
-                                        .await?;
-
-                                    // 为每个 commit 创建独立的信息记录
-                                    for commit in commits {
-                                        // 根据 primary_change_type 判断 level
-                                        let level = match commit.primary_change_type.as_deref() {
-                                            Some("CVE") => "High",
-                                            Some("Bugfix") => "Medium",
-                                            Some(_) => "Low",
-                                            None => "Normal",
-                                        };
-
-                                        if let Some(risk_client) = &risk_client {
-                                            let risk_level =
-                                                match commit.primary_change_type.as_deref() {
-                                                    Some("CVE") => 3,
-                                                    Some("Bugfix") => 2,
-                                                    Some(_) => 1,
-                                                    None => 1,
-                                                };
-
-                                            let version = if base_version.is_empty() {
-                                                commit
-                                                    .spec_version
-                                                    .clone()
-                                                    .unwrap_or_else(|| "unknown".to_string())
-                                            } else {
-                                                base_version.clone()
-                                            };
-
-                                            let release = if base_release.is_empty() {
-                                                commit
-                                                    .spec_release
-                                                    .clone()
-                                                    .unwrap_or_else(|| "unknown".to_string())
-                                            } else {
-                                                base_release.clone()
-                                            };
-
-                                            let req = RiskCreateReq {
-                                                description: format!(
-                                                    "{}\n{}",
-                                                    commit.commit_message, commit.api_url
-                                                ),
-                                                level: risk_level,
-                                                reporter: "track-system".to_string(),
-                                                r#type: commit
-                                                    .primary_change_type
-                                                    .clone()
-                                                    .unwrap_or_else(|| "Unknown".to_string()),
-                                                software: package_name.clone(),
-                                                version,
-                                                release,
-                                                platform: "noarch".to_string(),
-                                                disclosure_time: Some(
-                                                    commit.committed_at.to_rfc3339(),
-                                                ),
-                                                source: Some(tracking.l1_repo_owner.clone()),
-                                                package_id: 0,
-                                                inner_secret: "Ctyun@123".to_string(),
-                                                report_url: commit.api_url.clone(),
-                                                risk_type: risk_type_from_change_type(
-                                                    &commit
-                                                        .primary_change_type
-                                                        .clone()
-                                                        .unwrap_or_else(|| "Unknown".to_string()),
-                                                ),
-                                            };
-                                            info!(
-                                                tracking_id = tracking.id,
-                                                commit_sha = %commit.commit_sha,
-                                                req = ?req,
-                                                "调用 risk/create 请求"
-                                            );
-
-                                            match risk_client
-                                                .post(&risk_create_url)
-                                                .header("Content-Type", "application/json")
-                                                .json(&req)
-                                                .send()
-                                                .await
-                                            {
-                                                Ok(resp) if resp.status().is_success() => {
-                                                    let body =
-                                                        resp.text().await.unwrap_or_default();
-                                                    info!(
-                                                        tracking_id = tracking.id,
-                                                        commit_sha = %commit.commit_sha,
-                                                        body = body,
-                                                        "调用 risk/create 成功"
-                                                    );
-                                                }
-                                                Ok(resp) => {
-                                                    let status = resp.status().as_u16();
-                                                    let body =
-                                                        resp.text().await.unwrap_or_default();
-                                                    warn!(
-                                                        tracking_id = tracking.id,
-                                                        commit_sha = %commit.commit_sha,
-                                                        status = status,
-                                                        body = body,
-                                                        "调用 risk/create 失败"
-                                                    );
-                                                }
-                                                Err(err) => {
-                                                    warn!(
-                                                        tracking_id = tracking.id,
-                                                        commit_sha = %commit.commit_sha,
-                                                        error = %err,
-                                                        "调用 risk/create 失败"
-                                                    );
-                                                }
-                                            }
-                                        }
-
-                                        // 构建单个commit的信息
-                                        let commit_info = serde_json::json!({
-                                            "Description": commit.commit_message,
-                                            "Level": level,
-                                            "Reporter": commit.author_name,
-                                            "Software": &package_name,
-                                            "Version": &base_version,
-                                            "Release": &base_release,
-                                            "Platform": "noarch",
-                                            "DisclosureTime": commit.committed_at.to_rfc3339(),
-                                            "Source": &tracking.l1_repo_owner,
-                                            "CommitSha": commit.commit_sha,
-                                            "ChangeType": commit.primary_change_type.unwrap_or_else(|| "Unknown".to_string()),
-                                            "CVEList": commit.cve_list.unwrap_or_else(|| serde_json::json!([])),
-                                            "PackageID": tracking.package_id,
-                                            "Url": commit.api_url,
-                                        });
-                                        commit_reports.push(commit_info);
-                                    }
-                                }
-                            }
+                        if let Some(l2_vs_l1_diff) = &compare_report.l2_vs_l1_diff {
+                            apply_l2_vs_l1_commit_diff(
+                                self.db,
+                                l2_vs_l1_diff,
+                                tracking,
+                                &package_name,
+                                l1_snapshot_version.as_deref(),
+                                l1_snapshot_release.as_deref(),
+                                &mut base_version,
+                                &mut base_release,
+                                &mut commit_reports,
+                                &classification_overrides,
+                                risk_client.as_ref(),
+                                &risk_create_url,
+                            )
+                            .await?;
                         }
                     }
                 }
             }
         }
 
+        if let Some(class_stage) = classification_result {
+            merge_classification_results_into_commits(&mut commit_reports, class_stage);
+        }
+
         // 构建报告摘要 - 使用commit_reports数组
-        let diff_summary = serde_json::json!({
+        let mut diff_summary = serde_json::json!({
             "commits": commit_reports,
             "total_behind_commits": commit_reports.len(),
             "tracking_id": tracking.id,
             "package_name": package_name,
+            "l1_vs_l0": l1_vs_l0_summary,
+            "version_warnings": version_warnings,
         });
+
+        let cve_fix_comparison_input = if diff_context_from_pipeline {
+            let current_version_release = version_release_display(&base_version, &base_release);
+            let upstream_version = first_non_empty_string(&[
+                version_release_display(
+                    l1_snapshot_version.as_deref().unwrap_or_default(),
+                    l1_snapshot_release.as_deref().unwrap_or_default(),
+                ),
+                l1_vs_l0_summary
+                    .as_ref()
+                    .and_then(|summary| summary.get("latest_version"))
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .to_string(),
+            ]);
+            let input = CveFixComparisonInput {
+                tracking_id: tracking.id,
+                package_name: package_name.clone(),
+                system_version: tracking.l2_branch.clone(),
+                ctyunos_current_version: current_version_release,
+                default_upstream_version: upstream_version,
+                commit_reports: commit_reports.clone(),
+            };
+            if let Some(object) = diff_summary.as_object_mut() {
+                object.insert(
+                    "artifacts".to_string(),
+                    serde_json::json!({
+                        "cve_fix_comparison_xlsx": {
+                            "status": "pending_round_generation",
+                            "source": "scheduler_round",
+                        },
+                    }),
+                );
+                object.insert(
+                    "cve_fix_comparison_input".to_string(),
+                    serde_json::to_value(&input).unwrap_or_else(|_| serde_json::json!({})),
+                );
+            }
+            Some(input)
+        } else {
+            None
+        };
 
         // 从 classification_result 提取统计信息
         let representative_changes = if let Some(class_stage) = classification_result {
