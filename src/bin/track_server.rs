@@ -138,6 +138,10 @@ async fn main() -> Result<()> {
     let db = Arc::new(Database::connect(connect_opts).await?);
     info!("数据库连接成功");
 
+    info!("检查并执行数据库迁移...");
+    Migrator::up(db.as_ref(), None).await?;
+    info!("数据库迁移完成");
+
     // 根据命令执行不同模式
     match cli.command {
         Some(Commands::SchedulerOnly {
