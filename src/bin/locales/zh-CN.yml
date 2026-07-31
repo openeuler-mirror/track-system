@@ -231,9 +231,83 @@ track_cli:
           about: 显示报告详情
           args:
             id: 报告 ID
+            all: 显示完整报告内容（包含 l1_vs_l0）
         export:
           about: 导出报告
           args:
             id: 报告 ID
             format: 导出格式（json, yaml, markdown, html）
             output: 输出文件路径
+    ecosystem:
+      about: 生态评估目标管理
+      commands:
+        create:
+          about: 创建生态目标
+          args:
+            name: 目标名称
+            target_type: 目标类型
+            role: 目标角色
+            rule_profile: 规则画像
+            platform: 平台
+            homepage_url: 首页 URL
+            api_base_url: API 基地址
+            owner: 仓库所有者
+            repo: 仓库名称
+            default_branch: 默认分支
+            status: 目标状态
+            refresh_interval_hours: 刷新间隔（小时）
+            metadata: Metadata JSON 字符串
+        list:
+          about: 列出生态目标
+          args:
+            page: 页码
+            page_size: 每页大小
+            target_type: 按目标类型过滤
+            platform: 按平台过滤
+            status: 按状态过滤
+        show:
+          about: 查看生态目标
+          args:
+            id: 目标 ID
+        update:
+          about: 更新生态目标
+          args:
+            target: 目标 ID 或名称
+            name: 新目标名称
+            target_type: 新目标类型
+            role: 新角色
+            rule_profile: 新规则画像
+            platform: 新平台
+            homepage_url: 新首页 URL
+            api_base_url: 新 API 基地址
+            owner: 新仓库所有者
+            repo: 新仓库名称
+            default_branch: 新默认分支
+            status: 新状态
+            refresh_interval_hours: 新刷新间隔（小时）
+            metadata: Metadata JSON 字符串
+            last_error: 最近错误
+        delete:
+          about: 删除生态目标
+          args:
+            id: 目标 ID
+            confirm: 确认删除
+        refresh:
+          about: 刷新生态目标
+          args:
+            id: 目标 ID
+        latest-report:
+          about: 查看最新生态报告
+          args:
+            id: 目标 ID
+        reports:
+          about: 列出生态报告
+          args:
+            page: 页码
+            page_size: 每页大小
+            target_id: 按目标 ID 过滤
+            report_type: 按报告类型过滤
+        report:
+          about: 查看生态报告
+          args:
+            id: 报告 ID
