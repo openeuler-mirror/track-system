@@ -25,6 +25,7 @@
 
 use anyhow::Result;
 use clap::{CommandFactory, Parser, Subcommand};
+use migration::{Migrator, MigratorTrait};
 use sea_orm::{ConnectOptions, Database};
 use std::sync::Arc;
 use std::time::Duration;
