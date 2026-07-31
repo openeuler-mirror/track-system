@@ -152,13 +152,41 @@ async fn main() -> Result<()> {
             addr,
             interval,
             max_concurrent,
-        }) => run_server_with_scheduler(db, addr, interval, max_concurrent).await,
+        }) => {
+            run_server_with_scheduler(db, resolve_server_addr(addr), interval, max_concurrent).await
+        }
         Some(Commands::RunOnce { max_concurrent }) => run_once(db, max_concurrent).await,
         None => {
             // 默认：运行服务器 + 调度器
-            run_server_with_scheduler(db, "0.0.0.0:3000".to_string(), 3600, 10).await
+            run_server_with_scheduler(db, resolve_server_addr(None), 3600, 10).await
         }
     }
+}
+
+fn resolve_server_addr(cli_addr: Option<String>) -> String {
+    if let Some(addr) = cli_addr.filter(|value| !value.trim().is_empty()) {
+        return addr;
+    }
+
+    if let Ok(addr) = std::env::var("SERVER_ADDR") {
+        let trimmed = addr.trim();
+        if !trimmed.is_empty() {
+            return trimmed.to_string();
+        }
+    }
+
+    let host = std::env::var("SERVER_HOST")
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "0.0.0.0".to_string());
+    let port = std::env::var("SERVER_PORT")
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "3000".to_string());
+
+    format!("{}:{}", host, port)
 }
 
 /// 仅运行调度器（不启动 Web 服务器）
