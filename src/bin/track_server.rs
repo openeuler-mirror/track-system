@@ -80,8 +80,8 @@ enum Commands {
     /// 运行 Web 服务器 + 后台调度器
     Server {
         /// 服务器监听地址
-        #[arg(long, default_value = "0.0.0.0:3000")]
-        addr: String,
+        #[arg(long, env = "SERVER_ADDR")]
+        addr: Option<String>,
 
         /// 调度间隔（秒）
         #[arg(long, default_value = "3600")]
