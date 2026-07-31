@@ -32,6 +32,7 @@ use track_system::collectors::{
     local::LocalClient,
 };
 use track_system::i18n::{apply_clap_i18n, apply_help_i18n, detect_lang_from_args, init_i18n};
+use track_system::utils::load_track_system_env;
 
 /// 采集层级
 #[derive(Debug, Clone, Copy, ValueEnum)]
