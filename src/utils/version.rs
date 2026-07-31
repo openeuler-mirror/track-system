@@ -307,6 +307,49 @@ impl VersionParser {
     }
 }
 
+fn normalize_version_part(version_part: &str) -> String {
+    let value = version_part.trim().replace('_', ".");
+    let lower = value.to_ascii_lowercase();
+
+    for marker in ["alpha", "beta", "rc", "pre"] {
+        let Some(pos) = lower.find(marker) else {
+            continue;
+        };
+        if pos == 0 || !is_pre_release_suffix(&lower[pos..], marker) {
+            continue;
+        }
+
+        let before = value[..pos].trim_end_matches(['-', '.', '_']);
+        if !before
+            .chars()
+            .last()
+            .map(|value| value.is_ascii_digit())
+            .unwrap_or(false)
+        {
+            continue;
+        }
+
+        let after = value[pos..].trim_start_matches(['-', '.', '_']);
+        if !after.is_empty() {
+            return format!("{}-{}", before, after);
+        }
+    }
+
+    value
+}
+
+fn is_pre_release_suffix(suffix: &str, marker: &str) -> bool {
+    let Some(rest) = suffix.strip_prefix(marker) else {
+        return false;
+    };
+    rest.is_empty()
+        || rest
+            .chars()
+            .next()
+            .map(|value| value.is_ascii_digit() || matches!(value, '.' | '-' | '_'))
+            .unwrap_or(false)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
