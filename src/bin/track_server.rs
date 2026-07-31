@@ -36,6 +36,7 @@ use tracing::{error, info};
 use track_system::collectors::{gitea::GiteaClient, gitee::GiteeClient};
 use track_system::i18n::{apply_clap_i18n, apply_help_i18n, detect_lang_from_args, init_i18n};
 use track_system::scheduler::{scheduler_manager::WakeSignal, SchedulerConfig, SchedulerManager};
+use track_system::utils::load_track_system_env;
 
 #[derive(Parser)]
 #[command(name = "track-server")]
