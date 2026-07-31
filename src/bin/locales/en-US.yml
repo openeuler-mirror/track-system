@@ -231,9 +231,83 @@ track_cli:
           about: Show report details
           args:
             id: Report ID
+            all: Show full report content including l1_vs_l0
         export:
           about: Export report
           args:
             id: Report ID
             format: Export format (json, yaml, markdown, html)
             output: Output file path
+    ecosystem:
+      about: Ecosystem target management
+      commands:
+        create:
+          about: Create ecosystem target
+          args:
+            name: Target name
+            target_type: Target type
+            role: Target role
+            rule_profile: Rule profile
+            platform: Platform
+            homepage_url: Homepage URL
+            api_base_url: API base URL
+            owner: Repository owner
+            repo: Repository name
+            default_branch: Default branch
+            status: Target status
+            refresh_interval_hours: Refresh interval in hours
+            metadata: Metadata JSON string
+        list:
+          about: List ecosystem targets
+          args:
+            page: Page number
+            page_size: Page size
+            target_type: Filter by target type
+            platform: Filter by platform
+            status: Filter by status
+        show:
+          about: Show ecosystem target
+          args:
+            id: Target ID
+        update:
+          about: Update ecosystem target
+          args:
+            target: Target ID or name
+            name: New target name
+            target_type: New target type
+            role: New role
+            rule_profile: New rule profile
+            platform: New platform
+            homepage_url: New homepage URL
+            api_base_url: New API base URL
+            owner: New repository owner
+            repo: New repository name
+            default_branch: New default branch
+            status: New status
+            refresh_interval_hours: New refresh interval in hours
+            metadata: Metadata JSON string
+            last_error: Last error
+        delete:
+          about: Delete ecosystem target
+          args:
+            id: Target ID
+            confirm: Confirm deletion
+        refresh:
+          about: Refresh ecosystem target
+          args:
+            id: Target ID
+        latest-report:
+          about: Show latest ecosystem report
+          args:
+            id: Target ID
+        reports:
+          about: List ecosystem reports
+          args:
+            page: Page number
+            page_size: Page size
+            target_id: Filter by target ID
+            report_type: Filter by report type
+        report:
+          about: Show ecosystem report
+          args:
+            id: Report ID
