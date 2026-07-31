@@ -376,6 +376,25 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_pre_release_without_dash() {
+        let v = VersionParser::parse("1.2.3rc1").unwrap();
+        assert_eq!(v.major, 1);
+        assert_eq!(v.minor, 2);
+        assert_eq!(v.patch, 3);
+        assert_eq!(v.pre_release.as_deref(), Some("rc1"));
+
+        let v = VersionParser::parse("1.2.3.rc.2").unwrap();
+        assert_eq!(v.patch, 3);
+        assert_eq!(v.pre_release.as_deref(), Some("rc.2"));
+    }
+
+    #[test]
+    fn test_parse_rejects_invalid_numeric_parts() {
+        assert!(VersionParser::parse("1.2.x").is_err());
+        assert!(VersionParser::parse("1.2.3-").is_err());
+    }
+
+    #[test]
     fn test_version_comparison() {
         let v1 = Version::new(1, 0, 0);
         let v2 = Version::new(1, 1, 0);
