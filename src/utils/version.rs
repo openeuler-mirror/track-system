@@ -213,17 +213,23 @@ impl VersionParser {
             (version_str, None)
         };
 
+        let normalized_version_part = normalize_version_part(version_part);
+
         // 分离预发布标识（-号后面的部分）
-        let (core_version, pre_release) = if let Some(pos) = version_part.find('-') {
-            let (v, p) = version_part.split_at(pos);
-            (v, Some(p[1..].to_string()))
+        let (core_version, pre_release) = if let Some(pos) = normalized_version_part.find('-') {
+            let (v, p) = normalized_version_part.split_at(pos);
+            let pre_release = p[1..].trim();
+            if pre_release.is_empty() {
+                return Err(anyhow!("无效的预发布版本格式: {}", version_str));
+            }
+            (v, Some(pre_release.to_string()))
         } else {
-            (version_part, None)
+            (normalized_version_part.as_str(), None)
         };
 
         // 解析核心版本号（major.minor.patch）
         let parts: Vec<&str> = core_version.split('.').collect();
-        if parts.is_empty() || parts.len() > 3 {
+        if parts.is_empty() || parts.len() > 3 || parts.iter().any(|part| part.is_empty()) {
             return Err(anyhow!("无效的版本格式: {}", version_str));
         }
 
