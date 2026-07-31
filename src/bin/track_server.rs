@@ -576,7 +576,7 @@ mod tests {
                 interval,
                 max_concurrent,
             }) => {
-                assert_eq!(addr, "127.0.0.1:4000");
+                assert_eq!(addr.as_deref(), Some("127.0.0.1:4000"));
                 assert_eq!(interval, 600);
                 assert_eq!(max_concurrent, 20);
                 assert_eq!(cli.database_url, "sqlite://custom.db");
