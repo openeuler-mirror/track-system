@@ -292,4 +292,43 @@ mod tests {
         };
         assert!(invalid_timeout.validate().is_err());
     }
+
+    #[test]
+    fn default_config_uses_server_host_and_port_env() {
+        let _guard = lock_env();
+        clear_server_env();
+        std::env::set_var("SERVER_HOST", "127.0.0.1");
+        std::env::set_var("SERVER_PORT", "8080");
+
+        let config = ClientConfig::default();
+        assert_eq!(config.server_url, "http://127.0.0.1:8080");
+
+        clear_server_env();
+    }
+
+    #[test]
+    fn default_config_uses_server_addr_env() {
+        let _guard = lock_env();
+        clear_server_env();
+        std::env::set_var("SERVER_ADDR", "0.0.0.0:8080");
+
+        let config = ClientConfig::default();
+        assert_eq!(config.server_url, "http://localhost:8080");
+
+        clear_server_env();
+    }
+
+    #[test]
+    fn track_server_url_overrides_server_host_and_port() {
+        let _guard = lock_env();
+        clear_server_env();
+        std::env::set_var("TRACK_SERVER_URL", "http://example.test:9000");
+        std::env::set_var("SERVER_HOST", "127.0.0.1");
+        std::env::set_var("SERVER_PORT", "8080");
+
+        let config = ClientConfig::default();
+        assert_eq!(config.server_url, "http://example.test:9000");
+
+        clear_server_env();
+    }
 }
