@@ -10,8 +10,8 @@
 %define pkg_config_dir /etc/track-system
 
 Name:           %{pkg_name}
-Version:        1.2.0
-Release:        2
+Version:        2.0.0
+Release:        1
 Summary:        Automated Source Code Repository Tracking and Analysis Tool
 
 License:        MIT
