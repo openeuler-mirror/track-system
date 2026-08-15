@@ -1,6 +1,6 @@
 /*
  * Copyright(c) 2024-2026 China Telecom Cloud Technologies Co., Ltd. All rights
- * reserved. ctscat is licensed under Mulan PSL v2. You can use this software
+ * reserved. track-system is licensed under Mulan PSL v2. You can use this software
  * according to the terms and conditions of the Mulan PSL V2. You may obtain a
  * copy of Mulan PSL v2 at: http://license.coscl.org.cn/MulanPSL2.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
@@ -24,7 +24,8 @@ pub use comparison_service::ComparisonService;
 pub use git_client::GitRepositoryClient;
 pub use l1_vs_l0::{
     CveAnalysis, CveInfo, L0VersionInfo, L1VersionInfo, L1VsL0Comparator, L1VsL0Report,
-    PatchAnalysis, PatchInfo, UpgradableVersion, VersionTag,
+    LtsAssessment, MaintenanceNotice, MaintenanceStatus, OutdatedVersionAssessment, PatchAnalysis,
+    PatchInfo, UpgradableVersion, VersionTag,
 };
 pub use l2_vs_l1::{
     ConflictType, Customization, CustomizationAnalysis, CustomizationType, EffortLevel, L1Snapshot,

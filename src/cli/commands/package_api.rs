@@ -1,6 +1,6 @@
 /*
  * Copyright(c) 2024-2026 China Telecom Cloud Technologies Co., Ltd. All rights
- * reserved. ctscat is licensed under Mulan PSL v2. You can use this software
+ * reserved. track-system is licensed under Mulan PSL v2. You can use this software
  * according to the terms and conditions of the Mulan PSL V2. You may obtain a
  * copy of Mulan PSL v2 at: http://license.coscl.org.cn/MulanPSL2.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
@@ -14,11 +14,19 @@
 //! 通过 HTTP API 管理软件包
 
 use crate::cli::client::ApiClient;
+use crate::cli::commands::tracking_api::create_tracking_with_default_repos;
 use crate::cli::dto::{CreatePackageRequest, PackageDto, UpdatePackageRequest};
 use crate::cli::formatter::format_datetime_local;
 use crate::cli::parser::PackageAction;
 use anyhow::{bail, Result};
 use colored::Colorize;
+use std::fs;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct PackageImportRecord {
+    name: String,
+    l0_repo_url: Option<String>,
+}
 
 fn parse_sync_interval_hours(input: &str) -> Result<i32> {
     let s = input.trim().trim_matches(|c| c == '"' || c == '\'');
@@ -66,6 +74,29 @@ pub async fn execute(api_client: &ApiClient, action: PackageAction) -> Result<()
             l0_repo,
             description,
         } => add_package(api_client, name, level, sync_interval, l0_repo, description).await,
+        PackageAction::Import {
+            file,
+            level,
+            sync_interval,
+            description,
+            update_existing,
+            create_tracking,
+            distro,
+            tracking_status,
+        } => {
+            import_packages_from_file(
+                api_client,
+                file,
+                level,
+                sync_interval,
+                description,
+                update_existing,
+                create_tracking,
+                distro,
+                tracking_status,
+            )
+            .await
+        }
         PackageAction::List { limit } => list_packages(api_client, limit).await,
         PackageAction::Show { name_or_id } => show_package(api_client, name_or_id).await,
         PackageAction::Update {
@@ -76,6 +107,179 @@ pub async fn execute(api_client: &ApiClient, action: PackageAction) -> Result<()
         } => update_package(api_client, name, sync_interval, level, description).await,
         PackageAction::Remove { name, confirm } => remove_package(api_client, name, confirm).await,
     }
+}
+
+fn parse_package_import_file(content: &str) -> Result<Vec<PackageImportRecord>> {
+    let mut records = Vec::new();
+
+    for (idx, raw_line) in content.lines().enumerate() {
+        let line_no = idx + 1;
+        let line = raw_line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+
+        let mut parts = line.splitn(2, ',');
+        let name = parts
+            .next()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| anyhow::anyhow!("第 {} 行缺少组件名称", line_no))?;
+        let repo = parts
+            .next()
+            .map(str::trim)
+            .ok_or_else(|| anyhow::anyhow!("第 {} 行缺少上游仓库地址", line_no))?;
+
+        let l0_repo_url = if repo.is_empty() || repo.eq_ignore_ascii_case("NA") {
+            None
+        } else {
+            Some(repo.to_string())
+        };
+
+        records.push(PackageImportRecord {
+            name: name.to_string(),
+            l0_repo_url,
+        });
+    }
+
+    if records.is_empty() {
+        bail!("导入文件中没有可用的软件包记录");
+    }
+
+    Ok(records)
+}
+
+async fn import_packages_from_file(
+    api_client: &ApiClient,
+    file: String,
+    level: i32,
+    sync_interval: String,
+    description: Option<String>,
+    update_existing: bool,
+    create_tracking: bool,
+    distro: Option<String>,
+    tracking_status: String,
+) -> Result<()> {
+    println!("正在从文件导入软件包: {}", file.cyan());
+
+    let content =
+        fs::read_to_string(&file).map_err(|e| anyhow::anyhow!("读取文件失败 {}: {}", file, e))?;
+    let records = parse_package_import_file(&content)?;
+    let sync_interval_hours = parse_sync_interval_hours(&sync_interval)?;
+    let mut existing_packages = api_client.get::<Vec<PackageDto>>("/packages").await?;
+    let tracking_distro = if create_tracking {
+        Some(
+            distro
+                .clone()
+                .ok_or_else(|| anyhow::anyhow!("启用 --create-tracking 时必须提供 --distro"))?,
+        )
+    } else {
+        None
+    };
+
+    let mut created = 0_u64;
+    let mut updated = 0_u64;
+    let mut skipped = 0_u64;
+    let mut tracking_created = 0_u64;
+    let mut tracking_failed = 0_u64;
+
+    for record in records {
+        let package_name = record.name.clone();
+        match existing_packages
+            .iter()
+            .find(|package| package.name == record.name)
+            .cloned()
+        {
+            Some(existing) if update_existing => {
+                let request = UpdatePackageRequest {
+                    level: Some(level),
+                    sync_interval_hours: Some(sync_interval_hours),
+                    l0_repo_url: record.l0_repo_url.clone(),
+                    description: description.clone(),
+                };
+                let updated_pkg = api_client
+                    .put::<_, PackageDto>(&format!("/packages/{}", existing.id), &request)
+                    .await?;
+                if let Some(existing_pkg) = existing_packages
+                    .iter_mut()
+                    .find(|package| package.id == updated_pkg.id)
+                {
+                    *existing_pkg = updated_pkg;
+                }
+                println!(
+                    "{} 更新软件包: {}",
+                    "↺".yellow().bold(),
+                    existing.name.cyan()
+                );
+                updated += 1;
+            }
+            Some(existing) => {
+                println!(
+                    "{} 跳过已存在软件包: {}",
+                    "-".yellow(),
+                    existing.name.cyan()
+                );
+                skipped += 1;
+            }
+            None => {
+                let request = CreatePackageRequest {
+                    name: record.name.clone(),
+                    level,
+                    sync_interval_hours,
+                    l0_repo_url: record.l0_repo_url.clone(),
+                    description: description.clone(),
+                };
+                let created_pkg = api_client
+                    .post::<_, PackageDto>("/packages", &request)
+                    .await?;
+                existing_packages.push(created_pkg);
+                println!("{} 添加软件包: {}", "+".green().bold(), record.name.cyan());
+                created += 1;
+            }
+        }
+
+        if let Some(distro) = &tracking_distro {
+            match create_tracking_with_default_repos(
+                api_client,
+                package_name.clone(),
+                distro.clone(),
+                tracking_status.clone(),
+            )
+            .await
+            {
+                Ok(_) => tracking_created += 1,
+                Err(err) => {
+                    tracking_failed += 1;
+                    println!(
+                        "{} 创建 tracking 失败: package={}, error={}",
+                        "✗".red().bold(),
+                        package_name.cyan(),
+                        err
+                    );
+                }
+            }
+        }
+    }
+
+    println!(
+        "{} 导入完成: 新增 {}, 更新 {}, 跳过 {}",
+        "✓".green().bold(),
+        created,
+        updated,
+        skipped
+    );
+    if tracking_distro.is_some() {
+        println!(
+            "{} tracking 联动创建: 成功 {}, 失败 {}",
+            "✓".green().bold(),
+            tracking_created,
+            tracking_failed
+        );
+        if tracking_failed > 0 {
+            return Err(anyhow::anyhow!("{} 个 tracking 创建失败", tracking_failed));
+        }
+    }
+    Ok(())
 }
 
 /// 添加软件包
@@ -347,6 +551,33 @@ mod tests {
         assert!(parse_sync_interval_hours("8761h").is_err());
     }
 
+    #[test]
+    fn test_parse_package_import_file() {
+        let content = r#"
+# comment
+bash,https://git.savannah.gnu.org/git/bash.git
+hdparm,NA
+
+curl,https://github.com/curl/curl
+"#;
+        let records = parse_package_import_file(content).unwrap();
+        assert_eq!(records.len(), 3);
+        assert_eq!(
+            records[0],
+            PackageImportRecord {
+                name: "bash".to_string(),
+                l0_repo_url: Some("https://git.savannah.gnu.org/git/bash.git".to_string()),
+            }
+        );
+        assert_eq!(
+            records[1],
+            PackageImportRecord {
+                name: "hdparm".to_string(),
+                l0_repo_url: None,
+            }
+        );
+    }
+
     #[tokio::test]
     async fn test_add_package() {
         let (mut server, client) = setup_test_server().await;
@@ -377,6 +608,170 @@ mod tests {
         .await;
         assert!(result.is_ok(), "Result failed: {:?}", result.err());
         mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_import_packages_from_file_create_and_update() {
+        let (mut server, client) = setup_test_server().await;
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(
+            tmp.path(),
+            "bash,https://git.savannah.gnu.org/git/bash.git\ncurl,https://github.com/curl/curl\n",
+        )
+        .unwrap();
+
+        let list_mock = server
+            .mock("GET", "/api/packages")
+            .expect(1)
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(serde_json::json!([create_test_package_dto(10, "bash")]).to_string())
+            .create_async()
+            .await;
+
+        let update_mock = server
+            .mock("PUT", "/api/packages/10")
+            .match_body(mockito::Matcher::Json(serde_json::json!({
+                "level": 2,
+                "sync_interval_hours": 12,
+                "l0_repo_url": "https://git.savannah.gnu.org/git/bash.git",
+                "description": "batch import"
+            })))
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(create_test_package_dto(10, "bash").to_string())
+            .create_async()
+            .await;
+
+        let create_mock = server
+            .mock("POST", "/api/packages")
+            .match_body(mockito::Matcher::Json(serde_json::json!({
+                "name": "curl",
+                "level": 2,
+                "sync_interval_hours": 12,
+                "l0_repo_url": "https://github.com/curl/curl",
+                "description": "batch import"
+            })))
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(create_test_package_dto(11, "curl").to_string())
+            .create_async()
+            .await;
+
+        let result = import_packages_from_file(
+            &client,
+            tmp.path().display().to_string(),
+            2,
+            "12h".to_string(),
+            Some("batch import".to_string()),
+            true,
+            false,
+            None,
+            "active".to_string(),
+        )
+        .await;
+
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        list_mock.assert_async().await;
+        update_mock.assert_async().await;
+        create_mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_import_packages_from_file_with_create_tracking() {
+        let (mut server, client) = setup_test_server().await;
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(
+            tmp.path(),
+            "bash,https://git.savannah.gnu.org/git/bash.git\n",
+        )
+        .unwrap();
+
+        let list_mock = server
+            .mock("GET", "/api/packages")
+            .expect(2)
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(serde_json::json!([create_test_package_dto(10, "bash")]).to_string())
+            .create_async()
+            .await;
+
+        let update_mock = server
+            .mock("PUT", "/api/packages/10")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(create_test_package_dto(10, "bash").to_string())
+            .create_async()
+            .await;
+
+        let tracking_list_mock = server
+            .mock("GET", "/api/tracking?page=1&page_size=100&package_id=10")
+            .expect(5)
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "data": {
+                        "items": [],
+                        "total": 0
+                    }
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let tracking_create_mock = server
+            .mock("POST", "/api/tracking")
+            .expect(5)
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "data": {
+                        "id": 10,
+                        "package_id": 10,
+                        "package_name": "bash",
+                        "package_level": 1,
+                        "l0_repo_url": "https://git.savannah.gnu.org/git/bash.git",
+                        "distro_id": 1,
+                        "l1_repo_owner": "src-openeuler",
+                        "l1_repo_name": "bash",
+                        "l1_branch": "openEuler-20.03-LTS-SP4",
+                        "l2_branch": "2.0.1",
+                        "l2_repo_path": "https://work.ctyun.cn/git/sources-CTyunOS/bash.git",
+                        "tracking_status": "active",
+                        "last_sync_time": null,
+                        "last_l1_commit_sha": null,
+                        "last_l2_commit_sha": null,
+                        "maintenance_summary": null,
+                        "created_at": "2024-01-01T00:00:00Z",
+                        "updated_at": "2024-01-01T00:00:00Z"
+                    }
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = import_packages_from_file(
+            &client,
+            tmp.path().display().to_string(),
+            1,
+            "24h".to_string(),
+            None,
+            true,
+            true,
+            Some("1".to_string()),
+            "active".to_string(),
+        )
+        .await;
+
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        list_mock.assert_async().await;
+        update_mock.assert_async().await;
+        tracking_list_mock.assert_async().await;
+        tracking_create_mock.assert_async().await;
     }
 
     #[tokio::test]

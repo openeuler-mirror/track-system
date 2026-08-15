@@ -1,6 +1,6 @@
 /*
  * Copyright(c) 2024-2026 China Telecom Cloud Technologies Co., Ltd. All rights
- * reserved. ctscat is licensed under Mulan PSL v2. You can use this software
+ * reserved. track-system is licensed under Mulan PSL v2. You can use this software
  * according to the terms and conditions of the Mulan PSL V2. You may obtain a
  * copy of Mulan PSL v2 at: http://license.coscl.org.cn/MulanPSL2.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
@@ -25,6 +25,7 @@
 
 use anyhow::Result;
 use clap::{CommandFactory, Parser, Subcommand};
+use migration::{Migrator, MigratorTrait};
 use sea_orm::{ConnectOptions, Database};
 use std::sync::Arc;
 use std::time::Duration;
@@ -35,6 +36,7 @@ use tracing::{error, info};
 use track_system::collectors::{gitea::GiteaClient, gitee::GiteeClient};
 use track_system::i18n::{apply_clap_i18n, apply_help_i18n, detect_lang_from_args, init_i18n};
 use track_system::scheduler::{scheduler_manager::WakeSignal, SchedulerConfig, SchedulerManager};
+use track_system::utils::load_track_system_env;
 
 #[derive(Parser)]
 #[command(name = "track-server")]
@@ -78,8 +80,8 @@ enum Commands {
     /// 运行 Web 服务器 + 后台调度器
     Server {
         /// 服务器监听地址
-        #[arg(long, default_value = "0.0.0.0:3000")]
-        addr: String,
+        #[arg(long, env = "SERVER_ADDR")]
+        addr: Option<String>,
 
         /// 调度间隔（秒）
         #[arg(long, default_value = "3600")]
@@ -100,6 +102,8 @@ enum Commands {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    load_track_system_env();
+
     let raw_args: Vec<String> = std::env::args().collect();
     let arg_lang = detect_lang_from_args(&raw_args);
     let locale = init_i18n(arg_lang.as_deref());
@@ -134,6 +138,10 @@ async fn main() -> Result<()> {
     let db = Arc::new(Database::connect(connect_opts).await?);
     info!("数据库连接成功");
 
+    info!("检查并执行数据库迁移...");
+    Migrator::up(db.as_ref(), None).await?;
+    info!("数据库迁移完成");
+
     // 根据命令执行不同模式
     match cli.command {
         Some(Commands::SchedulerOnly {
@@ -144,13 +152,41 @@ async fn main() -> Result<()> {
             addr,
             interval,
             max_concurrent,
-        }) => run_server_with_scheduler(db, addr, interval, max_concurrent).await,
+        }) => {
+            run_server_with_scheduler(db, resolve_server_addr(addr), interval, max_concurrent).await
+        }
         Some(Commands::RunOnce { max_concurrent }) => run_once(db, max_concurrent).await,
         None => {
             // 默认：运行服务器 + 调度器
-            run_server_with_scheduler(db, "0.0.0.0:3000".to_string(), 3600, 10).await
+            run_server_with_scheduler(db, resolve_server_addr(None), 3600, 10).await
         }
     }
+}
+
+fn resolve_server_addr(cli_addr: Option<String>) -> String {
+    if let Some(addr) = cli_addr.filter(|value| !value.trim().is_empty()) {
+        return addr;
+    }
+
+    if let Ok(addr) = std::env::var("SERVER_ADDR") {
+        let trimmed = addr.trim();
+        if !trimmed.is_empty() {
+            return trimmed.to_string();
+        }
+    }
+
+    let host = std::env::var("SERVER_HOST")
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "0.0.0.0".to_string());
+    let port = std::env::var("SERVER_PORT")
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "3000".to_string());
+
+    format!("{}:{}", host, port)
 }
 
 /// 仅运行调度器（不启动 Web 服务器）
@@ -540,7 +576,7 @@ mod tests {
                 interval,
                 max_concurrent,
             }) => {
-                assert_eq!(addr, "127.0.0.1:4000");
+                assert_eq!(addr.as_deref(), Some("127.0.0.1:4000"));
                 assert_eq!(interval, 600);
                 assert_eq!(max_concurrent, 20);
                 assert_eq!(cli.database_url, "sqlite://custom.db");
@@ -548,6 +584,60 @@ mod tests {
             }
             _ => panic!("expected Server"),
         }
+    }
+
+    #[test]
+    fn resolve_server_addr_uses_cli_addr_first() {
+        let _guard = env_lock().lock().unwrap();
+        std::env::set_var("SERVER_ADDR", "127.0.0.1:5000");
+        std::env::set_var("SERVER_HOST", "127.0.0.1");
+        std::env::set_var("SERVER_PORT", "6000");
+
+        assert_eq!(
+            resolve_server_addr(Some("0.0.0.0:7000".to_string())),
+            "0.0.0.0:7000"
+        );
+
+        std::env::remove_var("SERVER_ADDR");
+        std::env::remove_var("SERVER_HOST");
+        std::env::remove_var("SERVER_PORT");
+    }
+
+    #[test]
+    fn resolve_server_addr_uses_server_addr_env() {
+        let _guard = env_lock().lock().unwrap();
+        std::env::set_var("SERVER_ADDR", "127.0.0.1:5000");
+        std::env::set_var("SERVER_HOST", "127.0.0.1");
+        std::env::set_var("SERVER_PORT", "6000");
+
+        assert_eq!(resolve_server_addr(None), "127.0.0.1:5000");
+
+        std::env::remove_var("SERVER_ADDR");
+        std::env::remove_var("SERVER_HOST");
+        std::env::remove_var("SERVER_PORT");
+    }
+
+    #[test]
+    fn resolve_server_addr_uses_host_and_port_env() {
+        let _guard = env_lock().lock().unwrap();
+        std::env::remove_var("SERVER_ADDR");
+        std::env::set_var("SERVER_HOST", "127.0.0.1");
+        std::env::set_var("SERVER_PORT", "8080");
+
+        assert_eq!(resolve_server_addr(None), "127.0.0.1:8080");
+
+        std::env::remove_var("SERVER_HOST");
+        std::env::remove_var("SERVER_PORT");
+    }
+
+    #[test]
+    fn resolve_server_addr_falls_back_to_default() {
+        let _guard = env_lock().lock().unwrap();
+        std::env::remove_var("SERVER_ADDR");
+        std::env::remove_var("SERVER_HOST");
+        std::env::remove_var("SERVER_PORT");
+
+        assert_eq!(resolve_server_addr(None), "0.0.0.0:3000");
     }
 
     #[test]

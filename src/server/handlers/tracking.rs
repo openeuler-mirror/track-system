@@ -1,6 +1,6 @@
 /*
  * Copyright(c) 2024-2026 China Telecom Cloud Technologies Co., Ltd. All rights
- * reserved. ctscat is licensed under Mulan PSL v2. You can use this software
+ * reserved. track-system is licensed under Mulan PSL v2. You can use this software
  * according to the terms and conditions of the Mulan PSL V2. You may obtain a
  * copy of Mulan PSL v2 at: http://license.coscl.org.cn/MulanPSL2.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
@@ -18,9 +18,10 @@ use axum::{
 use chrono::Utc;
 use sea_orm::*;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 use crate::{
-    entities::{prelude::*, tracking},
+    entities::{maintenance_reports, prelude::*, tracking},
     server::{
         api::{ApiResponse, PaginatedResponse},
         error::{ApiError, ApiResult},
@@ -86,6 +87,9 @@ pub struct UpdateTrackingRequest {
 pub struct TrackingResponse {
     pub id: i32,
     pub package_id: i32,
+    pub package_name: Option<String>,
+    pub package_level: Option<i32>,
+    pub l0_repo_url: Option<String>,
     pub distro_id: i32,
     pub l1_repo_owner: String,
     pub l1_repo_name: String,
@@ -96,6 +100,7 @@ pub struct TrackingResponse {
     pub last_sync_time: Option<chrono::DateTime<chrono::Utc>>,
     pub last_l1_commit_sha: Option<String>,
     pub last_l2_commit_sha: Option<String>,
+    pub maintenance_summary: Option<TrackingMaintenanceSummary>,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
 }
@@ -105,6 +110,9 @@ impl From<tracking::Model> for TrackingResponse {
         Self {
             id: model.id,
             package_id: model.package_id,
+            package_name: None,
+            package_level: None,
+            l0_repo_url: None,
             distro_id: model.distro_id,
             l1_repo_owner: model.l1_repo_owner,
             l1_repo_name: model.l1_repo_name,
@@ -115,10 +123,25 @@ impl From<tracking::Model> for TrackingResponse {
             last_sync_time: model.last_sync_time,
             last_l1_commit_sha: model.last_l1_commit_sha,
             last_l2_commit_sha: model.last_l2_commit_sha,
+            maintenance_summary: None,
             created_at: model.created_at,
             updated_at: model.updated_at,
         }
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrackingMaintenanceSummary {
+    pub report_id: i64,
+    pub overall_risk: String,
+    pub confidence: String,
+    pub generated_at: chrono::DateTime<chrono::Utc>,
+    pub commit_total: Option<i64>,
+    pub commits_last_12_months: Option<i64>,
+    pub committers_last_12_months: Option<i64>,
+    pub last_commit_at: Option<String>,
+    pub stars: Option<i64>,
+    pub forks: Option<i64>,
 }
 
 /// GET /api/tracking
@@ -165,7 +188,10 @@ pub async fn list_tracking(
         .all(state.db.as_ref())
         .await?;
 
-    let responses: Vec<TrackingResponse> = tracking_list.into_iter().map(Into::into).collect();
+    let mut responses = Vec::with_capacity(tracking_list.len());
+    for item in tracking_list {
+        responses.push(build_tracking_response(state.db.as_ref(), item).await?);
+    }
     let paginated = PaginatedResponse::new(responses, total, page, page_size);
 
     Ok(Json(ApiResponse::success(paginated)))
@@ -230,8 +256,9 @@ pub async fn create_tracking(
     };
 
     let result = tracking.insert(state.db.as_ref()).await?;
+    let response = build_tracking_response(state.db.as_ref(), result).await?;
 
-    Ok(Json(ApiResponse::created(result.into())))
+    Ok(Json(ApiResponse::created(response)))
 }
 
 /// GET /api/tracking/:id
@@ -246,7 +273,8 @@ pub async fn get_tracking(
         .await?
         .ok_or_else(|| ApiError::NotFound(format!("Tracking {} not found", id)))?;
 
-    Ok(Json(ApiResponse::success(tracking.into())))
+    let response = build_tracking_response(state.db.as_ref(), tracking).await?;
+    Ok(Json(ApiResponse::success(response)))
 }
 
 /// PUT /api/tracking/:id
@@ -289,7 +317,8 @@ pub async fn update_tracking(
 
     let result = active.update(state.db.as_ref()).await?;
 
-    Ok(Json(ApiResponse::success(result.into())))
+    let response = build_tracking_response(state.db.as_ref(), result).await?;
+    Ok(Json(ApiResponse::success(response)))
 }
 
 /// DELETE /api/tracking/:id
@@ -315,7 +344,7 @@ pub async fn delete_tracking(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::entities::{packages, tracking};
+    use crate::entities::{maintenance_reports, packages, tracking};
     use axum::extract::{Path, State};
     use sea_orm::{DatabaseBackend, MockDatabase};
 
@@ -347,6 +376,35 @@ mod tests {
             sync_interval_hours: 24,
             l0_repo_url: Some("https://github.com/bminor/glibc".to_string()),
             description: Some("GNU C Library".to_string()),
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        }
+    }
+
+    fn create_mock_maintenance_report(package_id: i32) -> maintenance_reports::Model {
+        maintenance_reports::Model {
+            id: 9,
+            package_id,
+            report_type: "maintenance_profile".to_string(),
+            status: "completed".to_string(),
+            overall_risk: "LOW".to_string(),
+            confidence: "HIGH".to_string(),
+            summary: "ok".to_string(),
+            dimensions: serde_json::json!({}),
+            evidence_summary: Some(serde_json::json!({})),
+            report_payload: serde_json::json!({
+                "section": {
+                    "indicators": [
+                        {"key": "commit_total", "value": 1000},
+                        {"key": "commits_last_12_months", "value": 100},
+                        {"key": "committers_last_12_months", "value": 10},
+                        {"key": "last_commit_at", "value": "2026-01-01T00:00:00Z"},
+                        {"key": "stars", "value": 2000},
+                        {"key": "forks", "value": 300}
+                    ]
+                }
+            }),
+            generated_at: chrono::Utc::now(),
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
         }
@@ -525,10 +583,13 @@ mod tests {
     async fn test_create_tracking_success() {
         let mock_package = create_mock_package(1);
         let mock_tracking = create_mock_tracking(1, 1);
+        let mock_report = create_mock_maintenance_report(1);
 
         let db = MockDatabase::new(DatabaseBackend::Postgres)
             .append_query_results([[mock_package]]) // Package exists
             .append_query_results([[mock_tracking]]) // Created tracking
+            .append_query_results([[create_mock_package(1)]]) // enrich package lookup
+            .append_query_results([[mock_report]]) // latest maintenance report
             .into_connection();
         let state = AppState::without_external_clients(db);
 
@@ -552,9 +613,13 @@ mod tests {
     #[tokio::test]
     async fn test_get_tracking_success() {
         let mock_tracking = create_mock_tracking(1, 1);
+        let mock_package = create_mock_package(1);
+        let mock_report = create_mock_maintenance_report(1);
 
         let db = MockDatabase::new(DatabaseBackend::Postgres)
             .append_query_results([[mock_tracking]])
+            .append_query_results([[mock_package]])
+            .append_query_results([[mock_report]])
             .into_connection();
         let state = AppState::without_external_clients(db);
 
@@ -585,10 +650,14 @@ mod tests {
         let mock_tracking = create_mock_tracking(1, 1);
         let mut updated_tracking = mock_tracking.clone();
         updated_tracking.l1_branch = "develop".to_string();
+        let mock_package = create_mock_package(1);
+        let mock_report = create_mock_maintenance_report(1);
 
         let db = MockDatabase::new(DatabaseBackend::Postgres)
             .append_query_results([[mock_tracking]]) // Find tracking
             .append_query_results([[updated_tracking]]) // Updated result
+            .append_query_results([[mock_package]])
+            .append_query_results([[mock_report]])
             .into_connection();
         let state = AppState::without_external_clients(db);
 
@@ -664,18 +733,6 @@ mod tests {
     }
 
     #[test]
-    fn test_tracking_response_from_model() {
-        let model = create_mock_tracking(1, 1);
-        let response: TrackingResponse = model.clone().into();
-
-        assert_eq!(response.id, model.id);
-        assert_eq!(response.package_id, model.package_id);
-        assert_eq!(response.l1_repo_owner, model.l1_repo_owner);
-        assert_eq!(response.l1_repo_name, model.l1_repo_name);
-        assert_eq!(response.tracking_status, model.tracking_status);
-    }
-
-    #[test]
     fn test_update_tracking_request_partial_update() {
         let req = UpdateTrackingRequest {
             l1_repo_owner: Some("new_owner".to_string()),
@@ -690,4 +747,112 @@ mod tests {
         assert!(req.l1_repo_name.is_none());
         assert!(req.l2_branch.is_some());
     }
+}
+
+async fn build_tracking_response(
+    db: &DatabaseConnection,
+    model: tracking::Model,
+) -> Result<TrackingResponse, ApiError> {
+    let package = Packages::find_by_id(model.package_id)
+        .one(db)
+        .await
+        .map_err(ApiError::from)?;
+    let maintenance_summary = latest_maintenance_summary(db, model.package_id).await?;
+
+    Ok(TrackingResponse {
+        id: model.id,
+        package_id: model.package_id,
+        package_name: package.as_ref().map(|pkg| pkg.name.clone()),
+        package_level: package.as_ref().map(|pkg| pkg.level),
+        l0_repo_url: package.as_ref().and_then(|pkg| pkg.l0_repo_url.clone()),
+        distro_id: model.distro_id,
+        l1_repo_owner: model.l1_repo_owner,
+        l1_repo_name: model.l1_repo_name,
+        l1_branch: model.l1_branch,
+        l2_branch: model.l2_branch,
+        l2_repo_path: model.l2_repo_path,
+        tracking_status: model.tracking_status,
+        last_sync_time: model.last_sync_time,
+        last_l1_commit_sha: model.last_l1_commit_sha,
+        last_l2_commit_sha: model.last_l2_commit_sha,
+        maintenance_summary,
+        created_at: model.created_at,
+        updated_at: model.updated_at,
+    })
+}
+
+async fn latest_maintenance_summary(
+    db: &DatabaseConnection,
+    package_id: i32,
+) -> Result<Option<TrackingMaintenanceSummary>, ApiError> {
+    let report = MaintenanceReports::find()
+        .filter(maintenance_reports::Column::PackageId.eq(package_id))
+        .order_by_desc(maintenance_reports::Column::GeneratedAt)
+        .one(db)
+        .await
+        .map_err(ApiError::from)?;
+
+    Ok(report.map(|report| TrackingMaintenanceSummary {
+        report_id: report.id,
+        overall_risk: report.overall_risk,
+        confidence: report.confidence,
+        generated_at: report.generated_at,
+        commit_total: find_report_i64(&report.report_payload, "commit_total"),
+        commits_last_12_months: find_report_i64(&report.report_payload, "commits_last_12_months"),
+        committers_last_12_months: find_report_i64(
+            &report.report_payload,
+            "committers_last_12_months",
+        ),
+        last_commit_at: find_report_string(&report.report_payload, "last_commit_at"),
+        stars: find_report_i64(&report.report_payload, "stars"),
+        forks: find_report_i64(&report.report_payload, "forks"),
+    }))
+}
+
+fn find_report_i64(report_payload: &Value, key: &str) -> Option<i64> {
+    find_report_json_value(report_payload, key).and_then(|value| match value {
+        Value::Number(number) => number.as_i64(),
+        Value::String(text) => text.parse::<i64>().ok(),
+        _ => None,
+    })
+}
+
+fn find_report_string(report_payload: &Value, key: &str) -> Option<String> {
+    find_report_json_value(report_payload, key).and_then(|value| match value {
+        Value::String(text) if !text.trim().is_empty() => Some(text),
+        Value::Number(number) => Some(number.to_string()),
+        Value::Bool(flag) => Some(flag.to_string()),
+        _ => None,
+    })
+}
+
+fn find_report_json_value(report_payload: &Value, key: &str) -> Option<Value> {
+    report_payload
+        .get("section")
+        .and_then(|section| section.get("indicators"))
+        .and_then(Value::as_array)
+        .and_then(|indicators| {
+            indicators.iter().find_map(|indicator| {
+                let indicator_key = indicator.get("key").and_then(Value::as_str)?;
+                if indicator_key == key {
+                    indicator.get("value").cloned()
+                } else {
+                    None
+                }
+            })
+        })
+        .or_else(|| {
+            report_payload
+                .get("raw_evidence")
+                .and_then(Value::as_array)
+                .and_then(|entries| {
+                    entries.iter().find_map(|entry| {
+                        let category = entry.get("assessment_category").and_then(Value::as_str)?;
+                        if category != "maintenance" {
+                            return None;
+                        }
+                        entry.get("data").and_then(|data| data.get(key)).cloned()
+                    })
+                })
+        })
 }

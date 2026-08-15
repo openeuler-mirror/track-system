@@ -1,6 +1,6 @@
 /*
  * Copyright(c) 2024-2026 China Telecom Cloud Technologies Co., Ltd. All rights
- * reserved. ctscat is licensed under Mulan PSL v2. You can use this software
+ * reserved. track-system is licensed under Mulan PSL v2. You can use this software
  * according to the terms and conditions of the Mulan PSL V2. You may obtain a
  * copy of Mulan PSL v2 at: http://license.coscl.org.cn/MulanPSL2.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
@@ -16,6 +16,7 @@ use axum::{
     Json,
 };
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 use crate::server::{
     api::{ApiResponse, PaginatedResponse},
@@ -72,10 +73,26 @@ pub struct ReportDetail {
     pub status: String,
     /// 报告内容（JSON）
     pub content: serde_json::Value,
+    /// 维护评估摘要（可选）
+    pub maintenance_summary: Option<ReportMaintenanceSummary>,
     /// 创建时间
     pub created_at: chrono::DateTime<chrono::Utc>,
     /// 更新时间
     pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReportMaintenanceSummary {
+    pub report_id: i64,
+    pub overall_risk: String,
+    pub confidence: String,
+    pub generated_at: chrono::DateTime<chrono::Utc>,
+    pub commit_total: Option<i64>,
+    pub commits_last_12_months: Option<i64>,
+    pub committers_last_12_months: Option<i64>,
+    pub last_commit_at: Option<String>,
+    pub stars: Option<i64>,
+    pub forks: Option<i64>,
 }
 
 /// 报告导出格式
@@ -192,14 +209,19 @@ pub async fn get_report(
     let (report_model, tracking_opt) = report;
 
     // 获取 package 名称
-    let package_name = if let Some(tracking_model) = tracking_opt {
-        Packages::find_by_id(tracking_model.package_id)
+    let (package_name, maintenance_summary) = if let Some(tracking_model) = tracking_opt {
+        let package = Packages::find_by_id(tracking_model.package_id)
             .one(state.db.as_ref())
-            .await?
-            .map(|p| p.name)
-            .unwrap_or_else(|| "unknown".to_string())
+            .await?;
+        let package_name = package
+            .as_ref()
+            .map(|p| p.name.clone())
+            .unwrap_or_else(|| "unknown".to_string());
+        let maintenance_summary =
+            latest_maintenance_summary(state.db.as_ref(), tracking_model.package_id).await?;
+        (package_name, maintenance_summary)
     } else {
-        "unknown".to_string()
+        ("unknown".to_string(), None)
     };
 
     let report_detail = ReportDetail {
@@ -209,6 +231,7 @@ pub async fn get_report(
         package_name,
         status: report_model.status,
         content: report_model.diff_summary,
+        maintenance_summary,
         created_at: report_model.created_at,
         updated_at: report_model.updated_at,
     };
@@ -315,6 +338,85 @@ pub async fn export_report(
     Ok(content)
 }
 
+async fn latest_maintenance_summary(
+    db: &sea_orm::DatabaseConnection,
+    package_id: i32,
+) -> Result<Option<ReportMaintenanceSummary>, ApiError> {
+    use crate::entities::{maintenance_reports, prelude::*};
+    use sea_orm::*;
+
+    let report = MaintenanceReports::find()
+        .filter(maintenance_reports::Column::PackageId.eq(package_id))
+        .order_by_desc(maintenance_reports::Column::GeneratedAt)
+        .one(db)
+        .await
+        .map_err(ApiError::from)?;
+
+    Ok(report.map(|report| ReportMaintenanceSummary {
+        report_id: report.id,
+        overall_risk: report.overall_risk,
+        confidence: report.confidence,
+        generated_at: report.generated_at,
+        commit_total: find_report_i64(&report.report_payload, "commit_total"),
+        commits_last_12_months: find_report_i64(&report.report_payload, "commits_last_12_months"),
+        committers_last_12_months: find_report_i64(
+            &report.report_payload,
+            "committers_last_12_months",
+        ),
+        last_commit_at: find_report_string(&report.report_payload, "last_commit_at"),
+        stars: find_report_i64(&report.report_payload, "stars"),
+        forks: find_report_i64(&report.report_payload, "forks"),
+    }))
+}
+
+fn find_report_i64(report_payload: &Value, key: &str) -> Option<i64> {
+    find_report_json_value(report_payload, key).and_then(|value| match value {
+        Value::Number(number) => number.as_i64(),
+        Value::String(text) => text.parse::<i64>().ok(),
+        _ => None,
+    })
+}
+
+fn find_report_string(report_payload: &Value, key: &str) -> Option<String> {
+    find_report_json_value(report_payload, key).and_then(|value| match value {
+        Value::String(text) if !text.trim().is_empty() => Some(text),
+        Value::Number(number) => Some(number.to_string()),
+        Value::Bool(flag) => Some(flag.to_string()),
+        _ => None,
+    })
+}
+
+fn find_report_json_value(report_payload: &Value, key: &str) -> Option<Value> {
+    report_payload
+        .get("section")
+        .and_then(|section| section.get("indicators"))
+        .and_then(Value::as_array)
+        .and_then(|indicators| {
+            indicators.iter().find_map(|indicator| {
+                let indicator_key = indicator.get("key").and_then(Value::as_str)?;
+                if indicator_key == key {
+                    indicator.get("value").cloned()
+                } else {
+                    None
+                }
+            })
+        })
+        .or_else(|| {
+            report_payload
+                .get("raw_evidence")
+                .and_then(Value::as_array)
+                .and_then(|entries| {
+                    entries.iter().find_map(|entry| {
+                        let category = entry.get("assessment_category").and_then(Value::as_str)?;
+                        if category != "maintenance" {
+                            return None;
+                        }
+                        entry.get("data").and_then(|data| data.get(key)).cloned()
+                    })
+                })
+        })
+}
+
 /// 导出格式查询参数
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExportFormatQuery {
@@ -411,6 +513,7 @@ mod tests {
             package_name: "redis".to_string(),
             status: "completed".to_string(),
             content: content.clone(),
+            maintenance_summary: None,
             created_at: now,
             updated_at: now,
         };

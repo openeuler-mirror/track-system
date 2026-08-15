@@ -1,6 +1,6 @@
 /*
  * Copyright(c) 2024-2026 China Telecom Cloud Technologies Co., Ltd. All rights
- * reserved. ctscat is licensed under Mulan PSL v2. You can use this software
+ * reserved. track-system is licensed under Mulan PSL v2. You can use this software
  * according to the terms and conditions of the Mulan PSL V2. You may obtain a
  * copy of Mulan PSL v2 at: http://license.coscl.org.cn/MulanPSL2.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
@@ -20,12 +20,18 @@ pub mod commit_records;
 pub mod compare_reports;
 pub mod distributed_locks;
 pub mod distros;
+pub mod ecosystem_bindings;
+pub mod ecosystem_evidence_snapshots;
+pub mod ecosystem_reports;
+pub mod ecosystem_targets;
 pub mod issue_events;
 pub mod issues;
 pub mod l0_commits;
 pub mod l1_commit_records;
 pub mod l2_commit_records;
 pub mod l2_snapshots;
+pub mod maintenance_evidence_snapshots;
+pub mod maintenance_reports;
 pub mod packages;
 pub mod spec_changes;
 pub mod spec_snapshots;

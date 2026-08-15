@@ -1,6 +1,6 @@
 /*
  * Copyright(c) 2024-2026 China Telecom Cloud Technologies Co., Ltd. All rights
- * reserved. ctscat is licensed under Mulan PSL v2. You can use this software
+ * reserved. track-system is licensed under Mulan PSL v2. You can use this software
  * according to the terms and conditions of the Mulan PSL V2. You may obtain a
  * copy of Mulan PSL v2 at: http://license.coscl.org.cn/MulanPSL2.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
@@ -105,5 +105,55 @@ impl Telemetry {
                 tracking_id, stage_name, "pipeline stage failed"
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::TimeZone;
+
+    fn init_test_subscriber() {
+        let _ = tracing_subscriber::fmt().with_test_writer().try_init();
+    }
+
+    #[test]
+    fn sync_job_events_cover_success_and_failure_paths() {
+        init_test_subscriber();
+
+        Telemetry::sync_job_queued(1, 10, 5);
+        Telemetry::sync_job_started(1, 10, 2);
+        Telemetry::sync_job_completed(1, 10, true);
+        Telemetry::sync_job_completed(1, 10, false);
+        Telemetry::sync_job_succeeded(1, 10);
+        Telemetry::sync_job_failed(1, 10, "network timeout");
+    }
+
+    #[test]
+    fn domain_batch_events_accept_expected_counters() {
+        init_test_subscriber();
+
+        Telemetry::ingestion_batch_finished(7, 12, 3);
+        Telemetry::l0_poll_summary(3, 4, 1);
+        Telemetry::backport_candidates_created(8, 2, 5);
+    }
+
+    #[test]
+    fn classification_events_cover_targeted_and_global_batches() {
+        init_test_subscriber();
+
+        Telemetry::classification_batch_processed(Some(42), 9);
+        Telemetry::classification_batch_processed(None, 4);
+    }
+
+    #[test]
+    fn snapshot_and_pipeline_events_cover_optional_and_failure_paths() {
+        init_test_subscriber();
+        let exported_at = Utc.with_ymd_and_hms(2026, 6, 23, 2, 58, 0).unwrap();
+
+        Telemetry::snapshot_export_completed(Some(11), "/tmp/snapshot.json", exported_at);
+        Telemetry::snapshot_export_completed(None, "/tmp/all-snapshots.json", exported_at);
+        Telemetry::pipeline_stage_completed(11, "diff-comparison", true);
+        Telemetry::pipeline_stage_completed(11, "report-generation", false);
     }
 }

@@ -1,6 +1,6 @@
 /*
  * Copyright(c) 2024-2026 China Telecom Cloud Technologies Co., Ltd. All rights
- * reserved. ctscat is licensed under Mulan PSL v2. You can use this software
+ * reserved. track-system is licensed under Mulan PSL v2. You can use this software
  * according to the terms and conditions of the Mulan PSL V2. You may obtain a
  * copy of Mulan PSL v2 at: http://license.coscl.org.cn/MulanPSL2.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
@@ -26,6 +26,7 @@ use crate::collectors::{
         FileContent, GitClient, Platform, SnapshotData,
     },
 };
+use crate::spec::parse_spec;
 
 /// 本地 Git 仓库客户端
 pub struct LocalClient {
@@ -477,17 +478,12 @@ impl LocalClient {
                             hasher.update(content);
                             spec_sha256 = Some(format!("{:x}", hasher.finalize()));
 
-                            // 尝试提取版本号和发行版号
-                            for line in text.lines() {
-                                if line.starts_with("Version:") {
-                                    spec_version = Some(
-                                        line.trim_start_matches("Version:").trim().to_string(),
-                                    );
-                                } else if line.starts_with("Release:") {
-                                    spec_release = Some(
-                                        line.trim_start_matches("Release:").trim().to_string(),
-                                    );
-                                }
+                            let spec_info = parse_spec(&text);
+                            if !spec_info.version.is_empty() {
+                                spec_version = Some(spec_info.version);
+                            }
+                            if !spec_info.release.is_empty() {
+                                spec_release = Some(spec_info.release);
                             }
                         }
                     }

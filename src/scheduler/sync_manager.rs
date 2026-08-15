@@ -1,6 +1,6 @@
 /*
  * Copyright(c) 2024-2026 China Telecom Cloud Technologies Co., Ltd. All rights
- * reserved. ctscat is licensed under Mulan PSL v2. You can use this software
+ * reserved. track-system is licensed under Mulan PSL v2. You can use this software
  * according to the terms and conditions of the Mulan PSL V2. You may obtain a
  * copy of Mulan PSL v2 at: http://license.coscl.org.cn/MulanPSL2.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
@@ -15,7 +15,7 @@
 
 use chrono::Utc;
 use sea_orm::*;
-use tracing::info;
+use tracing::{debug, info};
 
 use super::{SyncResult, SyncStatus};
 use crate::entities::{
@@ -206,6 +206,12 @@ impl<'a> SyncManager<'a> {
                 // 否则，处理所有任务
                 let id_matches = tracking_id.is_none_or(|id| track.id == id);
                 if id_matches && (should_sync(&track, &package, now) || wake_up) {
+                    info!(
+                        tracking_id = track.id,
+                        "Add track {} to pending tasks, last_sync_time {:?}",
+                        track.id,
+                        track.last_sync_time
+                    );
                     pending_tasks.push(track);
                 }
             }
@@ -350,6 +356,12 @@ impl<'a> SyncManager<'a> {
         let preserve_status = matches!(track.tracking_status.as_str(), "paused" | "archived");
         let mut active: tracking::ActiveModel = track.clone().into();
         let now = Utc::now();
+
+        let latest_job = self.find_latest_sync_job(tracking_id).await?;
+        let latest_attempts = latest_job
+            .as_ref()
+            .map(|job| job.attempt_count)
+            .unwrap_or(0);
 
         match &outcome {
             CompletionOutcome::Success => {

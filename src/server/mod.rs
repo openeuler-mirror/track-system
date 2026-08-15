@@ -1,6 +1,6 @@
 /*
  * Copyright(c) 2024-2026 China Telecom Cloud Technologies Co., Ltd. All rights
- * reserved. ctscat is licensed under Mulan PSL v2. You can use this software
+ * reserved. track-system is licensed under Mulan PSL v2. You can use this software
  * according to the terms and conditions of the Mulan PSL V2. You may obtain a
  * copy of Mulan PSL v2 at: http://license.coscl.org.cn/MulanPSL2.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
@@ -25,8 +25,9 @@ use crate::collectors::{gitea::GiteaClient, gitee::GiteeClient};
 
 use self::{
     routes::{
-        backport_routes, compare_routes, component_routes, health_routes, metadata_routes,
-        package_routes, reports_routes, sync_routes, tracking_routes,
+        ai_routes, backport_routes, compare_routes, component_routes, ecosystem_routes,
+        health_routes, l0_routes, maintenance_routes, metadata_routes, package_routes,
+        reports_routes, sync_routes, tracking_routes,
     },
     state::AppState,
 };
@@ -63,9 +64,13 @@ pub fn create_app_with_state(state: AppState) -> Router {
                 .merge(reports_routes())
                 .merge(package_routes())
                 .merge(tracking_routes())
+                .merge(l0_routes())
                 .merge(sync_routes())
                 .merge(backport_routes())
                 .merge(component_routes())
+                .merge(ecosystem_routes())
+                .merge(maintenance_routes())
+                .merge(ai_routes())
                 .merge(crate::server::routes::snapshot_routes()),
         )
         .with_state(state)

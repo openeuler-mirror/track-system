@@ -1,0 +1,146 @@
+use sea_orm_migration::prelude::*;
+use sea_orm_migration::sea_orm::DatabaseBackend;
+
+#[derive(DeriveMigrationName)]
+pub struct Migration;
+
+#[async_trait::async_trait]
+impl MigrationTrait for Migration {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        let backend = manager.get_database_backend();
+        manager
+            .create_table(
+                Table::create()
+                    .table(EcosystemTargets::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(EcosystemTargets::Id)
+                            .integer()
+                            .not_null()
+                            .auto_increment()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(EcosystemTargets::Name).string().not_null())
+                    .col(
+                        ColumnDef::new(EcosystemTargets::TargetType)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(ColumnDef::new(EcosystemTargets::Platform).string().null())
+                    .col(ColumnDef::new(EcosystemTargets::Role).string().not_null())
+                    .col(
+                        ColumnDef::new(EcosystemTargets::HomepageUrl)
+                            .string()
+                            .null(),
+                    )
+                    .col(ColumnDef::new(EcosystemTargets::ApiBaseUrl).string().null())
+                    .col(ColumnDef::new(EcosystemTargets::Owner).string().null())
+                    .col(ColumnDef::new(EcosystemTargets::Repo).string().null())
+                    .col(
+                        ColumnDef::new(EcosystemTargets::DefaultBranch)
+                            .string()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(EcosystemTargets::Status)
+                            .string()
+                            .not_null()
+                            .default("active"),
+                    )
+                    .col(
+                        ColumnDef::new(EcosystemTargets::RefreshIntervalHours)
+                            .integer()
+                            .not_null()
+                            .default(24),
+                    )
+                    .col(
+                        ColumnDef::new(EcosystemTargets::RuleProfile)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(ColumnDef::new(EcosystemTargets::Metadata).json().null())
+                    .col(
+                        ColumnDef::new(EcosystemTargets::LastCollectedAt)
+                            .custom(timestamp_type(backend))
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(EcosystemTargets::LastReportAt)
+                            .custom(timestamp_type(backend))
+                            .null(),
+                    )
+                    .col(ColumnDef::new(EcosystemTargets::LastError).text().null())
+                    .col(
+                        ColumnDef::new(EcosystemTargets::CreatedAt)
+                            .custom(timestamp_type(backend))
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(EcosystemTargets::UpdatedAt)
+                            .custom(timestamp_type(backend))
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_ecosystem_targets_name")
+                    .table(EcosystemTargets::Table)
+                    .col(EcosystemTargets::Name)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_ecosystem_targets_type")
+                    .table(EcosystemTargets::Table)
+                    .col(EcosystemTargets::TargetType)
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(EcosystemTargets::Table).to_owned())
+            .await
+    }
+}
+
+fn timestamp_type(backend: DatabaseBackend) -> Alias {
+    match backend {
+        DatabaseBackend::Postgres => Alias::new("timestamp with time zone"),
+        _ => Alias::new("timestamp"),
+    }
+}
+
+#[derive(DeriveIden)]
+enum EcosystemTargets {
+    Table,
+    Id,
+    Name,
+    TargetType,
+    Platform,
+    Role,
+    HomepageUrl,
+    ApiBaseUrl,
+    Owner,
+    Repo,
+    DefaultBranch,
+    Status,
+    RefreshIntervalHours,
+    RuleProfile,
+    Metadata,
+    LastCollectedAt,
+    LastReportAt,
+    LastError,
+    CreatedAt,
+    UpdatedAt,
+}

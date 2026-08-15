@@ -1,0 +1,323 @@
+use anyhow::{Context, Result};
+use chrono::{DateTime, Duration, Utc};
+use std::collections::BTreeSet;
+use tracing::warn;
+
+use crate::collectors::{Commit, CommitsParams, GitClient};
+
+const DEFAULT_MAX_TOTAL_COUNT_PAGES: u32 = 500;
+const DEFAULT_MAX_RECENT_ACTIVITY_PAGES: u32 = 200;
+const COMMITS_PER_PAGE: u32 = 100;
+
+#[derive(Debug, Clone, Default)]
+pub struct RepositoryActivityMetrics {
+    pub default_branch: Option<String>,
+    pub last_commit_at: Option<String>,
+    pub commit_total: i64,
+    pub commit_total_is_lower_bound: bool,
+    pub commits_last_12_months: i64,
+    pub commits_last_12_months_is_lower_bound: bool,
+    pub committers_last_12_months: i64,
+}
+
+pub async fn collect_commit_activity<C>(
+    client: &C,
+    owner: &str,
+    repo: &str,
+    branch: &str,
+) -> Result<RepositoryActivityMetrics>
+where
+    C: GitClient + ?Sized,
+{
+    collect_commit_activity_with_limits(
+        client,
+        owner,
+        repo,
+        branch,
+        DEFAULT_MAX_TOTAL_COUNT_PAGES,
+        DEFAULT_MAX_RECENT_ACTIVITY_PAGES,
+    )
+    .await
+}
+
+async fn collect_commit_activity_with_limits<C>(
+    client: &C,
+    owner: &str,
+    repo: &str,
+    branch: &str,
+    max_total_pages: u32,
+    max_recent_pages: u32,
+) -> Result<RepositoryActivityMetrics>
+where
+    C: GitClient + ?Sized,
+{
+    let since = Utc::now() - Duration::days(365);
+    let latest_commit = client
+        .get_commits(owner, repo, CommitsParams::new(branch).page(1).per_page(1))
+        .await
+        .with_context(|| format!("fetch latest commits failed for {owner}/{repo}"))?;
+    let last_commit_at = latest_commit
+        .first()
+        .map(commit_timestamp)
+        .map(|value| value.to_rfc3339());
+
+    let (commit_total, commit_total_is_lower_bound) =
+        count_commits(client, owner, repo, branch, None, max_total_pages).await?;
+    let (recent_commits, commits_last_12_months_is_lower_bound, recent_committers) =
+        collect_recent_activity(client, owner, repo, branch, since, max_recent_pages).await?;
+
+    Ok(RepositoryActivityMetrics {
+        default_branch: Some(branch.to_string()),
+        last_commit_at,
+        commit_total,
+        commit_total_is_lower_bound,
+        commits_last_12_months: recent_commits,
+        commits_last_12_months_is_lower_bound,
+        committers_last_12_months: recent_committers,
+    })
+}
+
+async fn count_commits<C>(
+    client: &C,
+    owner: &str,
+    repo: &str,
+    branch: &str,
+    since: Option<DateTime<Utc>>,
+    max_pages: u32,
+) -> Result<(i64, bool)>
+where
+    C: GitClient + ?Sized,
+{
+    let mut total = 0_i64;
+
+    for page in 1..=max_pages {
+        let mut params = CommitsParams::new(branch)
+            .page(page)
+            .per_page(COMMITS_PER_PAGE);
+        if let Some(since) = since {
+            params = params.since(since);
+        }
+
+        let commits = client
+            .get_commits(owner, repo, params)
+            .await
+            .with_context(|| format!("count commits failed for {owner}/{repo} page {page}"))?;
+        if commits.is_empty() {
+            return Ok((total, false));
+        }
+
+        total += commits.len() as i64;
+
+        if commits.len() < COMMITS_PER_PAGE as usize {
+            return Ok((total, false));
+        }
+    }
+
+    warn!(
+        owner,
+        repo, branch, max_pages, "平台 API commit 计数达到页数上限，返回下界"
+    );
+    Ok((total, true))
+}
+
+async fn collect_recent_activity<C>(
+    client: &C,
+    owner: &str,
+    repo: &str,
+    branch: &str,
+    since: DateTime<Utc>,
+    max_pages: u32,
+) -> Result<(i64, bool, i64)>
+where
+    C: GitClient + ?Sized,
+{
+    let mut total = 0_i64;
+    let mut identities = BTreeSet::new();
+
+    for page in 1..=max_pages {
+        let params = CommitsParams::new(branch)
+            .since(since)
+            .page(page)
+            .per_page(COMMITS_PER_PAGE);
+        let commits = client
+            .get_commits(owner, repo, params)
+            .await
+            .with_context(|| {
+                format!("collect recent activity failed for {owner}/{repo} page {page}")
+            })?;
+
+        if commits.is_empty() {
+            return Ok((total, false, identities.len() as i64));
+        }
+
+        total += commits.len() as i64;
+        for commit in &commits {
+            identities.insert(normalized_commit_identity(commit));
+        }
+
+        if commits.len() < COMMITS_PER_PAGE as usize {
+            return Ok((total, false, identities.len() as i64));
+        }
+    }
+
+    warn!(
+        owner,
+        repo, branch, max_pages, "平台 API 近 12 个月 commit 活跃度统计达到页数上限，返回下界"
+    );
+    Ok((total, true, identities.len() as i64))
+}
+
+pub fn normalized_commit_identity(commit: &Commit) -> String {
+    if !commit.committer_email.trim().is_empty() {
+        return commit.committer_email.to_ascii_lowercase();
+    }
+    if !commit.author_email.trim().is_empty() {
+        return commit.author_email.to_ascii_lowercase();
+    }
+    if !commit.committer_name.trim().is_empty() {
+        return format!("name:{}", commit.committer_name);
+    }
+    if !commit.author_name.trim().is_empty() {
+        return format!("name:{}", commit.author_name);
+    }
+    format!("sha:{}", commit.sha)
+}
+
+pub fn commit_timestamp(commit: &Commit) -> DateTime<Utc> {
+    if commit.committer_date >= commit.author_date {
+        commit.committer_date
+    } else {
+        commit.author_date
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use async_trait::async_trait;
+    use chrono::TimeZone;
+
+    use crate::collectors::{ApiResult, Branch, FileContent, GitClient, Repository};
+
+    #[derive(Clone)]
+    struct MockGitClient {
+        latest: Vec<Commit>,
+        total_pages: Vec<Vec<Commit>>,
+        recent_pages: Vec<Vec<Commit>>,
+    }
+
+    #[async_trait]
+    impl GitClient for MockGitClient {
+        async fn get_repository(&self, _owner: &str, _repo: &str) -> ApiResult<Repository> {
+            unreachable!("repository lookup is not used in activity tests")
+        }
+
+        async fn get_branches(&self, _owner: &str, _repo: &str) -> ApiResult<Vec<Branch>> {
+            unreachable!("branch lookup is not used in activity tests")
+        }
+
+        async fn get_commits(
+            &self,
+            _owner: &str,
+            _repo: &str,
+            params: CommitsParams,
+        ) -> ApiResult<Vec<Commit>> {
+            let page_index = params.page.saturating_sub(1) as usize;
+            if params.per_page == 1 && params.since.is_none() {
+                return Ok(self.latest.clone());
+            }
+
+            if params.since.is_some() {
+                return Ok(self
+                    .recent_pages
+                    .get(page_index)
+                    .cloned()
+                    .unwrap_or_default());
+            }
+
+            Ok(self
+                .total_pages
+                .get(page_index)
+                .cloned()
+                .unwrap_or_default())
+        }
+
+        async fn get_file_content(
+            &self,
+            _owner: &str,
+            _repo: &str,
+            _path: &str,
+            _branch: &str,
+        ) -> ApiResult<FileContent> {
+            unreachable!("file content is not used in activity tests")
+        }
+    }
+
+    fn commit(sha: &str, email: &str, when: DateTime<Utc>) -> Commit {
+        Commit {
+            sha: sha.to_string(),
+            title: sha.to_string(),
+            message: sha.to_string(),
+            author_name: "Author".to_string(),
+            author_email: email.to_string(),
+            author_date: when,
+            committer_name: "Committer".to_string(),
+            committer_email: email.to_string(),
+            committer_date: when,
+            html_url: String::new(),
+            stats: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn collect_commit_activity_counts_total_and_recent_committers() {
+        let now = Utc.with_ymd_and_hms(2026, 4, 23, 10, 0, 0).unwrap();
+        let client = MockGitClient {
+            latest: vec![commit("latest", "latest@example.com", now)],
+            total_pages: vec![
+                vec![commit("a", "a@example.com", now); 100],
+                vec![commit("b", "b@example.com", now); 3],
+            ],
+            recent_pages: vec![vec![
+                commit("r1", "alice@example.com", now),
+                commit("r2", "bob@example.com", now),
+                commit("r3", "alice@example.com", now),
+            ]],
+        };
+
+        let metrics = collect_commit_activity_with_limits(&client, "owner", "repo", "main", 10, 10)
+            .await
+            .unwrap();
+
+        assert_eq!(metrics.default_branch.as_deref(), Some("main"));
+        assert_eq!(metrics.commit_total, 103);
+        assert!(!metrics.commit_total_is_lower_bound);
+        assert_eq!(metrics.commits_last_12_months, 3);
+        assert!(!metrics.commits_last_12_months_is_lower_bound);
+        assert_eq!(metrics.committers_last_12_months, 2);
+        assert_eq!(
+            metrics.last_commit_at.as_deref(),
+            Some("2026-04-23T10:00:00+00:00")
+        );
+    }
+
+    #[tokio::test]
+    async fn collect_commit_activity_marks_lower_bound_when_page_limit_hits() {
+        let now = Utc.with_ymd_and_hms(2026, 4, 23, 10, 0, 0).unwrap();
+        let client = MockGitClient {
+            latest: vec![commit("latest", "latest@example.com", now)],
+            total_pages: vec![vec![commit("a", "a@example.com", now); 100]],
+            recent_pages: vec![vec![commit("r1", "alice@example.com", now); 100]],
+        };
+
+        let metrics = collect_commit_activity_with_limits(&client, "owner", "repo", "main", 1, 1)
+            .await
+            .unwrap();
+
+        assert_eq!(metrics.commit_total, 100);
+        assert!(metrics.commit_total_is_lower_bound);
+        assert_eq!(metrics.commits_last_12_months, 100);
+        assert!(metrics.commits_last_12_months_is_lower_bound);
+        assert_eq!(metrics.committers_last_12_months, 1);
+    }
+}

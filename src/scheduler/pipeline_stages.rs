@@ -1,6 +1,6 @@
 /*
  * Copyright(c) 2024-2026 China Telecom Cloud Technologies Co., Ltd. All rights
- * reserved. ctscat is licensed under Mulan PSL v2. You can use this software
+ * reserved. track-system is licensed under Mulan PSL v2. You can use this software
  * according to the terms and conditions of the Mulan PSL V2. You may obtain a
  * copy of Mulan PSL v2 at: http://license.coscl.org.cn/MulanPSL2.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
@@ -16,11 +16,13 @@ use chrono::Utc;
 use reqwest::Client;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
 use serde::Serialize;
-use std::collections::HashMap;
+use serde_json::Value;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::time::Duration;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
+use crate::ai::{AiAnalysisRequest, AiAnalysisService, AiAnalysisSource, AiContext};
 use crate::analyzer::ChangeClassifier;
 use crate::backport_advisor::BackportAdvisor;
 use crate::diff;
@@ -28,10 +30,35 @@ use crate::entities::{l1_commit_records, prelude::*, tracking, tracking_reports}
 use crate::metadata_bridge;
 
 use super::pipeline_executor::{
-    BackportSuggestionResult, ClassificationResult, DiffComparisonResult, L1IngestionResult,
-    L2SnapshotResult, PipelineExecutor, PipelineStage, ReportGenerationResult, StageResult,
+    BackportSuggestionResult, ClassificationResult, ClassifiedCommitResult, DiffComparisonResult,
+    L1IngestionResult, L2SnapshotResult, PipelineExecutor, PipelineStage, ReportGenerationResult,
+    StageResult,
 };
+use super::report_artifacts::CveFixComparisonInput;
 use super::{SyncService, SyncStatus};
+
+const L2_NEWER_FALLBACK_L2_BRANCHES: [&str; 2] = ["25.05", "25.07"];
+const L2_NEWER_PRIMARY_L1_BRANCH: &str = "openEuler-24.03-LTS-SP3";
+const L2_NEWER_FALLBACK_L1_BRANCH: &str = "openEuler-24.09";
+
+#[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
+enum RiskType {
+    CodeScan = 1, // 代码扫描漏洞
+    CVE = 2,      // CVE 安全漏洞
+    Bug = 3,      // bug
+    Porting = 4,  // 回合移植
+    License = 5,  // license冲突
+}
+
+impl serde::Serialize for RiskType {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_i32(*self as i32)
+    }
+}
 
 #[derive(Debug, Clone, Serialize)]
 struct RiskCreateReq {
@@ -59,6 +86,1284 @@ struct RiskCreateReq {
     package_id: u64,
     #[serde(rename = "inner_secret")]
     inner_secret: String,
+    #[serde(rename = "report_url")]
+    report_url: String,
+    #[serde(rename = "risk_type")]
+    risk_type: RiskType,
+}
+
+fn short_sha(sha: &str) -> String {
+    sha.chars().take(12).collect()
+}
+
+fn infer_changelog_entry_type(text: &str) -> String {
+    let lower = text.to_ascii_lowercase();
+    if lower.contains("cve") || lower.contains("security") || text.contains("安全") {
+        "security".to_string()
+    } else if lower.contains("fix") || lower.contains("bug") || text.contains("修复") {
+        "bugfix".to_string()
+    } else {
+        "change".to_string()
+    }
+}
+
+fn latest_version_from_strings(versions: &[String]) -> Option<String> {
+    versions
+        .iter()
+        .filter_map(|version| {
+            crate::utils::version::VersionParser::parse(version)
+                .ok()
+                .filter(|parsed| parsed.major < 1000)
+                .map(|parsed| (parsed, version.clone()))
+        })
+        .max_by(|(left, _), (right, _)| left.cmp(right))
+        .map(|(_, raw)| raw)
+}
+
+fn latest_version_from_tags(
+    versions: &[diff::l1_vs_l0::VersionTag],
+    stable_only: bool,
+) -> Option<String> {
+    versions
+        .iter()
+        .filter(|tag| !stable_only || tag.is_stable)
+        .filter_map(|tag| {
+            crate::utils::version::VersionParser::parse(&tag.version)
+                .ok()
+                .map(|parsed| (parsed, tag.version.clone()))
+        })
+        .max_by(|(left, _), (right, _)| left.cmp(right))
+        .map(|(_, raw)| raw)
+}
+
+async fn latest_snapshot_record(
+    db: &sea_orm::DatabaseConnection,
+    tracking_id: i32,
+    snapshot_type: &str,
+) -> Result<Option<crate::entities::l2_snapshots::Model>> {
+    use crate::entities::{l2_snapshots, prelude::L2Snapshots};
+
+    L2Snapshots::find()
+        .filter(l2_snapshots::Column::TrackingId.eq(tracking_id))
+        .filter(l2_snapshots::Column::SnapshotType.eq(snapshot_type))
+        .order_by_desc(l2_snapshots::Column::CreatedAt)
+        .one(db)
+        .await
+        .context("查询快照记录失败")
+}
+
+async fn latest_l2_snapshot_record_for_tracking(
+    db: &sea_orm::DatabaseConnection,
+    tracking: &tracking::Model,
+) -> Result<Option<crate::entities::l2_snapshots::Model>> {
+    use crate::entities::prelude::Tracking;
+    use crate::entities::tracking as tracking_entity;
+
+    if !is_l2_newer_fallback_tracking(tracking) {
+        return latest_snapshot_record(db, tracking.id, "l2").await;
+    }
+
+    let source_tracking = Tracking::find()
+        .filter(tracking_entity::Column::PackageId.eq(tracking.package_id))
+        .filter(tracking_entity::Column::L2Branch.eq(tracking.l2_branch.clone()))
+        .filter(tracking_entity::Column::L1Branch.eq(L2_NEWER_PRIMARY_L1_BRANCH))
+        .one(db)
+        .await
+        .context("查询 fallback L2 快照来源 tracking 失败")?;
+
+    let Some(source_tracking) = source_tracking else {
+        warn!(
+            tracking_id = tracking.id,
+            l2_branch = tracking.l2_branch,
+            source_l1_branch = L2_NEWER_PRIMARY_L1_BRANCH,
+            "openEuler-24.09 tracking 未找到可复用 L2 快照的 openEuler-24.03 tracking"
+        );
+        return Ok(None);
+    };
+
+    let record = latest_snapshot_record(db, source_tracking.id, "l2").await?;
+    if record.is_some() {
+        info!(
+            tracking_id = tracking.id,
+            source_tracking_id = source_tracking.id,
+            l2_branch = tracking.l2_branch,
+            source_l1_branch = L2_NEWER_PRIMARY_L1_BRANCH,
+            "openEuler-24.09 tracking 复用 openEuler-24.03 tracking 的 L2 快照"
+        );
+    } else {
+        warn!(
+            tracking_id = tracking.id,
+            source_tracking_id = source_tracking.id,
+            l2_branch = tracking.l2_branch,
+            source_l1_branch = L2_NEWER_PRIMARY_L1_BRANCH,
+            "openEuler-24.09 tracking 对应的 openEuler-24.03 tracking 也没有 L2 快照"
+        );
+    }
+    Ok(record)
+}
+
+fn is_l2_newer_target_l2_branch(tracking: &tracking::Model) -> bool {
+    L2_NEWER_FALLBACK_L2_BRANCHES
+        .iter()
+        .any(|branch| tracking.l2_branch.contains(branch))
+}
+
+fn is_l2_newer_fallback_tracking(tracking: &tracking::Model) -> bool {
+    is_l2_newer_target_l2_branch(tracking) && tracking.l1_branch == L2_NEWER_FALLBACK_L1_BRANCH
+}
+
+fn l2_newer_fallback_required(
+    tracking: &tracking::Model,
+    report: &diff::l2_vs_l1::L2VsL1Report,
+) -> bool {
+    is_l2_newer_target_l2_branch(tracking) && l2_newer_than_l1(report)
+}
+
+fn l2_newer_than_l1(report: &diff::l2_vs_l1::L2VsL1Report) -> bool {
+    report
+        .spec_diff
+        .version_diff
+        .as_ref()
+        .map(|version_diff| {
+            version_diff.relationship == diff::l2_vs_l1::VersionRelationship::L2Newer
+        })
+        .unwrap_or(false)
+}
+
+fn l2_vs_l1_diff_summary(r: &diff::l2_vs_l1::L2VsL1Report) -> Value {
+    serde_json::json!({
+        "patches_added": r.patch_diff.l2_added.len(),
+        "patches_added_list": r.patch_diff.l2_added.iter().map(|p| serde_json::json!({
+            "filename": p.filename,
+            "path": p.path,
+            "content_hash": p.content_hash,
+            "size": p.size,
+            "applied": p.applied,
+        })).collect::<Vec<_>>(),
+        "patches_modified": r.patch_diff.l2_modified.len(),
+        "patches_modified_list": r.patch_diff.l2_modified.iter().map(|p| serde_json::json!({
+            "filename": p.filename,
+            "l1_hash": p.l1_hash,
+            "l2_hash": p.l2_hash,
+        })).collect::<Vec<_>>(),
+        "patches_removed": r.patch_diff.l2_removed.len(),
+        "patches_removed_list": r.patch_diff.l2_removed.iter().map(|p| serde_json::json!({
+            "filename": p.filename,
+            "path": p.path,
+            "content_hash": p.content_hash,
+            "size": p.size,
+            "applied": p.applied,
+        })).collect::<Vec<_>>(),
+        "patches_identical": r.patch_diff.identical.len(),
+        "has_spec_changes": !r.spec_diff.content_identical,
+        "spec_diff": serde_json::json!({
+            "version_diff": r.spec_diff.version_diff.as_ref().map(|v| serde_json::json!({
+                "l1_version": v.l1_version,
+                "l2_version": v.l2_version,
+                "relationship": format!("{:?}", v.relationship),
+            })),
+            "diff_summary": r.spec_diff.diff_summary,
+            "key_changes": r.spec_diff.key_changes,
+            "build_requires_added": r.spec_diff.build_requires_added,
+            "build_requires_removed": r.spec_diff.build_requires_removed,
+            "configure_options_added": r.spec_diff.configure_options_added,
+            "configure_options_removed": r.spec_diff.configure_options_removed,
+        }),
+        "conflicts": r.conflicts.len(),
+        "commit_diff": serde_json::json!({
+            "l1_commits_count": r.commit_diff.l1_commits_count,
+            "l2_commits_count": r.commit_diff.l2_commits_count,
+            "behind_commits_count": r.commit_diff.behind_commits.len(),
+            "behind_commits": r.commit_diff.behind_commits.iter().map(|c| serde_json::json!({
+                "sha": c.sha,
+                "title": c.title,
+                "author": c.author,
+                "authored_at": c.authored_at,
+                "url": c.url,
+                "stats": serde_json::json!({
+                    "additions": c.stats.additions,
+                    "deletions": c.stats.deletions,
+                    "files_changed": c.stats.files_changed,
+                }),
+                "primary_change_type": c.primary_change_type,
+                "cve_list": c.cve_list,
+            })).collect::<Vec<_>>(),
+            "base_commit": r.commit_diff.base_commit.as_ref().map(|c| serde_json::json!({
+                "sha": c.sha,
+                "title": c.title,
+                "author": c.author,
+                "authored_at": c.authored_at,
+            })),
+            "base_version_release": r.commit_diff.base_version_release,
+        }),
+    })
+}
+
+fn l1_vs_l0_diff_summary(r: &diff::l1_vs_l0::L1VsL0Report) -> Value {
+    serde_json::json!({
+        "version_behind": r.version_behind,
+        "current_version": r.current_version,
+        "latest_stable": r.latest_stable,
+        "latest_version": r.latest_version,
+        "mainline_version": r.mainline_version,
+        "upgradable_versions": r.upgradable_versions.len(),
+        "upgradable_versions_list": r.upgradable_versions.iter().map(|v| serde_json::json!({
+            "version": v.version,
+            "release_date": v.release_date,
+            "is_security_release": v.is_security_release,
+            "breaking_changes": v.breaking_changes,
+        })).collect::<Vec<_>>(),
+        "patches_merged": r.patch_analysis.merged_in_upstream.len(),
+        "patches_merged_list": r.patch_analysis.merged_in_upstream.iter().map(|p| serde_json::json!({
+            "filename": p.filename,
+            "description": p.description,
+            "applied": p.applied,
+            "content_hash": p.content_hash,
+        })).collect::<Vec<_>>(),
+        "patches_still_needed": r.patch_analysis.still_needed.len(),
+        "patches_still_needed_list": r.patch_analysis.still_needed.iter().map(|p| serde_json::json!({
+            "filename": p.filename,
+            "description": p.description,
+            "applied": p.applied,
+            "content_hash": p.content_hash,
+        })).collect::<Vec<_>>(),
+        "patches_can_be_removed": r.patch_analysis.can_be_removed_after_upgrade,
+        "cves_fixed": r.cve_analysis.fixed_in_upstream.len(),
+        "cves_fixed_list": r.cve_analysis.fixed_in_upstream.iter().map(|c| serde_json::json!({
+            "cve_id": c.cve_id,
+            "patch_file": c.patch_file,
+            "description": c.description,
+            "severity": c.severity,
+        })).collect::<Vec<_>>(),
+        "cves_not_fixed": r.cve_analysis.not_fixed_in_upstream.len(),
+        "cves_not_fixed_list": r.cve_analysis.not_fixed_in_upstream.iter().map(|c| serde_json::json!({
+            "cve_id": c.cve_id,
+            "patch_file": c.patch_file,
+            "description": c.description,
+            "severity": c.severity,
+        })).collect::<Vec<_>>(),
+        "maintenance_status": serde_json::json!({
+            "status": r.maintenance_status.status,
+            "stop_maintenance_detected": r.maintenance_status.stop_maintenance_detected,
+            "matched_notice": r.maintenance_status.matched_notice,
+            "evidence": r.maintenance_status.evidence,
+            "confidence": r.maintenance_status.confidence,
+        }),
+        "outdated_version": serde_json::json!({
+            "current_version": r.outdated_version.current_version,
+            "latest_version": r.outdated_version.latest_version,
+            "latest_version_source": r.outdated_version.latest_version_source,
+            "mainline_version": r.outdated_version.mainline_version,
+            "mainline_version_source": r.outdated_version.mainline_version_source,
+            "major_version_gap": r.outdated_version.major_version_gap,
+            "threshold_major_versions": r.outdated_version.threshold_major_versions,
+            "is_outdated": r.outdated_version.is_outdated,
+        }),
+        "lts": serde_json::json!({
+            "is_lts": r.lts.is_lts,
+            "source": r.lts.source,
+            "evidence": r.lts.evidence,
+        }),
+        "recommendations": r.recommendations,
+    })
+}
+
+async fn apply_l2_vs_l1_commit_diff(
+    db: &sea_orm::DatabaseConnection,
+    l2_vs_l1_diff: &Value,
+    tracking: &tracking::Model,
+    package_name: &str,
+    l1_snapshot_version: Option<&str>,
+    l1_snapshot_release: Option<&str>,
+    base_version: &mut String,
+    base_release: &mut String,
+    commit_reports: &mut Vec<Value>,
+    classification_overrides: &HashMap<String, (String, Vec<String>)>,
+    risk_client: Option<&Client>,
+    risk_create_url: &str,
+) -> Result<()> {
+    let Some(commit_diff) = l2_vs_l1_diff.get("commit_diff") else {
+        debug!(tracking_id = tracking.id, "commit_diff 为空");
+        return Ok(());
+    };
+
+    if let Some(version_release) = commit_diff.get("base_version_release") {
+        if let Some(version) = version_release.get(0).and_then(Value::as_str) {
+            if !version.is_empty() {
+                *base_version = version.to_string();
+                info!(tracking_id = tracking.id, base_version = %base_version, "获取到 base_commit 版本");
+            }
+        } else {
+            debug!(tracking_id = tracking.id, package_name = %package_name, "version 为空");
+        }
+        if let Some(release) = version_release.get(1).and_then(Value::as_str) {
+            if !release.is_empty() {
+                *base_release = release.to_string();
+                info!(tracking_id = tracking.id, base_release = %base_release, "获取到 base_commit release");
+            }
+        } else {
+            debug!(tracking_id = tracking.id, package_name = %package_name, "release 为空");
+        }
+    } else {
+        debug!(tracking_id = tracking.id, "base_version_release 为空");
+    }
+
+    let Some(behind_commits) = commit_diff.get("behind_commits").and_then(Value::as_array) else {
+        return Ok(());
+    };
+    let behind_commit_shas = behind_commits
+        .iter()
+        .filter_map(|commit| text_field(commit, "sha"))
+        .collect::<Vec<_>>();
+    let l1_commits = l1_commit_records_by_sha(db, tracking.id, &behind_commit_shas).await?;
+    let fallback_upstream_version_release =
+        upstream_version_release_from_diff(l2_vs_l1_diff, l1_snapshot_version, l1_snapshot_release);
+
+    for commit in behind_commits {
+        let commit_sha = text_field(commit, "sha").unwrap_or_default();
+        let l1_commit = l1_commits.get(&commit_sha);
+        let commit_message = l1_commit
+            .map(|record| record.commit_message.trim().to_string())
+            .filter(|message| !message.is_empty())
+            .or_else(|| text_field(commit, "message"))
+            .or_else(|| text_field(commit, "title"))
+            .unwrap_or_default();
+        let (change_type, cve_list) =
+            if let Some((change_type, cve_list)) = classification_overrides.get(&commit_sha) {
+                (change_type.clone(), cve_list.clone())
+            } else {
+                let change_type = l1_commit
+                    .and_then(|record| record.primary_change_type.clone())
+                    .filter(|value| !value.trim().is_empty())
+                    .or_else(|| text_field(commit, "primary_change_type"))
+                    .unwrap_or_else(|| infer_change_type_from_commit(commit, &commit_message));
+                let cve_list = l1_commit
+                    .and_then(cve_list_from_l1_record)
+                    .unwrap_or_else(|| cve_list_from_json_field(commit, "cve_list"));
+                (change_type, cve_list)
+            };
+        let level = risk_level_label(&change_type);
+        let raw_commit_url = l1_commit
+            .map(|record| record.api_url.trim().to_string())
+            .filter(|url| !url.is_empty())
+            .or_else(|| text_field(commit, "url"))
+            .unwrap_or_default();
+        let commit_url = crate::utils::commit_url::normalize_commit_url_for_branch(
+            crate::collectors::traits::Platform::from_str(
+                tracking.platform.as_deref().unwrap_or("gitee"),
+            )
+            .unwrap_or(crate::collectors::traits::Platform::Gitee),
+            &raw_commit_url,
+            &tracking.l1_branch,
+        );
+        let author = l1_commit
+            .map(|record| record.author_name.trim().to_string())
+            .filter(|author| !author.is_empty())
+            .or_else(|| text_field(commit, "author"))
+            .unwrap_or_default();
+        let authored_at = l1_commit
+            .map(|record| record.committed_at.to_rfc3339())
+            .or_else(|| text_field(commit, "authored_at"));
+        let upstream_version_release = commit_version_release(l1_commit)
+            .unwrap_or_else(|| fallback_upstream_version_release.clone());
+
+        if let Some(risk_client) = risk_client {
+            let req = RiskCreateReq {
+                description: format!("{} (branch: {})", commit_message, tracking.l2_branch),
+                level: risk_level_number(&change_type),
+                reporter: "track-system".to_string(),
+                r#type: change_type.clone(),
+                software: package_name.to_string(),
+                version: base_version.clone(),
+                release: base_release.clone(),
+                platform: "noarch".to_string(),
+                disclosure_time: authored_at.clone(),
+                source: Some(tracking.l1_repo_owner.clone()),
+                package_id: 0,
+                inner_secret: "Ctyun@123".to_string(),
+                report_url: commit_url.clone(),
+                risk_type: risk_type_from_change_type(&change_type),
+            };
+            debug!(
+                tracking_id = tracking.id,
+                commit_sha = %commit_sha,
+                req = ?req,
+                "调用 risk/create 请求"
+            );
+
+            match risk_client
+                .post(risk_create_url)
+                .header("Content-Type", "application/json")
+                .json(&req)
+                .send()
+                .await
+            {
+                Ok(resp) if resp.status().is_success() => {
+                    let body = resp.text().await.unwrap_or_default();
+                    debug!(
+                        tracking_id = tracking.id,
+                        commit_sha = %commit_sha,
+                        body = body,
+                        "调用 risk/create 成功"
+                    );
+                }
+                Ok(resp) => {
+                    let status = resp.status().as_u16();
+                    let body = resp.text().await.unwrap_or_default();
+                    warn!(
+                        tracking_id = tracking.id,
+                        commit_sha = %commit_sha,
+                        status = status,
+                        body = body,
+                        "调用 risk/create 失败"
+                    );
+                }
+                Err(err) => {
+                    warn!(
+                        tracking_id = tracking.id,
+                        commit_sha = %commit_sha,
+                        error = %err,
+                        "调用 risk/create 失败"
+                    );
+                }
+            }
+        }
+
+        commit_reports.push(serde_json::json!({
+            "Description": commit_message,
+            "Level": level,
+            "Reporter": author,
+            "Software": package_name,
+            "Version": base_version,
+            "Release": base_release,
+            "Platform": "noarch",
+            "DisclosureTime": authored_at,
+            "Source": &tracking.l1_repo_owner,
+            "CommitSha": commit_sha,
+            "ChangeType": change_type,
+            "CVEList": cve_list,
+            "PackageID": tracking.package_id,
+            "Url": commit_url,
+            "UpstreamVersion": upstream_version_release.0,
+            "UpstreamRelease": upstream_version_release.1,
+            "UpstreamVersionRelease": version_release_display(&upstream_version_release.0, &upstream_version_release.1),
+        }));
+    }
+
+    Ok(())
+}
+
+async fn l1_commit_records_by_sha(
+    db: &sea_orm::DatabaseConnection,
+    tracking_id: i32,
+    shas: &[String],
+) -> Result<HashMap<String, l1_commit_records::Model>> {
+    if shas.is_empty() {
+        return Ok(HashMap::new());
+    }
+
+    let unique_shas = shas
+        .iter()
+        .map(|sha| sha.trim())
+        .filter(|sha| !sha.is_empty())
+        .collect::<HashSet<_>>()
+        .into_iter()
+        .map(ToOwned::to_owned)
+        .collect::<Vec<_>>();
+    if unique_shas.is_empty() {
+        return Ok(HashMap::new());
+    }
+
+    let records = L1CommitRecords::find()
+        .filter(l1_commit_records::Column::TrackingId.eq(tracking_id))
+        .filter(l1_commit_records::Column::CommitSha.is_in(unique_shas))
+        .all(db)
+        .await?;
+
+    Ok(records
+        .into_iter()
+        .map(|record| (record.commit_sha.clone(), record))
+        .collect())
+}
+
+fn commit_version_release(record: Option<&l1_commit_records::Model>) -> Option<(String, String)> {
+    let record = record?;
+    let version = record.spec_version.as_deref().unwrap_or_default().trim();
+    if version.is_empty() {
+        return None;
+    }
+
+    let release = record.spec_release.as_deref().unwrap_or_default().trim();
+    Some((version.to_string(), release.to_string()))
+}
+
+fn cve_list_from_l1_record(record: &l1_commit_records::Model) -> Option<Vec<String>> {
+    record
+        .cve_list
+        .as_ref()
+        .map(|value| cve_list_from_value(value))
+        .filter(|items| !items.is_empty())
+}
+
+fn cve_list_from_json_field(value: &Value, field: &str) -> Vec<String> {
+    value
+        .get(field)
+        .map(cve_list_from_value)
+        .unwrap_or_default()
+}
+
+fn cve_list_from_value(value: &Value) -> Vec<String> {
+    value
+        .as_array()
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(Value::as_str)
+                .map(str::trim)
+                .filter(|item| !item.is_empty())
+                .map(ToOwned::to_owned)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default()
+}
+
+fn upstream_version_release_from_diff(
+    l2_vs_l1_diff: &Value,
+    l1_snapshot_version: Option<&str>,
+    l1_snapshot_release: Option<&str>,
+) -> (String, String) {
+    let snapshot_version_release = version_release_display(
+        l1_snapshot_version.unwrap_or_default(),
+        l1_snapshot_release.unwrap_or_default(),
+    );
+    let version_release = first_non_empty_json_str(&[
+        l2_vs_l1_diff.get("l1_version_release"),
+        l2_vs_l1_diff
+            .get("spec_diff")
+            .and_then(|spec| spec.get("version_diff"))
+            .and_then(|diff| diff.get("l1_version_release")),
+    ]);
+    let (version, release) = split_version_release(&version_release);
+    if !version.is_empty() && !release.is_empty() {
+        return (version, release);
+    }
+
+    let version_release_from_diff = first_non_empty_json_str(&[
+        l2_vs_l1_diff.get("l1_version"),
+        l2_vs_l1_diff
+            .get("spec_diff")
+            .and_then(|spec| spec.get("version_diff"))
+            .and_then(|diff| diff.get("l1_version")),
+    ]);
+    let version_release =
+        first_non_empty_string(&[version_release_from_diff, snapshot_version_release]);
+    let (version, release) = split_version_release(&version_release);
+    if release.is_empty() {
+        (
+            version,
+            l1_snapshot_release.unwrap_or_default().trim().to_string(),
+        )
+    } else {
+        (version, release)
+    }
+}
+
+fn first_non_empty_string(values: &[String]) -> String {
+    values
+        .iter()
+        .map(|value| value.trim())
+        .find(|value| !value.is_empty())
+        .unwrap_or_default()
+        .to_string()
+}
+
+fn split_version_release(version_release: &str) -> (String, String) {
+    let trimmed = version_release.trim();
+    if trimmed.is_empty() {
+        return (String::new(), String::new());
+    }
+
+    match trimmed.rsplit_once('-') {
+        Some((version, release)) if !version.trim().is_empty() && !release.trim().is_empty() => {
+            (version.trim().to_string(), release.trim().to_string())
+        }
+        _ => (trimmed.to_string(), String::new()),
+    }
+}
+
+fn infer_change_type_from_commit(commit: &Value, message: &str) -> String {
+    let has_cve = commit
+        .get("cve_list")
+        .and_then(Value::as_array)
+        .is_some_and(|items| !items.is_empty());
+    let lower = message.to_ascii_lowercase();
+    if has_cve || lower.contains("cve") || lower.contains("security") {
+        "CVE".to_string()
+    } else if lower.contains("fix") || lower.contains("bug") || lower.contains("issue") {
+        "Bugfix".to_string()
+    } else if lower.contains("backport") || lower.contains("cherry-pick") {
+        "Backport".to_string()
+    } else {
+        "Unknown".to_string()
+    }
+}
+
+fn risk_level_label(change_type: &str) -> &'static str {
+    match change_type {
+        "CVE" => "High",
+        "Bugfix" => "Medium",
+        "Unknown" => "Normal",
+        _ => "Low",
+    }
+}
+
+fn risk_level_number(change_type: &str) -> i32 {
+    match change_type {
+        "CVE" => 3,
+        "Bugfix" => 2,
+        _ => 1,
+    }
+}
+
+fn risk_type_from_change_type(change_type: &str) -> RiskType {
+    match change_type {
+        "CVE" => RiskType::CVE,
+        "Bugfix" => RiskType::Bug,
+        "Backport" => RiskType::Porting,
+        "Unknown" => RiskType::CodeScan,
+        _ => RiskType::Porting,
+    }
+}
+
+fn text_field(value: &Value, field: &str) -> Option<String> {
+    value
+        .get(field)
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|text| !text.is_empty())
+        .map(ToOwned::to_owned)
+}
+
+fn first_non_empty_json_str(values: &[Option<&Value>]) -> String {
+    values
+        .iter()
+        .filter_map(|value| value.and_then(Value::as_str))
+        .map(str::trim)
+        .find(|text| !text.is_empty())
+        .unwrap_or_default()
+        .to_string()
+}
+
+fn classification_overrides(
+    classification_result: Option<&StageResult>,
+) -> HashMap<String, (String, Vec<String>)> {
+    let mut overrides = HashMap::new();
+    let Some(class_stage) = classification_result else {
+        return overrides;
+    };
+    let Some(items) = class_stage.details.get("commits").and_then(Value::as_array) else {
+        return overrides;
+    };
+
+    for item in items {
+        let Some(sha) = item.get("commit_sha").and_then(Value::as_str) else {
+            continue;
+        };
+        let change_type = item
+            .get("primary_change_type")
+            .and_then(Value::as_str)
+            .unwrap_or("Unknown")
+            .to_string();
+        let cve_list = item
+            .get("cve_list")
+            .and_then(Value::as_array)
+            .map(|items| {
+                items
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .map(ToOwned::to_owned)
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        overrides.insert(sha.to_string(), (change_type, cve_list));
+    }
+
+    overrides
+}
+
+fn version_release_display(version: &str, release: &str) -> String {
+    match (version.trim().is_empty(), release.trim().is_empty()) {
+        (true, true) => String::new(),
+        (false, true) => version.to_string(),
+        (true, false) => release.to_string(),
+        (false, false) => format!("{version}-{release}"),
+    }
+}
+
+fn merge_classification_results_into_commits(
+    commit_reports: &mut [Value],
+    class_stage: &StageResult,
+) {
+    let Some(items) = class_stage.details.get("commits").and_then(Value::as_array) else {
+        return;
+    };
+
+    let mut by_sha: HashMap<String, (&str, &Value)> = HashMap::new();
+    for item in items {
+        if let Some(sha) = item.get("commit_sha").and_then(Value::as_str) {
+            let change_type = item
+                .get("primary_change_type")
+                .and_then(Value::as_str)
+                .unwrap_or("Unknown");
+            let cve_list = item.get("cve_list").unwrap_or(&Value::Null);
+            by_sha.insert(sha.to_string(), (change_type, cve_list));
+        }
+    }
+
+    for commit in commit_reports {
+        let Some(sha) = commit.get("CommitSha").and_then(Value::as_str) else {
+            continue;
+        };
+        let Some((change_type, cve_list)) = by_sha.get(sha) else {
+            continue;
+        };
+        if let Some(object) = commit.as_object_mut() {
+            object.insert(
+                "ChangeType".to_string(),
+                Value::String((*change_type).to_string()),
+            );
+            object.insert(
+                "Level".to_string(),
+                Value::String(risk_level_label(change_type).to_string()),
+            );
+            object.insert("CVEList".to_string(), (*cve_list).clone());
+        }
+    }
+}
+
+fn append_version_catalog_entries(
+    catalog: &Value,
+    source: &str,
+    collected_at: chrono::DateTime<Utc>,
+    seen_versions: &mut HashSet<String>,
+    all_versions: &mut Vec<diff::l1_vs_l0::VersionTag>,
+    changelogs: &mut HashMap<String, Vec<diff::l1_vs_l0::ChangelogEntry>>,
+) {
+    let mut candidates = Vec::new();
+
+    if let Some(versions) = catalog.get("versions").and_then(Value::as_array) {
+        for item in versions {
+            if let Some(version) = version_from_catalog_item(item) {
+                candidates.push(version);
+            }
+        }
+    }
+
+    if let Some(latest_stable) = catalog.get("latest_stable").and_then(Value::as_str) {
+        candidates.push((latest_stable.to_string(), Some(true), None));
+    }
+    if let Some(latest_version) = catalog.get("latest_version").and_then(Value::as_str) {
+        candidates.push((latest_version.to_string(), None, None));
+    }
+
+    for (version, stable_hint, source_ref) in candidates {
+        append_l0_version_tag(
+            version.trim(),
+            stable_hint,
+            source_ref.as_deref(),
+            source,
+            collected_at,
+            seen_versions,
+            all_versions,
+            changelogs,
+        );
+    }
+}
+
+fn version_from_catalog_item(item: &Value) -> Option<(String, Option<bool>, Option<String>)> {
+    if let Some(version) = item.as_str() {
+        return Some((version.to_string(), None, None));
+    }
+
+    let version = item.get("version").and_then(Value::as_str)?.to_string();
+    let is_stable = item.get("is_stable").and_then(Value::as_bool);
+    let source_ref = item
+        .get("source_ref")
+        .and_then(Value::as_str)
+        .map(str::to_string);
+    Some((version, is_stable, source_ref))
+}
+
+fn append_l0_version_tag(
+    version: &str,
+    stable_hint: Option<bool>,
+    source_ref: Option<&str>,
+    source: &str,
+    collected_at: chrono::DateTime<Utc>,
+    seen_versions: &mut HashSet<String>,
+    all_versions: &mut Vec<diff::l1_vs_l0::VersionTag>,
+    changelogs: &mut HashMap<String, Vec<diff::l1_vs_l0::ChangelogEntry>>,
+) {
+    if version.is_empty() {
+        return;
+    }
+
+    let Ok(parsed) = crate::utils::version::VersionParser::parse(version) else {
+        return;
+    };
+    if !seen_versions.insert(version.to_string()) {
+        return;
+    }
+    let is_stable = stable_hint.unwrap_or_else(|| parsed.is_stable());
+    let source_detail = source_ref
+        .filter(|value| !value.trim().is_empty())
+        .map(|value| format!(" ({})", value))
+        .unwrap_or_default();
+
+    all_versions.push(diff::l1_vs_l0::VersionTag {
+        version: version.to_string(),
+        date: collected_at,
+        changelog: format!("version catalog: {}{}", source, source_detail),
+        is_stable,
+    });
+    changelogs
+        .entry(version.to_string())
+        .or_default()
+        .push(diff::l1_vs_l0::ChangelogEntry {
+            entry_type: "release".to_string(),
+            description: format!("版本目录识别到 L0 版本 {}{}", version, source_detail),
+            commit_sha: None,
+        });
+}
+
+fn version_catalog_payloads<'a>(
+    evidence: &'a crate::entities::maintenance_evidence_snapshots::Model,
+) -> Vec<&'a Value> {
+    let mut payloads = Vec::new();
+    if let Some(catalog) = find_version_catalog_data(&evidence.raw_payload) {
+        payloads.push(catalog);
+    }
+    if let Some(signals) = evidence.normalized_signals.as_ref() {
+        if let Some(catalog) = find_version_catalog_data(signals) {
+            payloads.push(catalog);
+        }
+    }
+    payloads
+}
+
+fn find_version_catalog_data(value: &Value) -> Option<&Value> {
+    if is_version_catalog_data(value) {
+        return Some(value);
+    }
+    value.get("data").and_then(find_version_catalog_data)
+}
+
+fn is_version_catalog_data(value: &Value) -> bool {
+    value.get("versions").and_then(Value::as_array).is_some()
+        || value
+            .get("latest_version")
+            .and_then(Value::as_str)
+            .is_some()
+        || value.get("latest_stable").and_then(Value::as_str).is_some()
+}
+
+fn should_collect_l0_version_catalog(package: &crate::entities::packages::Model) -> bool {
+    let Some(url) = package.l0_repo_url.as_deref() else {
+        return false;
+    };
+    let lower = url.to_ascii_lowercase();
+
+    lower.ends_with(".git")
+        || lower.starts_with("git://")
+        || lower.starts_with("ssh://")
+        || lower.contains('@')
+        || lower.contains("github.com/")
+        || lower.contains("gitlab.")
+        || lower.contains("gitlab.com/")
+        || lower.contains("gitee.com/")
+        || lower.contains("atomgit.com/")
+        || lower.contains("pagure.io/")
+}
+
+fn is_patch_path(path: &str) -> bool {
+    let lower = path.to_ascii_lowercase();
+    lower.ends_with(".patch") || lower.ends_with(".diff")
+}
+
+fn detect_lts_from_l1_sources(
+    tracking: &tracking::Model,
+    spec_text: &str,
+    commit_messages: &[String],
+) -> (Option<bool>, Vec<String>) {
+    let mut evidence = Vec::new();
+    let branch = tracking.l1_branch.as_str();
+    let repo = tracking.l1_repo_name.as_str();
+
+    if contains_lts_positive(branch) {
+        evidence.push(format!("L1 分支包含 LTS 标识: {}", branch));
+    }
+    if contains_lts_positive(repo) {
+        evidence.push(format!("L1 仓库名包含 LTS 标识: {}", repo));
+    }
+    if contains_lts_positive(spec_text) {
+        evidence.push("L1 spec 内容包含 LTS/长期维护标识".to_string());
+    }
+    for message in commit_messages.iter().take(20) {
+        if contains_lts_positive(message) {
+            evidence.push(format!(
+                "L1 commit message 包含 LTS 标识: {}",
+                message.chars().take(120).collect::<String>()
+            ));
+            break;
+        }
+    }
+
+    evidence.truncate(5);
+    if !evidence.is_empty() {
+        return (Some(true), evidence);
+    }
+
+    let negative_text = format!("{}\n{}\n{}", branch, repo, spec_text);
+    if contains_lts_negative(&negative_text) {
+        (
+            Some(false),
+            vec!["L1 仓库信息包含非 LTS/创新版本标识".to_string()],
+        )
+    } else {
+        (None, Vec::new())
+    }
+}
+
+fn contains_lts_positive(text: &str) -> bool {
+    let lower = text.to_ascii_lowercase();
+    lower.contains("lts")
+        || lower.contains("long term support")
+        || text.contains("长期支持")
+        || text.contains("长期维护")
+}
+
+fn contains_lts_negative(text: &str) -> bool {
+    let lower = text.to_ascii_lowercase();
+    lower.contains("non-lts")
+        || lower.contains("non lts")
+        || lower.contains("innovation")
+        || text.contains("非LTS")
+        || text.contains("非 LTS")
+        || text.contains("创新版本")
+}
+
+fn collect_version_warnings(l1_vs_l0_diff: &Value) -> Vec<String> {
+    let mut warnings = Vec::new();
+    if let Some(items) = l1_vs_l0_diff
+        .get("recommendations")
+        .and_then(Value::as_array)
+    {
+        warnings.extend(
+            items
+                .iter()
+                .filter_map(Value::as_str)
+                .filter(|item| {
+                    item.contains("停维")
+                        || item.contains("过时")
+                        || item.contains("LTS")
+                        || item.contains("长期维护")
+                })
+                .map(ToString::to_string),
+        );
+    }
+    warnings
+}
+
+async fn build_tracking_report_ai_analysis(
+    tracking: &tracking::Model,
+    package_name: &str,
+    diff_summary: &Value,
+    representative_changes: &Value,
+) -> Value {
+    let context = AiContext {
+        source: AiAnalysisSource::TrackingReport,
+        target_name: Some(package_name.to_string()),
+        target_type: Some("package".to_string()),
+        platform: tracking.platform.clone(),
+        report_type: Some("pipeline".to_string()),
+        rule_risk: Some(infer_tracking_report_rule_risk(diff_summary)),
+        rule_confidence: Some("medium".to_string()),
+        rule_summary: Some(build_tracking_report_rule_summary(
+            diff_summary,
+            representative_changes,
+        )),
+        evidence: serde_json::json!({
+            "diff_summary": diff_summary,
+            "representative_changes": representative_changes,
+        }),
+    };
+
+    let request = AiAnalysisRequest {
+        question: Some(
+            "请基于当前 tracking 报告评估 L2 组件相对 L1/L0 的版本、变更和维护风险，并结合 L0 社区安全与质量证据给出处置建议。安全重点关注 L0 仓库是否有安全策略、CVE 修复发布或 CVE 关联记录、待处理 CVE 积压和修复时效；质量重点关注是否有代码 review 机制、专人 review、发布物数字签名、校验值或 provenance/attestation。".to_string(),
+        ),
+        language: Some("中文".to_string()),
+        max_evidence_chars: None,
+        allow_external_research: Some(true),
+    };
+
+    match AiAnalysisService::from_env()
+        .analyze(context, request)
+        .await
+    {
+        Ok(response) => {
+            let mut value = serde_json::to_value(response).unwrap_or_else(|error| {
+                serde_json::json!({
+                    "status": "failed",
+                    "generated_at": Utc::now(),
+                    "error": format!("序列化 AI 评估结果失败: {}", error),
+                })
+            });
+            if let Some(object) = value.as_object_mut() {
+                object.remove("raw_model_output");
+            }
+            value
+        }
+        Err(error) => serde_json::json!({
+            "status": "failed",
+            "generated_at": Utc::now(),
+            "error": error.to_string(),
+        }),
+    }
+}
+
+async fn latest_l0_community_assessment(
+    db: &sea_orm::DatabaseConnection,
+    package: &crate::entities::packages::Model,
+) -> Result<Option<Value>> {
+    use crate::entities::{ecosystem_reports, ecosystem_targets};
+
+    let mut target_query = EcosystemTargets::find()
+        .filter(ecosystem_targets::Column::Role.eq("l0"))
+        .filter(ecosystem_targets::Column::Status.eq("active"));
+
+    if let Some(l0_repo_url) = package.l0_repo_url.as_deref() {
+        target_query = target_query.filter(
+            ecosystem_targets::Column::HomepageUrl
+                .eq(l0_repo_url)
+                .or(ecosystem_targets::Column::Name.eq(package.name.clone())),
+        );
+    } else {
+        target_query =
+            target_query.filter(ecosystem_targets::Column::Name.eq(package.name.clone()));
+    }
+
+    let targets = target_query.all(db).await?;
+    for target in targets {
+        let Some(report) = EcosystemReports::find()
+            .filter(ecosystem_reports::Column::TargetId.eq(target.id))
+            .order_by_desc(ecosystem_reports::Column::GeneratedAt)
+            .one(db)
+            .await?
+        else {
+            continue;
+        };
+
+        return Ok(Some(compact_l0_community_assessment(&target, &report)));
+    }
+
+    Ok(None)
+}
+
+fn compact_l0_community_assessment(
+    target: &crate::entities::ecosystem_targets::Model,
+    report: &crate::entities::ecosystem_reports::Model,
+) -> Value {
+    let sections = report.report_payload.get("sections");
+    let security = sections.and_then(|value| value.get("security")).cloned();
+    let quality = sections.and_then(|value| value.get("quality")).cloned();
+
+    serde_json::json!({
+        "target": {
+            "id": target.id,
+            "name": target.name,
+            "role": target.role,
+            "platform": target.platform,
+            "homepage_url": target.homepage_url,
+            "owner": target.owner,
+            "repo": target.repo,
+        },
+        "report": {
+            "id": report.id,
+            "report_type": report.report_type,
+            "overall_risk": report.overall_risk,
+            "confidence": report.confidence,
+            "summary": report.summary,
+            "generated_at": report.generated_at,
+        },
+        "security": security.map(compact_assessment_section),
+        "quality": quality.map(compact_assessment_section),
+    })
+}
+
+fn compact_assessment_section(section: Value) -> Value {
+    let indicators = section
+        .get("indicators")
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter(|item| is_l0_security_quality_indicator(item))
+                .cloned()
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+
+    serde_json::json!({
+        "level": section.get("level").cloned().unwrap_or(Value::Null),
+        "confidence": section.get("confidence").cloned().unwrap_or(Value::Null),
+        "score": section.get("score").cloned().unwrap_or(Value::Null),
+        "coverage": section.get("coverage").cloned().unwrap_or(Value::Null),
+        "reasons": section.get("reasons").cloned().unwrap_or(Value::Null),
+        "evidence_refs": section.get("evidence_refs").cloned().unwrap_or(Value::Null),
+        "indicators": indicators,
+    })
+}
+
+fn is_l0_security_quality_indicator(indicator: &Value) -> bool {
+    let Some(key) = indicator.get("key").and_then(Value::as_str) else {
+        return false;
+    };
+
+    matches!(
+        key,
+        "has_security_policy"
+            | "cve_fix_commits_last_12_months"
+            | "cve_linked_issues_last_12_months"
+            | "median_cve_fix_days"
+            | "open_cve_backlog"
+            | "dedicated_code_reviewers"
+            | "required_reviews"
+            | "signed_releases"
+            | "digital_signature_supported"
+            | "supports_gpg_commit_tag_verification"
+            | "supports_release_attachments"
+            | "documented_release_checksum"
+            | "documented_release_artifact_signature"
+            | "hash_verification_supported"
+            | "provenance_attestation"
+            | "release_checklist"
+            | "hash_signature_assessment"
+    )
+}
+
+fn infer_tracking_report_rule_risk(diff_summary: &Value) -> String {
+    if diff_summary
+        .get("l1_vs_l0")
+        .and_then(|value| value.get("maintenance_status"))
+        .and_then(|value| value.get("stop_maintenance_detected"))
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+        || diff_summary
+            .get("l1_vs_l0")
+            .and_then(|value| value.get("outdated_version"))
+            .and_then(|value| value.get("is_outdated"))
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+    {
+        return "high".to_string();
+    }
+
+    let has_high_commit = diff_summary
+        .get("commits")
+        .and_then(Value::as_array)
+        .map(|commits| {
+            commits.iter().any(|commit| {
+                commit
+                    .get("Level")
+                    .and_then(Value::as_str)
+                    .map(|level| level.eq_ignore_ascii_case("high"))
+                    .unwrap_or(false)
+            })
+        })
+        .unwrap_or(false);
+    if has_high_commit {
+        return "high".to_string();
+    }
+
+    let has_medium_commit = diff_summary
+        .get("commits")
+        .and_then(Value::as_array)
+        .map(|commits| {
+            commits.iter().any(|commit| {
+                commit
+                    .get("Level")
+                    .and_then(Value::as_str)
+                    .map(|level| level.eq_ignore_ascii_case("medium"))
+                    .unwrap_or(false)
+            })
+        })
+        .unwrap_or(false);
+    if has_medium_commit
+        || diff_summary
+            .get("version_warnings")
+            .and_then(Value::as_array)
+            .map(|items| !items.is_empty())
+            .unwrap_or(false)
+    {
+        return "medium".to_string();
+    }
+
+    "low".to_string()
+}
+
+fn build_tracking_report_rule_summary(
+    diff_summary: &Value,
+    representative_changes: &Value,
+) -> String {
+    let mut parts = Vec::new();
+    let behind_commits = diff_summary
+        .get("total_behind_commits")
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
+    parts.push(format!("L2 相对 L1 落后 commit 数 {}", behind_commits));
+
+    let version_warning_count = diff_summary
+        .get("version_warnings")
+        .and_then(Value::as_array)
+        .map(Vec::len)
+        .unwrap_or(0);
+    parts.push(format!("版本风险提示 {} 条", version_warning_count));
+
+    if let Some(outdated) = diff_summary
+        .get("l1_vs_l0")
+        .and_then(|value| value.get("outdated_version"))
+    {
+        let is_outdated = outdated
+            .get("is_outdated")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        let gap = outdated
+            .get("major_version_gap")
+            .and_then(Value::as_i64)
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| "-".to_string());
+        parts.push(format!(
+            "过时版本评估 {}，大版本差距 {}",
+            if is_outdated { "命中" } else { "未命中" },
+            gap
+        ));
+    }
+
+    let cve_count = representative_changes
+        .get("cve_count")
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
+    let needs_review_count = representative_changes
+        .get("needs_review_count")
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
+    parts.push(format!(
+        "CVE 数 {}，需人工复核 {}",
+        cve_count, needs_review_count
+    ));
+
+    parts.join("；")
 }
 
 impl<'a> PipelineExecutor<'a> {
@@ -140,6 +1445,42 @@ impl<'a> PipelineExecutor<'a> {
             "执行 L2 快照生成阶段"
         );
 
+        if is_l2_newer_fallback_tracking(tracking) {
+            info!(
+                tracking_id = tracking.id,
+                l1_branch = tracking.l1_branch,
+                l2_branch = tracking.l2_branch,
+                source_l1_branch = L2_NEWER_PRIMARY_L1_BRANCH,
+                "openEuler-24.09 fallback tracking 跳过独立 L2 快照生成，复用 openEuler-24.03 tracking 的 L2 快照"
+            );
+
+            let l2_record = latest_l2_snapshot_record_for_tracking(self.db, tracking).await?;
+            if let Some(snapshot) = l2_record {
+                let snapshot_data: crate::snapshot::types::RepositorySnapshot =
+                    serde_json::from_value(snapshot.payload.clone())
+                        .context("解析复用 L2 快照 payload 失败")?;
+
+                return Ok(L2SnapshotResult {
+                    snapshot_id: Some(snapshot.id as i64),
+                    snapshot_path: None,
+                    files_count: snapshot_data.files.len(),
+                    has_new_data: true,
+                });
+            }
+
+            warn!(
+                tracking_id = tracking.id,
+                source_l1_branch = L2_NEWER_PRIMARY_L1_BRANCH,
+                "openEuler-24.09 fallback tracking 未找到可复用 L2 快照，跳过独立 L2 快照生成"
+            );
+            return Ok(L2SnapshotResult {
+                snapshot_id: None,
+                snapshot_path: None,
+                files_count: 0,
+                has_new_data: false,
+            });
+        }
+
         // 检查 L2 仓库路径是否存在
         let l2_repo_path = PathBuf::from(&tracking.l2_repo_path);
         if !l2_repo_path.exists() {
@@ -149,16 +1490,9 @@ impl<'a> PipelineExecutor<'a> {
                 "不存在，尝试使用数据库中的历史快照"
             );
 
-            // 查询数据库中最新的 L2 快照
-            use crate::entities::l2_snapshots;
-            use crate::entities::prelude::L2Snapshots;
-
-            let l2_record = L2Snapshots::find()
-                .filter(l2_snapshots::Column::TrackingId.eq(tracking.id))
-                .filter(l2_snapshots::Column::SnapshotType.eq("l2"))
-                .order_by_desc(l2_snapshots::Column::CreatedAt)
-                .one(self.db)
-                .await?;
+            // 查询数据库中最新的 L2 快照。openEuler-24.09 fallback tracking
+            // 不单独采集 L2，复用同 L2 分支 openEuler-24.03 tracking 的 L2 快照。
+            let l2_record = latest_l2_snapshot_record_for_tracking(self.db, tracking).await?;
 
             if let Some(snapshot) = l2_record {
                 // 反序列化快照以获取文件数量
@@ -263,6 +1597,8 @@ impl<'a> PipelineExecutor<'a> {
             report_id: Some(report_id),
             files_changed,
             has_spec_changes,
+            l2_vs_l1_diff: l2_vs_l1_result.as_ref().map(l2_vs_l1_diff_summary),
+            l1_vs_l0_diff: l1_vs_l0_result.as_ref().map(l1_vs_l0_diff_summary),
         })
     }
 
@@ -271,9 +1607,8 @@ impl<'a> PipelineExecutor<'a> {
         &self,
         tracking: &tracking::Model,
     ) -> Result<Option<diff::l2_vs_l1::L2VsL1Report>> {
-        use crate::entities::l2_snapshots;
-        use crate::entities::prelude::{L2Snapshots, Packages};
-        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
+        use crate::entities::prelude::Packages;
+        use sea_orm::EntityTrait;
 
         info!(tracking_id = tracking.id, "执行 L2 vs L1 对比");
 
@@ -285,19 +1620,8 @@ impl<'a> PipelineExecutor<'a> {
         let package_name = package.name.clone();
 
         // 查询最新的 L1/L2 快照
-        let l1_record = L2Snapshots::find()
-            .filter(l2_snapshots::Column::TrackingId.eq(tracking.id))
-            .filter(l2_snapshots::Column::SnapshotType.eq("l1"))
-            .order_by_desc(l2_snapshots::Column::CreatedAt)
-            .one(self.db)
-            .await?;
-
-        let l2_record = L2Snapshots::find()
-            .filter(l2_snapshots::Column::TrackingId.eq(tracking.id))
-            .filter(l2_snapshots::Column::SnapshotType.eq("l2"))
-            .order_by_desc(l2_snapshots::Column::CreatedAt)
-            .one(self.db)
-            .await?;
+        let l1_record = latest_snapshot_record(self.db, tracking.id, "l1").await?;
+        let l2_record = latest_l2_snapshot_record_for_tracking(self.db, tracking).await?;
 
         if l1_record.is_none() || l2_record.is_none() {
             warn!(
@@ -318,7 +1642,7 @@ impl<'a> PipelineExecutor<'a> {
                 .context("解析 L2 快照 payload 失败")?;
 
         let comparator = diff::l2_vs_l1::L2VsL1Comparator::new();
-        let l1_snap = diff::l2_vs_l1::L2VsL1Comparator::create_l1_snapshot(
+        let mut l1_snap = diff::l2_vs_l1::L2VsL1Comparator::create_l1_snapshot(
             package_name.clone(),
             &l1_snapshot,
         )
@@ -329,11 +1653,101 @@ impl<'a> PipelineExecutor<'a> {
         )
         .context("构建 L2 快照失败")?;
 
-        // 执行对比
-        let report = comparator
-            .compare(&l1_snap, &l2_snap, self.db, tracking.id)
+        // 先只判断版本/内容关系。25.05/25.07 可能需要切换到 openEuler-24.09
+        // 重新判断，避免在错误的 L1 基线上提前生成误导性的 commit 差异。
+        let mut report = comparator
+            .compare_with_options(&l1_snap, &l2_snap, self.db, tracking.id, true)
             .await
-            .context("L2 vs L1 内容对比失败")?;
+            .context("L2 vs L1 内容对比预判断失败")?;
+
+        if l2_newer_fallback_required(tracking, &report) {
+            let fallback_tracking = self
+                .find_or_create_l2_newer_fallback_tracking(tracking)
+                .await?;
+
+            if let Some(fallback_tracking) = fallback_tracking {
+                if let Some(fallback_l1_record) = self
+                    .latest_or_refresh_fallback_l1_snapshot_record(&fallback_tracking)
+                    .await?
+                {
+                    let fallback_l1_snapshot: crate::snapshot::types::RepositorySnapshot =
+                        serde_json::from_value(fallback_l1_record.payload.clone())
+                            .context("解析 openEuler-24.09 L1 快照 payload 失败")?;
+                    let fallback_l1_snap = diff::l2_vs_l1::L2VsL1Comparator::create_l1_snapshot(
+                        package_name.clone(),
+                        &fallback_l1_snapshot,
+                    )
+                    .context("构建 openEuler-24.09 L1 快照失败")?;
+                    let fallback_probe = comparator
+                        .compare_with_options(
+                            &fallback_l1_snap,
+                            &l2_snap,
+                            self.db,
+                            fallback_tracking.id,
+                            true,
+                        )
+                        .await
+                        .context("使用 openEuler-24.09 重新判断 L2 vs L1 失败")?;
+
+                    if l2_newer_than_l1(&fallback_probe) {
+                        info!(
+                            tracking_id = tracking.id,
+                            fallback_tracking_id = fallback_tracking.id,
+                            fallback_l1_branch = L2_NEWER_FALLBACK_L1_BRANCH,
+                            "L2 版本仍高于 openEuler-24.09，跳过 commit 差异判断"
+                        );
+                        l1_snap = fallback_l1_snap;
+                        report = fallback_probe;
+                    } else {
+                        info!(
+                            tracking_id = tracking.id,
+                            fallback_tracking_id = fallback_tracking.id,
+                            fallback_l1_branch = L2_NEWER_FALLBACK_L1_BRANCH,
+                            "使用 openEuler-24.09 重新判断后 L2 不再领先，采用 openEuler-24.09 对比结果"
+                        );
+                        report = comparator
+                            .compare_with_commit_tracking_ids(
+                                &fallback_l1_snap,
+                                &l2_snap,
+                                self.db,
+                                fallback_tracking.id,
+                                tracking.id,
+                                false,
+                            )
+                            .await
+                            .context("使用 openEuler-24.09 重新执行 L2 vs L1 内容对比失败")?;
+                        l1_snap = fallback_l1_snap;
+                    }
+                } else {
+                    warn!(
+                        tracking_id = tracking.id,
+                        fallback_tracking_id = fallback_tracking.id,
+                        fallback_l1_branch = L2_NEWER_FALLBACK_L1_BRANCH,
+                        "openEuler-24.09 L1 快照不可用，跳过 commit 差异判断避免误判"
+                    );
+                }
+            } else {
+                warn!(
+                    tracking_id = tracking.id,
+                    l2_branch = tracking.l2_branch,
+                    fallback_l1_branch = L2_NEWER_FALLBACK_L1_BRANCH,
+                    "未找到 openEuler-24.09 tracking，跳过 commit 差异判断避免误判"
+                );
+            }
+        } else {
+            if l2_newer_than_l1(&report) {
+                info!(
+                    tracking_id = tracking.id,
+                    l2_branch = tracking.l2_branch,
+                    "L2 版本高于 L1，认为 L2 没有落后 commit，跳过 commit 差异判断"
+                );
+            } else {
+                report = comparator
+                    .compare(&l1_snap, &l2_snap, self.db, tracking.id)
+                    .await
+                    .context("L2 vs L1 内容对比失败")?;
+            }
+        }
 
         info!(
             tracking_id = tracking.id,
@@ -344,6 +1758,123 @@ impl<'a> PipelineExecutor<'a> {
         );
 
         Ok(Some(report))
+    }
+
+    async fn latest_or_refresh_fallback_l1_snapshot_record(
+        &self,
+        fallback_tracking: &tracking::Model,
+    ) -> Result<Option<crate::entities::l2_snapshots::Model>> {
+        if let Some(record) = latest_snapshot_record(self.db, fallback_tracking.id, "l1").await? {
+            return Ok(Some(record));
+        }
+
+        info!(
+            tracking_id = fallback_tracking.id,
+            fallback_l1_branch = L2_NEWER_FALLBACK_L1_BRANCH,
+            "openEuler-24.09 L1 快照缺失，尝试即时同步并生成快照"
+        );
+
+        let sync_service = SyncService::new(self.db);
+        match sync_service.sync_tracking(fallback_tracking.id).await {
+            Ok(sync_result) => {
+                info!(
+                    tracking_id = fallback_tracking.id,
+                    commits_synced = sync_result.commits_synced,
+                    issues_synced = sync_result.issues_synced,
+                    status = ?sync_result.status,
+                    "openEuler-24.09 L1 即时同步完成"
+                );
+            }
+            Err(err) => {
+                warn!(
+                    tracking_id = fallback_tracking.id,
+                    error = %err,
+                    "openEuler-24.09 L1 即时同步失败"
+                );
+                return Ok(None);
+            }
+        }
+
+        let output_path = format!(
+            "/tmp/l1_fallback_snapshot_{}_{}.json",
+            fallback_tracking.id,
+            Utc::now().timestamp()
+        );
+        if let Err(err) =
+            metadata_bridge::export_l1_snapshot(self.db, fallback_tracking.id, None, &output_path)
+                .await
+        {
+            warn!(
+                tracking_id = fallback_tracking.id,
+                error = %err,
+                "openEuler-24.09 L1 即时快照生成失败"
+            );
+            return Ok(None);
+        }
+
+        latest_snapshot_record(self.db, fallback_tracking.id, "l1").await
+    }
+
+    async fn find_or_create_l2_newer_fallback_tracking(
+        &self,
+        source_tracking: &tracking::Model,
+    ) -> Result<Option<tracking::Model>> {
+        use crate::entities::tracking as tracking_entity;
+        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+
+        if source_tracking.l1_branch == L2_NEWER_FALLBACK_L1_BRANCH {
+            return Ok(Some(source_tracking.clone()));
+        }
+
+        if let Some(existing) = Tracking::find()
+            .filter(tracking_entity::Column::PackageId.eq(source_tracking.package_id))
+            .filter(tracking_entity::Column::L2Branch.eq(source_tracking.l2_branch.clone()))
+            .filter(tracking_entity::Column::L1RepoOwner.eq(source_tracking.l1_repo_owner.clone()))
+            .filter(tracking_entity::Column::L1RepoName.eq(source_tracking.l1_repo_name.clone()))
+            .filter(tracking_entity::Column::L1Branch.eq(L2_NEWER_FALLBACK_L1_BRANCH))
+            .one(self.db)
+            .await
+            .context("查询 openEuler-24.09 fallback tracking 失败")?
+        {
+            return Ok(Some(existing));
+        }
+
+        let now = Utc::now();
+        let fallback = tracking::ActiveModel {
+            package_id: Set(source_tracking.package_id),
+            distro_id: Set(source_tracking.distro_id),
+            l1_repo_owner: Set(source_tracking.l1_repo_owner.clone()),
+            l1_repo_name: Set(source_tracking.l1_repo_name.clone()),
+            l1_branch: Set(L2_NEWER_FALLBACK_L1_BRANCH.to_string()),
+            l2_branch: Set(source_tracking.l2_branch.clone()),
+            l2_repo_path: Set(source_tracking.l2_repo_path.clone()),
+            tracking_status: Set("active".to_string()),
+            created_at: Set(now),
+            updated_at: Set(now),
+            platform: Set(source_tracking.platform.clone()),
+            ..Default::default()
+        };
+
+        match fallback.insert(self.db).await {
+            Ok(model) => {
+                info!(
+                    tracking_id = source_tracking.id,
+                    fallback_tracking_id = model.id,
+                    fallback_l1_branch = L2_NEWER_FALLBACK_L1_BRANCH,
+                    "按需创建 openEuler-24.09 fallback tracking"
+                );
+                Ok(Some(model))
+            }
+            Err(err) => {
+                warn!(
+                    tracking_id = source_tracking.id,
+                    error = %err,
+                    fallback_l1_branch = L2_NEWER_FALLBACK_L1_BRANCH,
+                    "按需创建 openEuler-24.09 fallback tracking 失败"
+                );
+                Err(err).context("创建 openEuler-24.09 fallback tracking 失败")
+            }
+        }
     }
 
     /// 执行 L1 vs L0 对比
@@ -357,30 +1888,31 @@ impl<'a> PipelineExecutor<'a> {
 
         // 获取 L0 版本信息（从 l0_commits 表）
         let l0_info = self.get_l0_version_info(tracking).await?;
-        if l0_info.is_none() {
-            warn!(
-                tracking_id = tracking.id,
-                "缺少 L0 版本信息，跳过 L1 vs L0 对比"
-            );
-            return Ok(None);
-        }
 
         // 获取 L1 版本信息（从 commit_records 和快照）
         let l1_info = self.get_l1_version_info(tracking).await?;
-        if l1_info.is_none() {
+        let Some(l1_info) = l1_info else {
             warn!(
                 tracking_id = tracking.id,
                 "缺少 L1 版本信息，跳过 L1 vs L0 对比"
             );
             return Ok(None);
-        }
+        };
 
         // 使用 L1VsL0Comparator
         let comparator = L1VsL0Comparator::new();
-        let report = comparator
-            .compare(&l0_info.unwrap(), &l1_info.unwrap())
-            .await
-            .context("L1 vs L0 对比失败")?;
+        let report = if let Some(l0_info) = l0_info {
+            comparator
+                .compare(&l0_info, &l1_info)
+                .await
+                .context("L1 vs L0 对比失败")?
+        } else {
+            warn!(
+                tracking_id = tracking.id,
+                "缺少 L0 版本信息，生成部分 L1 vs L0 评估"
+            );
+            comparator.compare_without_l0(&l1_info)
+        };
 
         info!(
             tracking_id = tracking.id,
@@ -396,8 +1928,10 @@ impl<'a> PipelineExecutor<'a> {
         &self,
         tracking: &tracking::Model,
     ) -> Result<Option<diff::l1_vs_l0::L0VersionInfo>> {
-        use crate::entities::{l0_commits, prelude::*};
-        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
+        use crate::ecosystem::maintenance::collectors::GenericGitMaintenanceCollector;
+        use crate::entities::{l0_commits, maintenance_evidence_snapshots, prelude::*};
+        use crate::utils::version::{Version, VersionParser};
+        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
 
         // 从 l0_commits 表获取版本信息
         let l0_commits = L0Commits::find()
@@ -409,16 +1943,202 @@ impl<'a> PipelineExecutor<'a> {
             .take(100)
             .collect::<Vec<_>>();
 
-        if l0_commits.is_empty() {
+        let package = Packages::find_by_id(tracking.package_id)
+            .one(self.db)
+            .await?;
+        let package_name = package
+            .as_ref()
+            .map(|package| package.name.clone())
+            .unwrap_or_else(|| tracking.l1_repo_name.clone());
+
+        let mut seen_versions = HashSet::new();
+        let mut all_versions = Vec::new();
+        let mut changelogs: HashMap<String, Vec<diff::l1_vs_l0::ChangelogEntry>> = HashMap::new();
+        let mut maintenance_notices = Vec::new();
+
+        for commit in &l0_commits {
+            let metadata_text = commit
+                .metadata
+                .as_ref()
+                .and_then(|metadata| serde_json::to_string(metadata).ok())
+                .unwrap_or_default();
+            let evidence_text = format!("{}\n{}", commit.summary, metadata_text);
+
+            for version in diff::l1_vs_l0::extract_versions_from_text(&evidence_text) {
+                if !seen_versions.insert(version.clone()) {
+                    continue;
+                }
+                let parsed =
+                    VersionParser::parse(&version).unwrap_or_else(|_| Version::new(0, 0, 0));
+                all_versions.push(diff::l1_vs_l0::VersionTag {
+                    version: version.clone(),
+                    date: commit.authored_at,
+                    changelog: commit.summary.clone(),
+                    is_stable: parsed.is_stable(),
+                });
+                changelogs
+                    .entry(version)
+                    .or_default()
+                    .push(diff::l1_vs_l0::ChangelogEntry {
+                        entry_type: infer_changelog_entry_type(&evidence_text),
+                        description: commit.summary.clone(),
+                        commit_sha: Some(commit.commit_sha.clone()),
+                    });
+            }
+
+            maintenance_notices.extend(diff::l1_vs_l0::extract_maintenance_notices(
+                &evidence_text,
+                format!("l0_commit:{}", short_sha(&commit.commit_sha)),
+            ));
+        }
+
+        let native_evidence = MaintenanceEvidenceSnapshots::find()
+            .filter(maintenance_evidence_snapshots::Column::PackageId.eq(tracking.package_id))
+            .order_by_desc(maintenance_evidence_snapshots::Column::CollectedAt)
+            .limit(20)
+            .all(self.db)
+            .await?;
+
+        for evidence in &native_evidence {
+            let raw_text = serde_json::to_string(&evidence.raw_payload).unwrap_or_default();
+            let normalized_text = evidence
+                .normalized_signals
+                .as_ref()
+                .and_then(|value| serde_json::to_string(value).ok())
+                .unwrap_or_default();
+            let evidence_text = format!("{}\n{}", raw_text, normalized_text);
+            let source = format!(
+                "native_community:{}:{}",
+                evidence.source_name, evidence.source_url
+            );
+            for catalog in version_catalog_payloads(evidence) {
+                append_version_catalog_entries(
+                    catalog,
+                    &source,
+                    evidence.collected_at,
+                    &mut seen_versions,
+                    &mut all_versions,
+                    &mut changelogs,
+                );
+            }
+            maintenance_notices.extend(diff::l1_vs_l0::extract_maintenance_notices(
+                &evidence_text,
+                source,
+            ));
+        }
+
+        if all_versions.is_empty() {
+            if let Some(package) = package.as_ref() {
+                if GenericGitMaintenanceCollector::matches_package(package)
+                    && should_collect_l0_version_catalog(package)
+                {
+                    let collector = GenericGitMaintenanceCollector::new();
+                    match collector.collect_version_catalog(package).await {
+                        Ok(version_catalog) => {
+                            let source = format!(
+                                "native_community:{}:{}",
+                                version_catalog
+                                    .get("source_name")
+                                    .and_then(Value::as_str)
+                                    .unwrap_or("generic_git_version_catalog"),
+                                version_catalog
+                                    .get("source_url")
+                                    .and_then(Value::as_str)
+                                    .unwrap_or_default()
+                            );
+                            if let Some(catalog) = find_version_catalog_data(&version_catalog) {
+                                append_version_catalog_entries(
+                                    catalog,
+                                    &source,
+                                    Utc::now(),
+                                    &mut seen_versions,
+                                    &mut all_versions,
+                                    &mut changelogs,
+                                );
+                            }
+
+                            let now = Utc::now();
+                            let evidence = maintenance_evidence_snapshots::ActiveModel {
+                                package_id: Set(package.id),
+                                source_type: Set(version_catalog
+                                    .get("source_type")
+                                    .and_then(Value::as_str)
+                                    .unwrap_or("generic_git_version_catalog")
+                                    .to_string()),
+                                source_name: Set(version_catalog
+                                    .get("source_name")
+                                    .and_then(Value::as_str)
+                                    .unwrap_or("generic_git_version_catalog")
+                                    .to_string()),
+                                source_url: Set(version_catalog
+                                    .get("source_url")
+                                    .and_then(Value::as_str)
+                                    .unwrap_or_default()
+                                    .to_string()),
+                                http_status: Set(version_catalog
+                                    .get("http_status")
+                                    .and_then(Value::as_i64)
+                                    .map(|value| value as i32)
+                                    .or(Some(200))),
+                                content_hash: Set(None),
+                                raw_payload: Set(version_catalog.clone()),
+                                normalized_signals: Set(version_catalog.get("data").cloned()),
+                                collected_at: Set(now),
+                                created_at: Set(now),
+                                updated_at: Set(now),
+                                ..Default::default()
+                            };
+                            if let Err(error) = evidence.insert(self.db).await {
+                                warn!(
+                                    tracking_id = tracking.id,
+                                    package_id = package.id,
+                                    error = %error,
+                                    "L0 Git tag 版本目录兜底证据落库失败，仅用于本次报告"
+                                );
+                            }
+                        }
+                        Err(error) => {
+                            warn!(
+                                tracking_id = tracking.id,
+                                package_id = package.id,
+                                repo_url = package.l0_repo_url.as_deref().unwrap_or_default(),
+                                error = %error,
+                                "L0 Git tag 版本目录兜底采集失败"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        all_versions.sort_by(|left, right| {
+            let left =
+                VersionParser::parse(&left.version).unwrap_or_else(|_| Version::new(0, 0, 0));
+            let right =
+                VersionParser::parse(&right.version).unwrap_or_else(|_| Version::new(0, 0, 0));
+            left.cmp(&right)
+        });
+
+        if all_versions.is_empty() && maintenance_notices.is_empty() {
+            warn!(
+                tracking_id = tracking.id,
+                "L0 数据中未识别到版本或停维公告信息"
+            );
             return Ok(None);
         }
 
-        // TODO: 从 l0_commits 构建 L0VersionInfo
-        // 这里需要解析 commit message 和 tags 来提取版本信息
-        // 暂时返回 None，需要进一步实现
-        warn!(tracking_id = tracking.id, "L0 版本信息提取功能待实现");
+        let latest_version = latest_version_from_tags(&all_versions, false).unwrap_or_default();
+        let latest_stable =
+            latest_version_from_tags(&all_versions, true).unwrap_or_else(|| latest_version.clone());
 
-        Ok(None)
+        Ok(Some(diff::l1_vs_l0::L0VersionInfo {
+            package_name,
+            latest_stable,
+            latest_version,
+            all_versions,
+            changelogs,
+            maintenance_notices,
+        }))
     }
 
     /// 获取 L1 版本信息
@@ -426,11 +2146,135 @@ impl<'a> PipelineExecutor<'a> {
         &self,
         tracking: &tracking::Model,
     ) -> Result<Option<diff::l1_vs_l0::L1VersionInfo>> {
-        // TODO: 从 commit_records 和快照提取 L1 版本信息
-        // 需要解析 spec 文件和 patch 文件
-        warn!(tracking_id = tracking.id, "L1 版本信息提取功能待实现");
+        use crate::entities::{l2_snapshots, prelude::*};
+        use crate::snapshot::types::RepositorySnapshot;
+        use crate::utils::PatchParser;
+        use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
+        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 
-        Ok(None)
+        let package_name = Packages::find_by_id(tracking.package_id)
+            .one(self.db)
+            .await?
+            .map(|package| package.name)
+            .unwrap_or_else(|| tracking.l1_repo_name.clone());
+
+        let l1_snapshot_record = L2Snapshots::find()
+            .filter(l2_snapshots::Column::TrackingId.eq(tracking.id))
+            .filter(l2_snapshots::Column::SnapshotType.eq("l1"))
+            .order_by_desc(l2_snapshots::Column::CreatedAt)
+            .one(self.db)
+            .await?;
+
+        let l2_snapshot_record = latest_l2_snapshot_record_for_tracking(self.db, tracking).await?;
+
+        let mut current_version = None;
+        let mut component_version = None;
+        let mut spec_text = String::new();
+        let mut patches = Vec::new();
+        let mut cve_patches = Vec::new();
+
+        if let Some(snapshot_record) = l1_snapshot_record {
+            let snapshot: RepositorySnapshot = serde_json::from_value(snapshot_record.payload)
+                .context("解析 L1 快照 payload 失败")?;
+            if let Some(spec) = snapshot.spec {
+                current_version = spec
+                    .version
+                    .clone()
+                    .filter(|value| !value.trim().is_empty());
+                if let Ok(decoded) = BASE64_STANDARD.decode(spec.content_base64.replace('\n', "")) {
+                    spec_text = String::from_utf8(decoded).unwrap_or_default();
+                }
+            }
+
+            for file in snapshot
+                .files
+                .iter()
+                .filter(|file| is_patch_path(&file.path))
+            {
+                let filename = std::path::Path::new(&file.path)
+                    .file_name()
+                    .and_then(|value| value.to_str())
+                    .unwrap_or(file.path.as_str())
+                    .to_string();
+                patches.push(diff::l1_vs_l0::PatchInfo {
+                    filename: filename.clone(),
+                    description: file.path.clone(),
+                    applied: true,
+                    content_hash: Some(file.sha256.clone()),
+                });
+
+                for cve_id in PatchParser::extract_cve_from_filename(&filename) {
+                    cve_patches.push(diff::l1_vs_l0::CveInfo {
+                        cve_id,
+                        patch_file: filename.clone(),
+                        description: file.path.clone(),
+                        severity: None,
+                    });
+                }
+            }
+        }
+
+        if let Some(snapshot_record) = l2_snapshot_record {
+            let snapshot: RepositorySnapshot = serde_json::from_value(snapshot_record.payload)
+                .context("解析 L2 快照 payload 失败")?;
+            component_version = snapshot
+                .spec
+                .and_then(|spec| spec.version)
+                .filter(|value| !value.trim().is_empty());
+        }
+
+        let commits = L1CommitRecords::find()
+            .filter(l1_commit_records::Column::TrackingId.eq(tracking.id))
+            .order_by_desc(l1_commit_records::Column::CommittedAt)
+            .all(self.db)
+            .await?;
+
+        if current_version.is_none() {
+            current_version = commits
+                .iter()
+                .find_map(|commit| commit.spec_version.clone())
+                .filter(|value| !value.trim().is_empty());
+        }
+
+        let mut known_versions = Vec::new();
+        if let Some(version) = current_version.as_ref() {
+            known_versions.push(version.clone());
+        }
+        for commit in &commits {
+            if let Some(version) = commit.spec_version.as_ref() {
+                if !version.trim().is_empty() && !known_versions.iter().any(|v| v == version) {
+                    known_versions.push(version.clone());
+                }
+            }
+        }
+
+        let current_version = match current_version {
+            Some(version) => version,
+            None => {
+                warn!(tracking_id = tracking.id, "未能从 L1 仓库信息识别当前版本");
+                return Ok(None);
+            }
+        };
+
+        let latest_version = latest_version_from_strings(&known_versions);
+        let commit_messages = commits
+            .iter()
+            .map(|commit| commit.commit_message.clone())
+            .collect::<Vec<_>>();
+        let (is_lts, lts_evidence) =
+            detect_lts_from_l1_sources(tracking, &spec_text, &commit_messages);
+
+        Ok(Some(diff::l1_vs_l0::L1VersionInfo {
+            package_name,
+            current_version,
+            component_version,
+            latest_version,
+            known_versions,
+            is_lts,
+            lts_evidence,
+            patches,
+            cve_patches,
+        }))
     }
 
     /// 保存对比报告
@@ -444,116 +2288,8 @@ impl<'a> PipelineExecutor<'a> {
 
         // 构建报告摘要，包含详细的 patch 和 commit_diff 信息
 
-        let l2_vs_l1_diff = l2_vs_l1.as_ref().map(|r| serde_json::json!({
-                "patches_added": r.patch_diff.l2_added.len(),
-                "patches_added_list": r.patch_diff.l2_added.iter().map(|p| serde_json::json!({
-                    "filename": p.filename,
-                    "path": p.path,
-                    "content_hash": p.content_hash,
-                    "size": p.size,
-                    "applied": p.applied,
-                })).collect::<Vec<_>>(),
-                "patches_modified": r.patch_diff.l2_modified.len(),
-                "patches_modified_list": r.patch_diff.l2_modified.iter().map(|p| serde_json::json!({
-                    "filename": p.filename,
-                    "l1_hash": p.l1_hash,
-                    "l2_hash": p.l2_hash,
-                })).collect::<Vec<_>>(),
-                "patches_removed": r.patch_diff.l2_removed.len(),
-                "patches_removed_list": r.patch_diff.l2_removed.iter().map(|p| serde_json::json!({
-                    "filename": p.filename,
-                    "path": p.path,
-                    "content_hash": p.content_hash,
-                    "size": p.size,
-                    "applied": p.applied,
-                })).collect::<Vec<_>>(),
-                "patches_identical": r.patch_diff.identical.len(),
-                "has_spec_changes": !r.spec_diff.content_identical,
-                "spec_diff": serde_json::json!({
-                    "version_diff": r.spec_diff.version_diff.as_ref().map(|v| serde_json::json!({
-                        "l1_version": v.l1_version,
-                        "l2_version": v.l2_version,
-                        "relationship": format!("{:?}", v.relationship),
-                    })),
-                    "diff_summary": r.spec_diff.diff_summary,
-                    "key_changes": r.spec_diff.key_changes,
-                    "build_requires_added": r.spec_diff.build_requires_added,
-                    "build_requires_removed": r.spec_diff.build_requires_removed,
-                    "configure_options_added": r.spec_diff.configure_options_added,
-                    "configure_options_removed": r.spec_diff.configure_options_removed,
-                }),
-                "conflicts": r.conflicts.len(),
-                "commit_diff": serde_json::json!({
-                    "l1_commits_count": r.commit_diff.l1_commits_count,
-                    "l2_commits_count": r.commit_diff.l2_commits_count,
-                    "behind_commits_count": r.commit_diff.behind_commits.len(),
-                    "behind_commits": r.commit_diff.behind_commits.iter().map(|c| serde_json::json!({
-                        "sha": c.sha,
-                        "title": c.title,
-                        "author": c.author,
-                        "authored_at": c.authored_at,
-                        "url": c.url,
-                        "stats": serde_json::json!({
-                            "additions": c.stats.additions,
-                            "deletions": c.stats.deletions,
-                            "files_changed": c.stats.files_changed,
-                        }),
-                        "primary_change_type": c.primary_change_type,
-                        "cve_list": c.cve_list,
-                    })).collect::<Vec<_>>(),
-                    "base_commit": r.commit_diff.base_commit.as_ref().map(|c| serde_json::json!({
-                        "sha": c.sha,
-                        "title": c.title,
-                        "author": c.author,
-                        "authored_at": c.authored_at,
-                    })),
-                    "base_version_release": r.commit_diff.base_version_release,
-                }),
-            }));
-
-        let l1_vs_l0_diff = l1_vs_l0.as_ref().map(|r| serde_json::json!({
-                "version_behind": r.version_behind,
-                "current_version": r.current_version,
-                "latest_stable": r.latest_stable,
-                "latest_version": r.latest_version,
-                "upgradable_versions": r.upgradable_versions.len(),
-                "upgradable_versions_list": r.upgradable_versions.iter().map(|v| serde_json::json!({
-                    "version": v.version,
-                    "release_date": v.release_date,
-                    "is_security_release": v.is_security_release,
-                    "breaking_changes": v.breaking_changes,
-                })).collect::<Vec<_>>(),
-                "patches_merged": r.patch_analysis.merged_in_upstream.len(),
-                "patches_merged_list": r.patch_analysis.merged_in_upstream.iter().map(|p| serde_json::json!({
-                    "filename": p.filename,
-                    "description": p.description,
-                    "applied": p.applied,
-                    "content_hash": p.content_hash,
-                })).collect::<Vec<_>>(),
-                "patches_still_needed": r.patch_analysis.still_needed.len(),
-                "patches_still_needed_list": r.patch_analysis.still_needed.iter().map(|p| serde_json::json!({
-                    "filename": p.filename,
-                    "description": p.description,
-                    "applied": p.applied,
-                    "content_hash": p.content_hash,
-                })).collect::<Vec<_>>(),
-                "patches_can_be_removed": r.patch_analysis.can_be_removed_after_upgrade,
-                "cves_fixed": r.cve_analysis.fixed_in_upstream.len(),
-                "cves_fixed_list": r.cve_analysis.fixed_in_upstream.iter().map(|c| serde_json::json!({
-                    "cve_id": c.cve_id,
-                    "patch_file": c.patch_file,
-                    "description": c.description,
-                    "severity": c.severity,
-                })).collect::<Vec<_>>(),
-                "cves_not_fixed": r.cve_analysis.not_fixed_in_upstream.len(),
-                "cves_not_fixed_list": r.cve_analysis.not_fixed_in_upstream.iter().map(|c| serde_json::json!({
-                    "cve_id": c.cve_id,
-                    "patch_file": c.patch_file,
-                    "description": c.description,
-                    "severity": c.severity,
-                })).collect::<Vec<_>>(),
-                "recommendations": r.recommendations,
-            }));
+        let l2_vs_l1_diff = l2_vs_l1.as_ref().map(l2_vs_l1_diff_summary);
+        let l1_vs_l0_diff = l1_vs_l0.as_ref().map(l1_vs_l0_diff_summary);
 
         // 创建报告记录
         let report = crate::entities::compare_reports::ActiveModel {
@@ -595,6 +2331,7 @@ impl<'a> PipelineExecutor<'a> {
                 classified_count: 0,
                 cve_count: 0,
                 needs_review_count: 0,
+                commits: Vec::new(),
             });
         }
 
@@ -602,17 +2339,19 @@ impl<'a> PipelineExecutor<'a> {
         let mut classified_count = 0;
         let mut cve_count = 0;
         let mut needs_review_count = 0;
+        let mut classified_commits = Vec::new();
 
         for commit in pending_commits {
             // 分类 commit
             match classifier.classify_commit(commit.id).await {
                 Ok(classification) => {
+                    let commit_sha = commit.commit_sha.clone();
+                    let primary_change_type = classification.primary_type.as_str().to_string();
+                    let cve_numbers = classification.cve_numbers.clone();
                     // 更新 commit 记录
                     let mut active_commit: l1_commit_records::ActiveModel = commit.into();
-                    active_commit.primary_change_type =
-                        Set(Some(classification.primary_type.as_str().to_string()));
-                    active_commit.cve_list =
-                        Set(Some(serde_json::to_value(&classification.cve_numbers)?));
+                    active_commit.primary_change_type = Set(Some(primary_change_type.clone()));
+                    active_commit.cve_list = Set(Some(serde_json::to_value(&cve_numbers)?));
                     active_commit.spec_changed = Set(classification.has_spec_change);
                     active_commit.classification_status = Set("done".to_string());
                     active_commit.updated_at = Set(Utc::now());
@@ -624,6 +2363,11 @@ impl<'a> PipelineExecutor<'a> {
 
                     classified_count += 1;
                     cve_count += classification.cve_numbers.len();
+                    classified_commits.push(ClassifiedCommitResult {
+                        commit_sha,
+                        primary_change_type,
+                        cve_list: cve_numbers,
+                    });
 
                     // 检查是否需要人工审核
                     if classification.primary_type.as_str() == "MixedChange" {
@@ -652,6 +2396,7 @@ impl<'a> PipelineExecutor<'a> {
             classified_count,
             cve_count,
             needs_review_count,
+            commits: classified_commits,
         })
     }
 
@@ -702,199 +2447,219 @@ impl<'a> PipelineExecutor<'a> {
         let mut commit_reports = Vec::new();
         let mut base_version = String::new();
         let mut base_release = String::new();
+        let mut l1_vs_l0_summary: Option<Value> = None;
+        let mut version_warnings: Vec<String> = Vec::new();
+        let mut diff_context_from_pipeline = false;
+        let classification_overrides = classification_overrides(classification_result);
+
+        let mut snapshot_version: Option<String> = None;
+        let mut snapshot_release: Option<String> = None;
+        let mut l1_snapshot_version: Option<String> = None;
+        let mut l1_snapshot_release: Option<String> = None;
+
+        {
+            use crate::entities::l2_snapshots;
+            use crate::snapshot::types::RepositorySnapshot;
+
+            let l1_snapshot_record = L2Snapshots::find()
+                .filter(l2_snapshots::Column::TrackingId.eq(tracking.id))
+                .filter(l2_snapshots::Column::SnapshotType.eq("l1"))
+                .order_by_desc(l2_snapshots::Column::CreatedAt)
+                .one(self.db)
+                .await?;
+
+            let l2_snapshot_record =
+                latest_l2_snapshot_record_for_tracking(self.db, tracking).await?;
+
+            if let Some(snapshot) = l1_snapshot_record {
+                match serde_json::from_value::<RepositorySnapshot>(snapshot.payload.clone()) {
+                    Ok(snapshot_data) => {
+                        if let Some(spec) = snapshot_data.spec {
+                            if let Some(version) = spec.version {
+                                if !version.is_empty() {
+                                    l1_snapshot_version = Some(version);
+                                }
+                            }
+                            if let Some(release) = spec.release {
+                                if !release.is_empty() {
+                                    l1_snapshot_release = Some(release);
+                                }
+                            }
+                        }
+                    }
+                    Err(err) => {
+                        warn!(
+                            tracking_id = tracking.id,
+                            error = %err,
+                            "解析 L1 快照 payload 失败"
+                        );
+                    }
+                }
+            }
+
+            if let Some(snapshot) = l2_snapshot_record {
+                match serde_json::from_value::<RepositorySnapshot>(snapshot.payload.clone()) {
+                    Ok(snapshot_data) => {
+                        if let Some(spec) = snapshot_data.spec {
+                            if let Some(version) = spec.version {
+                                if !version.is_empty() {
+                                    snapshot_version = Some(version);
+                                }
+                            }
+                            if let Some(release) = spec.release {
+                                if !release.is_empty() {
+                                    snapshot_release = Some(release);
+                                }
+                            }
+                        }
+                    }
+                    Err(err) => {
+                        warn!(
+                            tracking_id = tracking.id,
+                            error = %err,
+                            "解析 L2 快照 payload 失败"
+                        );
+                    }
+                }
+            }
+        }
+
+        if base_version.is_empty() {
+            if let Some(version) = snapshot_version.clone() {
+                base_version = version;
+            }
+        }
+        if base_release.is_empty() {
+            if let Some(release) = snapshot_release.clone() {
+                base_release = release;
+            }
+        }
 
         // 从 diff_result 中获取 report_id，然后查询 compare_reports 表
         if let Some(diff_stage) = diff_result {
-            if let Some(report_id) = diff_stage.details.get("report_id").and_then(|v| v.as_i64()) {
-                // 查询 compare_reports 表获取对比数据
-                if let Some(compare_report) = CompareReports::find_by_id(report_id as i32)
-                    .one(self.db)
-                    .await?
+            let mut compare_from_pipeline = false;
+            if let Some(l1_vs_l0_diff) = diff_stage.details.get("l1_vs_l0_diff") {
+                if !l1_vs_l0_diff.is_null() {
+                    version_warnings.extend(collect_version_warnings(l1_vs_l0_diff));
+                    l1_vs_l0_summary = Some(l1_vs_l0_diff.clone());
+                    compare_from_pipeline = true;
+                }
+            }
+
+            if let Some(l2_vs_l1_diff) = diff_stage.details.get("l2_vs_l1_diff") {
+                if !l2_vs_l1_diff.is_null() {
+                    apply_l2_vs_l1_commit_diff(
+                        self.db,
+                        l2_vs_l1_diff,
+                        tracking,
+                        &package_name,
+                        l1_snapshot_version.as_deref(),
+                        l1_snapshot_release.as_deref(),
+                        &mut base_version,
+                        &mut base_release,
+                        &mut commit_reports,
+                        &classification_overrides,
+                        risk_client.as_ref(),
+                        &risk_create_url,
+                    )
+                    .await?;
+                    compare_from_pipeline = true;
+                }
+            }
+            diff_context_from_pipeline = compare_from_pipeline;
+
+            if !compare_from_pipeline {
+                if let Some(report_id) =
+                    diff_stage.details.get("report_id").and_then(|v| v.as_i64())
                 {
-                    // 从 l2_vs_l1_diff 中提取 commit_diff 信息
-                    if let Some(l2_vs_l1_diff) = &compare_report.l2_vs_l1_diff {
-                        if let Some(commit_diff) = l2_vs_l1_diff.get("commit_diff") {
-                            // 获取 base_version_release
-                            if let Some(version_release) = commit_diff.get("base_version_release") {
-                                if let Some(version) =
-                                    version_release.get(0).and_then(|v| v.as_str())
-                                {
-                                    base_version = version.to_string();
-                                    info!(tracking_id = tracking.id, base_version = %base_version, "获取到 base_commit 版本");
-                                }
-                                if let Some(release) =
-                                    version_release.get(1).and_then(|v| v.as_str())
-                                {
-                                    base_release = release.to_string();
-                                    info!(tracking_id = tracking.id, base_release = %base_release, "获取到 base_commit release");
-                                }
-                            }
+                    // 查询 compare_reports 表获取对比数据
+                    if let Some(compare_report) = CompareReports::find_by_id(report_id as i32)
+                        .one(self.db)
+                        .await?
+                    {
+                        // 从 l2_vs_l1_diff 中提取 commit_diff 信息
+                        if let Some(l1_vs_l0_diff) = &compare_report.l1_vs_l0_diff {
+                            version_warnings.extend(collect_version_warnings(l1_vs_l0_diff));
+                            l1_vs_l0_summary = Some(l1_vs_l0_diff.clone());
+                        }
 
-                            // 获取 behind_commits 列表
-                            if let Some(behind_commits) =
-                                commit_diff.get("behind_commits").and_then(|v| v.as_array())
-                            {
-                                // 提取 behind_commits 中的 SHA 列表
-                                let behind_commit_shas: Vec<String> = behind_commits
-                                    .iter()
-                                    .filter_map(|c| {
-                                        c.get("sha").and_then(|s| s.as_str()).map(|s| s.to_string())
-                                    })
-                                    .collect();
-
-                                // 从 l1_commit_records 表中获取这些 commit 的详细信息
-                                if !behind_commit_shas.is_empty() {
-                                    let commits = L1CommitRecords::find()
-                                        .filter(
-                                            l1_commit_records::Column::TrackingId.eq(tracking.id),
-                                        )
-                                        .filter(
-                                            l1_commit_records::Column::CommitSha
-                                                .is_in(behind_commit_shas),
-                                        )
-                                        .all(self.db)
-                                        .await?;
-
-                                    // 为每个 commit 创建独立的信息记录
-                                    for commit in commits {
-                                        // 根据 primary_change_type 判断 level
-                                        let level = match commit.primary_change_type.as_deref() {
-                                            Some("CVE") => "High",
-                                            Some("Bugfix") => "Medium",
-                                            Some(_) => "Low",
-                                            None => "Normal",
-                                        };
-
-                                        if let Some(risk_client) = &risk_client {
-                                            let risk_level =
-                                                match commit.primary_change_type.as_deref() {
-                                                    Some("CVE") => 3,
-                                                    Some("Bugfix") => 2,
-                                                    Some(_) => 1,
-                                                    None => 1,
-                                                };
-
-                                            let version = if base_version.is_empty() {
-                                                commit
-                                                    .spec_version
-                                                    .clone()
-                                                    .unwrap_or_else(|| "unknown".to_string())
-                                            } else {
-                                                base_version.clone()
-                                            };
-
-                                            let release = if base_release.is_empty() {
-                                                commit
-                                                    .spec_release
-                                                    .clone()
-                                                    .unwrap_or_else(|| "unknown".to_string())
-                                            } else {
-                                                base_release.clone()
-                                            };
-
-                                            let req = RiskCreateReq {
-                                                description: format!(
-                                                    "{}\n{}",
-                                                    commit.commit_message, commit.api_url
-                                                ),
-                                                level: risk_level,
-                                                reporter: "track-system".to_string(),
-                                                r#type: commit
-                                                    .primary_change_type
-                                                    .clone()
-                                                    .unwrap_or_else(|| "Unknown".to_string()),
-                                                software: package_name.clone(),
-                                                version,
-                                                release,
-                                                platform: "noarch".to_string(),
-                                                disclosure_time: Some(
-                                                    commit.committed_at.to_rfc3339(),
-                                                ),
-                                                source: Some(tracking.l1_repo_owner.clone()),
-                                                package_id: 0,
-                                                inner_secret: "Ctyun@123".to_string(),
-                                            };
-                                            info!(
-                                                tracking_id = tracking.id,
-                                                commit_sha = %commit.commit_sha,
-                                                req = ?req,
-                                                "调用 risk/create 请求"
-                                            );
-
-                                            match risk_client
-                                                .post(&risk_create_url)
-                                                .header("Content-Type", "application/json")
-                                                .json(&req)
-                                                .send()
-                                                .await
-                                            {
-                                                Ok(resp) if resp.status().is_success() => {
-                                                    let body =
-                                                        resp.text().await.unwrap_or_default();
-                                                    info!(
-                                                        tracking_id = tracking.id,
-                                                        commit_sha = %commit.commit_sha,
-                                                        body = body,
-                                                        "调用 risk/create 成功"
-                                                    );
-                                                }
-                                                Ok(resp) => {
-                                                    let status = resp.status().as_u16();
-                                                    let body =
-                                                        resp.text().await.unwrap_or_default();
-                                                    warn!(
-                                                        tracking_id = tracking.id,
-                                                        commit_sha = %commit.commit_sha,
-                                                        status = status,
-                                                        body = body,
-                                                        "调用 risk/create 失败"
-                                                    );
-                                                }
-                                                Err(err) => {
-                                                    warn!(
-                                                        tracking_id = tracking.id,
-                                                        commit_sha = %commit.commit_sha,
-                                                        error = %err,
-                                                        "调用 risk/create 失败"
-                                                    );
-                                                }
-                                            }
-                                        }
-
-                                        // 构建单个commit的信息
-                                        let commit_info = serde_json::json!({
-                                            "Description": commit.commit_message,
-                                            "Level": level,
-                                            "Reporter": commit.author_name,
-                                            "Software": &package_name,
-                                            "Version": &base_version,
-                                            "Release": &base_release,
-                                            "Platform": "noarch",
-                                            "DisclosureTime": commit.committed_at.to_rfc3339(),
-                                            "Source": &tracking.l1_repo_owner,
-                                            "CommitSha": commit.commit_sha,
-                                            "ChangeType": commit.primary_change_type.unwrap_or_else(|| "Unknown".to_string()),
-                                            "CVEList": commit.cve_list.unwrap_or_else(|| serde_json::json!([])),
-                                            "PackageID": tracking.package_id,
-                                            "Url": commit.api_url,
-                                        });
-                                        commit_reports.push(commit_info);
-                                    }
-                                }
-                            }
+                        if let Some(l2_vs_l1_diff) = &compare_report.l2_vs_l1_diff {
+                            apply_l2_vs_l1_commit_diff(
+                                self.db,
+                                l2_vs_l1_diff,
+                                tracking,
+                                &package_name,
+                                l1_snapshot_version.as_deref(),
+                                l1_snapshot_release.as_deref(),
+                                &mut base_version,
+                                &mut base_release,
+                                &mut commit_reports,
+                                &classification_overrides,
+                                risk_client.as_ref(),
+                                &risk_create_url,
+                            )
+                            .await?;
                         }
                     }
                 }
             }
         }
 
+        if let Some(class_stage) = classification_result {
+            merge_classification_results_into_commits(&mut commit_reports, class_stage);
+        }
+
         // 构建报告摘要 - 使用commit_reports数组
-        let diff_summary = serde_json::json!({
+        let mut diff_summary = serde_json::json!({
             "commits": commit_reports,
             "total_behind_commits": commit_reports.len(),
             "tracking_id": tracking.id,
             "package_name": package_name,
+            "l1_vs_l0": l1_vs_l0_summary,
+            "version_warnings": version_warnings,
         });
+
+        let cve_fix_comparison_input = if diff_context_from_pipeline {
+            let current_version_release = version_release_display(&base_version, &base_release);
+            let upstream_version = first_non_empty_string(&[
+                version_release_display(
+                    l1_snapshot_version.as_deref().unwrap_or_default(),
+                    l1_snapshot_release.as_deref().unwrap_or_default(),
+                ),
+                l1_vs_l0_summary
+                    .as_ref()
+                    .and_then(|summary| summary.get("latest_version"))
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .to_string(),
+            ]);
+            let input = CveFixComparisonInput {
+                tracking_id: tracking.id,
+                package_name: package_name.clone(),
+                system_version: tracking.l2_branch.clone(),
+                ctyunos_current_version: current_version_release,
+                default_upstream_version: upstream_version,
+                commit_reports: commit_reports.clone(),
+            };
+            if let Some(object) = diff_summary.as_object_mut() {
+                object.insert(
+                    "artifacts".to_string(),
+                    serde_json::json!({
+                        "cve_fix_comparison_xlsx": {
+                            "status": "pending_round_generation",
+                            "source": "scheduler_round",
+                        },
+                    }),
+                );
+                object.insert(
+                    "cve_fix_comparison_input".to_string(),
+                    serde_json::to_value(&input).unwrap_or_else(|_| serde_json::json!({})),
+                );
+            }
+            Some(input)
+        } else {
+            None
+        };
 
         // 从 classification_result 提取统计信息
         let representative_changes = if let Some(class_stage) = classification_result {
@@ -918,6 +2683,44 @@ impl<'a> PipelineExecutor<'a> {
                 "needs_review_count": 0,
             })
         };
+
+        let l0_community_assessment = match latest_l0_community_assessment(self.db, &package).await
+        {
+            Ok(Some(assessment)) => assessment,
+            Ok(None) => serde_json::json!({
+                "status": "missing",
+                "reason": "未找到与当前软件包匹配的 L0 ecosystem report，无法基于规则证据评估 L0 社区安全和质量情况。",
+            }),
+            Err(error) => {
+                warn!(
+                    tracking_id = tracking.id,
+                    package_name = %package_name,
+                    error = %error,
+                    "查询 L0 社区安全/质量评估失败"
+                );
+                serde_json::json!({
+                    "status": "failed",
+                    "reason": format!("查询 L0 ecosystem report 失败: {}", error),
+                })
+            }
+        };
+        if let Some(object) = diff_summary.as_object_mut() {
+            object.insert(
+                "l0_community_assessment".to_string(),
+                l0_community_assessment,
+            );
+        }
+
+        let ai_analysis = build_tracking_report_ai_analysis(
+            tracking,
+            &package_name,
+            &diff_summary,
+            &representative_changes,
+        )
+        .await;
+        if let Some(object) = diff_summary.as_object_mut() {
+            object.insert("ai_analysis".to_string(), ai_analysis);
+        }
 
         // 创建报告记录到 tracking_reports 表（用于最终报告）
         let report = tracking_reports::ActiveModel {
@@ -945,6 +2748,8 @@ impl<'a> PipelineExecutor<'a> {
         Ok(ReportGenerationResult {
             report_id: inserted.id as i64,
             report_status: "success".to_string(),
+            cve_fix_comparison_input,
+            cve_fix_comparison_xlsx: None,
         })
     }
 
@@ -984,7 +2789,10 @@ impl<'a> PipelineExecutor<'a> {
 mod tests {
     use super::*;
     use crate::diff;
-    use crate::entities::{l0_commits, l2_snapshots, packages, tracking};
+    use crate::entities::{
+        l0_commits, l1_commit_records, l2_snapshots, maintenance_evidence_snapshots, packages,
+        tracking,
+    };
     use chrono::Utc;
     use sea_orm::{DatabaseBackend, MockDatabase};
     use serial_test::serial;
@@ -1012,6 +2820,115 @@ mod tests {
                 Some(v) => env::set_var(&self.key, v),
                 None => env::remove_var(&self.key),
             }
+        }
+    }
+
+    fn test_tracking_model(
+        id: i32,
+        package_id: i32,
+        l1_branch: &str,
+        l2_branch: &str,
+    ) -> tracking::Model {
+        tracking::Model {
+            id,
+            package_id,
+            distro_id: 1,
+            l1_branch: l1_branch.to_string(),
+            l1_repo_owner: "owner".to_string(),
+            l1_repo_name: "repo".to_string(),
+            l2_branch: l2_branch.to_string(),
+            l2_repo_path: "/path".to_string(),
+            tracking_status: "idle".to_string(),
+            last_sync_time: Some(Utc::now()),
+            last_l1_commit_sha: None,
+            last_l2_commit_sha: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            last_error: None,
+            platform: Some("Gitee".to_string()),
+        }
+    }
+
+    fn test_package_model(id: i32, name: &str) -> packages::Model {
+        packages::Model {
+            id,
+            name: name.to_string(),
+            level: 1,
+            sync_interval_hours: 24,
+            l0_repo_url: None,
+            description: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+
+    fn test_repository_snapshot(
+        tracking_id: i32,
+        origin: crate::snapshot::types::SnapshotOrigin,
+        package_name: &str,
+        version: &str,
+        release: &str,
+        commit_sha: &str,
+    ) -> crate::snapshot::types::RepositorySnapshot {
+        use crate::snapshot::types::{
+            ChangeStats, CommitEntry, FileEntry, RepositorySnapshot, SpecEntry,
+        };
+        use base64::Engine;
+
+        let spec_content = format!(
+            "Name: {package_name}\nVersion: {version}\nRelease: {release}\nSummary: Test package\n"
+        );
+        let spec_base64 = base64::engine::general_purpose::STANDARD.encode(spec_content.as_bytes());
+
+        RepositorySnapshot {
+            tracking_id,
+            generated_at: Utc::now(),
+            origin,
+            files: vec![FileEntry {
+                path: format!("{package_name}.c"),
+                size: 10,
+                sha256: format!("{package_name}-{version}-{release}"),
+                is_binary: false,
+            }],
+            spec: Some(SpecEntry {
+                path: format!("{package_name}.spec"),
+                sha256: format!("spec-{version}-{release}"),
+                version: Some(version.to_string()),
+                release: Some(release.to_string()),
+                content_base64: spec_base64,
+            }),
+            commits: vec![CommitEntry {
+                sha: commit_sha.to_string(),
+                title: "Update package".to_string(),
+                message: "Update package".to_string(),
+                author: "dev".to_string(),
+                authored_at: Utc::now(),
+                url: None,
+                stats: ChangeStats {
+                    additions: 1,
+                    deletions: 0,
+                    files_changed: 1,
+                },
+                primary_change_type: None,
+                cve_list: vec![],
+            }],
+            issues: vec![],
+        }
+    }
+
+    fn test_snapshot_model(
+        id: i32,
+        tracking_id: i32,
+        snapshot_type: &str,
+        snapshot: &crate::snapshot::types::RepositorySnapshot,
+    ) -> l2_snapshots::Model {
+        l2_snapshots::Model {
+            id,
+            tracking_id,
+            snapshot_type: snapshot_type.to_string(),
+            checksum: format!("checksum-{id}"),
+            payload: serde_json::to_value(snapshot).unwrap(),
+            created_at: Utc::now(),
         }
     }
 
@@ -1085,6 +3002,8 @@ mod tests {
             report_id: Some(456),
             files_changed: 10,
             has_spec_changes: true,
+            l2_vs_l1_diff: None,
+            l1_vs_l0_diff: None,
         };
 
         assert_eq!(result.report_id, Some(456));
@@ -1098,6 +3017,8 @@ mod tests {
             report_id: Some(789),
             files_changed: 0,
             has_spec_changes: false,
+            l2_vs_l1_diff: None,
+            l1_vs_l0_diff: None,
         };
 
         assert_eq!(result.report_id, Some(789));
@@ -1111,6 +3032,7 @@ mod tests {
             classified_count: 15,
             cve_count: 3,
             needs_review_count: 2,
+            commits: Vec::new(),
         };
 
         assert_eq!(result.classified_count, 15);
@@ -1124,6 +3046,7 @@ mod tests {
             classified_count: 10,
             cve_count: 0,
             needs_review_count: 0,
+            commits: Vec::new(),
         };
 
         assert_eq!(result.classified_count, 10);
@@ -1136,6 +3059,8 @@ mod tests {
         let result = ReportGenerationResult {
             report_id: 999,
             report_status: "success".to_string(),
+            cve_fix_comparison_input: None,
+            cve_fix_comparison_xlsx: None,
         };
 
         assert_eq!(result.report_id, 999);
@@ -1206,6 +3131,42 @@ mod tests {
         assert_eq!(res.snapshot_id, Some(1));
         assert_eq!(res.files_count, 1);
         assert!(res.has_new_data);
+    }
+
+    #[tokio::test]
+    async fn test_stage_l2_snapshot_fallback_reuses_primary_l2_snapshot() {
+        use crate::snapshot::types::SnapshotOrigin;
+
+        let source_tracking = test_tracking_model(1, 1, "openEuler-24.03-LTS-SP3", "CTyunOS25.07");
+        let fallback_tracking = test_tracking_model(2, 1, "openEuler-24.09", "CTyunOS25.07");
+        let source_l2_snapshot = test_repository_snapshot(
+            source_tracking.id,
+            SnapshotOrigin::L2,
+            "pkg",
+            "1.30",
+            "1",
+            "source-l2",
+        );
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<tracking::Model, _, _>(vec![vec![source_tracking]])
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![test_snapshot_model(
+                99,
+                1,
+                "l2",
+                &source_l2_snapshot,
+            )]])
+            .into_connection();
+
+        let executor = PipelineExecutor::new(&db, None);
+        let result = executor
+            .stage_l2_snapshot(&fallback_tracking)
+            .await
+            .unwrap();
+
+        assert_eq!(result.snapshot_id, Some(99));
+        assert_eq!(result.files_count, source_l2_snapshot.files.len());
+        assert!(result.has_new_data);
     }
 
     #[tokio::test]
@@ -1331,10 +3292,16 @@ mod tests {
         };
 
         let db = MockDatabase::new(DatabaseBackend::Postgres)
-            .append_query_results::<packages::Model, _, _>(vec![vec![package_model]])
+            .append_query_results::<packages::Model, _, _>(vec![vec![package_model.clone()]])
             .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![]])
             .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![]])
             .append_query_results::<l0_commits::Model, _, _>(vec![vec![]])
+            .append_query_results::<packages::Model, _, _>(vec![vec![]])
+            .append_query_results::<maintenance_evidence_snapshots::Model, _, _>(vec![vec![]])
+            .append_query_results::<packages::Model, _, _>(vec![vec![package_model]])
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![]])
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![]])
+            .append_query_results::<l1_commit_records::Model, _, _>(vec![vec![]])
             .append_query_results::<compare_reports::Model, _, _>(vec![vec![compare_model]])
             .into_connection();
 
@@ -1526,12 +3493,197 @@ Summary: Test package
     }
 
     #[tokio::test]
+    async fn test_compare_l2_vs_l1_fallback_2409_skips_commit_diff_when_l2_still_newer() {
+        use crate::snapshot::types::SnapshotOrigin;
+
+        let tracking_model = test_tracking_model(1, 1, "openEuler-24.03-LTS-SP3", "CTyunOS25.05");
+        let fallback_tracking = test_tracking_model(2, 1, "openEuler-24.09", "CTyunOS25.05");
+        let package_model = test_package_model(1, "pkg");
+
+        let l1_snapshot = test_repository_snapshot(
+            tracking_model.id,
+            SnapshotOrigin::L1,
+            "pkg",
+            "1.0.0",
+            "1",
+            "l1-2403",
+        );
+        let l2_snapshot = test_repository_snapshot(
+            tracking_model.id,
+            SnapshotOrigin::L2,
+            "pkg",
+            "2.1.0",
+            "1",
+            "l2-newer",
+        );
+        let fallback_l1_snapshot = test_repository_snapshot(
+            fallback_tracking.id,
+            SnapshotOrigin::L1,
+            "pkg",
+            "2.0.0",
+            "1",
+            "l1-2409",
+        );
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<packages::Model, _, _>(vec![vec![package_model]])
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![test_snapshot_model(
+                1,
+                tracking_model.id,
+                "l1",
+                &l1_snapshot,
+            )]])
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![test_snapshot_model(
+                2,
+                tracking_model.id,
+                "l2",
+                &l2_snapshot,
+            )]])
+            .append_query_results::<tracking::Model, _, _>(vec![vec![fallback_tracking.clone()]])
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![test_snapshot_model(
+                3,
+                fallback_tracking.id,
+                "l1",
+                &fallback_l1_snapshot,
+            )]])
+            .into_connection();
+
+        let executor = PipelineExecutor::new(&db, None);
+        let report = executor
+            .compare_l2_vs_l1(&tracking_model)
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert!(l2_newer_than_l1(&report));
+        assert_eq!(report.spec_diff.version_diff.unwrap().l1_version, "2.0.0");
+        assert_eq!(report.commit_diff.l1_commits_count, 1);
+        assert_eq!(report.commit_diff.l2_commits_count, 1);
+        assert!(report.commit_diff.behind_commits.is_empty());
+        assert!(report.commit_diff.base_commit.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_compare_l2_vs_l1_non_fallback_l2_newer_skips_commit_diff() {
+        use crate::snapshot::types::SnapshotOrigin;
+
+        let tracking_model = test_tracking_model(1, 1, "openEuler-20.03-LTS-SP4", "CTyunOS22.06");
+        let package_model = test_package_model(1, "chrony");
+        let l1_snapshot = test_repository_snapshot(
+            tracking_model.id,
+            SnapshotOrigin::L1,
+            "chrony",
+            "3.5",
+            "4",
+            "l1-older",
+        );
+        let l2_snapshot = test_repository_snapshot(
+            tracking_model.id,
+            SnapshotOrigin::L2,
+            "chrony",
+            "4.1",
+            "3",
+            "l2-newer",
+        );
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<packages::Model, _, _>(vec![vec![package_model]])
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![test_snapshot_model(
+                1,
+                tracking_model.id,
+                "l1",
+                &l1_snapshot,
+            )]])
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![test_snapshot_model(
+                2,
+                tracking_model.id,
+                "l2",
+                &l2_snapshot,
+            )]])
+            .into_connection();
+
+        let executor = PipelineExecutor::new(&db, None);
+        let report = executor
+            .compare_l2_vs_l1(&tracking_model)
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert!(l2_newer_than_l1(&report));
+        let version_diff = report.spec_diff.version_diff.unwrap();
+        assert_eq!(version_diff.l1_version, "3.5");
+        assert_eq!(version_diff.l2_version, "4.1");
+        assert_eq!(report.commit_diff.l1_commits_count, 1);
+        assert_eq!(report.commit_diff.l2_commits_count, 1);
+        assert!(report.commit_diff.behind_commits.is_empty());
+        assert!(report.commit_diff.base_commit.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_compare_l2_vs_l1_missing_fallback_snapshot_skips_commit_diff() {
+        use crate::snapshot::types::SnapshotOrigin;
+
+        let tracking_model = test_tracking_model(1, 1, "openEuler-24.03-LTS-SP3", "CTyunOS25.07");
+        let fallback_tracking = test_tracking_model(2, 1, "openEuler-24.09", "CTyunOS25.07");
+        let package_model = test_package_model(1, "pkg");
+        let l1_snapshot = test_repository_snapshot(
+            tracking_model.id,
+            SnapshotOrigin::L1,
+            "pkg",
+            "1.0.0",
+            "1",
+            "l1-2403",
+        );
+        let l2_snapshot = test_repository_snapshot(
+            tracking_model.id,
+            SnapshotOrigin::L2,
+            "pkg",
+            "2.1.0",
+            "1",
+            "l2-newer",
+        );
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<packages::Model, _, _>(vec![vec![package_model]])
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![test_snapshot_model(
+                1,
+                tracking_model.id,
+                "l1",
+                &l1_snapshot,
+            )]])
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![test_snapshot_model(
+                2,
+                tracking_model.id,
+                "l2",
+                &l2_snapshot,
+            )]])
+            .append_query_results::<tracking::Model, _, _>(vec![vec![fallback_tracking.clone()]])
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![]])
+            .append_query_errors([sea_orm::DbErr::Custom(
+                "fallback sync unavailable in test".to_string(),
+            )])
+            .into_connection();
+
+        let executor = PipelineExecutor::new(&db, None);
+        let report = executor
+            .compare_l2_vs_l1(&tracking_model)
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert!(l2_newer_than_l1(&report));
+        assert_eq!(report.spec_diff.version_diff.unwrap().l1_version, "1.0.0");
+        assert!(report.commit_diff.behind_commits.is_empty());
+        assert!(report.commit_diff.base_commit.is_none());
+    }
+
+    #[tokio::test]
     async fn test_compare_l1_vs_l0_no_l0_info() {
         let tracking_model = tracking::Model {
             id: 1,
             package_id: 1,
             distro_id: 1,
-            l1_branch: "main".to_string(),
+            l1_branch: "openEuler-20.03-LTS-SP4".to_string(),
             l1_repo_owner: "owner".to_string(),
             l1_repo_name: "repo".to_string(),
             l2_branch: "local".to_string(),
@@ -1543,15 +3695,57 @@ Summary: Test package
             created_at: Utc::now(),
             updated_at: Utc::now(),
             last_error: None,
+            platform: Some("Gitee".to_string()),
+        };
+
+        let commit_model = l1_commit_records::Model {
+            id: 1,
+            tracking_id: tracking_model.id,
+            commit_sha: "sha-001".to_string(),
+            commit_message: "initial import".to_string(),
+            author_name: "dev".to_string(),
+            author_email: "dev@example.com".to_string(),
+            committed_at: Utc::now(),
+            change_type: None,
+            primary_change_type: None,
+            cve_list: None,
+            spec_changed: false,
+            patch_stats: None,
+            classification_status: "done".to_string(),
+            classification_notes: None,
+            sync_status: "done".to_string(),
+            synced_to_l2_commit: None,
+            synced_at: None,
+            api_url: "https://example.com/sha-001".to_string(),
+            fetched_at: Utc::now(),
+            files_changed_count: 0,
+            additions: 0,
+            deletions: 0,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            spec_version: Some("1.0.0".to_string()),
+            spec_release: Some("1".to_string()),
         };
 
         let db = MockDatabase::new(DatabaseBackend::Postgres)
             .append_query_results::<l0_commits::Model, _, _>(vec![vec![]])
+            .append_query_results::<packages::Model, _, _>(vec![vec![]])
+            .append_query_results::<maintenance_evidence_snapshots::Model, _, _>(vec![vec![]])
+            .append_query_results::<packages::Model, _, _>(vec![vec![]])
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![]])
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![]])
+            .append_query_results::<l1_commit_records::Model, _, _>(vec![vec![commit_model]])
             .into_connection();
 
         let executor = PipelineExecutor::new(&db, None);
         let result = executor.compare_l1_vs_l0(&tracking_model).await.unwrap();
-        assert!(result.is_none());
+        let report = result.expect("missing L0 should still produce partial L1 vs L0 report");
+        assert_eq!(report.maintenance_status.status, "UNKNOWN");
+        assert_eq!(report.lts.is_lts, Some(true));
+        assert!(report
+            .recommendations
+            .iter()
+            .any(|item| item.contains("缺少 L0 版本/生命周期证据")));
     }
 
     #[tokio::test]
@@ -1572,10 +3766,13 @@ Summary: Test package
             created_at: Utc::now(),
             updated_at: Utc::now(),
             last_error: None,
+            platform: Some("Gitee".to_string()),
         };
 
         let db = MockDatabase::new(DatabaseBackend::Postgres)
             .append_query_results::<l0_commits::Model, _, _>(vec![vec![]])
+            .append_query_results::<packages::Model, _, _>(vec![vec![]])
+            .append_query_results::<maintenance_evidence_snapshots::Model, _, _>(vec![vec![]])
             .into_connection();
 
         let executor = PipelineExecutor::new(&db, None);
@@ -1584,7 +3781,154 @@ Summary: Test package
     }
 
     #[tokio::test]
-    async fn test_get_l1_version_info_unimplemented() {
+    async fn test_get_l0_version_info_reads_native_maintenance_evidence() {
+        let tracking_model = tracking::Model {
+            id: 1,
+            package_id: 1,
+            distro_id: 1,
+            l1_branch: "main".to_string(),
+            l1_repo_owner: "owner".to_string(),
+            l1_repo_name: "repo".to_string(),
+            l2_branch: "local".to_string(),
+            l2_repo_path: "/path".to_string(),
+            tracking_status: "idle".to_string(),
+            last_sync_time: Some(Utc::now()),
+            last_l1_commit_sha: None,
+            last_l2_commit_sha: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            last_error: None,
+        };
+        let package_model = packages::Model {
+            id: 1,
+            name: "demo".to_string(),
+            level: 1,
+            sync_interval_hours: 24,
+            l0_repo_url: Some("https://example.com/demo".to_string()),
+            description: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+        let evidence_model = maintenance_evidence_snapshots::Model {
+            id: 1,
+            package_id: 1,
+            source_type: "official_page".to_string(),
+            source_name: "demo_lifecycle".to_string(),
+            source_url: "https://example.com/lifecycle".to_string(),
+            http_status: Some(200),
+            content_hash: None,
+            raw_payload: serde_json::json!({
+                "announcement": "Version 1.0 will be no longer supported after 2030-01-01"
+            }),
+            normalized_signals: None,
+            collected_at: Utc::now(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<l0_commits::Model, _, _>(vec![vec![]])
+            .append_query_results::<packages::Model, _, _>(vec![vec![package_model]])
+            .append_query_results::<maintenance_evidence_snapshots::Model, _, _>(vec![vec![
+                evidence_model,
+            ]])
+            .into_connection();
+
+        let executor = PipelineExecutor::new(&db, None);
+        let result = executor
+            .get_l0_version_info(&tracking_model)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(result.package_name, "demo");
+        assert_eq!(result.maintenance_notices.len(), 1);
+        assert_eq!(
+            result.maintenance_notices[0].support_until.as_deref(),
+            Some("2030-01-01")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_l0_version_info_reads_version_catalog_evidence() {
+        let tracking_model = tracking::Model {
+            id: 1,
+            package_id: 1,
+            distro_id: 1,
+            l1_branch: "main".to_string(),
+            l1_repo_owner: "owner".to_string(),
+            l1_repo_name: "repo".to_string(),
+            l2_branch: "local".to_string(),
+            l2_repo_path: "/path".to_string(),
+            tracking_status: "idle".to_string(),
+            last_sync_time: Some(Utc::now()),
+            last_l1_commit_sha: None,
+            last_l2_commit_sha: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            last_error: None,
+        };
+        let package_model = packages::Model {
+            id: 1,
+            name: "demo".to_string(),
+            level: 1,
+            sync_interval_hours: 24,
+            l0_repo_url: Some("https://example.com/demo".to_string()),
+            description: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+        let evidence_model = maintenance_evidence_snapshots::Model {
+            id: 1,
+            package_id: 1,
+            source_type: "generic_git_version_catalog".to_string(),
+            source_name: "generic_git_version_catalog".to_string(),
+            source_url: "https://example.com/demo".to_string(),
+            http_status: Some(200),
+            content_hash: None,
+            raw_payload: serde_json::json!({
+                "assessment_subcategory": "version_catalog",
+                "data": {
+                    "latest_version": "2.0.0-rc1",
+                    "latest_stable": "1.4.0",
+                    "versions": [
+                        {"version": "1.0.0", "source_ref": "refs/tags/v1.0.0", "is_stable": true},
+                        {"version": "1.4.0", "source_ref": "refs/tags/v1.4.0", "is_stable": true},
+                        {"version": "2.0.0-rc1", "source_ref": "refs/tags/v2.0.0-rc1", "is_stable": false}
+                    ]
+                }
+            }),
+            normalized_signals: None,
+            collected_at: Utc::now(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<l0_commits::Model, _, _>(vec![vec![]])
+            .append_query_results::<packages::Model, _, _>(vec![vec![package_model]])
+            .append_query_results::<maintenance_evidence_snapshots::Model, _, _>(vec![vec![
+                evidence_model,
+            ]])
+            .into_connection();
+
+        let executor = PipelineExecutor::new(&db, None);
+        let result = executor
+            .get_l0_version_info(&tracking_model)
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(result.latest_version, "2.0.0-rc1");
+        assert_eq!(result.latest_stable, "1.4.0");
+        assert_eq!(result.all_versions.len(), 3);
+        assert!(result
+            .all_versions
+            .iter()
+            .any(|version| version.version == "2.0.0-rc1" && !version.is_stable));
+    }
+
+    #[tokio::test]
+    async fn test_get_l1_version_info_empty() {
         let tracking_model = tracking::Model {
             id: 1,
             package_id: 1,
@@ -1603,7 +3947,12 @@ Summary: Test package
             last_error: None,
         };
 
-        let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<packages::Model, _, _>(vec![vec![]])
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![]])
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![]])
+            .append_query_results::<l1_commit_records::Model, _, _>(vec![vec![]])
+            .into_connection();
         let executor = PipelineExecutor::new(&db, None);
         let result = executor.get_l1_version_info(&tracking_model).await.unwrap();
         assert!(result.is_none());
@@ -1685,6 +4034,7 @@ Summary: Test package
             current_version: "1.0.0".to_string(),
             latest_stable: "1.0.0".to_string(),
             latest_version: "1.0.0".to_string(),
+            mainline_version: Some("1.0.0".to_string()),
             version_behind: 0,
             upgradable_versions: vec![],
             patch_analysis: diff::l1_vs_l0::PatchAnalysis {
@@ -1697,6 +4047,28 @@ Summary: Test package
                 total_cves: 0,
                 fixed_in_upstream: vec![],
                 not_fixed_in_upstream: vec![],
+            },
+            maintenance_status: diff::l1_vs_l0::MaintenanceStatus {
+                status: "UNKNOWN".to_string(),
+                stop_maintenance_detected: false,
+                matched_notice: None,
+                evidence: vec![],
+                confidence: "LOW".to_string(),
+            },
+            outdated_version: diff::l1_vs_l0::OutdatedVersionAssessment {
+                current_version: "1.0.0".to_string(),
+                latest_version: Some("1.0.0".to_string()),
+                latest_version_source: Some("l1_repo".to_string()),
+                mainline_version: Some("1.0.0".to_string()),
+                mainline_version_source: Some("l0_repo".to_string()),
+                major_version_gap: Some(0),
+                threshold_major_versions: 3,
+                is_outdated: false,
+            },
+            lts: diff::l1_vs_l0::LtsAssessment {
+                is_lts: None,
+                source: "l1_repo".to_string(),
+                evidence: vec![],
             },
             recommendations: vec![],
             created_at: Utc::now(),
@@ -1876,12 +4248,14 @@ Summary: Test package
     #[serial]
     async fn test_stage_report_generation_min() {
         use crate::entities::{
-            compare_reports, l1_commit_records, packages, tracking, tracking_reports,
+            compare_reports, ecosystem_targets, l1_commit_records, l2_snapshots, packages,
+            tracking, tracking_reports,
         };
         use chrono::Utc;
         use sea_orm::{DatabaseBackend, MockDatabase};
 
         let _risk_enabled_guard = EnvVarGuard::set("RISK_CREATE_ENABLED", "false");
+        let _ai_enabled_guard = EnvVarGuard::set("AI_ANALYSIS_ENABLED", "false");
 
         let tracking_model = tracking::Model {
             id: 2,
@@ -1977,10 +4351,13 @@ Summary: Test package
 
         let db = MockDatabase::new(DatabaseBackend::Postgres)
             .append_query_results::<packages::Model, _, _>(vec![vec![package_model.clone()]])
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![]])
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![]])
             .append_query_results::<compare_reports::Model, _, _>(vec![vec![compare_model.clone()]])
             .append_query_results::<l1_commit_records::Model, _, _>(vec![
                 vec![commit_model.clone()],
             ])
+            .append_query_results::<ecosystem_targets::Model, _, _>(vec![vec![]])
             .append_query_results::<tracking_reports::Model, _, _>(vec![vec![
                 inserted_report.clone()
             ]])
@@ -2007,9 +4384,393 @@ Summary: Test package
 
     #[tokio::test]
     #[serial]
+    async fn test_stage_report_generation_prepares_xlsx_input_from_pipeline_context() {
+        use crate::entities::{
+            ecosystem_targets, l1_commit_records, l2_snapshots, packages, tracking,
+            tracking_reports,
+        };
+        use chrono::Utc;
+        use sea_orm::{DatabaseBackend, MockDatabase};
+
+        let _risk_enabled_guard = EnvVarGuard::set("RISK_CREATE_ENABLED", "false");
+        let _ai_enabled_guard = EnvVarGuard::set("AI_ANALYSIS_ENABLED", "false");
+
+        let tracking_model = tracking::Model {
+            id: 21,
+            package_id: 3,
+            distro_id: 1,
+            l1_branch: "openEuler-20.03-LTS-SP4".to_string(),
+            l1_repo_owner: "src-openeuler".to_string(),
+            l1_repo_name: "bash".to_string(),
+            l2_branch: "ctyunos-22.06".to_string(),
+            l2_repo_path: "/path".to_string(),
+            tracking_status: "idle".to_string(),
+            last_sync_time: Some(Utc::now()),
+            last_l1_commit_sha: None,
+            last_l2_commit_sha: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            last_error: None,
+            platform: Some("atomgit".to_string()),
+        };
+
+        let package_model = packages::Model {
+            id: 3,
+            name: "bash".to_string(),
+            level: 1,
+            sync_interval_hours: 24,
+            l0_repo_url: None,
+            description: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let inserted_report = tracking_reports::Model {
+            id: 100,
+            tracking_id: tracking_model.id,
+            generated_at: Utc::now(),
+            diff_summary: serde_json::json!({}),
+            representative_changes: None,
+            source: "pipeline".to_string(),
+            status: "success".to_string(),
+            failure_reason: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let l1_snapshot = l2_snapshots::Model {
+            id: 11,
+            tracking_id: tracking_model.id,
+            snapshot_type: "l1".to_string(),
+            payload: serde_json::json!({
+                "tracking_id": tracking_model.id,
+                "generated_at": Utc::now().to_rfc3339(),
+                "origin": "L1",
+                "files": [],
+                "spec": {
+                    "path": "bash.spec",
+                    "sha256": "l1-spec",
+                    "version": "5.2",
+                    "release": "3",
+                    "content_base64": ""
+                },
+                "commits": [],
+                "issues": []
+            }),
+            created_at: Utc::now(),
+            checksum: "l1-checksum".to_string(),
+        };
+
+        let commit_model = l1_commit_records::Model {
+            id: 7,
+            tracking_id: tracking_model.id,
+            commit_sha: "sha-001".to_string(),
+            commit_message: "Fix CVE-2026-1234 in parser".to_string(),
+            author_name: "dev".to_string(),
+            author_email: "dev@example.com".to_string(),
+            committed_at: Utc::now(),
+            created_at: Utc::now(),
+            change_type: None,
+            primary_change_type: Some("CVE".to_string()),
+            cve_list: Some(serde_json::json!(["CVE-2026-1234"])),
+            spec_changed: true,
+            patch_stats: None,
+            classification_status: "done".to_string(),
+            classification_notes: None,
+            sync_status: "synced".to_string(),
+            synced_to_l2_commit: None,
+            synced_at: None,
+            api_url: "https://atomgit.com/src-openeuler/bash/commits/detail/sha-001".to_string(),
+            fetched_at: Utc::now(),
+            files_changed_count: 1,
+            additions: 10,
+            deletions: 2,
+            updated_at: Utc::now(),
+            spec_version: Some("5.2".to_string()),
+            spec_release: Some("4".to_string()),
+        };
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<packages::Model, _, _>(vec![vec![package_model.clone()]])
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![l1_snapshot]])
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![]])
+            .append_query_results::<l1_commit_records::Model, _, _>(vec![vec![commit_model]])
+            .append_query_results::<ecosystem_targets::Model, _, _>(vec![vec![]])
+            .append_query_results::<tracking_reports::Model, _, _>(vec![vec![
+                inserted_report.clone()
+            ]])
+            .into_connection();
+
+        let executor = PipelineExecutor::new(&db, None);
+        let mut prev = std::collections::HashMap::new();
+        let diff_details = serde_json::json!({
+            "report_id": 42,
+            "l2_vs_l1_diff": {
+                "commit_diff": {
+                    "base_version_release": ["5.2", "1"],
+                    "behind_commits": [{
+                        "sha": "sha-001",
+                        "title": "Fix CVE-2026-1234",
+                        "message": "Fix CVE-2026-1234 in parser",
+                        "author": "dev",
+                        "authored_at": "2026-01-01T00:00:00Z",
+                        "url": "https://atomgit.com/src-openeuler/bash/commits/detail/sha-001",
+                        "primary_change_type": "Unknown",
+                        "cve_list": []
+                    }]
+                },
+                "spec_diff": {
+                    "version_diff": {
+                        "l1_version": "5.2"
+                    }
+                }
+            },
+            "l1_vs_l0_diff": {
+                "latest_version": "5.2-3"
+            }
+        });
+        let stage = StageResult::success(
+            PipelineStage::DiffComparison,
+            "ok".to_string(),
+            Utc::now(),
+            diff_details,
+        );
+        prev.insert(PipelineStage::DiffComparison, stage);
+        let classification_stage = StageResult::success(
+            PipelineStage::Classification,
+            "classified".to_string(),
+            Utc::now(),
+            serde_json::json!({
+                "classified_count": 1,
+                "cve_count": 1,
+                "needs_review_count": 0,
+                "commits": [{
+                    "commit_sha": "sha-001",
+                    "primary_change_type": "CVE",
+                    "cve_list": ["CVE-2026-1234"]
+                }]
+            }),
+        );
+        prev.insert(PipelineStage::Classification, classification_stage);
+
+        let result = executor
+            .stage_report_generation(&tracking_model, &prev)
+            .await
+            .unwrap();
+
+        assert!(result.cve_fix_comparison_xlsx.is_none());
+        let input = result.cve_fix_comparison_input.unwrap();
+        assert_eq!(input.tracking_id, tracking_model.id);
+        assert_eq!(input.package_name, "bash");
+        assert_eq!(input.system_version, "ctyunos-22.06");
+        assert_eq!(input.ctyunos_current_version, "5.2-1");
+        assert_eq!(input.default_upstream_version, "5.2-3");
+        assert_eq!(input.commit_reports.len(), 1);
+        assert_eq!(
+            input.commit_reports[0]["UpstreamVersionRelease"],
+            serde_json::json!("5.2-4")
+        );
+        assert_eq!(
+            input.commit_reports[0]["Url"],
+            serde_json::json!(
+                "https://atomgit.com/src-openeuler/bash/commits/detail/sha-001?ref=openEuler-20.03-LTS-SP4"
+            )
+        );
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_stage_report_generation_prefers_behind_commit_spec_for_upstream_fix_version() {
+        use crate::entities::{
+            ecosystem_targets, l1_commit_records, l2_snapshots, packages, tracking,
+            tracking_reports,
+        };
+        use chrono::Utc;
+        use sea_orm::{DatabaseBackend, MockDatabase};
+
+        let _risk_enabled_guard = EnvVarGuard::set("RISK_CREATE_ENABLED", "false");
+        let _ai_enabled_guard = EnvVarGuard::set("AI_ANALYSIS_ENABLED", "false");
+
+        let tracking_model = tracking::Model {
+            id: 407,
+            package_id: 82,
+            distro_id: 1,
+            l1_branch: "openEuler-20.03-LTS-SP4".to_string(),
+            l1_repo_owner: "src-openeuler".to_string(),
+            l1_repo_name: "openssl".to_string(),
+            l2_branch: "22.06".to_string(),
+            l2_repo_path: "https://work.ctyun.cn/git/sources-CTyunOS/openssl.git".to_string(),
+            tracking_status: "active".to_string(),
+            last_sync_time: Some(Utc::now()),
+            last_l1_commit_sha: None,
+            last_l2_commit_sha: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            last_error: None,
+            platform: Some("atomgit".to_string()),
+        };
+
+        let package_model = packages::Model {
+            id: 82,
+            name: "openssl".to_string(),
+            level: 1,
+            sync_interval_hours: 24,
+            l0_repo_url: None,
+            description: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let stale_l1_snapshot = l2_snapshots::Model {
+            id: 1908,
+            tracking_id: tracking_model.id,
+            snapshot_type: "l1".to_string(),
+            payload: serde_json::json!({
+                "tracking_id": tracking_model.id,
+                "generated_at": Utc::now().to_rfc3339(),
+                "origin": "L1",
+                "files": [],
+                "spec": {
+                    "path": "openssl.spec",
+                    "sha256": "l1-spec",
+                    "version": "1.1.1f",
+                    "release": "40",
+                    "content_base64": ""
+                },
+                "commits": [],
+                "issues": []
+            }),
+            created_at: Utc::now(),
+            checksum: "l1-checksum".to_string(),
+        };
+
+        let l2_snapshot = l2_snapshots::Model {
+            id: 369,
+            tracking_id: tracking_model.id,
+            snapshot_type: "l2".to_string(),
+            payload: serde_json::json!({
+                "tracking_id": tracking_model.id,
+                "generated_at": Utc::now().to_rfc3339(),
+                "origin": "L2",
+                "files": [],
+                "spec": {
+                    "path": "openssl.spec",
+                    "sha256": "l2-spec",
+                    "version": "1.1.1f",
+                    "release": "42",
+                    "content_base64": ""
+                },
+                "commits": [],
+                "issues": []
+            }),
+            created_at: Utc::now(),
+            checksum: "l2-checksum".to_string(),
+        };
+
+        let commit_model = l1_commit_records::Model {
+            id: 13053,
+            tracking_id: tracking_model.id,
+            commit_sha: "ae8715e85b8774c9af059c8dce72ba164f3078fc".to_string(),
+            commit_message:
+                "fix CVE-2026-42766 CVE-2026-34180 CVE-2026-45447 CVE-2026-7383 CVE-2026-9076"
+                    .to_string(),
+            author_name: "yixiangzhike".to_string(),
+            author_email: "dev@example.com".to_string(),
+            committed_at: Utc::now(),
+            created_at: Utc::now(),
+            change_type: None,
+            primary_change_type: Some("CVE".to_string()),
+            cve_list: Some(serde_json::json!([
+                "CVE-2026-34180",
+                "CVE-2026-42766",
+                "CVE-2026-45447",
+                "CVE-2026-7383",
+                "CVE-2026-9076"
+            ])),
+            spec_changed: true,
+            patch_stats: None,
+            classification_status: "done".to_string(),
+            classification_notes: None,
+            sync_status: "synced".to_string(),
+            synced_to_l2_commit: None,
+            synced_at: None,
+            api_url: "https://atomgit.com/src-openeuler/openssl/commit/ae8715e85b8774c9af059c8dce72ba164f3078fc".to_string(),
+            fetched_at: Utc::now(),
+            files_changed_count: 1,
+            additions: 10,
+            deletions: 2,
+            updated_at: Utc::now(),
+            spec_version: Some("1.1.1f".to_string()),
+            spec_release: Some("43".to_string()),
+        };
+
+        let inserted_report = tracking_reports::Model {
+            id: 1728,
+            tracking_id: tracking_model.id,
+            generated_at: Utc::now(),
+            diff_summary: serde_json::json!({}),
+            representative_changes: None,
+            source: "pipeline".to_string(),
+            status: "success".to_string(),
+            failure_reason: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results::<packages::Model, _, _>(vec![vec![package_model.clone()]])
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![stale_l1_snapshot]])
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![l2_snapshot]])
+            .append_query_results::<l1_commit_records::Model, _, _>(vec![vec![commit_model]])
+            .append_query_results::<ecosystem_targets::Model, _, _>(vec![vec![]])
+            .append_query_results::<tracking_reports::Model, _, _>(vec![vec![
+                inserted_report.clone()
+            ]])
+            .into_connection();
+
+        let executor = PipelineExecutor::new(&db, None);
+        let mut prev = std::collections::HashMap::new();
+        let diff_details = serde_json::json!({
+            "l2_vs_l1_diff": {
+                "commit_diff": {
+                    "base_version_release": ["1.1.1f", "42"],
+                    "behind_commits": [{
+                        "sha": "ae8715e85b8774c9af059c8dce72ba164f3078fc",
+                        "title": "fix CVE-2026-42766 CVE-2026-34180 CVE-2026-45447 CVE-2026-7383 CVE-2026-9076"
+                    }]
+                }
+            }
+        });
+        prev.insert(
+            PipelineStage::DiffComparison,
+            StageResult::success(
+                PipelineStage::DiffComparison,
+                "ok".to_string(),
+                Utc::now(),
+                diff_details,
+            ),
+        );
+
+        let result = executor
+            .stage_report_generation(&tracking_model, &prev)
+            .await
+            .unwrap();
+
+        let input = result.cve_fix_comparison_input.unwrap();
+        assert_eq!(input.ctyunos_current_version, "1.1.1f-42");
+        assert_eq!(input.default_upstream_version, "1.1.1f-40");
+        assert_eq!(
+            input.commit_reports[0]["UpstreamVersionRelease"],
+            serde_json::json!("1.1.1f-43")
+        );
+    }
+
+    #[tokio::test]
+    #[serial]
     async fn test_stage_report_generation_calls_risk_create() {
         use crate::entities::{
-            compare_reports, l1_commit_records, packages, tracking, tracking_reports,
+            compare_reports, ecosystem_targets, l1_commit_records, l2_snapshots, packages,
+            tracking, tracking_reports,
         };
         use chrono::{TimeZone, Utc};
         use httpmock::prelude::*;
@@ -2020,6 +4781,7 @@ Summary: Test package
         let _risk_url_guard = EnvVarGuard::set("RISK_CREATE_URL", &risk_create_url);
         let _risk_enabled_guard = EnvVarGuard::set("RISK_CREATE_ENABLED", "true");
         let _risk_timeout_guard = EnvVarGuard::set("RISK_HTTP_TIMEOUT_SECS", "2");
+        let _ai_enabled_guard = EnvVarGuard::set("AI_ANALYSIS_ENABLED", "false");
 
         let fixed_time = Utc.timestamp_opt(1_700_000_000, 0).unwrap();
 
@@ -2166,5 +4928,94 @@ Summary: Test package
         assert_eq!(result.report_status, "success".to_string());
         assert!(result.report_id > 0);
         mock.assert_calls(1);
+    }
+
+    #[test]
+    fn compact_l0_community_assessment_keeps_security_quality_focus() {
+        use crate::entities::{ecosystem_reports, ecosystem_targets};
+
+        let now = Utc::now();
+        let target = ecosystem_targets::Model {
+            id: 11,
+            name: "bash".to_string(),
+            target_type: "component".to_string(),
+            platform: Some("github".to_string()),
+            role: "l0".to_string(),
+            homepage_url: Some("https://github.com/bminor/bash".to_string()),
+            api_base_url: Some("https://api.github.com".to_string()),
+            owner: Some("bminor".to_string()),
+            repo: Some("bash".to_string()),
+            default_branch: Some("master".to_string()),
+            status: "active".to_string(),
+            refresh_interval_hours: 24,
+            rule_profile: "default".to_string(),
+            metadata: None,
+            last_collected_at: None,
+            last_report_at: None,
+            last_error: None,
+            created_at: now,
+            updated_at: now,
+        };
+        let report = ecosystem_reports::Model {
+            id: 22,
+            target_id: 11,
+            report_type: "ecosystem_profile".to_string(),
+            status: "success".to_string(),
+            overall_risk: "MEDIUM".to_string(),
+            confidence: "HIGH".to_string(),
+            summary: "summary".to_string(),
+            dimensions: serde_json::json!({}),
+            evidence_summary: None,
+            report_payload: serde_json::json!({
+                "sections": {
+                    "security": {
+                        "level": "LOW",
+                        "confidence": "HIGH",
+                        "score": 90,
+                        "coverage": 100,
+                        "reasons": ["安全流程较稳定"],
+                        "evidence_refs": ["security:cve_process"],
+                        "indicators": [
+                            {"key": "has_security_policy", "value": true},
+                            {"key": "unrelated_metric", "value": "drop"}
+                        ]
+                    },
+                    "quality": {
+                        "level": "MEDIUM",
+                        "confidence": "HIGH",
+                        "score": 70,
+                        "coverage": 80,
+                        "reasons": ["发布物签名证据不足"],
+                        "evidence_refs": ["quality:release_quality"],
+                        "indicators": [
+                            {"key": "signed_releases", "value": false},
+                            {"key": "another_unrelated_metric", "value": "drop"}
+                        ]
+                    }
+                }
+            }),
+            generated_at: now,
+            created_at: now,
+            updated_at: now,
+        };
+
+        let compact = compact_l0_community_assessment(&target, &report);
+        assert_eq!(compact["target"]["name"], "bash");
+        assert_eq!(
+            compact["security"]["indicators"].as_array().unwrap().len(),
+            1
+        );
+        assert_eq!(
+            compact["security"]["indicators"][0]["key"],
+            "has_security_policy"
+        );
+        assert_eq!(
+            compact["quality"]["indicators"].as_array().unwrap().len(),
+            1
+        );
+        assert_eq!(
+            compact["quality"]["indicators"][0]["key"],
+            "signed_releases"
+        );
     }
 }

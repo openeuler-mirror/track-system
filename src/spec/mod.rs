@@ -1,6 +1,6 @@
 /*
  * Copyright(c) 2024-2026 China Telecom Cloud Technologies Co., Ltd. All rights
- * reserved. ctscat is licensed under Mulan PSL v2. You can use this software
+ * reserved. track-system is licensed under Mulan PSL v2. You can use this software
  * according to the terms and conditions of the Mulan PSL V2. You may obtain a
  * copy of Mulan PSL v2 at: http://license.coscl.org.cn/MulanPSL2.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
@@ -30,13 +30,20 @@ impl SpecFile {
     fn parse(content: &str) -> Self {
         let mut spec = Self::default();
 
-        let version_re = Regex::new(r"^Version:\s*(.+)$").unwrap();
-        let release_re = Regex::new(r"^Release:\s*(.+)$").unwrap();
+        let version_re = Regex::new(r"^Version\s*:\s*(.+)$").unwrap();
+        let release_re = Regex::new(r"^Release\s*:\s*(.+)$").unwrap();
+        let section_re =
+            Regex::new(r"^%(?:package|description|prep|build|install|check|files|changelog)\b")
+                .unwrap();
         let macro_define_re = Regex::new(r"^%(?:define|global)\s+(\w+)\s+(.+)$").unwrap();
         let macro_usage_re = Regex::new(r"%\{(\??)([\w_]+)\}").unwrap();
 
         for raw_line in content.lines() {
             let line = raw_line.trim();
+
+            if section_re.is_match(line) {
+                break;
+            }
 
             if let Some(caps) = macro_define_re.captures(line) {
                 let name = caps.get(1).unwrap().as_str();
@@ -47,6 +54,9 @@ impl SpecFile {
             }
 
             if let Some(caps) = version_re.captures(line) {
+                if !spec.version.is_empty() {
+                    continue;
+                }
                 let raw = caps.get(1).unwrap().as_str().trim();
                 let expanded = spec.expand_macros(raw, &macro_usage_re);
                 spec.version = SpecFile::format_version(&expanded);
@@ -54,6 +64,9 @@ impl SpecFile {
             }
 
             if let Some(caps) = release_re.captures(line) {
+                if !spec.release.is_empty() {
+                    continue;
+                }
                 let raw = caps.get(1).unwrap().as_str().trim();
                 let expanded = spec.expand_macros(raw, &macro_usage_re);
                 spec.release = SpecFile::format_version(&expanded);
@@ -181,5 +194,25 @@ Release: 1
 "#;
         let spec = SpecFile::parse(content);
         assert_eq!(spec.version, "1.2.3");
+    }
+
+    #[test]
+    fn test_parse_ignores_subpackage_version_release() {
+        let content = r#"
+%global openssh_release 13
+
+Name:           openssh
+Version:        9.6p1
+Release:        %{openssh_release}
+Summary:        OpenSSH package
+
+%package -n pam_ssh_agent_auth
+Summary:        PAM module for authentication with ssh-agent
+Version:        0.10.4
+Release:        5.%{openssh_release}
+"#;
+        let spec = SpecFile::parse(content);
+        assert_eq!(spec.version, "9.6p1");
+        assert_eq!(spec.release, "13");
     }
 }

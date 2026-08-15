@@ -1,6 +1,6 @@
 /*
  * Copyright(c) 2024-2026 China Telecom Cloud Technologies Co., Ltd. All rights
- * reserved. ctscat is licensed under Mulan PSL v2. You can use this software
+ * reserved. track-system is licensed under Mulan PSL v2. You can use this software
  * according to the terms and conditions of the Mulan PSL V2. You may obtain a
  * copy of Mulan PSL v2 at: http://license.coscl.org.cn/MulanPSL2.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
@@ -215,5 +215,64 @@ mod tests {
 
         assert_eq!(result.primary_type, ChangeType::CVE);
         assert_eq!(result.cve_numbers, vec!["CVE-2024-1234".to_string()]);
+    }
+
+    #[tokio::test]
+    async fn batch_classify_commits_returns_empty_for_empty_input() {
+        let db = MockDatabase::new(sea_orm::DatabaseBackend::Postgres).into_connection();
+        let classifier = ChangeClassifier::new(&db);
+
+        let result = classifier.batch_classify_commits(Vec::new()).await.unwrap();
+
+        assert!(result.is_empty());
+    }
+
+    #[tokio::test]
+    async fn batch_classify_commits_classifies_all_requested_commits() {
+        let now = chrono::Utc::now();
+        let cve_commit = l1_commit_records::Model {
+            id: 1,
+            tracking_id: 1,
+            commit_sha: "sha1".to_string(),
+            commit_message: "Fix CVE-2024-1234".to_string(),
+            author_name: "author".to_string(),
+            author_email: "author@example.com".to_string(),
+            committed_at: now,
+            created_at: now,
+            change_type: None,
+            primary_change_type: None,
+            cve_list: None,
+            spec_changed: false,
+            patch_stats: None,
+            classification_status: "pending".to_string(),
+            classification_notes: None,
+            sync_status: "pending".to_string(),
+            synced_to_l2_commit: None,
+            synced_at: None,
+            api_url: "https://api.github.com/repos/owner/repo/commits/sha1".to_string(),
+            fetched_at: now,
+            files_changed_count: 1,
+            additions: 100,
+            deletions: 50,
+            updated_at: now,
+            spec_version: None,
+            spec_release: None,
+        };
+        let mut backport_commit = cve_commit.clone();
+        backport_commit.id = 2;
+        backport_commit.commit_sha = "sha2".to_string();
+        backport_commit.commit_message = "Backport fix from upstream".to_string();
+
+        let db = MockDatabase::new(sea_orm::DatabaseBackend::Postgres)
+            .append_query_results(vec![vec![cve_commit]])
+            .append_query_results(vec![vec![backport_commit]])
+            .into_connection();
+        let classifier = ChangeClassifier::new(&db);
+
+        let result = classifier.batch_classify_commits(vec![1, 2]).await.unwrap();
+
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].primary_type, ChangeType::CVE);
+        assert_eq!(result[1].primary_type, ChangeType::Backport);
     }
 }

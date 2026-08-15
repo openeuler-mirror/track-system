@@ -1,6 +1,6 @@
 /*
  * Copyright(c) 2024-2026 China Telecom Cloud Technologies Co., Ltd. All rights
- * reserved. ctscat is licensed under Mulan PSL v2. You can use this software
+ * reserved. track-system is licensed under Mulan PSL v2. You can use this software
  * according to the terms and conditions of the Mulan PSL V2. You may obtain a
  * copy of Mulan PSL v2 at: http://license.coscl.org.cn/MulanPSL2.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
@@ -92,5 +92,18 @@ impl Default for ChangeClassification {
             version_info: None,
             cve_numbers: Vec::new(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn change_type_as_str_returns_stable_labels() {
+        assert_eq!(ChangeType::CVE.as_str(), "CVE");
+        assert_eq!(ChangeType::Bugfix.as_str(), "Bugfix");
+        assert_eq!(ChangeType::Backport.as_str(), "Backport");
+        assert_eq!(ChangeType::Unknown.as_str(), "Unknown");
     }
 }

@@ -1,6 +1,6 @@
 /*
  * Copyright(c) 2024-2026 China Telecom Cloud Technologies Co., Ltd. All rights
- * reserved. ctscat is licensed under Mulan PSL v2. You can use this software
+ * reserved. track-system is licensed under Mulan PSL v2. You can use this software
  * according to the terms and conditions of the Mulan PSL V2. You may obtain a
  * copy of Mulan PSL v2 at: http://license.coscl.org.cn/MulanPSL2.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
@@ -14,19 +14,25 @@
 //! 负责根据软件等级和同步间隔管理同步任务
 
 pub mod cron_scheduler;
+pub mod ecosystem_sync_service;
+pub mod mail_service;
+pub mod maintenance_sync_service;
 pub mod pipeline_executor;
 pub mod pipeline_stages;
 pub mod pipeline_state;
+pub mod report_artifacts;
 pub mod scheduler_manager;
 pub mod sync_executor;
 pub mod sync_manager;
 pub mod sync_service;
 
 pub use cron_scheduler::CronScheduler;
+pub use ecosystem_sync_service::EcosystemSyncService;
+pub use maintenance_sync_service::{MaintenanceSyncService, MaintenanceSyncSummary};
 pub use pipeline_executor::{
-    BackportSuggestionResult, ClassificationResult, DiffComparisonResult, JobProgress,
-    L1IngestionResult, L2SnapshotResult, PipelineExecutor, PipelineStage, ReportGenerationResult,
-    StageResult, SyncJobResult,
+    BackportSuggestionResult, ClassificationResult, ClassifiedCommitResult, DiffComparisonResult,
+    JobProgress, L1IngestionResult, L2SnapshotResult, PipelineExecutor, PipelineStage,
+    ReportGenerationResult, StageResult, SyncJobResult,
 };
 pub use pipeline_state::{PipelineState, PipelineStateManager};
 pub use scheduler_manager::{SchedulerConfig, SchedulerManager, SchedulerStatus};

@@ -1,6 +1,6 @@
 /*
  * Copyright(c) 2024-2026 China Telecom Cloud Technologies Co., Ltd. All rights
- * reserved. ctscat is licensed under Mulan PSL v2. You can use this software
+ * reserved. track-system is licensed under Mulan PSL v2. You can use this software
  * according to the terms and conditions of the Mulan PSL V2. You may obtain a
  * copy of Mulan PSL v2 at: http://license.coscl.org.cn/MulanPSL2.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
@@ -33,7 +33,7 @@ const MAX_RETRIES: u32 = 3;
 /// Gitee API 客户端
 pub struct GiteeClient {
     client: Client,
-    token: String,
+    token: Option<String>,
     base_url: String,
 }
 
@@ -46,9 +46,11 @@ impl GiteeClient {
             .no_proxy()
             .build()?;
 
+        let token = normalize_token(token);
+
         Ok(Self {
             client,
-            token: token.into(),
+            token,
             base_url: GITEE_API_BASE.to_string(),
         })
     }
@@ -76,9 +78,11 @@ impl GiteeClient {
             .no_proxy()
             .build()?;
 
+        let token = normalize_token(token);
+
         Ok(Self {
             client,
-            token: token.into(),
+            token,
             base_url: base_url.into(),
         })
     }
@@ -94,12 +98,11 @@ impl GiteeClient {
         let mut retries = 0;
 
         loop {
-            let response = self
-                .client
-                .get(url)
-                .query(&[("access_token", &self.token)])
-                .send()
-                .await?;
+            let mut request = self.client.get(url);
+            if let Some(token) = &self.token {
+                request = request.query(&[("access_token", token)]);
+            }
+            let response = request.send().await?;
 
             let status = response.status();
 
@@ -135,6 +138,15 @@ impl GiteeClient {
 
             return Err(error);
         }
+    }
+}
+
+fn normalize_token(token: impl Into<String>) -> Option<String> {
+    let token = token.into();
+    if token.trim().is_empty() {
+        None
+    } else {
+        Some(token)
     }
 }
 

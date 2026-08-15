@@ -1,6 +1,6 @@
 /*
  * Copyright(c) 2024-2026 China Telecom Cloud Technologies Co., Ltd. All rights
- * reserved. ctscat is licensed under Mulan PSL v2. You can use this software
+ * reserved. track-system is licensed under Mulan PSL v2. You can use this software
  * according to the terms and conditions of the Mulan PSL V2. You may obtain a
  * copy of Mulan PSL v2 at: http://license.coscl.org.cn/MulanPSL2.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
@@ -15,6 +15,7 @@ use axum::{
     extract::{Path, Query, State},
     Json,
 };
+use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use sea_orm::ActiveModelTrait;
 use serde::{Deserialize, Serialize};
 
@@ -25,6 +26,7 @@ use crate::{
         state::AppState,
     },
     snapshot::types::RepositorySnapshot,
+    spec::parse_spec,
 };
 
 /// L0 元数据导入请求
@@ -248,7 +250,9 @@ pub async fn import_l2_metadata(
         .ok_or_else(|| ApiError::NotFound(format!("跟踪配置 {} 不存在", request.tracking_id)))?;
 
     // 2. 保存快照到数据库（L2 使用 l2_snapshots 表存储完整快照）
-    let snapshot_json = serde_json::to_value(&request.snapshot)
+    let mut snapshot = request.snapshot;
+    normalize_imported_snapshot_spec_version_release(&mut snapshot);
+    let snapshot_json = serde_json::to_value(&snapshot)
         .map_err(|e| ApiError::BadRequest(format!("序列化快照失败: {}", e)))?;
 
     // 计算快照校验和
@@ -295,15 +299,15 @@ pub async fn import_l2_metadata(
     tracing::info!(
         "L2 元数据导入完成: snapshot_id={}, files={}, commits={}, issues={}",
         snapshot_id,
-        request.snapshot.files.len(),
-        request.snapshot.commits.len(),
-        request.snapshot.issues.len()
+        snapshot.files.len(),
+        snapshot.commits.len(),
+        snapshot.issues.len()
     );
 
     let response = ImportResponse {
         snapshot_id,
         tracking_id: request.tracking_id,
-        file_count: request.snapshot.files.len(),
+        file_count: snapshot.files.len(),
         imported_at: now,
     };
 
@@ -492,6 +496,50 @@ fn validate_import_request(tracking_id: i32, snapshot: &RepositorySnapshot) -> A
     }
 
     Ok(())
+}
+
+fn normalize_imported_snapshot_spec_version_release(snapshot: &mut RepositorySnapshot) {
+    let Some(spec) = snapshot.spec.as_mut() else {
+        return;
+    };
+    let normalized = spec.content_base64.replace('\n', "");
+    if normalized.trim().is_empty() {
+        return;
+    }
+
+    let bytes = match BASE64_STANDARD.decode(normalized.as_bytes()) {
+        Ok(bytes) => bytes,
+        Err(err) => {
+            tracing::warn!(
+                tracking_id = snapshot.tracking_id,
+                spec_path = %spec.path,
+                error = %err,
+                "导入 L2 元数据 spec 内容 Base64 解码失败，保留请求中的版本信息"
+            );
+            return;
+        }
+    };
+
+    let content = match String::from_utf8(bytes) {
+        Ok(content) => content,
+        Err(err) => {
+            tracing::warn!(
+                tracking_id = snapshot.tracking_id,
+                spec_path = %spec.path,
+                error = %err,
+                "导入 L2 元数据 spec 内容不是 UTF-8，保留请求中的版本信息"
+            );
+            return;
+        }
+    };
+
+    let parsed = parse_spec(&content);
+    if !parsed.version.is_empty() {
+        spec.version = Some(parsed.version);
+    }
+    if !parsed.release.is_empty() {
+        spec.release = Some(parsed.release);
+    }
 }
 
 /// 导入 L0 commit 到数据库
@@ -720,6 +768,35 @@ mod tests {
         let snapshot = create_test_snapshot(1);
         let result = validate_import_request(2, &snapshot);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_normalize_imported_l2_snapshot_spec_expands_macros() {
+        let spec_text = r#"
+%global openssh_release 16
+
+Name:           openssh
+Version:        9.6p1
+Release:        %{openssh_release}
+
+%package -n pam_ssh_agent_auth
+Version:        0.10.4
+Release:        5.%{openssh_release}
+"#;
+        let mut snapshot = RepositorySnapshot::new(1, crate::snapshot::types::SnapshotOrigin::L2);
+        snapshot.spec = Some(crate::snapshot::types::SpecEntry {
+            path: "openssh.spec".to_string(),
+            sha256: "sha".to_string(),
+            version: Some("9.6p1".to_string()),
+            release: Some("%{openssh_release}".to_string()),
+            content_base64: BASE64_STANDARD.encode(spec_text),
+        });
+
+        normalize_imported_snapshot_spec_version_release(&mut snapshot);
+
+        let spec = snapshot.spec.as_ref().unwrap();
+        assert_eq!(spec.version.as_deref(), Some("9.6p1"));
+        assert_eq!(spec.release.as_deref(), Some("16"));
     }
 
     #[tokio::test]

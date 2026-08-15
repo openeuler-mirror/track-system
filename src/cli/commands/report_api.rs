@@ -1,6 +1,6 @@
 /*
  * Copyright(c) 2024-2026 China Telecom Cloud Technologies Co., Ltd. All rights
- * reserved. ctscat is licensed under Mulan PSL v2. You can use this software
+ * reserved. track-system is licensed under Mulan PSL v2. You can use this software
  * according to the terms and conditions of the Mulan PSL V2. You may obtain a
  * copy of Mulan PSL v2 at: http://license.coscl.org.cn/MulanPSL2.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
@@ -42,8 +42,23 @@ struct ReportDetail {
     package_name: String,
     status: String,
     content: serde_json::Value,
+    maintenance_summary: Option<ReportMaintenanceSummary>,
     created_at: chrono::DateTime<chrono::Utc>,
     updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct ReportMaintenanceSummary {
+    report_id: i64,
+    overall_risk: String,
+    confidence: String,
+    generated_at: chrono::DateTime<chrono::Utc>,
+    commit_total: Option<i64>,
+    commits_last_12_months: Option<i64>,
+    committers_last_12_months: Option<i64>,
+    last_commit_at: Option<String>,
+    stars: Option<i64>,
+    forks: Option<i64>,
 }
 
 /// API 响应包装
@@ -141,7 +156,7 @@ pub async fn list_reports(
 }
 
 /// 显示报告详情
-pub async fn show_report(api_client: &ApiClient, id: i64) -> Result<()> {
+pub async fn show_report(api_client: &ApiClient, id: i64, show_all: bool) -> Result<()> {
     println!("正在获取报告详情...");
     println!("  报告 ID: {}", id);
     println!();
@@ -170,9 +185,64 @@ pub async fn show_report(api_client: &ApiClient, id: i64) -> Result<()> {
             println!("  创建时间: {}", format_datetime_local(&report.created_at));
             println!("  更新时间: {}", format_datetime_local(&report.updated_at));
 
+            if let Some(maintenance) = &report.maintenance_summary {
+                println!();
+                println!("{}", "关联 Maintenance 摘要:".bold());
+                println!("  报告 ID: {}", maintenance.report_id);
+                println!("  风险等级: {}", maintenance.overall_risk);
+                println!("  置信度: {}", maintenance.confidence);
+                println!(
+                    "  报告时间: {}",
+                    format_datetime_local(&maintenance.generated_at)
+                );
+                println!(
+                    "  Commit 总数: {}",
+                    maintenance
+                        .commit_total
+                        .map(|v| v.to_string())
+                        .unwrap_or_else(|| "-".to_string())
+                );
+                println!(
+                    "  近 12 月 Commit 数: {}",
+                    maintenance
+                        .commits_last_12_months
+                        .map(|v| v.to_string())
+                        .unwrap_or_else(|| "-".to_string())
+                );
+                println!(
+                    "  近 12 月 Committer 数: {}",
+                    maintenance
+                        .committers_last_12_months
+                        .map(|v| v.to_string())
+                        .unwrap_or_else(|| "-".to_string())
+                );
+                println!(
+                    "  最近一次 Commit 时间: {}",
+                    maintenance
+                        .last_commit_at
+                        .clone()
+                        .unwrap_or_else(|| "-".to_string())
+                );
+                println!(
+                    "  Stars/Forks: {}/{}",
+                    maintenance
+                        .stars
+                        .map(|v| v.to_string())
+                        .unwrap_or_else(|| "-".to_string()),
+                    maintenance
+                        .forks
+                        .map(|v| v.to_string())
+                        .unwrap_or_else(|| "-".to_string())
+                );
+            }
+
+            print_version_lifecycle_details(&report.content);
+            print_ai_analysis_details(&report.content);
+
             println!();
             println!("{}", "报告内容:".bold());
-            println!("{}", serde_json::to_string_pretty(&report.content)?);
+            let content = report_content_for_display(&report.content, show_all);
+            println!("{}", serde_json::to_string_pretty(&content)?);
 
             Ok(())
         }
@@ -180,6 +250,353 @@ pub async fn show_report(api_client: &ApiClient, id: i64) -> Result<()> {
             println!("{} 获取报告详情失败: {}", "✗".red().bold(), e);
             Err(e.into())
         }
+    }
+}
+
+fn report_content_for_display(content: &serde_json::Value, show_all: bool) -> serde_json::Value {
+    if show_all {
+        return content.clone();
+    }
+
+    let mut content = content.clone();
+    if let Some(object) = content.as_object_mut() {
+        object.remove("l1_vs_l0");
+        object.remove("version_warnings");
+    }
+    content
+}
+
+fn print_ai_analysis_details(content: &serde_json::Value) {
+    let Some(lines) = ai_analysis_lines(content) else {
+        return;
+    };
+
+    println!();
+    println!("{}", "AI 评估:".bold());
+    for line in lines {
+        println!("  {}", line);
+    }
+}
+
+fn ai_analysis_lines(content: &serde_json::Value) -> Option<Vec<String>> {
+    let ai = content.get("ai_analysis")?;
+    let mut lines = Vec::new();
+
+    if ai.is_null() {
+        lines.push("状态: 未生成".to_string());
+        return Some(lines);
+    }
+
+    if let Some(error) = ai.get("error").and_then(text_value_from_value) {
+        lines.push("状态: 生成失败".to_string());
+        lines.push(format!("错误: {}", error));
+        return Some(lines);
+    }
+
+    lines.push(format!("模型: {}", display_value(ai.get("model"))));
+    lines.push(format!(
+        "远端模型: {}",
+        display_bool(ai.get("used_remote_model"))
+    ));
+    lines.push(format!(
+        "外部公开信息: {}",
+        display_bool(ai.get("external_research_used"))
+    ));
+    lines.push(format!("风险等级: {}", display_value(ai.get("risk"))));
+    lines.push(format!("置信度: {}", display_value(ai.get("confidence"))));
+
+    if let Some(summary) = ai.get("summary").and_then(text_value_from_value) {
+        lines.push(format!("摘要: {}", summary));
+    }
+
+    let actions = ai
+        .get("recommended_actions")
+        .and_then(serde_json::Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(text_value_from_value)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    if !actions.is_empty() {
+        lines.push("建议动作:".to_string());
+        for action in actions.into_iter().take(5) {
+            lines.push(format!("  - {}", action));
+        }
+    }
+
+    let external_references = ai
+        .get("external_references")
+        .and_then(serde_json::Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(text_value_from_value)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    if !external_references.is_empty() {
+        lines.push("外部参考:".to_string());
+        for reference in external_references.into_iter().take(5) {
+            lines.push(format!("  - {}", reference));
+        }
+    }
+
+    let sources_to_check = ai
+        .get("sources_to_check")
+        .and_then(serde_json::Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(text_value_from_value)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    if !sources_to_check.is_empty() {
+        lines.push("建议核验来源:".to_string());
+        for source in sources_to_check.into_iter().take(5) {
+            lines.push(format!("  - {}", source));
+        }
+    }
+
+    Some(lines)
+}
+
+fn print_version_lifecycle_details(content: &serde_json::Value) {
+    let Some(lines) = version_lifecycle_lines(content) else {
+        return;
+    };
+
+    println!();
+    println!("{}", "版本生命周期评估:".bold());
+    for line in lines {
+        println!("  {}", line);
+    }
+}
+
+fn version_lifecycle_lines(content: &serde_json::Value) -> Option<Vec<String>> {
+    let l1_vs_l0 = content.get("l1_vs_l0")?;
+    let mut lines = Vec::new();
+
+    if l1_vs_l0.is_null() {
+        lines.push("L1 vs L0 子报告: 未生成".to_string());
+        lines.push("停维生命周期识别: -".to_string());
+        lines.push("LTS 判断: -".to_string());
+        lines.push("过时版本评估: -".to_string());
+        append_version_warnings(&mut lines, content);
+        return Some(lines);
+    }
+
+    append_maintenance_status(&mut lines, l1_vs_l0);
+    append_lts_assessment(&mut lines, l1_vs_l0);
+    append_outdated_version(&mut lines, l1_vs_l0);
+    append_version_warnings(&mut lines, content);
+
+    Some(lines)
+}
+
+fn append_maintenance_status(lines: &mut Vec<String>, l1_vs_l0: &serde_json::Value) {
+    let Some(status) = l1_vs_l0.get("maintenance_status") else {
+        lines.push("停维生命周期识别: -".to_string());
+        return;
+    };
+
+    lines.push(format!(
+        "停维生命周期识别: {}",
+        display_value(status.get("status"))
+    ));
+    lines.push(format!(
+        "停维信息命中: {}",
+        display_bool(status.get("stop_maintenance_detected"))
+    ));
+    lines.push(format!(
+        "停维识别置信度: {}",
+        display_value(status.get("confidence"))
+    ));
+
+    if let Some(notice) = status
+        .get("matched_notice")
+        .filter(|value| value.is_object())
+    {
+        lines.push(format!(
+            "命中公告版本: {}",
+            display_value(notice.get("version"))
+        ));
+        lines.push(format!(
+            "命中公告系列: {}",
+            display_value(notice.get("series"))
+        ));
+        lines.push(format!(
+            "维护截止日期: {}",
+            display_value(notice.get("support_until"))
+        ));
+        lines.push(format!("公告来源: {}", display_value(notice.get("source"))));
+        if let Some(evidence) = text_value(notice.get("evidence")) {
+            lines.push(format!("公告片段: {}", evidence));
+        }
+    }
+
+    if let Some(evidence) = status.get("evidence").and_then(short_evidence_text) {
+        lines.push(format!("停维候选证据: {}", evidence));
+    }
+}
+
+fn append_lts_assessment(lines: &mut Vec<String>, l1_vs_l0: &serde_json::Value) {
+    let Some(lts) = l1_vs_l0.get("lts") else {
+        lines.push("LTS 判断: -".to_string());
+        return;
+    };
+
+    lines.push(format!("LTS 判断: {}", display_lts_bool(lts.get("is_lts"))));
+    lines.push(format!("LTS 来源: {}", display_value(lts.get("source"))));
+
+    if let Some(evidence) = lts.get("evidence").and_then(short_evidence_text) {
+        lines.push(format!("LTS 证据: {}", evidence));
+    }
+}
+
+fn append_outdated_version(lines: &mut Vec<String>, l1_vs_l0: &serde_json::Value) {
+    let Some(outdated) = l1_vs_l0.get("outdated_version") else {
+        lines.push("过时版本评估: -".to_string());
+        return;
+    };
+
+    lines.push(format!(
+        "过时版本评估: {}",
+        display_bool(outdated.get("is_outdated"))
+    ));
+    lines.push(format!(
+        "当前组件版本: {}",
+        display_value(outdated.get("current_version"))
+    ));
+    lines.push(format!(
+        "最新版本(L1): {}",
+        display_value(outdated.get("latest_version"))
+    ));
+    lines.push(format!(
+        "最新版本来源: {}",
+        display_value(outdated.get("latest_version_source"))
+    ));
+    lines.push(format!(
+        "主线版本(L0): {}",
+        display_value(outdated.get("mainline_version"))
+    ));
+    lines.push(format!(
+        "主线版本来源: {}",
+        display_value(outdated.get("mainline_version_source"))
+    ));
+    lines.push(format!(
+        "大版本差距: {} / {}",
+        display_value(outdated.get("major_version_gap")),
+        display_value(outdated.get("threshold_major_versions"))
+    ));
+}
+
+fn append_version_warnings(lines: &mut Vec<String>, content: &serde_json::Value) {
+    let warnings = content
+        .get("version_warnings")
+        .and_then(serde_json::Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(text_value_from_value)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+
+    if warnings.is_empty() {
+        lines.push("版本风险提示: 无".to_string());
+    } else {
+        lines.push("版本风险提示:".to_string());
+        for warning in warnings {
+            lines.push(format!("  - {}", warning));
+        }
+    }
+}
+
+fn display_lts_bool(value: Option<&serde_json::Value>) -> String {
+    match value {
+        Some(serde_json::Value::Bool(true)) => "是".to_string(),
+        Some(serde_json::Value::Bool(false)) => "否".to_string(),
+        Some(serde_json::Value::String(text)) if text.eq_ignore_ascii_case("true") => {
+            "是".to_string()
+        }
+        Some(serde_json::Value::String(text)) if text.eq_ignore_ascii_case("false") => {
+            "否".to_string()
+        }
+        _ => "未知".to_string(),
+    }
+}
+
+fn display_bool(value: Option<&serde_json::Value>) -> String {
+    match value {
+        Some(serde_json::Value::Bool(true)) => "是".to_string(),
+        Some(serde_json::Value::Bool(false)) => "否".to_string(),
+        Some(serde_json::Value::String(text)) if text.eq_ignore_ascii_case("true") => {
+            "是".to_string()
+        }
+        Some(serde_json::Value::String(text)) if text.eq_ignore_ascii_case("false") => {
+            "否".to_string()
+        }
+        _ => "-".to_string(),
+    }
+}
+
+fn display_value(value: Option<&serde_json::Value>) -> String {
+    value
+        .and_then(text_value_from_value)
+        .unwrap_or_else(|| "-".to_string())
+}
+
+fn text_value(value: Option<&serde_json::Value>) -> Option<String> {
+    value.and_then(text_value_from_value)
+}
+
+fn text_value_from_value(value: &serde_json::Value) -> Option<String> {
+    match value {
+        serde_json::Value::Null => None,
+        serde_json::Value::String(text) => {
+            let trimmed = text.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            }
+        }
+        serde_json::Value::Bool(flag) => Some(flag.to_string()),
+        serde_json::Value::Number(number) => Some(number.to_string()),
+        serde_json::Value::Array(items) => {
+            let values = items
+                .iter()
+                .filter_map(text_value_from_value)
+                .collect::<Vec<_>>();
+            if values.is_empty() {
+                None
+            } else {
+                Some(values.join("；"))
+            }
+        }
+        serde_json::Value::Object(_) => serde_json::to_string(value).ok(),
+    }
+}
+
+fn short_evidence_text(value: &serde_json::Value) -> Option<String> {
+    let items = value.as_array()?;
+    let evidence = items
+        .iter()
+        .take(3)
+        .filter_map(|item| {
+            item.get("evidence")
+                .and_then(text_value_from_value)
+                .or_else(|| text_value_from_value(item))
+        })
+        .collect::<Vec<_>>();
+
+    if evidence.is_empty() {
+        None
+    } else {
+        Some(evidence.join("；"))
     }
 }
 
@@ -238,6 +655,125 @@ mod tests {
         };
         let client = ApiClient::new(config).unwrap();
         (server, client)
+    }
+
+    #[test]
+    fn test_version_lifecycle_lines_extracts_l1_vs_l0_assessment() {
+        let content = serde_json::json!({
+            "l1_vs_l0": {
+                "maintenance_status": {
+                    "status": "SCHEDULED_EOL",
+                    "stop_maintenance_detected": true,
+                    "confidence": "HIGH",
+                    "matched_notice": {
+                        "version": "1.2.0",
+                        "series": "1.2",
+                        "support_until": "2027-12-31",
+                        "source": "official_page",
+                        "evidence": "1.2 will reach end of support on 2027-12-31"
+                    },
+                    "evidence": [
+                        {
+                            "evidence": "1.2 will reach end of support on 2027-12-31"
+                        }
+                    ]
+                },
+                "lts": {
+                    "is_lts": true,
+                    "source": "l1_repo",
+                    "evidence": ["L1 分支包含 LTS 标识: openEuler-24.03-LTS-SP3"]
+                },
+                "outdated_version": {
+                    "current_version": "1.2.0",
+                    "latest_version": "4.2.0",
+                    "latest_version_source": "l1_repo",
+                    "mainline_version": "5.0.0",
+                    "mainline_version_source": "l0_repo",
+                    "major_version_gap": 3,
+                    "threshold_major_versions": 3,
+                    "is_outdated": true
+                }
+            },
+            "version_warnings": [
+                "当前版本识别为 LTS/长期维护版本",
+                "当前组件版本与 L1 最新版本相差 3 个大版本，已达到过时版本阈值 3，建议规划升级"
+            ]
+        });
+
+        let text = version_lifecycle_lines(&content).unwrap().join("\n");
+        assert!(text.contains("停维生命周期识别: SCHEDULED_EOL"));
+        assert!(text.contains("停维信息命中: 是"));
+        assert!(text.contains("维护截止日期: 2027-12-31"));
+        assert!(text.contains("LTS 判断: 是"));
+        assert!(text.contains("过时版本评估: 是"));
+        assert!(text.contains("当前组件版本: 1.2.0"));
+        assert!(text.contains("最新版本(L1): 4.2.0"));
+        assert!(text.contains("主线版本(L0): 5.0.0"));
+        assert!(text.contains("大版本差距: 3 / 3"));
+        assert!(text.contains("版本风险提示:"));
+    }
+
+    #[test]
+    fn test_version_lifecycle_lines_reports_missing_l1_vs_l0_assessment() {
+        let content = serde_json::json!({
+            "l1_vs_l0": null,
+            "version_warnings": []
+        });
+
+        let text = version_lifecycle_lines(&content).unwrap().join("\n");
+        assert!(text.contains("L1 vs L0 子报告: 未生成"));
+        assert!(text.contains("停维生命周期识别: -"));
+        assert!(text.contains("LTS 判断: -"));
+        assert!(text.contains("过时版本评估: -"));
+        assert!(text.contains("版本风险提示: 无"));
+    }
+
+    #[test]
+    fn test_report_content_for_display_hides_l1_vs_l0_by_default() {
+        let content = serde_json::json!({
+            "commits": [],
+            "total_behind_commits": 0,
+            "l1_vs_l0": {
+                "current_version": "1.0.0"
+            },
+            "version_warnings": ["warning"]
+        });
+
+        let default_content = report_content_for_display(&content, false);
+        assert!(default_content.get("commits").is_some());
+        assert!(default_content.get("l1_vs_l0").is_none());
+        assert!(default_content.get("version_warnings").is_none());
+
+        let full_content = report_content_for_display(&content, true);
+        assert!(full_content.get("l1_vs_l0").is_some());
+        assert!(full_content.get("version_warnings").is_some());
+    }
+
+    #[test]
+    fn test_ai_analysis_lines_extracts_embedded_result() {
+        let content = serde_json::json!({
+            "ai_analysis": {
+                "model": "local-heuristic",
+                "used_remote_model": false,
+                "external_research_used": false,
+                "summary": "AI summary",
+                "risk": "medium",
+                "confidence": "medium",
+                "recommended_actions": ["review evidence", "plan upgrade"],
+                "external_references": ["https://example.com/security"],
+                "sources_to_check": ["upstream SECURITY.md"]
+            }
+        });
+
+        let text = ai_analysis_lines(&content).unwrap().join("\n");
+        assert!(text.contains("模型: local-heuristic"));
+        assert!(text.contains("远端模型: 否"));
+        assert!(text.contains("外部公开信息: 否"));
+        assert!(text.contains("风险等级: medium"));
+        assert!(text.contains("摘要: AI summary"));
+        assert!(text.contains("建议动作:"));
+        assert!(text.contains("外部参考:"));
+        assert!(text.contains("建议核验来源:"));
     }
 
     #[tokio::test]
@@ -373,7 +909,7 @@ mod tests {
             .create_async()
             .await;
 
-        let result = show_report(&client, 123).await;
+        let result = show_report(&client, 123, false).await;
         assert!(result.is_ok(), "Result failed: {:?}", result.err());
         mock.assert_async().await;
     }
@@ -442,7 +978,7 @@ mod tests {
             .create_async()
             .await;
 
-        let result = show_report(&client, 111).await;
+        let result = show_report(&client, 111, false).await;
         assert!(result.is_ok(), "Result failed: {:?}", result.err());
         mock.assert_async().await;
     }

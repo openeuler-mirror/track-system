@@ -1,6 +1,6 @@
 /*
  * Copyright(c) 2024-2026 China Telecom Cloud Technologies Co., Ltd. All rights
- * reserved. ctscat is licensed under Mulan PSL v2. You can use this software
+ * reserved. track-system is licensed under Mulan PSL v2. You can use this software
  * according to the terms and conditions of the Mulan PSL V2. You may obtain a
  * copy of Mulan PSL v2 at: http://license.coscl.org.cn/MulanPSL2.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
@@ -18,12 +18,18 @@ pub use super::commit_records::Entity as CommitRecords;
 pub use super::compare_reports::Entity as CompareReports;
 pub use super::distributed_locks::Entity as DistributedLocks;
 pub use super::distros::Entity as Distros;
+pub use super::ecosystem_bindings::Entity as EcosystemBindings;
+pub use super::ecosystem_evidence_snapshots::Entity as EcosystemEvidenceSnapshots;
+pub use super::ecosystem_reports::Entity as EcosystemReports;
+pub use super::ecosystem_targets::Entity as EcosystemTargets;
 pub use super::issue_events::Entity as IssueEvents;
 pub use super::issues::Entity as Issues;
 pub use super::l0_commits::Entity as L0Commits;
 pub use super::l1_commit_records::Entity as L1CommitRecords;
 pub use super::l2_commit_records::Entity as L2CommitRecords;
 pub use super::l2_snapshots::Entity as L2Snapshots;
+pub use super::maintenance_evidence_snapshots::Entity as MaintenanceEvidenceSnapshots;
+pub use super::maintenance_reports::Entity as MaintenanceReports;
 pub use super::packages::Entity as Packages;
 pub use super::spec_changes::Entity as SpecChanges;
 pub use super::spec_snapshots::Entity as SpecSnapshots;

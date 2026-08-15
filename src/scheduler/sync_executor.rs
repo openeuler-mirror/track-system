@@ -1,6 +1,6 @@
 /*
  * Copyright(c) 2024-2026 China Telecom Cloud Technologies Co., Ltd. All rights
- * reserved. ctscat is licensed under Mulan PSL v2. You can use this software
+ * reserved. track-system is licensed under Mulan PSL v2. You can use this software
  * according to the terms and conditions of the Mulan PSL V2. You may obtain a
  * copy of Mulan PSL v2 at: http://license.coscl.org.cn/MulanPSL2.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
@@ -101,8 +101,9 @@ impl<'a> SyncExecutor<'a> {
         let outcome = match self.do_sync(&tracking).await {
             Ok(result) => result,
             Err(err) => {
+                let failure = SyncResult::failed(&err.to_string());
                 self.sync_manager
-                    .complete_sync_task(tracking_id, false)
+                    .complete_sync_task_with_result(tracking_id, &failure)
                     .await
                     .context("完成同步任务失败")?;
 

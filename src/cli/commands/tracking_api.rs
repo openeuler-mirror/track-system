@@ -1,6 +1,6 @@
 /*
  * Copyright(c) 2024-2026 China Telecom Cloud Technologies Co., Ltd. All rights
- * reserved. ctscat is licensed under Mulan PSL v2. You can use this software
+ * reserved. track-system is licensed under Mulan PSL v2. You can use this software
  * according to the terms and conditions of the Mulan PSL V2. You may obtain a
  * copy of Mulan PSL v2 at: http://license.coscl.org.cn/MulanPSL2.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
@@ -15,12 +15,24 @@
 
 use anyhow::{anyhow, Result};
 use colored::Colorize;
+use csv::ReaderBuilder;
 use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::Path;
 
 use crate::cli::client::ApiClient;
 use crate::cli::dto::{CreateTrackingRequest, PackageDto, TrackingDto, UpdateTrackingRequest};
 use crate::cli::formatter::format_datetime_local;
 use crate::cli::parser::TrackingAction;
+use crate::collectors::traits::Platform;
+
+const DEFAULT_BRANCH_MAPPINGS: [(&str, &str); 5] = [
+    ("2.0.1", "openEuler-20.03-LTS-SP4"),
+    ("22.06", "openEuler-20.03-LTS-SP4"),
+    ("23.01", "openEuler-22.03-LTS-SP4"),
+    ("25.05", "openEuler-22.03-LTS-SP4"),
+    ("25.07", "openEuler-24.03-LTS-SP1"),
+];
 
 /// API 响应包装
 #[derive(Debug, Serialize, Deserialize)]
@@ -33,6 +45,23 @@ struct ApiResponse<T> {
 struct ListResponse<T> {
     items: Vec<T>,
     total: usize,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct TrackingImportRecord {
+    package: String,
+    l2_repo: String,
+    l1_repo: String,
+}
+
+fn build_default_tracking_repos(package: &str) -> (String, String) {
+    (
+        format!(
+            "src-openEuler:https://atomgit.com/src-openeuler/{}.git",
+            package
+        ),
+        format!("https://work.ctyun.cn/git/sources-CTyunOS/{}.git", package),
+    )
 }
 
 /// 解析 "owner/repo"、"owner:repo"、"owner&repo" 或完整 URL
@@ -103,6 +132,46 @@ async fn resolve_package_id(api_client: &ApiClient, input: &str) -> Result<i32> 
     }
 }
 
+async fn find_duplicate_tracking(
+    api_client: &ApiClient,
+    package_id: i32,
+    l1_owner: &str,
+    l1_name: &str,
+    l1_branch: &str,
+    l2_branch: &str,
+) -> Result<Option<TrackingDto>> {
+    let mut page = 1u64;
+    let page_size = 100u64;
+    loop {
+        let query = format!(
+            "?page={}&page_size={}&package_id={}",
+            page, page_size, package_id
+        );
+        let response = api_client
+            .get::<ApiResponse<ListResponse<TrackingDto>>>(&format!("/tracking{}", query))
+            .await?;
+        let total = response.data.total;
+        let items = response.data.items;
+        if items.is_empty() {
+            return Ok(None);
+        }
+        if let Some(found) = items.into_iter().find(|t| {
+            t.l1_repo_owner == l1_owner
+                && t.l1_repo_name == l1_name
+                && t.l1_branch == l1_branch
+                && t.l2_branch == l2_branch
+                && t.package_id == package_id
+        }) {
+            return Ok(Some(found));
+        }
+        let fetched = (page * page_size) as usize;
+        if fetched >= total {
+            return Ok(None);
+        }
+        page += 1;
+    }
+}
+
 /// 执行跟踪配置管理命令
 pub async fn execute(api_client: &ApiClient, action: TrackingAction) -> Result<()> {
     match action {
@@ -120,6 +189,11 @@ pub async fn execute(api_client: &ApiClient, action: TrackingAction) -> Result<(
             )
             .await
         }
+        TrackingAction::Import {
+            file,
+            distro,
+            status,
+        } => import_tracking_from_file(api_client, file, distro, status).await,
         TrackingAction::List {
             limit,
             package,
@@ -130,6 +204,74 @@ pub async fn execute(api_client: &ApiClient, action: TrackingAction) -> Result<(
         TrackingAction::Resume { id } => update_tracking_status(api_client, id, true).await,
         TrackingAction::Remove { id, confirm } => remove_tracking(api_client, id, confirm).await,
     }
+}
+
+fn parse_tracking_import_file(path: &Path) -> Result<Vec<TrackingImportRecord>> {
+    let content = fs::read_to_string(path)
+        .map_err(|e| anyhow!("读取 tracking 导入文件失败 {}: {}", path.display(), e))?;
+    let first_non_empty = content
+        .lines()
+        .map(str::trim)
+        .find(|line| !line.is_empty() && !line.starts_with('#'))
+        .ok_or_else(|| anyhow!("tracking 导入文件中没有可用记录"))?;
+
+    if first_non_empty.eq_ignore_ascii_case("package,l2_repo,l1_repo") {
+        let mut reader = ReaderBuilder::new()
+            .has_headers(true)
+            .comment(Some(b'#'))
+            .trim(csv::Trim::All)
+            .from_reader(content.as_bytes());
+
+        let mut records = Vec::new();
+        for row in reader.deserialize() {
+            let record: TrackingImportRecord = row?;
+            if record.package.trim().is_empty()
+                || record.l1_repo.trim().is_empty()
+                || record.l2_repo.trim().is_empty()
+            {
+                return Err(anyhow!("tracking 导入文件存在空字段"));
+            }
+            records.push(record);
+        }
+
+        if records.is_empty() {
+            return Err(anyhow!("tracking 导入文件中没有可用记录"));
+        }
+
+        return Ok(records);
+    }
+
+    let mut records = Vec::new();
+    for (idx, raw_line) in content.lines().enumerate() {
+        let line_no = idx + 1;
+        let line = raw_line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let mut parts = line.splitn(2, ',');
+        let package = parts
+            .next()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| anyhow!("第 {} 行缺少组件名称", line_no))?;
+        let _l0_repo = parts
+            .next()
+            .map(str::trim)
+            .ok_or_else(|| anyhow!("第 {} 行缺少上游仓库地址", line_no))?;
+
+        let (l1_repo, l2_repo) = build_default_tracking_repos(package);
+        records.push(TrackingImportRecord {
+            package: package.to_string(),
+            l1_repo,
+            l2_repo,
+        });
+    }
+
+    if records.is_empty() {
+        return Err(anyhow!("tracking 导入文件中没有可用记录"));
+    }
+
+    Ok(records)
 }
 
 /// 添加跟踪配置
@@ -149,41 +291,175 @@ async fn add_tracking(
     let package_id = resolve_package_id(api_client, &package).await?;
     let distro_id = parse_distro_id(&distro)?;
     let (l1_owner, l1_name) = parse_owner_repo(&l1_repo)?;
-
-    let request = CreateTrackingRequest {
-        package_id,
-        distro_id,
-        l1_repo_owner: l1_owner,
-        l1_repo_name: l1_name,
-        l1_branch,
-        l2_branch,
-        l2_repo_path,
-        tracking_status: Some(status),
+    let platform = if l1_repo.contains("github") {
+        Platform::GitHub
+    } else if l1_repo.contains("gitea") {
+        Platform::Gitea
+    } else if l1_repo.contains("atomgit") {
+        Platform::AtomGit
+    } else {
+        // 默认使用 Gitee（当前系统主要使用的平台）
+        Platform::Gitee
     };
 
-    match api_client
-        .post::<_, ApiResponse<TrackingDto>>("/tracking", &request)
-        .await
-    {
-        Ok(response) => {
-            println!("{} 跟踪配置添加成功", "✓".green().bold());
-            println!("  ID: {}", response.data.id);
+
+    let mappings = vec![(l1_branch, l2_branch)];
+    let mut created = 0;
+    let mut skipped = 0;
+
+    for (l1_branch, l2_branch) in mappings {
+        if let Some(existing) = find_duplicate_tracking(
+            api_client, package_id, &l1_owner, &l1_name, &l1_branch, &l2_branch,
+        )
+        .await?
+        {
             println!(
-                "  L1 仓库: {}/{} ({})",
-                response.data.l1_repo_owner, response.data.l1_repo_name, response.data.l1_branch
+                "{} 已存在相同包名和 L1 仓库的 tracking，跳过创建",
+                "ℹ".cyan()
             );
             println!(
-                "  L2 路径: {} ({})",
-                response.data.l2_repo_path, response.data.l2_branch
+                "  ID: {}  L1: {}/{}  分支: {}",
+                existing.id, existing.l1_repo_owner, existing.l1_repo_name, existing.l1_branch
             );
-            println!("  状态: {}", response.data.tracking_status);
-            Ok(())
+            skipped += 1;
+            continue;
         }
-        Err(e) => {
-            println!("{} 添加跟踪配置失败: {}", "✗".red().bold(), e);
-            Err(e.into())
+
+        let request = CreateTrackingRequest {
+            package_id,
+            distro_id,
+            l1_repo_owner: l1_owner.clone(),
+            l1_repo_name: l1_name.clone(),
+            l1_branch: l1_branch.clone(),
+            l2_branch: l2_branch.clone(),
+            l2_repo_path: l2_repo_path.clone(),
+            tracking_status: Some(status.clone()),
+        };
+
+        match api_client
+            .post::<_, ApiResponse<TrackingDto>>("/tracking", &request)
+            .await
+        {
+            Ok(response) => {
+                println!("{} 跟踪配置添加成功", "✓".green().bold());
+                println!("  ID: {}", response.data.id);
+                println!(
+                    "  L1 仓库: {}/{} ({})",
+                    response.data.l1_repo_owner,
+                    response.data.l1_repo_name,
+                    response.data.l1_branch
+                );
+                println!(
+                    "  L2 路径: {} ({})",
+                    response.data.l2_repo_path, response.data.l2_branch
+                );
+                println!("  状态: {}", response.data.tracking_status);
+                created += 1;
+            }
+            Err(e) => {
+                println!("{} 添加跟踪配置失败: {}", "✗".red().bold(), e);
+                return Err(e.into());
+            }
         }
     }
+
+    println!(
+        "完成: 新增 {} 个，跳过 {} 个",
+        created.to_string().green(),
+        skipped.to_string().yellow()
+    );
+    Ok(())
+
+}
+
+
+pub(crate) async fn create_tracking_with_default_repos(
+    api_client: &ApiClient,
+    package: String,
+    distro: String,
+    status: String,
+) -> Result<()> {
+    let (l1_repo, l2_repo) = build_default_tracking_repos(&package);
+    for (l2_branch, l1_branch) in DEFAULT_BRANCH_MAPPINGS {
+        add_tracking(
+            api_client,
+            package.clone(),
+            distro.clone(),
+            l1_repo.clone(),
+            l1_branch.to_string(),
+            l2_repo.clone(),
+            l2_branch.to_string(),
+            status.clone(),
+        )
+        .await?;
+    }
+    Ok(())
+}
+
+
+async fn import_tracking_from_file(
+    api_client: &ApiClient,
+    file: String,
+    distro: String,
+    status: String,
+) -> Result<()> {
+    println!("正在从配置文件导入 tracking: {}", file.cyan());
+    let path = Path::new(&file);
+    if !path.exists() {
+        return Err(anyhow!("配置文件不存在: {}", file));
+    }
+
+    let records = parse_tracking_import_file(path)?;
+    let mut succeeded = 0_u64;
+    let mut failed = 0_u64;
+
+    for record in records {
+        println!();
+        println!("导入 tracking: {}", record.package.cyan());
+        match {
+            let mut result = Ok(());
+            for (l2_branch, l1_branch) in DEFAULT_BRANCH_MAPPINGS {
+                if let Err(err) = add_tracking(
+                    api_client,
+                    record.package.clone(),
+                    distro.clone(),
+                    record.l1_repo.clone(),
+                    l1_branch.to_string(),
+                    record.l2_repo.clone(),
+                    l2_branch.to_string(),
+                    status.clone(),
+                )
+                .await
+                {
+                    result = Err(err);
+                    break;
+                }
+            }
+            result
+        } {
+            Ok(_) => {
+                succeeded += 1;
+            }
+            Err(err) => {
+                failed += 1;
+                println!("{} 导入失败: {}", "✗".red().bold(), err);
+            }
+        }
+    }
+
+    println!();
+    println!(
+        "{} tracking 批量导入完成: 成功 {}, 失败 {}",
+        "✓".green().bold(),
+        succeeded,
+        failed
+    );
+
+    if failed > 0 {
+        return Err(anyhow!("{} 个 tracking 导入失败", failed));
+    }
+
+    Ok(())
 }
 
 /// 列出跟踪配置
@@ -220,16 +496,30 @@ async fn list_tracking(
             println!();
             println!("{}", "跟踪配置列表:".bold());
             println!(
-                "{:<5} {:<15} {:<15} {:<30} {:<10}",
-                "ID", "软件包ID", "发行版ID", "L1 仓库", "状态"
+                "{:<5} {:<18} {:<12} {:<30} {:<10} {:<8}",
+                "ID", "软件包", "发行版ID", "L1 仓库", "状态", "维护风险"
             );
-            println!("{}", "-".repeat(75));
+            println!("{}", "-".repeat(100));
 
             for track in trackings {
                 let l1_repo = format!("{}/{}", track.l1_repo_owner, track.l1_repo_name);
+                let package_label = track
+                    .package_name
+                    .clone()
+                    .unwrap_or_else(|| track.package_id.to_string());
+                let maintenance_risk = track
+                    .maintenance_summary
+                    .as_ref()
+                    .map(|summary| summary.overall_risk.clone())
+                    .unwrap_or_else(|| "-".to_string());
                 println!(
-                    "{:<5} {:<15} {:<15} {:<30} {:<10}",
-                    track.id, track.package_id, track.distro_id, l1_repo, track.tracking_status
+                    "{:<5} {:<18} {:<12} {:<30} {:<10} {:<8}",
+                    track.id,
+                    package_label,
+                    track.distro_id,
+                    l1_repo,
+                    track.tracking_status,
+                    maintenance_risk
                 );
             }
 
@@ -258,6 +548,15 @@ async fn show_tracking(api_client: &ApiClient, id: i32) -> Result<()> {
             println!("{}", "跟踪配置详情:".bold());
             println!("  ID: {}", track.id);
             println!("  软件包 ID: {}", track.package_id);
+            if let Some(package_name) = &track.package_name {
+                println!("  软件包名称: {}", package_name);
+            }
+            if let Some(package_level) = track.package_level {
+                println!("  软件包等级: {}", package_level);
+            }
+            if let Some(l0_repo_url) = &track.l0_repo_url {
+                println!("  L0 上游仓库: {}", l0_repo_url);
+            }
             println!("  发行版 ID: {}", track.distro_id);
             println!("  L1 仓库: {}/{}", track.l1_repo_owner, track.l1_repo_name);
             println!("  L1 分支: {}", track.l1_branch);
@@ -272,6 +571,58 @@ async fn show_tracking(api_client: &ApiClient, id: i32) -> Result<()> {
             }
             if let Some(sha) = track.last_l2_commit_sha {
                 println!("  最近 L2 提交: {}", sha);
+            }
+            if let Some(maintenance) = &track.maintenance_summary {
+                println!("  维护评估摘要:");
+                println!("    - 报告 ID: {}", maintenance.report_id);
+                println!("    - 风险等级: {}", maintenance.overall_risk);
+                println!("    - 置信度: {}", maintenance.confidence);
+                println!(
+                    "    - 报告时间: {}",
+                    format_datetime_local(&maintenance.generated_at)
+                );
+                println!(
+                    "    - Commit 总数: {}",
+                    maintenance
+                        .commit_total
+                        .map(|value| value.to_string())
+                        .unwrap_or_else(|| "-".to_string())
+                );
+                println!(
+                    "    - 近 12 月 Commit 数: {}",
+                    maintenance
+                        .commits_last_12_months
+                        .map(|value| value.to_string())
+                        .unwrap_or_else(|| "-".to_string())
+                );
+                println!(
+                    "    - 近 12 月 Committer 数: {}",
+                    maintenance
+                        .committers_last_12_months
+                        .map(|value| value.to_string())
+                        .unwrap_or_else(|| "-".to_string())
+                );
+                println!(
+                    "    - 最近一次 Commit 时间: {}",
+                    maintenance
+                        .last_commit_at
+                        .clone()
+                        .unwrap_or_else(|| "-".to_string())
+                );
+                println!(
+                    "    - Stars: {}",
+                    maintenance
+                        .stars
+                        .map(|value| value.to_string())
+                        .unwrap_or_else(|| "-".to_string())
+                );
+                println!(
+                    "    - Forks: {}",
+                    maintenance
+                        .forks
+                        .map(|value| value.to_string())
+                        .unwrap_or_else(|| "-".to_string())
+                );
             }
             println!("  创建时间: {}", format_datetime_local(&track.created_at));
             println!("  更新时间: {}", format_datetime_local(&track.updated_at));
@@ -346,6 +697,8 @@ mod tests {
     use super::*;
     use crate::cli::client::ClientConfig;
     use mockito::Server;
+    use std::io::Write;
+    use tempfile::NamedTempFile;
 
     async fn setup_test_server() -> (mockito::ServerGuard, ApiClient) {
         let server = Server::new_async().await;
@@ -614,6 +967,158 @@ mod tests {
         let result = update_tracking_status(&client, 5, true).await;
         assert!(result.is_ok(), "Result failed: {:?}", result.err());
         mock.assert_async().await;
+    }
+
+    #[test]
+    fn test_parse_tracking_import_file() {
+        let mut file = NamedTempFile::new().unwrap();
+        writeln!(file, "package,l2_repo,l1_repo").unwrap();
+        writeln!(
+            file,
+            "bash,https://work.ctyun.cn/git/sources-CTyunOS/bash.git,src-openEuler:https://atomgit.com/src-openeuler/bash.git"
+        )
+        .unwrap();
+        file.flush().unwrap();
+
+        let records = parse_tracking_import_file(file.path()).unwrap();
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].package, "bash");
+        assert_eq!(
+            records[0].l2_repo,
+            "https://work.ctyun.cn/git/sources-CTyunOS/bash.git"
+        );
+        assert_eq!(
+            records[0].l1_repo,
+            "src-openEuler:https://atomgit.com/src-openeuler/bash.git"
+        );
+    }
+
+    #[test]
+    fn test_parse_tracking_import_file_from_package_mapping() {
+        let mut file = NamedTempFile::new().unwrap();
+        writeln!(file, "bash,https://git.savannah.gnu.org/git/bash.git").unwrap();
+        file.flush().unwrap();
+
+        let records = parse_tracking_import_file(file.path()).unwrap();
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].package, "bash");
+        assert_eq!(
+            records[0].l1_repo,
+            "src-openEuler:https://atomgit.com/src-openeuler/bash.git"
+        );
+        assert_eq!(
+            records[0].l2_repo,
+            "https://work.ctyun.cn/git/sources-CTyunOS/bash.git"
+        );
+    }
+
+    #[test]
+    fn test_default_branch_mappings_use_2409_only_as_runtime_fallback() {
+        assert_eq!(DEFAULT_BRANCH_MAPPINGS.len(), 5);
+        assert!(DEFAULT_BRANCH_MAPPINGS.contains(&("25.05", "openEuler-24.03-LTS-SP3")));
+        assert!(DEFAULT_BRANCH_MAPPINGS.contains(&("25.07", "openEuler-24.03-LTS-SP3")));
+        assert!(!DEFAULT_BRANCH_MAPPINGS.contains(&("25.05", "openEuler-24.09")));
+        assert!(!DEFAULT_BRANCH_MAPPINGS.contains(&("25.07", "openEuler-24.09")));
+    }
+
+    #[tokio::test]
+    async fn test_import_tracking_from_file() {
+        let (mut server, client) = setup_test_server().await;
+
+        let mut file = NamedTempFile::new().unwrap();
+        writeln!(file, "package,l2_repo,l1_repo").unwrap();
+        writeln!(
+            file,
+            "bash,https://work.ctyun.cn/git/sources-CTyunOS/bash.git,src-openEuler:https://atomgit.com/src-openeuler/bash.git"
+        )
+        .unwrap();
+        file.flush().unwrap();
+
+        let packages_mock = server
+            .mock("GET", "/api/packages")
+            .expect(1)
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!([
+                    {
+                        "id": 1,
+                        "name": "bash",
+                        "level": 1,
+                        "sync_interval_hours": 24,
+                        "l0_repo_url": "https://git.savannah.gnu.org/git/bash.git",
+                        "description": null,
+                        "created_at": "2024-01-01T00:00:00Z",
+                        "updated_at": "2024-01-01T00:00:00Z"
+                    }
+                ])
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let tracking_list_mock = server
+            .mock("GET", "/api/tracking?page=1&page_size=100&package_id=1")
+            .expect(DEFAULT_BRANCH_MAPPINGS.len())
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "data": {
+                        "items": [],
+                        "total": 0
+                    }
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let create_tracking_mock = server
+            .mock("POST", "/api/tracking")
+            .expect(DEFAULT_BRANCH_MAPPINGS.len())
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                serde_json::json!({
+                    "data": {
+                        "id": 10,
+                        "package_id": 1,
+                        "package_name": "bash",
+                        "package_level": 1,
+                        "l0_repo_url": "https://git.savannah.gnu.org/git/bash.git",
+                        "distro_id": 1,
+                        "l1_repo_owner": "src-openeuler",
+                        "l1_repo_name": "bash",
+                        "l1_branch": "openEuler-20.03-LTS-SP4",
+                        "l2_branch": "2.0.1",
+                        "l2_repo_path": "https://work.ctyun.cn/git/sources-CTyunOS/bash.git",
+                        "tracking_status": "active",
+                        "last_sync_time": null,
+                        "last_l1_commit_sha": null,
+                        "last_l2_commit_sha": null,
+                        "maintenance_summary": null,
+                        "created_at": "2024-01-01T00:00:00Z",
+                        "updated_at": "2024-01-01T00:00:00Z"
+                    }
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let result = import_tracking_from_file(
+            &client,
+            file.path().display().to_string(),
+            "1".to_string(),
+            "active".to_string(),
+        )
+        .await;
+
+        assert!(result.is_ok(), "Result failed: {:?}", result.err());
+        packages_mock.assert_async().await;
+        tracking_list_mock.assert_async().await;
+        create_tracking_mock.assert_async().await;
     }
 
     #[tokio::test]

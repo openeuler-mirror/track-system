@@ -1,6 +1,6 @@
 /*
  * Copyright(c) 2024-2026 China Telecom Cloud Technologies Co., Ltd. All rights
- * reserved. ctscat is licensed under Mulan PSL v2. You can use this software
+ * reserved. track-system is licensed under Mulan PSL v2. You can use this software
  * according to the terms and conditions of the Mulan PSL V2. You may obtain a
  * copy of Mulan PSL v2 at: http://license.coscl.org.cn/MulanPSL2.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
@@ -16,6 +16,7 @@ use std::{
 };
 
 use crate::collectors::traits::GitClient;
+use crate::spec::parse_spec;
 use crate::utils::spec::SpecParser;
 use anyhow::{bail, Context, Result};
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
@@ -28,7 +29,7 @@ use sea_orm::{
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use tracing::{error, info};
+use tracing::{debug, error, info};
 use walkdir::WalkDir;
 
 use crate::{
@@ -99,7 +100,7 @@ pub async fn import_snapshot<P: AsRef<Path>>(
         .context("tracking configuration not found")?;
 
     let json = fs::read_to_string(input_path.as_ref())?;
-    let snapshot: RepositorySnapshot = serde_json::from_str(&json)?;
+    let mut snapshot: RepositorySnapshot = serde_json::from_str(&json)?;
 
     if snapshot.tracking_id != tracking.id {
         bail!(
@@ -109,6 +110,7 @@ pub async fn import_snapshot<P: AsRef<Path>>(
         );
     }
 
+    normalize_snapshot_spec_version_release(&mut snapshot);
     persist_snapshot(db, &snapshot, input_path.as_ref()).await
 }
 
@@ -527,30 +529,57 @@ async fn persist_snapshot<P: AsRef<Path>>(
 }
 
 fn extract_spec_version(content: &str) -> Option<String> {
-    let re = Regex::new(r"(?m)^\s*Version\s*:\s*([\w\.\-]+)").ok()?;
-    re.captures(content)
-        .and_then(|caps| caps.get(1))
-        .map(|m| m.as_str().to_string())
+    let info = parse_spec(content);
+    (!info.version.is_empty()).then_some(info.version)
 }
 
 fn extract_spec_release(content: &str) -> Option<String> {
-    let re = Regex::new(r"(?m)^\s*Release\s*:\s*([^\r\n]+)").ok()?;
-    re.captures(content)
-        .and_then(|caps| caps.get(1))
-        .map(|m| {
-            let raw = m.as_str().trim();
-            // 去掉常见的可选宏与尾随右括号
-            let cleaned = raw
-                .replace("%{?dist}", "")
-                .replace("%{?scl:", "")
-                .replace("%{!?scl:", "")
-                .replace("%{?scl_prefix}", "")
-                .replace('}', "")
-                .trim()
-                .to_string();
-            cleaned
-        })
-        .filter(|s| !s.is_empty())
+    let info = parse_spec(content);
+    (!info.release.is_empty()).then_some(info.release)
+}
+
+fn normalize_snapshot_spec_version_release(snapshot: &mut RepositorySnapshot) {
+    let Some(spec) = snapshot.spec.as_mut() else {
+        return;
+    };
+    let normalized = spec.content_base64.replace('\n', "");
+    if normalized.trim().is_empty() {
+        return;
+    }
+
+    let bytes = match BASE64_STANDARD.decode(normalized.as_bytes()) {
+        Ok(bytes) => bytes,
+        Err(err) => {
+            tracing::warn!(
+                tracking_id = snapshot.tracking_id,
+                spec_path = %spec.path,
+                error = %err,
+                "离线导入快照 spec 内容 Base64 解码失败，保留导入文件中的版本信息"
+            );
+            return;
+        }
+    };
+
+    let content = match String::from_utf8(bytes) {
+        Ok(content) => content,
+        Err(err) => {
+            tracing::warn!(
+                tracking_id = snapshot.tracking_id,
+                spec_path = %spec.path,
+                error = %err,
+                "离线导入快照 spec 内容不是 UTF-8，保留导入文件中的版本信息"
+            );
+            return;
+        }
+    };
+
+    let parsed = parse_spec(&content);
+    if !parsed.version.is_empty() {
+        spec.version = Some(parsed.version);
+    }
+    if !parsed.release.is_empty() {
+        spec.release = Some(parsed.release);
+    }
 }
 
 fn sha256_hex(data: &[u8]) -> String {
@@ -1000,6 +1029,53 @@ mod tests {
     fn test_extract_spec_release_strips_scl_macros() {
         let content = "Release: 1%{?scl:foo}%{!?scl:bar}%{?scl_prefix}\n";
         assert_eq!(extract_spec_release(content), Some("1foobar".to_string()));
+    }
+
+    #[test]
+    fn test_extract_spec_ignores_subpackage_version_release() {
+        let content = r#"
+%global openssh_release 13
+
+Name:           openssh
+Version:        9.6p1
+Release:        %{openssh_release}
+
+%package -n pam_ssh_agent_auth
+Version:        0.10.4
+Release:        5.%{openssh_release}
+"#;
+
+        assert_eq!(extract_spec_version(content), Some("9.6p1".to_string()));
+        assert_eq!(extract_spec_release(content), Some("13".to_string()));
+    }
+
+    #[test]
+    fn test_normalize_snapshot_spec_version_release_expands_imported_macros() {
+        let spec_text = r#"
+%global openssh_release 16
+
+Name:           openssh
+Version:        9.6p1
+Release:        %{openssh_release}
+
+%package -n pam_ssh_agent_auth
+Version:        0.10.4
+Release:        5.%{openssh_release}
+"#;
+        let mut snapshot = RepositorySnapshot::new(1, SnapshotOrigin::L2);
+        snapshot.spec = Some(SpecEntry {
+            path: "openssh.spec".to_string(),
+            sha256: "sha".to_string(),
+            version: Some("9.6p1".to_string()),
+            release: Some("%{openssh_release}".to_string()),
+            content_base64: BASE64_STANDARD.encode(spec_text),
+        });
+
+        normalize_snapshot_spec_version_release(&mut snapshot);
+
+        let spec = snapshot.spec.as_ref().unwrap();
+        assert_eq!(spec.version.as_deref(), Some("9.6p1"));
+        assert_eq!(spec.release.as_deref(), Some("16"));
     }
 
     #[test]

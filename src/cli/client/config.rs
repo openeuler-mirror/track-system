@@ -1,6 +1,6 @@
 /*
  * Copyright(c) 2024-2026 China Telecom Cloud Technologies Co., Ltd. All rights
- * reserved. ctscat is licensed under Mulan PSL v2. You can use this software
+ * reserved. track-system is licensed under Mulan PSL v2. You can use this software
  * according to the terms and conditions of the Mulan PSL V2. You may obtain a
  * copy of Mulan PSL v2 at: http://license.coscl.org.cn/MulanPSL2.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
@@ -49,11 +49,65 @@ fn default_verify_ssl() -> bool {
 impl Default for ClientConfig {
     fn default() -> Self {
         Self {
-            server_url: "http://localhost:3000".to_string(),
+            server_url: default_server_url(),
             auth_token: None,
             timeout: default_timeout(),
             verify_ssl: default_verify_ssl(),
         }
+    }
+}
+
+fn default_server_url() -> String {
+    resolve_server_url_from_env().unwrap_or_else(|| "http://localhost:8080".to_string())
+}
+
+fn resolve_server_url_from_env() -> Option<String> {
+    if let Ok(url) = std::env::var("TRACK_SERVER_URL") {
+        let trimmed = url.trim();
+        if !trimmed.is_empty() {
+            return Some(trimmed.to_string());
+        }
+    }
+
+    if let Ok(addr) = std::env::var("SERVER_ADDR") {
+        let trimmed = addr.trim();
+        if !trimmed.is_empty() {
+            return Some(server_url_from_addr(trimmed));
+        }
+    }
+
+    let host = std::env::var("SERVER_HOST")
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty());
+    let port = std::env::var("SERVER_PORT")
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty());
+
+    match (host, port) {
+        (Some(host), Some(port)) => Some(format!("http://{}:{}", normalize_cli_host(&host), port)),
+        (Some(host), None) => Some(format!("http://{}:3000", normalize_cli_host(&host))),
+        (None, Some(port)) => Some(format!("http://localhost:{}", port)),
+        (None, None) => None,
+    }
+}
+
+fn server_url_from_addr(addr: &str) -> String {
+    if addr.starts_with("http://") || addr.starts_with("https://") {
+        return addr.trim_end_matches('/').to_string();
+    }
+
+    let mut parts = addr.rsplitn(2, ':');
+    let port = parts.next().unwrap_or("3000");
+    let host = parts.next().unwrap_or("localhost");
+    format!("http://{}:{}", normalize_cli_host(host), port)
+}
+
+fn normalize_cli_host(host: &str) -> String {
+    match host {
+        "0.0.0.0" | "::" | "[::]" => "localhost".to_string(),
+        other => other.trim_matches(['[', ']']).to_string(),
     }
 }
 
@@ -123,7 +177,7 @@ impl ClientConfig {
         let mut config = Self::load()?;
 
         // 环境变量覆盖配置文件
-        if let Ok(url) = std::env::var("TRACK_SERVER_URL") {
+        if let Some(url) = resolve_server_url_from_env() {
             config.server_url = url;
         }
 
@@ -174,11 +228,31 @@ impl ClientConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{Mutex, OnceLock};
+
+    fn env_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
+
+    fn lock_env() -> std::sync::MutexGuard<'static, ()> {
+        env_lock().lock().unwrap_or_else(|err| err.into_inner())
+    }
+
+    fn clear_server_env() {
+        std::env::remove_var("TRACK_SERVER_URL");
+        std::env::remove_var("SERVER_ADDR");
+        std::env::remove_var("SERVER_HOST");
+        std::env::remove_var("SERVER_PORT");
+    }
 
     #[test]
     fn test_default_config() {
+        let _guard = lock_env();
+        clear_server_env();
+
         let config = ClientConfig::default();
-        assert_eq!(config.server_url, "http://localhost:3000");
+        assert_eq!(config.server_url, "http://localhost:8080");
         assert_eq!(config.timeout, 30);
         assert!(config.verify_ssl);
     }
@@ -200,6 +274,9 @@ mod tests {
 
     #[test]
     fn test_validate() {
+        let _guard = lock_env();
+        clear_server_env();
+
         let config = ClientConfig::default();
         assert!(config.validate().is_ok());
 
@@ -214,5 +291,44 @@ mod tests {
             ..Default::default()
         };
         assert!(invalid_timeout.validate().is_err());
+    }
+
+    #[test]
+    fn default_config_uses_server_host_and_port_env() {
+        let _guard = lock_env();
+        clear_server_env();
+        std::env::set_var("SERVER_HOST", "127.0.0.1");
+        std::env::set_var("SERVER_PORT", "8080");
+
+        let config = ClientConfig::default();
+        assert_eq!(config.server_url, "http://127.0.0.1:8080");
+
+        clear_server_env();
+    }
+
+    #[test]
+    fn default_config_uses_server_addr_env() {
+        let _guard = lock_env();
+        clear_server_env();
+        std::env::set_var("SERVER_ADDR", "0.0.0.0:8080");
+
+        let config = ClientConfig::default();
+        assert_eq!(config.server_url, "http://localhost:8080");
+
+        clear_server_env();
+    }
+
+    #[test]
+    fn track_server_url_overrides_server_host_and_port() {
+        let _guard = lock_env();
+        clear_server_env();
+        std::env::set_var("TRACK_SERVER_URL", "http://example.test:9000");
+        std::env::set_var("SERVER_HOST", "127.0.0.1");
+        std::env::set_var("SERVER_PORT", "8080");
+
+        let config = ClientConfig::default();
+        assert_eq!(config.server_url, "http://example.test:9000");
+
+        clear_server_env();
     }
 }

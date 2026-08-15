@@ -1,6 +1,6 @@
 /*
  * Copyright(c) 2024-2026 China Telecom Cloud Technologies Co., Ltd. All rights
- * reserved. ctscat is licensed under Mulan PSL v2. You can use this software
+ * reserved. track-system is licensed under Mulan PSL v2. You can use this software
  * according to the terms and conditions of the Mulan PSL V2. You may obtain a
  * copy of Mulan PSL v2 at: http://license.coscl.org.cn/MulanPSL2.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
@@ -25,6 +25,7 @@ use tracing::{error, info, warn};
 use crate::entities::{sync_jobs, tracking};
 use crate::telemetry::Telemetry;
 
+use super::report_artifacts::CveFixComparisonInput;
 use super::{SyncApiClient, SyncManager};
 
 /// 流水线阶段
@@ -168,6 +169,10 @@ pub struct DiffComparisonResult {
     pub report_id: Option<i64>,
     pub files_changed: usize,
     pub has_spec_changes: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub l2_vs_l1_diff: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub l1_vs_l0_diff: Option<serde_json::Value>,
 }
 
 /// 变更分类结果
@@ -176,6 +181,16 @@ pub struct ClassificationResult {
     pub classified_count: usize,
     pub cve_count: usize,
     pub needs_review_count: usize,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub commits: Vec<ClassifiedCommitResult>,
+}
+
+/// 单个 commit 的变更分类结果
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClassifiedCommitResult {
+    pub commit_sha: String,
+    pub primary_change_type: String,
+    pub cve_list: Vec<String>,
 }
 
 /// 报告生成结果
@@ -183,6 +198,10 @@ pub struct ClassificationResult {
 pub struct ReportGenerationResult {
     pub report_id: i64,
     pub report_status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cve_fix_comparison_input: Option<CveFixComparisonInput>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cve_fix_comparison_xlsx: Option<String>,
 }
 
 /// 回合建议结果
@@ -410,7 +429,6 @@ impl<'a> PipelineExecutor<'a> {
 
         Ok(result)
     }
-
     /// 执行单个阶段
     async fn execute_stage(
         &self,
@@ -645,6 +663,8 @@ mod tests {
             report_id: Some(456),
             files_changed: 15,
             has_spec_changes: true,
+            l2_vs_l1_diff: None,
+            l1_vs_l0_diff: None,
         };
 
         let json = serde_json::to_value(&result).unwrap();
@@ -659,6 +679,7 @@ mod tests {
             classified_count: 20,
             cve_count: 3,
             needs_review_count: 7,
+            commits: Vec::new(),
         };
 
         let json = serde_json::to_value(&result).unwrap();
@@ -672,6 +693,8 @@ mod tests {
         let result = ReportGenerationResult {
             report_id: 789,
             report_status: "completed".to_string(),
+            cve_fix_comparison_input: None,
+            cve_fix_comparison_xlsx: None,
         };
 
         let json = serde_json::to_value(&result).unwrap();

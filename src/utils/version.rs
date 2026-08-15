@@ -1,6 +1,6 @@
 /*
  * Copyright(c) 2024-2026 China Telecom Cloud Technologies Co., Ltd. All rights
- * reserved. ctscat is licensed under Mulan PSL v2. You can use this software
+ * reserved. track-system is licensed under Mulan PSL v2. You can use this software
  * according to the terms and conditions of the Mulan PSL V2. You may obtain a
  * copy of Mulan PSL v2 at: http://license.coscl.org.cn/MulanPSL2.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
@@ -213,17 +213,23 @@ impl VersionParser {
             (version_str, None)
         };
 
+        let normalized_version_part = normalize_version_part(version_part);
+
         // 分离预发布标识（-号后面的部分）
-        let (core_version, pre_release) = if let Some(pos) = version_part.find('-') {
-            let (v, p) = version_part.split_at(pos);
-            (v, Some(p[1..].to_string()))
+        let (core_version, pre_release) = if let Some(pos) = normalized_version_part.find('-') {
+            let (v, p) = normalized_version_part.split_at(pos);
+            let pre_release = p[1..].trim();
+            if pre_release.is_empty() {
+                return Err(anyhow!("无效的预发布版本格式: {}", version_str));
+            }
+            (v, Some(pre_release.to_string()))
         } else {
-            (version_part, None)
+            (normalized_version_part.as_str(), None)
         };
 
         // 解析核心版本号（major.minor.patch）
         let parts: Vec<&str> = core_version.split('.').collect();
-        if parts.is_empty() || parts.len() > 3 {
+        if parts.is_empty() || parts.len() > 3 || parts.iter().any(|part| part.is_empty()) {
             return Err(anyhow!("无效的版本格式: {}", version_str));
         }
 
@@ -234,12 +240,20 @@ impl VersionParser {
 
         let minor = parts
             .get(1)
-            .and_then(|s| s.parse::<u32>().ok())
+            .map(|s| {
+                s.parse::<u32>()
+                    .map_err(|_| anyhow!("无法解析次版本号: {}", version_str))
+            })
+            .transpose()?
             .unwrap_or(0);
 
         let patch = parts
             .get(2)
-            .and_then(|s| s.parse::<u32>().ok())
+            .map(|s| {
+                s.parse::<u32>()
+                    .map_err(|_| anyhow!("无法解析修订版本号: {}", version_str))
+            })
+            .transpose()?
             .unwrap_or(0);
 
         Ok(Version {
@@ -293,6 +307,49 @@ impl VersionParser {
     }
 }
 
+fn normalize_version_part(version_part: &str) -> String {
+    let value = version_part.trim().replace('_', ".");
+    let lower = value.to_ascii_lowercase();
+
+    for marker in ["alpha", "beta", "rc", "pre"] {
+        let Some(pos) = lower.find(marker) else {
+            continue;
+        };
+        if pos == 0 || !is_pre_release_suffix(&lower[pos..], marker) {
+            continue;
+        }
+
+        let before = value[..pos].trim_end_matches(['-', '.', '_']);
+        if !before
+            .chars()
+            .last()
+            .map(|value| value.is_ascii_digit())
+            .unwrap_or(false)
+        {
+            continue;
+        }
+
+        let after = value[pos..].trim_start_matches(['-', '.', '_']);
+        if !after.is_empty() {
+            return format!("{}-{}", before, after);
+        }
+    }
+
+    value
+}
+
+fn is_pre_release_suffix(suffix: &str, marker: &str) -> bool {
+    let Some(rest) = suffix.strip_prefix(marker) else {
+        return false;
+    };
+    rest.is_empty()
+        || rest
+            .chars()
+            .next()
+            .map(|value| value.is_ascii_digit() || matches!(value, '.' | '-' | '_'))
+            .unwrap_or(false)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -316,6 +373,25 @@ mod tests {
         assert!(v.is_pre_release());
         assert_eq!(v.pre_release, Some("beta.1".to_string()));
         assert_eq!(v.to_string(), "1.2.3-beta.1");
+    }
+
+    #[test]
+    fn test_parse_pre_release_without_dash() {
+        let v = VersionParser::parse("1.2.3rc1").unwrap();
+        assert_eq!(v.major, 1);
+        assert_eq!(v.minor, 2);
+        assert_eq!(v.patch, 3);
+        assert_eq!(v.pre_release.as_deref(), Some("rc1"));
+
+        let v = VersionParser::parse("1.2.3.rc.2").unwrap();
+        assert_eq!(v.patch, 3);
+        assert_eq!(v.pre_release.as_deref(), Some("rc.2"));
+    }
+
+    #[test]
+    fn test_parse_rejects_invalid_numeric_parts() {
+        assert!(VersionParser::parse("1.2.x").is_err());
+        assert!(VersionParser::parse("1.2.3-").is_err());
     }
 
     #[test]

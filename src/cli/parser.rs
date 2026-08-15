@@ -1,6 +1,6 @@
 /*
  * Copyright(c) 2024-2026 China Telecom Cloud Technologies Co., Ltd. All rights
- * reserved. ctscat is licensed under Mulan PSL v2. You can use this software
+ * reserved. track-system is licensed under Mulan PSL v2. You can use this software
  * according to the terms and conditions of the Mulan PSL V2. You may obtain a
  * copy of Mulan PSL v2 at: http://license.coscl.org.cn/MulanPSL2.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
@@ -146,6 +146,18 @@ pub enum Commands {
         #[command(subcommand)]
         action: ReportAction,
     },
+
+    /// 生态评估目标管理命令
+    Ecosystem {
+        #[command(subcommand)]
+        action: EcosystemAction,
+    },
+
+    /// 组件维护评估目标管理命令
+    Maintenance {
+        #[command(subcommand)]
+        action: MaintenanceAction,
+    },
 }
 
 // ============== Sync Commands ==============
@@ -281,6 +293,13 @@ pub enum L0Action {
     #[command(about = "Poll L0 repository")]
     Poll {
         /// Package ID (可选，不指定则轮询所有)
+        package_id: Option<i32>,
+    },
+
+    /// 主动预热 L0 仓库缓存
+    #[command(about = "Warm cached mirrors for L0 repositories")]
+    WarmCache {
+        /// Package ID (可选，不指定则预热所有有 L0 仓库地址的软件包)
         package_id: Option<i32>,
     },
 
@@ -502,6 +521,35 @@ pub enum PackageAction {
         description: Option<String>,
     },
 
+    /// 从配置文件批量导入软件包
+    #[command(about = "Import packages from a repo mapping file")]
+    Import {
+        /// 配置文件路径，格式参考 l1_package_name.txt：name,url
+        #[arg(long)]
+        file: String,
+        /// 默认优先级等级
+        #[arg(long, default_value = "1")]
+        level: i32,
+        /// 默认同步间隔（如 12h, 24h）
+        #[arg(long, default_value = "24h")]
+        sync_interval: String,
+        /// 默认描述（可选）
+        #[arg(long)]
+        description: Option<String>,
+        /// 已存在时更新 L0 仓库和元数据，而不是报错
+        #[arg(long, default_value_t = true)]
+        update_existing: bool,
+        /// 导入 package 后，按约定模板自动创建 tracking
+        #[arg(long, default_value_t = false)]
+        create_tracking: bool,
+        /// 当启用 --create-tracking 时必填，表示 tracking 使用的发行版 ID
+        #[arg(long)]
+        distro: Option<String>,
+        /// 当启用 --create-tracking 时使用的 tracking 状态
+        #[arg(long, default_value = "active")]
+        tracking_status: String,
+    },
+
     /// 列出所有软件包
     #[command(about = "List all packages")]
     List {
@@ -621,6 +669,22 @@ pub enum TrackingAction {
         /// L2 分支名称
         #[arg(long, default_value = "main", help = "L2 分支名称")]
         l2_branch: String,
+
+        /// 跟踪状态（active/paused）
+        #[arg(long, default_value = "active", help = "跟踪状态（active/paused）")]
+        status: String,
+    },
+
+    /// 从配置文件批量创建跟踪配置
+    #[command(about = "Import tracking configurations from csv file")]
+    Import {
+        /// 配置文件路径，CSV 表头需包含 package,l2_repo,l1_repo
+        #[arg(long)]
+        file: String,
+
+        /// 发行版ID（仅支持数字ID）
+        #[arg(long, help = "发行版ID（仅支持数字ID）")]
+        distro: String,
 
         /// 跟踪状态（active/paused）
         #[arg(long, default_value = "active", help = "跟踪状态（active/paused）")]
@@ -765,6 +829,10 @@ pub enum ReportAction {
     Show {
         /// 报告 ID
         id: i64,
+
+        /// 显示完整报告内容（包含 l1_vs_l0）
+        #[arg(long)]
+        all: bool,
     },
 
     /// 导出报告
@@ -780,6 +848,184 @@ pub enum ReportAction {
         /// 输出文件路径
         #[arg(long)]
         output: Option<String>,
+    },
+}
+
+// ============== Ecosystem Commands ==============
+
+#[derive(Subcommand, Debug)]
+pub enum EcosystemAction {
+    /// 创建生态目标
+    #[command(about = "Create ecosystem target")]
+    Create {
+        #[arg(long)]
+        name: String,
+        #[arg(long)]
+        target_type: Option<String>,
+        #[arg(long)]
+        role: Option<String>,
+        #[arg(long)]
+        rule_profile: Option<String>,
+        #[arg(long)]
+        platform: Option<String>,
+        #[arg(long)]
+        homepage_url: Option<String>,
+        #[arg(long)]
+        api_base_url: Option<String>,
+        #[arg(long)]
+        owner: Option<String>,
+        #[arg(long)]
+        repo: Option<String>,
+        #[arg(long)]
+        default_branch: Option<String>,
+        #[arg(long)]
+        status: Option<String>,
+        #[arg(long)]
+        refresh_interval_hours: Option<i32>,
+        #[arg(long, help = "metadata JSON 字符串")]
+        metadata: Option<String>,
+    },
+
+    /// 列出生态目标
+    #[command(about = "List ecosystem targets")]
+    List {
+        #[arg(long, default_value = "1")]
+        page: u64,
+        #[arg(long, default_value = "10")]
+        page_size: u64,
+        #[arg(long)]
+        target_type: Option<String>,
+        #[arg(long)]
+        platform: Option<String>,
+        #[arg(long)]
+        status: Option<String>,
+    },
+
+    /// 查看生态目标详情
+    #[command(about = "Show ecosystem target")]
+    Show { id: i32 },
+
+    /// 更新生态目标
+    #[command(about = "Update ecosystem target")]
+    Update {
+        #[arg(help = "目标 ID 或名称")]
+        target: String,
+        #[arg(long)]
+        name: Option<String>,
+        #[arg(long)]
+        target_type: Option<String>,
+        #[arg(long)]
+        role: Option<String>,
+        #[arg(long)]
+        rule_profile: Option<String>,
+        #[arg(long)]
+        platform: Option<String>,
+        #[arg(long)]
+        homepage_url: Option<String>,
+        #[arg(long)]
+        api_base_url: Option<String>,
+        #[arg(long)]
+        owner: Option<String>,
+        #[arg(long)]
+        repo: Option<String>,
+        #[arg(long)]
+        default_branch: Option<String>,
+        #[arg(long)]
+        status: Option<String>,
+        #[arg(long)]
+        refresh_interval_hours: Option<i32>,
+        #[arg(long, help = "metadata JSON 字符串")]
+        metadata: Option<String>,
+        #[arg(long)]
+        last_error: Option<String>,
+    },
+
+    /// 删除生态目标
+    #[command(about = "Delete ecosystem target")]
+    Delete {
+        #[arg(long)]
+        id: i32,
+        #[arg(long)]
+        confirm: bool,
+    },
+
+    /// 刷新生态目标
+    #[command(about = "Refresh ecosystem target")]
+    Refresh {
+        #[arg(long)]
+        id: i32,
+    },
+
+    /// 查询最新生态报告
+    #[command(about = "Show latest ecosystem report")]
+    LatestReport {
+        #[arg(long)]
+        id: i32,
+        #[arg(long, help = "打印原始报告载荷")]
+        verbose: bool,
+    },
+
+    /// 列出生态报告
+    #[command(about = "List ecosystem reports")]
+    Reports {
+        #[arg(long, default_value = "1")]
+        page: u64,
+        #[arg(long, default_value = "10")]
+        page_size: u64,
+        #[arg(long)]
+        target_id: Option<i32>,
+        #[arg(long)]
+        report_type: Option<String>,
+    },
+
+    /// 查看生态报告详情
+    #[command(about = "Show ecosystem report")]
+    Report {
+        id: i64,
+        #[arg(long, help = "打印原始报告载荷")]
+        verbose: bool,
+    },
+}
+
+// ============== Maintenance Commands ==============
+
+#[derive(Subcommand, Debug)]
+pub enum MaintenanceAction {
+    /// 刷新维护评估
+    #[command(about = "Refresh maintenance report for a package")]
+    Refresh {
+        #[arg(help = "软件包 ID 或名称")]
+        package: String,
+    },
+
+    /// 查询最新维护评估报告
+    #[command(about = "Show latest maintenance report")]
+    LatestReport {
+        #[arg(help = "软件包 ID 或名称")]
+        package: String,
+        #[arg(long, help = "打印原始报告载荷")]
+        verbose: bool,
+    },
+
+    /// 列出维护评估报告
+    #[command(about = "List maintenance reports")]
+    Reports {
+        #[arg(long, default_value = "1")]
+        page: u64,
+        #[arg(long, default_value = "10")]
+        page_size: u64,
+        #[arg(long)]
+        package: Option<String>,
+        #[arg(long)]
+        report_type: Option<String>,
+    },
+
+    /// 查看维护评估报告详情
+    #[command(about = "Show maintenance report")]
+    Report {
+        id: i64,
+        #[arg(long, help = "打印原始报告载荷")]
+        verbose: bool,
     },
 }
 
@@ -846,7 +1092,14 @@ mod tests {
         }
 
         for visible in [
-            "sync", "snapshot", "import", "package", "tracking", "report",
+            "sync",
+            "snapshot",
+            "import",
+            "package",
+            "tracking",
+            "report",
+            "ecosystem",
+            "maintenance",
         ] {
             assert!(
                 root_commands.contains(&visible.to_string()),
@@ -864,5 +1117,208 @@ mod tests {
         );
 
         i18n::init_i18n(Some("en-US"));
+    }
+
+    #[test]
+    fn cli_parse_ecosystem_create_command() {
+        let cli = Cli::parse_from([
+            "track-cli",
+            "ecosystem",
+            "create",
+            "--name",
+            "openEuler Community",
+        ]);
+
+        match cli.command {
+            Commands::Ecosystem {
+                action:
+                    EcosystemAction::Create {
+                        name,
+                        target_type,
+                        role,
+                        rule_profile,
+                        ..
+                    },
+            } => {
+                assert_eq!(name, "openEuler Community");
+                assert_eq!(target_type, None);
+                assert_eq!(role, None);
+                assert_eq!(rule_profile, None);
+            }
+            other => panic!("expected ecosystem create command, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn cli_parse_ecosystem_update_command() {
+        let cli = Cli::parse_from([
+            "track-cli",
+            "ecosystem",
+            "update",
+            "openeuler",
+            "--status",
+            "active",
+        ]);
+
+        match cli.command {
+            Commands::Ecosystem {
+                action: EcosystemAction::Update { target, status, .. },
+            } => {
+                assert_eq!(target, "openeuler");
+                assert_eq!(status.as_deref(), Some("active"));
+            }
+            other => panic!("expected ecosystem update command, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn cli_parse_ecosystem_latest_report_verbose_command() {
+        let cli = Cli::parse_from([
+            "track-cli",
+            "ecosystem",
+            "latest-report",
+            "--id",
+            "1",
+            "--verbose",
+        ]);
+
+        match cli.command {
+            Commands::Ecosystem {
+                action: EcosystemAction::LatestReport { id, verbose },
+            } => {
+                assert_eq!(id, 1);
+                assert!(verbose);
+            }
+            other => panic!("expected ecosystem latest-report command, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn cli_parse_ecosystem_report_verbose_command() {
+        let cli = Cli::parse_from(["track-cli", "ecosystem", "report", "7", "--verbose"]);
+
+        match cli.command {
+            Commands::Ecosystem {
+                action: EcosystemAction::Report { id, verbose },
+            } => {
+                assert_eq!(id, 7);
+                assert!(verbose);
+            }
+            other => panic!("expected ecosystem report command, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn cli_parse_maintenance_create_command() {
+        let cli = Cli::parse_from(["track-cli", "maintenance", "refresh", "openssl"]);
+
+        match cli.command {
+            Commands::Maintenance {
+                action: MaintenanceAction::Refresh { package },
+            } => {
+                assert_eq!(package, "openssl");
+            }
+            other => panic!("expected maintenance refresh command, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn cli_parse_maintenance_report_verbose_command() {
+        let cli = Cli::parse_from(["track-cli", "maintenance", "report", "9", "--verbose"]);
+
+        match cli.command {
+            Commands::Maintenance {
+                action: MaintenanceAction::Report { id, verbose },
+            } => {
+                assert_eq!(id, 9);
+                assert!(verbose);
+            }
+            other => panic!("expected maintenance report command, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn cli_parse_l0_warm_cache_command() {
+        let cli = Cli::parse_from(["track-cli", "l0", "warm-cache", "12"]);
+
+        match cli.command {
+            Commands::L0 {
+                action: L0Action::WarmCache { package_id },
+            } => {
+                assert_eq!(package_id, Some(12));
+            }
+            other => panic!("expected l0 warm-cache command, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn cli_parse_package_import_command() {
+        let cli = Cli::parse_from([
+            "track-cli",
+            "package",
+            "import",
+            "--file",
+            "l1_package_name.txt",
+            "--level",
+            "2",
+            "--sync-interval",
+            "12h",
+        ]);
+
+        match cli.command {
+            Commands::Package {
+                action:
+                    PackageAction::Import {
+                        file,
+                        level,
+                        sync_interval,
+                        create_tracking,
+                        distro,
+                        tracking_status,
+                        update_existing,
+                        ..
+                    },
+            } => {
+                assert_eq!(file, "l1_package_name.txt");
+                assert_eq!(level, 2);
+                assert_eq!(sync_interval, "12h");
+                assert!(!create_tracking);
+                assert!(distro.is_none());
+                assert_eq!(tracking_status, "active");
+                assert!(update_existing);
+            }
+            other => panic!("expected package import command, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn cli_parse_tracking_import_command() {
+        let cli = Cli::parse_from([
+            "track-cli",
+            "tracking",
+            "import",
+            "--file",
+            "config/tracking_batch_atomgit_src-openEuler.csv",
+            "--distro",
+            "1",
+            "--status",
+            "active",
+        ]);
+
+        match cli.command {
+            Commands::Tracking {
+                action:
+                    TrackingAction::Import {
+                        file,
+                        distro,
+                        status,
+                    },
+            } => {
+                assert_eq!(file, "config/tracking_batch_atomgit_src-openEuler.csv");
+                assert_eq!(distro, "1");
+                assert_eq!(status, "active");
+            }
+            other => panic!("expected tracking import command, got: {:?}", other),
+        }
     }
 }

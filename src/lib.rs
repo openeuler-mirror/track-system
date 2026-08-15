@@ -1,6 +1,6 @@
 /*
  * Copyright(c) 2024-2026 China Telecom Cloud Technologies Co., Ltd. All rights
- * reserved. ctscat is licensed under Mulan PSL v2. You can use this software
+ * reserved. track-system is licensed under Mulan PSL v2. You can use this software
  * according to the terms and conditions of the Mulan PSL V2. You may obtain a
  * copy of Mulan PSL v2 at: http://license.coscl.org.cn/MulanPSL2.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
@@ -27,13 +27,16 @@ rust_i18n::i18n!("src/bin/locales", fallback = "en-US");
 // - utils: 工具函数
 
 // 已实现的模块
+pub mod ai;
 pub mod analyzer;
 pub mod backport_advisor;
 pub mod classifier_job;
 pub mod cli;
 pub mod collectors;
 pub mod component;
+pub mod config;
 pub mod diff;
+pub mod ecosystem;
 pub mod entities;
 pub mod exporter;
 pub mod i18n;
@@ -50,7 +53,6 @@ pub mod utils;
 pub mod workflow;
 
 // 待实现的模块占位符
-// pub mod config;
 // pub mod repository;
 // pub mod branch;
 // pub mod concurrency;

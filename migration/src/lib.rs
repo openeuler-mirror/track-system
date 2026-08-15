@@ -1,6 +1,6 @@
 /*
  * Copyright(c) 2024-2026 China Telecom Cloud Technologies Co., Ltd. All rights
- * reserved. ctscat is licensed under Mulan PSL v2. You can use this software
+ * reserved. track-system is licensed under Mulan PSL v2. You can use this software
  * according to the terms and conditions of the Mulan PSL V2. You may obtain a
  * copy of Mulan PSL v2 at: http://license.coscl.org.cn/MulanPSL2.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
@@ -28,6 +28,13 @@ mod m20251125_000001_add_spec_fields_to_commit_records;
 mod m20251125_060001_rename_commit_records_to_l1;
 mod m20251125_060002_create_l2_commit_records;
 mod m20251127_000001_create_compare_reports;
+mod m20260202_000001_add_platform_to_tracking;
+mod m20260331_000001_create_ecosystem_targets;
+mod m20260331_000002_create_ecosystem_bindings;
+mod m20260331_000003_create_ecosystem_evidence_snapshots;
+mod m20260331_000004_create_ecosystem_reports;
+mod m20260416_000002_create_maintenance_evidence_snapshots;
+mod m20260416_000003_create_maintenance_reports;
 
 pub struct Migrator;
 
@@ -52,6 +59,13 @@ impl MigratorTrait for Migrator {
             Box::new(m20251125_060001_rename_commit_records_to_l1::Migration),
             Box::new(m20251125_060002_create_l2_commit_records::Migration),
             Box::new(m20251127_000001_create_compare_reports::Migration),
+            Box::new(m20260202_000001_add_platform_to_tracking::Migration),
+            Box::new(m20260331_000001_create_ecosystem_targets::Migration),
+            Box::new(m20260331_000002_create_ecosystem_bindings::Migration),
+            Box::new(m20260331_000003_create_ecosystem_evidence_snapshots::Migration),
+            Box::new(m20260331_000004_create_ecosystem_reports::Migration),
+            Box::new(m20260416_000002_create_maintenance_evidence_snapshots::Migration),
+            Box::new(m20260416_000003_create_maintenance_reports::Migration),
         ]
     }
 }
