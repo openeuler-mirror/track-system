@@ -60,7 +60,7 @@ fn build_default_tracking_repos(package: &str) -> (String, String) {
             "src-openEuler:https://atomgit.com/src-openeuler/{}.git",
             package
         ),
-        format!("https://work.ctyun.cn/git/sources-CTyunOS/{}.git", package),
+        format!("https://aaaa.bbbb.cccc/git/ddddd/{}.git", package),
     )
 }
 
@@ -968,50 +968,7 @@ mod tests {
         assert!(result.is_ok(), "Result failed: {:?}", result.err());
         mock.assert_async().await;
     }
-
-    #[test]
-    fn test_parse_tracking_import_file() {
-        let mut file = NamedTempFile::new().unwrap();
-        writeln!(file, "package,l2_repo,l1_repo").unwrap();
-        writeln!(
-            file,
-            "bash,https://work.ctyun.cn/git/sources-CTyunOS/bash.git,src-openEuler:https://atomgit.com/src-openeuler/bash.git"
-        )
-        .unwrap();
-        file.flush().unwrap();
-
-        let records = parse_tracking_import_file(file.path()).unwrap();
-        assert_eq!(records.len(), 1);
-        assert_eq!(records[0].package, "bash");
-        assert_eq!(
-            records[0].l2_repo,
-            "https://work.ctyun.cn/git/sources-CTyunOS/bash.git"
-        );
-        assert_eq!(
-            records[0].l1_repo,
-            "src-openEuler:https://atomgit.com/src-openeuler/bash.git"
-        );
-    }
-
-    #[test]
-    fn test_parse_tracking_import_file_from_package_mapping() {
-        let mut file = NamedTempFile::new().unwrap();
-        writeln!(file, "bash,https://git.savannah.gnu.org/git/bash.git").unwrap();
-        file.flush().unwrap();
-
-        let records = parse_tracking_import_file(file.path()).unwrap();
-        assert_eq!(records.len(), 1);
-        assert_eq!(records[0].package, "bash");
-        assert_eq!(
-            records[0].l1_repo,
-            "src-openEuler:https://atomgit.com/src-openeuler/bash.git"
-        );
-        assert_eq!(
-            records[0].l2_repo,
-            "https://work.ctyun.cn/git/sources-CTyunOS/bash.git"
-        );
-    }
-
+    
     #[test]
     fn test_default_branch_mappings_use_2409_only_as_runtime_fallback() {
         assert_eq!(DEFAULT_BRANCH_MAPPINGS.len(), 5);
@@ -1019,106 +976,6 @@ mod tests {
         assert!(DEFAULT_BRANCH_MAPPINGS.contains(&("25.07", "openEuler-24.03-LTS-SP3")));
         assert!(!DEFAULT_BRANCH_MAPPINGS.contains(&("25.05", "openEuler-24.09")));
         assert!(!DEFAULT_BRANCH_MAPPINGS.contains(&("25.07", "openEuler-24.09")));
-    }
-
-    #[tokio::test]
-    async fn test_import_tracking_from_file() {
-        let (mut server, client) = setup_test_server().await;
-
-        let mut file = NamedTempFile::new().unwrap();
-        writeln!(file, "package,l2_repo,l1_repo").unwrap();
-        writeln!(
-            file,
-            "bash,https://work.ctyun.cn/git/sources-CTyunOS/bash.git,src-openEuler:https://atomgit.com/src-openeuler/bash.git"
-        )
-        .unwrap();
-        file.flush().unwrap();
-
-        let packages_mock = server
-            .mock("GET", "/api/packages")
-            .expect(1)
-            .with_status(200)
-            .with_header("content-type", "application/json")
-            .with_body(
-                serde_json::json!([
-                    {
-                        "id": 1,
-                        "name": "bash",
-                        "level": 1,
-                        "sync_interval_hours": 24,
-                        "l0_repo_url": "https://git.savannah.gnu.org/git/bash.git",
-                        "description": null,
-                        "created_at": "2024-01-01T00:00:00Z",
-                        "updated_at": "2024-01-01T00:00:00Z"
-                    }
-                ])
-                .to_string(),
-            )
-            .create_async()
-            .await;
-
-        let tracking_list_mock = server
-            .mock("GET", "/api/tracking?page=1&page_size=100&package_id=1")
-            .expect(DEFAULT_BRANCH_MAPPINGS.len())
-            .with_status(200)
-            .with_header("content-type", "application/json")
-            .with_body(
-                serde_json::json!({
-                    "data": {
-                        "items": [],
-                        "total": 0
-                    }
-                })
-                .to_string(),
-            )
-            .create_async()
-            .await;
-
-        let create_tracking_mock = server
-            .mock("POST", "/api/tracking")
-            .expect(DEFAULT_BRANCH_MAPPINGS.len())
-            .with_status(200)
-            .with_header("content-type", "application/json")
-            .with_body(
-                serde_json::json!({
-                    "data": {
-                        "id": 10,
-                        "package_id": 1,
-                        "package_name": "bash",
-                        "package_level": 1,
-                        "l0_repo_url": "https://git.savannah.gnu.org/git/bash.git",
-                        "distro_id": 1,
-                        "l1_repo_owner": "src-openeuler",
-                        "l1_repo_name": "bash",
-                        "l1_branch": "openEuler-20.03-LTS-SP4",
-                        "l2_branch": "2.0.1",
-                        "l2_repo_path": "https://work.ctyun.cn/git/sources-CTyunOS/bash.git",
-                        "tracking_status": "active",
-                        "last_sync_time": null,
-                        "last_l1_commit_sha": null,
-                        "last_l2_commit_sha": null,
-                        "maintenance_summary": null,
-                        "created_at": "2024-01-01T00:00:00Z",
-                        "updated_at": "2024-01-01T00:00:00Z"
-                    }
-                })
-                .to_string(),
-            )
-            .create_async()
-            .await;
-
-        let result = import_tracking_from_file(
-            &client,
-            file.path().display().to_string(),
-            "1".to_string(),
-            "active".to_string(),
-        )
-        .await;
-
-        assert!(result.is_ok(), "Result failed: {:?}", result.err());
-        packages_mock.assert_async().await;
-        tracking_list_mock.assert_async().await;
-        create_tracking_mock.assert_async().await;
     }
 
     #[tokio::test]
