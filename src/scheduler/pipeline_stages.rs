@@ -381,6 +381,7 @@ async fn apply_l2_vs_l1_commit_diff(
     classification_overrides: &HashMap<String, (String, Vec<String>)>,
     risk_client: Option<&Client>,
     risk_create_url: &str,
+    risk_inner_secret: Option<&str>,
 ) -> Result<()> {
     let Some(commit_diff) = l2_vs_l1_diff.get("commit_diff") else {
         debug!(tracking_id = tracking.id, "commit_diff 为空");
@@ -467,7 +468,7 @@ async fn apply_l2_vs_l1_commit_diff(
         let upstream_version_release = commit_version_release(l1_commit)
             .unwrap_or_else(|| fallback_upstream_version_release.clone());
 
-        if let Some(risk_client) = risk_client {
+        if let (Some(risk_client), Some(risk_inner_secret)) = (risk_client, risk_inner_secret) {
             let req = RiskCreateReq {
                 description: format!("{} (branch: {})", commit_message, tracking.l2_branch),
                 level: risk_level_number(&change_type),
@@ -480,14 +481,13 @@ async fn apply_l2_vs_l1_commit_diff(
                 disclosure_time: authored_at.clone(),
                 source: Some(tracking.l1_repo_owner.clone()),
                 package_id: 0,
-                inner_secret: "Ctyun@123".to_string(),
+                inner_secret: risk_inner_secret.to_string(),
                 report_url: commit_url.clone(),
                 risk_type: risk_type_from_change_type(&change_type),
             };
             debug!(
                 tracking_id = tracking.id,
                 commit_sha = %commit_sha,
-                req = ?req,
                 "调用 risk/create 请求"
             );
 
@@ -2423,7 +2423,7 @@ impl<'a> PipelineExecutor<'a> {
         let risk_create_url = std::env::var("RISK_CREATE_URL")
             .unwrap_or_else(|_| "http://localhost:8899/risk/create/inner".to_string());
         let risk_create_enabled = std::env::var("RISK_CREATE_ENABLED")
-            .unwrap_or_else(|_| "true".to_string())
+            .unwrap_or_else(|_| "false".to_string())
             .to_lowercase()
             != "false";
 
@@ -2432,7 +2432,25 @@ impl<'a> PipelineExecutor<'a> {
             .and_then(|v| v.parse().ok())
             .unwrap_or(5);
 
-        let risk_client = if risk_create_enabled {
+        let risk_inner_secret = if risk_create_enabled {
+            match crate::utils::secret::decrypt_secret_from_env(
+                "RISK_CREATE_INNER_SECRET_ENCRYPTED",
+                "RISK_CREATE_INNER_SECRET_KEY_FILE",
+            ) {
+                Ok(secret) => Some(secret),
+                Err(err) => {
+                    warn!(
+                        error = %err,
+                        "Risk 上报已禁用：未能读取 RISK_CREATE_INNER_SECRET_ENCRYPTED"
+                    );
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
+        let risk_client = if risk_inner_secret.is_some() {
             Some(
                 Client::builder()
                     .timeout(Duration::from_secs(risk_timeout_secs))
@@ -2561,6 +2579,7 @@ impl<'a> PipelineExecutor<'a> {
                         &classification_overrides,
                         risk_client.as_ref(),
                         &risk_create_url,
+                        risk_inner_secret.as_deref(),
                     )
                     .await?;
                     compare_from_pipeline = true;
@@ -2597,6 +2616,7 @@ impl<'a> PipelineExecutor<'a> {
                                 &classification_overrides,
                                 risk_client.as_ref(),
                                 &risk_create_url,
+                                risk_inner_secret.as_deref(),
                             )
                             .await?;
                         }
@@ -2793,10 +2813,16 @@ mod tests {
         l0_commits, l1_commit_records, l2_snapshots, maintenance_evidence_snapshots, packages,
         tracking,
     };
+    use aes_gcm::{
+        aead::{Aead, OsRng},
+        AeadCore, Aes256Gcm, KeyInit,
+    };
+    use base64::{engine::general_purpose, Engine as _};
     use chrono::Utc;
     use sea_orm::{DatabaseBackend, MockDatabase};
     use serial_test::serial;
-    use std::env;
+    use std::{env, fs};
+    use tempfile::tempdir;
 
     struct EnvVarGuard {
         key: String,
@@ -4595,6 +4621,28 @@ Summary: Test package
         let _risk_enabled_guard = EnvVarGuard::set("RISK_CREATE_ENABLED", "true");
         let _risk_timeout_guard = EnvVarGuard::set("RISK_HTTP_TIMEOUT_SECS", "2");
         let _ai_enabled_guard = EnvVarGuard::set("AI_ANALYSIS_ENABLED", "false");
+        let key_dir = tempdir().unwrap();
+        let key_path = key_dir.path().join("risk-inner-secret.key");
+        let key = [9_u8; 32];
+        fs::write(
+            &key_path,
+            format!("base64:{}", general_purpose::STANDARD.encode(key)),
+        )
+        .unwrap();
+        let cipher = Aes256Gcm::new_from_slice(&key).unwrap();
+        let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
+        let ciphertext = cipher
+            .encrypt(&nonce, b"test-inner-secret".as_slice())
+            .unwrap();
+        let mut payload = nonce.to_vec();
+        payload.extend(ciphertext);
+        let encrypted_secret = general_purpose::STANDARD.encode(payload);
+        let _risk_secret_guard =
+            EnvVarGuard::set("RISK_CREATE_INNER_SECRET_ENCRYPTED", &encrypted_secret);
+        let _risk_key_file_guard = EnvVarGuard::set(
+            "RISK_CREATE_INNER_SECRET_KEY_FILE",
+            key_path.to_str().unwrap(),
+        );
 
         let fixed_time = Utc.timestamp_opt(1_700_000_000, 0).unwrap();
 
@@ -4610,7 +4658,7 @@ Summary: Test package
             "disclosure_time": fixed_time.to_rfc3339(),
             "source": "owner",
             "package_id": 0,
-            "inner_secret": "Ctyun@123"
+            "inner_secret": "test-inner-secret"
         });
 
         let mock = server.mock(|when, then| {

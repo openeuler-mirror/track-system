@@ -16,6 +16,7 @@
 pub mod commit_url;
 pub mod env;
 pub mod patch;
+pub mod secret;
 pub mod spec;
 pub mod version;
 

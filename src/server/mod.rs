@@ -40,8 +40,7 @@ pub fn create_app(db: Arc<DatabaseConnection>) -> Router {
 
     let gitea = match env::var("GITEA_ACCESS_TOKEN") {
         Ok(token) => {
-            let base = env::var("GITEA_API_BASE")
-                .unwrap_or_else(|_| "".to_string());
+            let base = env::var("GITEA_API_BASE").unwrap_or_else(|_| "".to_string());
             GiteaClient::new(base, token).ok()
         }
         Err(_) => None,

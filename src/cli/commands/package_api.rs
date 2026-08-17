@@ -676,7 +676,7 @@ curl,https://github.com/curl/curl
         update_mock.assert_async().await;
         create_mock.assert_async().await;
     }
-    
+
     #[tokio::test]
     async fn test_list_packages() {
         let (mut server, client) = setup_test_server().await;
