@@ -966,10 +966,10 @@ mod tests {
     }
 
     #[test]
-    fn test_default_branch_mappings_use_2409_only_as_runtime_fallback() {
+    fn test_default_branch_mappings_match_supported_releases() {
         assert_eq!(DEFAULT_BRANCH_MAPPINGS.len(), 5);
-        assert!(DEFAULT_BRANCH_MAPPINGS.contains(&("25.05", "openEuler-24.03-LTS-SP3")));
-        assert!(DEFAULT_BRANCH_MAPPINGS.contains(&("25.07", "openEuler-24.03-LTS-SP3")));
+        assert!(DEFAULT_BRANCH_MAPPINGS.contains(&("25.05", "openEuler-22.03-LTS-SP4")));
+        assert!(DEFAULT_BRANCH_MAPPINGS.contains(&("25.07", "openEuler-24.03-LTS-SP1")));
         assert!(!DEFAULT_BRANCH_MAPPINGS.contains(&("25.05", "openEuler-24.09")));
         assert!(!DEFAULT_BRANCH_MAPPINGS.contains(&("25.07", "openEuler-24.09")));
     }

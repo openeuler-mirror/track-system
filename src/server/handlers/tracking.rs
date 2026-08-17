@@ -364,6 +364,7 @@ mod tests {
             last_l2_commit_sha: None,
             created_at: chrono::Utc::now(),
             last_error: None,
+            platform: None,
             updated_at: chrono::Utc::now(),
         }
     }

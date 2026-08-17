@@ -556,6 +556,7 @@ mod tests {
             created_at: Utc::now(),
             updated_at: Utc::now(),
             last_error: None,
+            platform: None,
         }
     }
 
@@ -675,6 +676,7 @@ mod tests {
             created_at: Utc::now(),
             updated_at: Utc::now(),
             last_error: None,
+            platform: None,
         };
 
         let package_model = packages::Model {
@@ -721,6 +723,7 @@ mod tests {
             created_at: Utc::now(),
             updated_at: Utc::now(),
             last_error: None,
+            platform: None,
         };
 
         let package_model = packages::Model {
@@ -777,6 +780,7 @@ mod tests {
             created_at: now,
             updated_at: now,
             last_error: None,
+            platform: None,
         };
 
         let idle_track = tracking::Model {
@@ -795,6 +799,7 @@ mod tests {
             created_at: now,
             updated_at: now,
             last_error: None,
+            platform: None,
         };
 
         let pkg1 = packages::Model {
@@ -871,6 +876,7 @@ mod tests {
             created_at: Utc::now(),
             updated_at: Utc::now(),
             last_error: None,
+            platform: None,
         };
 
         let db = MockDatabase::new(DatabaseBackend::Postgres)

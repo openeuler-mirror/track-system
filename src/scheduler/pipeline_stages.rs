@@ -3111,6 +3111,7 @@ mod tests {
             created_at: Utc::now(),
             updated_at: Utc::now(),
             last_error: None,
+            platform: None,
         };
 
         let snapshot_payload = serde_json::json!({
@@ -3221,6 +3222,7 @@ mod tests {
             created_at: Utc::now(),
             updated_at: Utc::now(),
             last_error: None,
+            platform: None,
         };
 
         let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
@@ -3255,6 +3257,7 @@ mod tests {
             created_at: Utc::now(),
             updated_at: Utc::now(),
             last_error: None,
+            platform: None,
         };
 
         let db = MockDatabase::new(DatabaseBackend::Postgres)
@@ -3291,6 +3294,7 @@ mod tests {
             created_at: Utc::now(),
             updated_at: Utc::now(),
             last_error: None,
+            platform: None,
         };
 
         let package_model = packages::Model {
@@ -3361,6 +3365,7 @@ mod tests {
             created_at: Utc::now(),
             updated_at: Utc::now(),
             last_error: None,
+            platform: None,
         };
 
         let package_model = packages::Model {
@@ -3409,6 +3414,7 @@ mod tests {
             created_at: Utc::now(),
             updated_at: Utc::now(),
             last_error: None,
+            platform: None,
         };
 
         let package_model = packages::Model {
@@ -3824,6 +3830,7 @@ Summary: Test package
             created_at: Utc::now(),
             updated_at: Utc::now(),
             last_error: None,
+            platform: None,
         };
         let package_model = packages::Model {
             id: 1,
@@ -3892,6 +3899,7 @@ Summary: Test package
             created_at: Utc::now(),
             updated_at: Utc::now(),
             last_error: None,
+            platform: None,
         };
         let package_model = packages::Model {
             id: 1,
@@ -3971,6 +3979,7 @@ Summary: Test package
             created_at: Utc::now(),
             updated_at: Utc::now(),
             last_error: None,
+            platform: None,
         };
 
         let db = MockDatabase::new(DatabaseBackend::Postgres)
@@ -4002,6 +4011,7 @@ Summary: Test package
             created_at: Utc::now(),
             updated_at: Utc::now(),
             last_error: None,
+            platform: None,
         };
 
         let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
@@ -4127,6 +4137,7 @@ Summary: Test package
             created_at: Utc::now(),
             updated_at: Utc::now(),
             last_error: None,
+            platform: None,
         };
 
         let db = MockDatabase::new(DatabaseBackend::Postgres)
@@ -4160,6 +4171,7 @@ Summary: Test package
             created_at: Utc::now(),
             updated_at: Utc::now(),
             last_error: None,
+            platform: None,
         };
 
         let db = MockDatabase::new(DatabaseBackend::Postgres)
@@ -4200,6 +4212,7 @@ Summary: Test package
             created_at: Utc::now(),
             updated_at: Utc::now(),
             last_error: None,
+            platform: None,
         };
 
         let pending_commit = L1Model {
@@ -4299,6 +4312,7 @@ Summary: Test package
             created_at: Utc::now(),
             updated_at: Utc::now(),
             last_error: None,
+            platform: None,
         };
 
         let package_model = packages::Model {
@@ -4647,7 +4661,7 @@ Summary: Test package
         let fixed_time = Utc.timestamp_opt(1_700_000_000, 0).unwrap();
 
         let expected_body = serde_json::json!({
-            "description": "Fix bug\nhttp://example.com/commit/sha-001",
+            "description": "Fix bug (branch: local)",
             "level": 2,
             "reporter": "track-system",
             "type": "Bugfix",
@@ -4658,6 +4672,8 @@ Summary: Test package
             "disclosure_time": fixed_time.to_rfc3339(),
             "source": "owner",
             "package_id": 0,
+            "risk_type": 3,
+            "report_url": "http://example.com/commit/sha-001",
             "inner_secret": "test-inner-secret"
         });
 
@@ -4684,6 +4700,7 @@ Summary: Test package
             created_at: Utc::now(),
             updated_at: Utc::now(),
             last_error: None,
+            platform: None,
         };
 
         let package_model = packages::Model {
@@ -4762,10 +4779,13 @@ Summary: Test package
 
         let db = MockDatabase::new(DatabaseBackend::Postgres)
             .append_query_results::<packages::Model, _, _>(vec![vec![package_model.clone()]])
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![]])
+            .append_query_results::<l2_snapshots::Model, _, _>(vec![vec![]])
             .append_query_results::<compare_reports::Model, _, _>(vec![vec![compare_model.clone()]])
             .append_query_results::<l1_commit_records::Model, _, _>(vec![
                 vec![commit_model.clone()],
             ])
+            .append_query_results::<ecosystem_targets::Model, _, _>(vec![vec![]])
             .append_query_results::<tracking_reports::Model, _, _>(vec![vec![
                 inserted_report.clone()
             ]])

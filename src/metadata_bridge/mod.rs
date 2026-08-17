@@ -1210,6 +1210,7 @@ Patch1: fix.patch
             created_at: Utc::now(),
             updated_at: Utc::now(),
             last_error: None,
+            platform: None,
         };
 
         let db = MockDatabase::new(DatabaseBackend::Postgres)
@@ -1419,6 +1420,7 @@ Patch1: fix.patch
             created_at: Utc::now(),
             updated_at: Utc::now(),
             last_error: None,
+            platform: None,
         }
     }
 

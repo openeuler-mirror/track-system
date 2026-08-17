@@ -1469,7 +1469,7 @@ mod tests {
 
         let action = ImportAction::Metadata {
             file: temp_file.path().to_str().unwrap().to_string(),
-            tracking_id: Some(1),
+            tracking_id: 1,
         };
         let result = execute(&client, action).await;
         assert!(result.is_ok(), "Result failed: {:?}", result.err());

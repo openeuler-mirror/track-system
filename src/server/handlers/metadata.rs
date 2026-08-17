@@ -864,6 +864,7 @@ Release:        5.%{openssh_release}
             created_at: Utc::now(),
             updated_at: Utc::now(),
             last_error: None,
+            platform: None,
         }
     }
 

@@ -788,6 +788,7 @@ mod tests_extra {
             created_at: Utc::now(),
             updated_at: Utc::now(),
             last_error: None,
+            platform: None,
         };
 
         let db = MockDatabase::new(DatabaseBackend::Postgres)
@@ -795,16 +796,18 @@ mod tests_extra {
             .append_query_results::<tracking::Model, _, _>(vec![vec![track.clone()]])
             // queue_sync_job: find_active_sync_job
             .append_query_results::<sync_jobs::Model, _, _>(vec![vec![]])
-            // queue_sync_job: find_retryable_failed_job
-            .append_query_results::<sync_jobs::Model, _, _>(vec![vec![]])
             // queue_sync_job: Tracking::find_by_id
             .append_query_results::<tracking::Model, _, _>(vec![vec![track.clone()]])
             // queue_sync_job: insert sync_job
             .append_query_results::<sync_jobs::Model, _, _>(vec![vec![job.clone()]])
+            // execute_sync_job: get_sync_job
             .append_query_results::<sync_jobs::Model, _, _>(vec![vec![job.clone()]])
+            // execute_sync_job: get_tracking; stage_l1_ingestion: sync_tracking
             .append_query_results::<tracking::Model, _, _>(vec![vec![track.clone()]])
             .append_query_results::<tracking::Model, _, _>(vec![vec![track.clone()]])
+            // complete_sync_task_with_result: apply_completion
             .append_query_results::<tracking::Model, _, _>(vec![vec![track.clone()]])
+            .append_query_results::<sync_jobs::Model, _, _>(vec![vec![job.clone()]])
             .append_query_results::<tracking::Model, _, _>(vec![vec![track.clone()]])
             .append_query_results::<sync_jobs::Model, _, _>(vec![vec![job.clone()]])
             .append_query_results::<sync_jobs::Model, _, _>(vec![vec![job.clone()]])
@@ -855,6 +858,7 @@ mod tests_extra {
             created_at: Utc::now(),
             updated_at: Utc::now(),
             last_error: None,
+            platform: None,
         };
 
         let job = sync_jobs::Model {
@@ -969,6 +973,7 @@ mod tests_extra {
             created_at: Utc::now(),
             updated_at: Utc::now(),
             last_error: None,
+            platform: None,
         };
 
         let db = MockDatabase::new(DatabaseBackend::Postgres)

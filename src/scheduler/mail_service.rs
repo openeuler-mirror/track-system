@@ -17,7 +17,11 @@ use lettre::{
     transport::smtp::{authentication::Credentials, client::Tls},
     AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor,
 };
-use std::{env, path::PathBuf, time::Duration};
+use std::{
+    env, fs,
+    path::{Path, PathBuf},
+    time::Duration,
+};
 use tracing::{debug, info};
 
 use crate::utils::secret::decrypt_secret_from_env;
