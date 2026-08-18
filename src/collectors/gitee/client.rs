@@ -65,7 +65,7 @@ impl GiteeClient {
 
         Ok(Self {
             client,
-            token: token.into(),
+            token: Some(token.into()),
             base_url: GITEE_API_BASE.to_string(),
         })
     }

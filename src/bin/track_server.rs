@@ -432,8 +432,7 @@ fn load_external_clients_from_env() -> (Option<GiteeClient>, Option<GiteaClient>
 
     let gitea = match env::var("GITEA_ACCESS_TOKEN") {
         Ok(token) => {
-            let base = env::var("GITEA_API_BASE")
-                .unwrap_or_else(|_| "".to_string());
+            let base = env::var("GITEA_API_BASE").unwrap_or_else(|_| "".to_string());
             GiteaClient::new(token, base).ok()
         }
         Err(_) => None,

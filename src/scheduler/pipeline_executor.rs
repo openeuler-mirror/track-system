@@ -784,6 +784,7 @@ mod tests {
             created_at: Utc::now(),
             updated_at: Utc::now(),
             last_error: None,
+            platform: None,
         };
 
         let _pkg = packages::Model {

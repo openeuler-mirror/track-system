@@ -302,7 +302,6 @@ async fn add_tracking(
         Platform::Gitee
     };
 
-
     let mappings = vec![(l1_branch, l2_branch)];
     let mut created = 0;
     let mut skipped = 0;
@@ -369,9 +368,7 @@ async fn add_tracking(
         skipped.to_string().yellow()
     );
     Ok(())
-
 }
-
 
 pub(crate) async fn create_tracking_with_default_repos(
     api_client: &ApiClient,
@@ -395,7 +392,6 @@ pub(crate) async fn create_tracking_with_default_repos(
     }
     Ok(())
 }
-
 
 async fn import_tracking_from_file(
     api_client: &ApiClient,
@@ -660,7 +656,7 @@ async fn update_tracking_status(api_client: &ApiClient, id: i32, enabled: bool) 
         Ok(_) => {
             println!("{} 跟踪配置{}成功", "✓".green().bold(), action);
             Ok(())
-        } 
+        }
         Err(e) => {
             println!("{} {}跟踪配置失败: {}", "✗".red().bold(), action, e);
             Err(e.into())
@@ -968,12 +964,12 @@ mod tests {
         assert!(result.is_ok(), "Result failed: {:?}", result.err());
         mock.assert_async().await;
     }
-    
+
     #[test]
-    fn test_default_branch_mappings_use_2409_only_as_runtime_fallback() {
+    fn test_default_branch_mappings_match_supported_releases() {
         assert_eq!(DEFAULT_BRANCH_MAPPINGS.len(), 5);
-        assert!(DEFAULT_BRANCH_MAPPINGS.contains(&("25.05", "openEuler-24.03-LTS-SP3")));
-        assert!(DEFAULT_BRANCH_MAPPINGS.contains(&("25.07", "openEuler-24.03-LTS-SP3")));
+        assert!(DEFAULT_BRANCH_MAPPINGS.contains(&("25.05", "openEuler-22.03-LTS-SP4")));
+        assert!(DEFAULT_BRANCH_MAPPINGS.contains(&("25.07", "openEuler-24.03-LTS-SP1")));
         assert!(!DEFAULT_BRANCH_MAPPINGS.contains(&("25.05", "openEuler-24.09")));
         assert!(!DEFAULT_BRANCH_MAPPINGS.contains(&("25.07", "openEuler-24.09")));
     }
